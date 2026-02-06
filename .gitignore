@@ -1,0 +1,99 @@
+# NOTE: we are just going to dump a bunch of filename
+# and folder patterns used by common programming tools
+# here. This does not mean we are using all these tools;
+# some of these are just for future-proofing.
+
+# ===================
+# Node.js / npm
+# ===================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+
+# NAPI-RS platform-specific native binaries (from @nanalogue/node)
+*.node
+
+# ===================
+# TypeScript
+# ===================
+dist/
+*.tsbuildinfo
+
+# ===================
+# Electron
+# ===================
+out/
+
+# ===================
+# Data files (large BAM/BED files)
+# ===================
+data/
+
+# ===================
+# Testing
+# ===================
+coverage/
+.nyc_output/
+*.lcov
+
+# ===================
+# IDEs and Editors
+# ===================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# ===================
+# OS Files
+# ===================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===================
+# Environment
+# ===================
+.env
+.env.local
+.env.*.local
+
+# ===================
+# Project-specific (local development)
+# ===================
+# Claude AI assistant files
+claude.md
+CLAUDE.md
+.claude/
+
+# Local brainstorming notes (not for GitHub)
+brainstorming*
+
+# Logs
+*.log
+
+# Temporary files
+tmp*
+temp/
+*.tmp
+
+# Local configuration overrides
+ignore*
+slurm*
+coderabbit.md
+commit_message
+
+# Backup files
+bkup/
+*.bak
+*.backup
+
+# HPC/cluster artifacts
+cargo.def
+cargo.img

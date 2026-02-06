@@ -1,0 +1,262 @@
+/* Shared styles for the swipe mode renderer page. */
+
+/* Global reset to ensure consistent box model and spacing across elements. */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Base body styling with system font stack and full-viewport height. */
+body {
+    background: #fff;
+    color: #333;
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Oxygen,
+        Ubuntu,
+        sans-serif;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Root application container using a vertical flex layout. */
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: relative;
+}
+
+/* Full-screen overlay that flashes green or red on accept/reject actions. */
+#flash-overlay {
+    inset: 0;
+    opacity: 0%;
+    pointer-events: none;
+    position: fixed;
+    transition: opacity 0.15s ease-out;
+    z-index: 1000;
+}
+
+/* Green flash shown when the user accepts an annotation. */
+#flash-overlay.flash-accept {
+    background: rgb(76 175 80 / 30%);
+    opacity: 100%;
+}
+
+/* Red flash shown when the user rejects an annotation. */
+#flash-overlay.flash-reject {
+    background: rgb(244 67 54 / 30%);
+    opacity: 100%;
+}
+
+/* Header bar displaying the current annotation title. */
+#title-bar {
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+    padding: 16px 24px;
+}
+
+/* Monospace title text that truncates with ellipsis when too long. */
+#plot-title {
+    color: #333;
+    font-family: Monaco, Menlo, monospace;
+    font-size: 16px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Flexible container that holds the Chart.js canvas for signal plotting. */
+#chart-container {
+    background: #fff;
+    flex: 1;
+    min-height: 0;
+    padding: 20px;
+    position: relative;
+}
+
+/* Canvas element stretched to fill its container. */
+#chart {
+    height: 100%;
+    width: 100%;
+}
+
+/* Centered overlay panels for loading, empty-data, and completion states. */
+#loading-overlay,
+#no-data-message,
+#done-message {
+    align-items: center;
+    background: rgb(255 255 255 / 95%);
+    display: flex;
+    flex-direction: column;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+    z-index: 100;
+}
+
+/* Hide overlays by toggling the hidden class. */
+#loading-overlay.hidden,
+#no-data-message.hidden,
+#done-message.hidden {
+    display: none;
+}
+
+/* Circular spinning animation indicator for loading states. */
+.spinner {
+    animation: spin 1s linear infinite;
+    border: 3px solid #ddd;
+    border-radius: 50%;
+    border-top-color: #333;
+    height: 40px;
+    width: 40px;
+}
+
+/* Keyframe animation for the spinner rotation. */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Status text beneath loading and empty-data overlays. */
+#loading-overlay p,
+#no-data-message p {
+    color: #666;
+    margin-top: 16px;
+}
+
+/* Smaller hint text within the empty-data and completion overlays. */
+#no-data-message .hint,
+#done-message .hint {
+    color: #888;
+    font-size: 13px;
+    margin-top: 8px;
+}
+
+/* Large green heading shown on the completion screen. */
+#done-message h2 {
+    color: #4caf50;
+    font-size: 28px;
+    margin-bottom: 16px;
+}
+
+/* Summary line displaying accept/reject counts after completion. */
+.done-summary {
+    color: #666;
+    font-size: 18px;
+}
+
+/* Footer bar containing reject/accept controls and the progress indicator. */
+#controls {
+    align-items: center;
+    background: #fff;
+    border-top: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    padding: 16px 24px;
+}
+
+/* Clickable control area containing a keyboard key icon and label. */
+.control-hint {
+    align-items: center;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    gap: 12px;
+    padding: 8px 12px;
+    transition: background 0.15s ease;
+}
+
+/* Subtle background on hover for control hints. */
+.control-hint:hover {
+    background: #f5f5f5;
+}
+
+/* Slightly darker background on active press for control hints. */
+.control-hint:active {
+    background: #eee;
+}
+
+/* Keyboard key icon styled as a rounded square. */
+.control-hint .key {
+    align-items: center;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    color: #666;
+    display: flex;
+    font-size: 20px;
+    height: 40px;
+    justify-content: center;
+    width: 40px;
+}
+
+/* Red key icon for the reject (left arrow) control. */
+.control-hint.left .key {
+    color: #d32f2f;
+}
+
+/* Green key icon for the accept (right arrow) control. */
+.control-hint.right .key {
+    color: #388e3c;
+}
+
+/* Label text beneath the keyboard key icons. */
+.control-hint .label {
+    color: #888;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Red label for the reject control. */
+.control-hint.left .label {
+    color: #d32f2f;
+}
+
+/* Green label for the accept control. */
+.control-hint.right .label {
+    color: #388e3c;
+}
+
+/* Centered column containing the progress bar and counter text. */
+#progress-container {
+    align-items: center;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 24px;
+    max-width: 400px;
+}
+
+/* Background track for the progress bar. */
+#progress-bar {
+    background: #eee;
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+    width: 100%;
+}
+
+/* Filled portion of the progress bar with a dark gradient. */
+#progress-fill {
+    background: linear-gradient(90deg, #666, #333);
+    border-radius: 4px;
+    height: 100%;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+/* Numeric progress counter text with tabular number alignment. */
+#progress-text {
+    color: #666;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}

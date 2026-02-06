@@ -1,0 +1,395 @@
+/* Styles for QC configuration and results pages. */
+
+/* Full-viewport flex containers for both QC pages. */
+#qc-config-app,
+#qc-results-app {
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Shared header bar with horizontal layout for both QC pages. */
+#qc-config-app header,
+#qc-results-app header {
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    gap: 16px;
+    padding: 16px 24px;
+}
+
+/* Page title styling within the header. */
+#qc-config-app header h1,
+#qc-results-app header h1 {
+    color: #333;
+    font-size: 18px;
+    font-weight: 500;
+}
+
+/* Navigation button to return to the previous screen. */
+.back-button {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    color: #666;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 8px 16px;
+    transition: all 0.15s ease;
+}
+
+/* Darker background and border on back button hover. */
+.back-button:hover {
+    background: #eee;
+    border-color: #ccc;
+}
+
+/* Scrollable main content area for the QC configuration form. */
+#qc-config-app main {
+    flex: 1;
+    margin: 0 auto;
+    max-width: 600px;
+    overflow-y: auto;
+    padding: 24px;
+    width: 100%;
+}
+
+/* Vertical spacing between configuration form sections. */
+.config-section {
+    margin-bottom: 24px;
+}
+
+/* Section heading within the configuration form. */
+.config-section h2 {
+    color: #333;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+/* De-emphasized text for optional field indicators. */
+.config-section .optional {
+    color: #888;
+    font-weight: 400;
+}
+
+/* Horizontal radio button group for toggling between file and URL source. */
+.source-toggle {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 12px;
+}
+
+/* Individual radio label with inline icon-text layout. */
+.source-toggle label {
+    align-items: center;
+    color: #666;
+    cursor: pointer;
+    display: flex;
+    font-size: 14px;
+    gap: 6px;
+}
+
+/* Row containing a text input and a browse button side by side. */
+.file-input-row {
+    display: flex;
+    gap: 8px;
+}
+
+/* Input within the file row expands to fill available space. */
+.file-input-row input {
+    flex: 1;
+}
+
+/* Base styling for text and number input fields. */
+input[type="text"],
+input[type="number"] {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    padding: 10px 12px;
+    width: 100%;
+}
+
+/* Focused input state with darker border and no default outline. */
+input[type="text"]:focus,
+input[type="number"]:focus {
+    border-color: #666;
+    outline: none;
+}
+
+/* Horizontal layout for an input paired with a unit label. */
+.input-with-unit {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+}
+
+/* Fixed width for inputs inside unit-labeled groups. */
+.input-with-unit input {
+    width: 100px;
+}
+
+/* Unit text displayed next to the input field. */
+.input-with-unit .unit {
+    color: #666;
+    font-size: 14px;
+}
+
+/* Small helper text below form fields. */
+.hint {
+    color: #888;
+    font-size: 12px;
+    margin-top: 6px;
+}
+
+/* Warning-colored hint for important caveats. */
+.hint.warning {
+    color: #e65100;
+}
+
+/* Centered container for the primary action button. */
+.action-row {
+    margin-top: 32px;
+    text-align: center;
+}
+
+/* Dark primary action button used for form submission. */
+.primary-button {
+    background: #333;
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+    padding: 12px 32px;
+    transition: all 0.15s ease;
+}
+
+/* Greyed-out state when the primary button is disabled. */
+.primary-button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+/* Slightly lighter background on primary button hover. */
+.primary-button:hover {
+    background: #444;
+}
+
+/* Rounded card container for displaying BAM file metadata. */
+#file-info-section {
+    background: #f8f8f8;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+/* Default text styling for file info content. */
+#file-info-content {
+    color: #666;
+    font-size: 14px;
+}
+
+/* Small muted label above file info details. */
+#file-info-content .info-label {
+    color: #888;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+/* Compact vertical spacing for paragraphs within file info. */
+#file-info-content p {
+    margin: 4px 0;
+}
+
+/* Italic placeholder shown before a BAM file is selected. */
+.placeholder-text {
+    color: #999;
+    font-style: italic;
+}
+
+/* Text style for inline loading status messages. */
+.loading-text {
+    color: #666;
+}
+
+/* Red text for error messages in the file info panel. */
+.error-text {
+    color: #d32f2f;
+}
+
+/* Full-screen loading overlay with semi-transparent white background. */
+#loading-overlay {
+    align-items: center;
+    background: rgb(255 255 255 / 95%);
+    display: flex;
+    flex-direction: column;
+    inset: 0;
+    justify-content: center;
+    position: fixed;
+    z-index: 100;
+}
+
+/* Toggle loading overlay visibility via the hidden class. */
+#loading-overlay.hidden {
+    display: none;
+}
+
+/* Results page main content as a vertical flex container. */
+#qc-results-app main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Horizontal tab bar for switching between QC result views. */
+.tabs {
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    padding: 0 24px;
+}
+
+/* Individual tab button with an underline indicator for the active state. */
+.tab-button {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #666;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 12px 20px;
+    transition: all 0.15s ease;
+}
+
+/* Darker text on tab hover. */
+.tab-button:hover {
+    color: #333;
+}
+
+/* Active tab with dark text and visible bottom border. */
+.tab-button.active {
+    border-bottom-color: #333;
+    color: #333;
+}
+
+/* Tab content panel hidden by default, shown as flex when active. */
+.tab-content {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+/* Visible tab content panel with flex layout. */
+.tab-content.active {
+    display: flex;
+}
+
+/* Flexible container for Chart.js canvases with a minimum height. */
+.chart-container {
+    flex: 1;
+    min-height: 300px;
+    position: relative;
+}
+
+/* Half-height chart container used for stacked density charts. */
+.chart-container-half {
+    flex: 0.5;
+}
+
+/* Section heading for density chart subsections. */
+.density-heading {
+    color: #333;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+}
+
+/* Density heading with additional top margin for vertical separation. */
+.density-heading-spaced {
+    color: #333;
+    font-size: 16px;
+    font-weight: 600;
+    margin: 24px 0 16px;
+}
+
+/* Accessible utility class that hides content visually but keeps it for screen readers. */
+.visually-hidden {
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+}
+
+/* Expandable panel displaying summary statistics for a chart. */
+.stats-panel {
+    background: #f8f8f8;
+    border-radius: 8px;
+    margin-top: 24px;
+    padding: 16px;
+}
+
+/* Header row within the stats panel with title and toggle button. */
+.stats-header {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+/* Bold title inside the stats panel header. */
+.stats-header h3 {
+    color: #333;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Underlined toggle link to expand or collapse additional stats. */
+.stats-toggle {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 12px;
+    text-decoration: underline;
+}
+
+/* Responsive grid layout for individual stat key-value pairs. */
+.stats-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+/* Individual statistic item within the grid. */
+.stat-item {
+    font-size: 13px;
+}
+
+/* Muted label text for a statistic name. */
+.stat-item .label {
+    color: #888;
+}
+
+/* Bold value text for a statistic number. */
+.stat-item .value {
+    color: #333;
+    font-weight: 500;
+}
+
+/* Additional stats section hidden by default. */
+.stats-expanded {
+    display: none;
+    margin-top: 12px;
+}
+
+/* Reveal the expanded stats grid when the panel has the expanded class. */
+.stats-panel.expanded .stats-expanded {
+    display: grid;
+}

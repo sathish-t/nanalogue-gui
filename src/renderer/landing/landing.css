@@ -1,0 +1,74 @@
+/* Styles for the landing page mode selection screen. */
+
+/* Full-viewport centered layout for the landing page. */
+#landing-app {
+    align-items: center;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    justify-content: center;
+}
+
+/* Spacing below the header to separate it from mode buttons. */
+#landing-app header {
+    margin-bottom: 48px;
+}
+
+/* Application title with light font weight. */
+#landing-app h1 {
+    color: #333;
+    font-size: 32px;
+    font-weight: 300;
+    letter-spacing: -0.5px;
+}
+
+/* Horizontal row of mode selection buttons. */
+#mode-selection {
+    display: flex;
+    gap: 24px;
+}
+
+/* Large card-style button for selecting an application mode. */
+.mode-button {
+    align-items: center;
+    background: #f8f8f8;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    height: 160px;
+    justify-content: center;
+    padding: 24px;
+    transition: all 0.15s ease;
+    width: 200px;
+}
+
+/* Hover state with slight upward lift and border darkening. */
+.mode-button:hover {
+    background: #f0f0f0;
+    border-color: #ccc;
+    transform: translateY(-2px);
+}
+
+/* Reset the lift on active press. */
+.mode-button:active {
+    transform: translateY(0);
+}
+
+/* Bold mode name displayed inside the card button. */
+.mode-title {
+    color: #333;
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+/* Smaller descriptive text below the mode name. */
+.mode-description {
+    color: #666;
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: center;
+}

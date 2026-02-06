@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Content Security Policy restricting scripts and styles to same-origin. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
+  <title>QC Results - nanalogue-gui</title>
+  <!-- Shared base styles and QC-specific styles. -->
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="stylesheet" href="qc.css">
+</head>
+<body>
+  <!-- QC results page root container. -->
+  <div id="qc-results-app">
+    <!-- Header with back navigation and page title. -->
+    <header>
+      <button type="button" id="btn-back" class="back-button">&larr; Back to Config</button>
+      <h1>QC Results</h1>
+    </header>
+
+    <main>
+      <!-- Tab bar for switching between QC result chart views. -->
+      <div class="tabs">
+        <button type="button" class="tab-button active" data-tab="read-lengths">Read Lengths</button>
+        <button type="button" class="tab-button" data-tab="yield">Yield Curve</button>
+        <button type="button" class="tab-button" data-tab="density">Analogue Density</button>
+        <button type="button" class="tab-button" data-tab="probability">Raw Probability</button>
+      </div>
+
+      <!-- Read lengths histogram tab showing aligned read length distribution. -->
+      <div id="tab-read-lengths" class="tab-content active">
+        <div class="chart-container">
+          <canvas id="chart-read-lengths"></canvas>
+        </div>
+        <!-- Expandable statistics panel populated by the script. -->
+        <div class="stats-panel" id="stats-read-lengths"></div>
+      </div>
+
+      <!-- Cumulative yield curve tab showing total bases over read count. -->
+      <div id="tab-yield" class="tab-content">
+        <div class="chart-container">
+          <canvas id="chart-yield"></canvas>
+        </div>
+        <div class="stats-panel" id="stats-yield"></div>
+      </div>
+
+      <!-- Analogue density tab with two stacked charts: whole-read and windowed. -->
+      <div id="tab-density" class="tab-content">
+        <!-- Whole-read density histogram across all reads. -->
+        <h2 class="density-heading">Whole-read Analogue Density</h2>
+        <div class="chart-container chart-container-half">
+          <canvas id="chart-whole-density"></canvas>
+        </div>
+        <div class="stats-panel" id="stats-whole-density"></div>
+
+        <!-- Windowed density histogram computed per sliding window. -->
+        <h2 class="density-heading-spaced">Windowed Analogue Density</h2>
+        <div class="chart-container chart-container-half">
+          <canvas id="chart-windowed-density"></canvas>
+        </div>
+        <div class="stats-panel" id="stats-windowed-density"></div>
+      </div>
+
+      <!-- Raw modification probability distribution tab. -->
+      <div id="tab-probability" class="tab-content">
+        <div class="chart-container">
+          <canvas id="chart-probability"></canvas>
+        </div>
+        <div class="stats-panel" id="stats-probability"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Chart.js library for rendering QC result plots. -->
+  <script src="../shared/chart.umd.js"></script>
+  <!-- Bundled QC results script handling tab switching and chart rendering. -->
+  <script src="qc-results.js"></script>
+</body>
+</html>

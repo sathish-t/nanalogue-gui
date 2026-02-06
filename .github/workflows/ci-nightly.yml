@@ -1,0 +1,13 @@
+# Nightly CI workflow for nanalogue-gui
+# Runs the full CI suite on a schedule to catch upstream breakage
+
+name: Nightly CI
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # 03:00 UTC daily
+  workflow_dispatch: # Manual trigger for testing
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml

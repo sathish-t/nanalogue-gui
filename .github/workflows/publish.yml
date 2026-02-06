@@ -1,0 +1,160 @@
+# Publish workflow for nanalogue-gui
+# Builds on all platforms, then publishes to npm
+# Triggers on GitHub Release or manual dispatch (dry-run)
+
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (build & validate without publishing)"
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  version-check:
+    name: Verify versions match
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check tag matches version
+        if: github.event_name == 'release'
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          TAG_V="${TAG#v}"
+          V=$(jq -r '.version' package.json)
+          [ "$TAG_V" = "$V" ] || { echo "Tag $TAG_V != package.json $V"; exit 1; }
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: version-check
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS builds
+          - target: x86_64-apple-darwin
+            runner: macos-15-intel
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+
+          # Linux glibc builds (via Docker with pypa manylinux containers)
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            use_docker: true
+            container: quay.io/pypa/manylinux_2_28_x86_64
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            use_docker: true
+            container: quay.io/pypa/manylinux_2_28_aarch64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      # macOS: direct build
+      - name: Setup Node.js
+        if: ${{ !matrix.use_docker }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install npm dependencies
+        if: ${{ !matrix.use_docker }}
+        run: npm ci
+
+      - name: Build
+        if: ${{ !matrix.use_docker }}
+        run: npm run build
+
+      - name: Run tests
+        if: ${{ !matrix.use_docker }}
+        run: npm test
+
+      # Linux: Docker container build
+      - name: Build and test (Linux via Docker)
+        if: ${{ matrix.use_docker }}
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ matrix.container }} \
+            bash -c '
+              set -e
+
+              # Install Node.js 22 via NodeSource
+              curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
+              yum install -y nodejs
+
+              # Print Node.js version for debugging
+              echo "Node.js version: $(node --version)"
+              echo "npm version: $(npm --version)"
+
+              # Install npm dependencies, build, and test
+              npm ci
+              npm run build
+              npm test
+            '
+
+      # TODO: When electron-builder is configured, upload platform-specific
+      # binaries (DMG for macOS, AppImage for Linux) as artifacts here.
+      #
+      # - name: Build Electron binaries
+      #   run: npm run dist
+      #
+      # - name: Upload artifact
+      #   uses: actions/upload-artifact@v6
+      #   with:
+      #     name: electron-${{ matrix.target }}
+      #     path: out/**/*
+      #     if-no-files-found: error
+
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: build
+    environment: publish
+    permissions:
+      contents: read
+      id-token: write # OIDC trusted publishing
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Update npm for OIDC support
+        run: npm install -g npm@latest
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # TODO: When electron-builder is configured, download and attach
+      # platform binaries to the GitHub Release here.
+      #
+      # - name: Download all artifacts
+      #   uses: actions/download-artifact@v7
+      #   with:
+      #     path: artifacts
+
+      - name: Publish to npm (dry run)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: npm publish --dry-run --provenance --access public
+
+      - name: Publish to npm
+        if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run) }}
+        run: npm publish --provenance --access public

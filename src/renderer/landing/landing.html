@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Content Security Policy restricting scripts and styles to same-origin. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
+  <title>nanalogue-gui</title>
+  <!-- Shared base styles used across all renderer pages. -->
+  <link rel="stylesheet" href="../shared/styles.css">
+  <!-- Landing page specific styles for mode selection layout. -->
+  <link rel="stylesheet" href="landing.css">
+</head>
+<body>
+  <!-- Landing page root container centered on screen. -->
+  <div id="landing-app">
+    <header>
+      <h1>nanalogue-gui</h1>
+    </header>
+
+    <!-- Mode selection buttons that launch the chosen application mode. -->
+    <main id="mode-selection">
+      <!-- Opens the swipe mode for manual annotation curation. -->
+      <button type="button" id="btn-swipe" class="mode-button">
+        <span class="mode-title">Swipe</span>
+        <span class="mode-description">Manual curation of genomic annotations</span>
+      </button>
+
+      <!-- Opens the QC mode for BAM quality control visualization. -->
+      <button type="button" id="btn-qc" class="mode-button">
+        <span class="mode-title">QC</span>
+        <span class="mode-description">Generate QC plots from BAM</span>
+      </button>
+    </main>
+  </div>
+
+  <!-- Bundled landing page script handling mode button click events. -->
+  <script src="landing.js"></script>
+</body>
+</html>

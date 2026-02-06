@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Content Security Policy restricting scripts and styles to same-origin. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
+  <title>nanalogue-swipe</title>
+  <!-- Shared styles providing the swipe mode layout and components. -->
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <!-- Swipe mode root container with header, chart, and controls. -->
+  <div id="app">
+    <!-- Full-screen flash overlay that briefly shows green or red on accept/reject. -->
+    <div id="flash-overlay"></div>
+
+    <!-- Title bar displaying the current annotation file name. -->
+    <header id="title-bar">
+      <h1 id="plot-title">Loading...</h1>
+    </header>
+
+    <!-- Main chart area where the signal data is plotted. -->
+    <main id="chart-container">
+      <!-- Chart.js canvas for rendering the signal trace. -->
+      <canvas id="chart"></canvas>
+
+      <!-- Loading spinner shown while annotation data is being fetched. -->
+      <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p>Loading data...</p>
+      </div>
+
+      <!-- Message shown when the current annotation has no plottable data. -->
+      <div id="no-data-message" class="hidden">
+        <p>No data for this annotation</p>
+        <p class="hint">Press left to reject or right to accept anyway</p>
+      </div>
+
+      <!-- Completion screen shown after all annotations have been reviewed. -->
+      <div id="done-message" class="hidden">
+        <h2>All Done!</h2>
+        <!-- Summary text populated with accept/reject counts by the script. -->
+        <p id="summary" class="done-summary"></p>
+        <p class="hint">Close the window to exit</p>
+      </div>
+    </main>
+
+    <!-- Footer controls for reject (left arrow) and accept (right arrow) actions. -->
+    <footer id="controls">
+      <!-- Reject control with keyboard shortcut indicator. -->
+      <div class="control-hint left">
+        <span class="key">&larr;</span>
+        <span class="label">REJECT</span>
+      </div>
+
+      <!-- Progress bar and counter showing annotation review progress. -->
+      <div id="progress-container">
+        <div id="progress-bar">
+          <div id="progress-fill"></div>
+        </div>
+        <div id="progress-text">0 / 0</div>
+      </div>
+
+      <!-- Accept control with keyboard shortcut indicator. -->
+      <div class="control-hint right">
+        <span class="label">ACCEPT</span>
+        <span class="key">&rarr;</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Chart.js library for rendering signal trace plots. -->
+  <script src="../shared/chart.umd.js"></script>
+  <!-- Bundled swipe mode script handling keyboard input and chart rendering. -->
+  <script src="swipe.js"></script>
+</body>
+</html>
