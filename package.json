@@ -13,7 +13,7 @@
     "build:swipe": "esbuild src/renderer/swipe/swipe.ts --bundle --outfile=dist/renderer/swipe/swipe.js --format=iife --platform=browser",
     "build:qc": "esbuild src/renderer/qc/qc-config.ts src/renderer/qc/qc-results.ts --bundle --outdir=dist/renderer/qc --format=iife --platform=browser",
     "copy-assets": "npm run copy:shared && npm run copy:landing && npm run copy:swipe && npm run copy:qc",
-    "copy:shared": "mkdir -p dist/renderer/shared && cp src/renderer/shared/styles.css node_modules/chart.js/dist/chart.umd.js dist/renderer/shared/",
+    "copy:shared": "mkdir -p dist/renderer/shared && cp src/renderer/shared/styles.css node_modules/chart.js/dist/chart.umd.js node_modules/chartjs-plugin-annotation/dist/chartjs-plugin-annotation.min.js dist/renderer/shared/",
     "copy:landing": "mkdir -p dist/renderer/landing && cp src/renderer/landing/landing.html src/renderer/landing/landing.css dist/renderer/landing/",
     "copy:swipe": "mkdir -p dist/renderer/swipe && cp src/renderer/swipe/swipe.html dist/renderer/swipe/",
     "copy:qc": "mkdir -p dist/renderer/qc && cp src/renderer/qc/*.html src/renderer/qc/*.css dist/renderer/qc/ 2>/dev/null || true",
@@ -25,19 +25,21 @@
     "lint:css": "stylelint \"src/**/*.css\"",
     "lint:css:fix": "stylelint --fix \"src/**/*.css\"",
     "lint:html": "html-validate \"src/**/*.html\"",
-    "test": "echo 'No tests configured yet'"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@nanalogue/node": "^0.1.2",
-    "chart.js": "^4.4.0"
+    "chart.js": "^4.4.0",
+    "chartjs-plugin-annotation": "^3.1.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.13",
+    "@biomejs/biome": "^2.3.14",
     "@eslint/js": "^9.39.2",
     "@stylistic/stylelint-plugin": "^5.0.1",
     "@types/node": "^22.0.0",
-    "electron": "^40.1.0",
-    "esbuild": "^0.27.2",
+    "electron": "^40.2.1",
+    "esbuild": "^0.27.3",
     "eslint": "^9.39.2",
     "eslint-plugin-jsdoc": "^62.5.2",
     "html-validate": "^10.7.0",
@@ -45,7 +47,8 @@
     "stylelint-config-standard": "^40.0.0",
     "stylelint-order": "^7.0.1",
     "typescript": "^5.4.0",
-    "typescript-eslint": "^8.54.0"
+    "typescript-eslint": "^8.54.0",
+    "vitest": "^4.0.18"
   },
   "engines": {
     "node": ">= 22"

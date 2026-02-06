@@ -78,6 +78,11 @@ const elements = {
     /** Input field for the analysis window size. */
     windowSize: document.getElementById("window-size") as HTMLInputElement,
 
+    /** Dropdown for read length histogram granularity. */
+    readLengthGranularity: document.getElementById(
+        "read-length-granularity",
+    ) as HTMLSelectElement,
+
     /** Overlay element shown while QC generation is in progress. */
     loadingOverlay: document.getElementById("loading-overlay") as HTMLElement,
 
@@ -92,6 +97,9 @@ let isUrl = false;
 
 /** Stores the most recent BAM peek result, or null if none has been loaded. */
 let peekResult: PeekResult | null = null;
+
+/** Monotonically increasing counter to guard against stale peek responses. */
+let peekRequestId = 0;
 
 /**
  * Reads the currently selected source type from the radio button group.
@@ -124,12 +132,21 @@ async function loadPeekInfo() {
     const bamPath = elements.bamPath.value.trim();
     if (!bamPath) return;
 
+    const currentRequestId = ++peekRequestId;
+
     elements.fileInfoContent.innerHTML =
         '<p class="loading-text">Loading...</p>';
     elements.btnGenerate.disabled = true;
+    elements.bamPath.disabled = true;
+    elements.btnBrowse.disabled = true;
 
     try {
-        peekResult = await api.peekBam(bamPath, isUrl);
+        const result = await api.peekBam(bamPath, isUrl);
+
+        // Discard stale response if a newer request was issued
+        if (currentRequestId !== peekRequestId) return;
+
+        peekResult = result;
 
         const contigsText = peekResult.contigs.join(", ");
         const contigsSuffix =
@@ -142,16 +159,45 @@ async function loadPeekInfo() {
                 ? peekResult.modifications.join(", ")
                 : "None detected";
 
-        elements.fileInfoContent.innerHTML = `
-      <p class="info-label">Header and first few records show:</p>
-      <p><strong>Contigs:</strong> ${contigsText}${contigsSuffix}</p>
-      <p><strong>Detected modifications:</strong> ${modsText}</p>
-    `;
+        elements.fileInfoContent.textContent = "";
+
+        const infoLabel = document.createElement("p");
+        infoLabel.className = "info-label";
+        infoLabel.textContent = "Header and first few records show:";
+
+        const contigsP = document.createElement("p");
+        const contigsStrong = document.createElement("strong");
+        contigsStrong.textContent = "Contigs: ";
+        contigsP.appendChild(contigsStrong);
+        contigsP.appendChild(
+            document.createTextNode(`${contigsText}${contigsSuffix}`),
+        );
+
+        const modsP = document.createElement("p");
+        const modsStrong = document.createElement("strong");
+        modsStrong.textContent = "Detected modifications: ";
+        modsP.appendChild(modsStrong);
+        modsP.appendChild(document.createTextNode(modsText));
+
+        elements.fileInfoContent.append(infoLabel, contigsP, modsP);
 
         elements.btnGenerate.disabled = false;
     } catch (error) {
-        elements.fileInfoContent.innerHTML = `<p class="error-text">Error loading file: ${error}</p>`;
+        // Discard stale error if a newer request was issued
+        if (currentRequestId !== peekRequestId) return;
+
+        elements.fileInfoContent.textContent = "";
+        const errorP = document.createElement("p");
+        errorP.className = "error-text";
+        errorP.textContent = `Error loading file: ${String(error)}`;
+        elements.fileInfoContent.appendChild(errorP);
         peekResult = null;
+    } finally {
+        // Only re-enable input if this is still the latest request
+        if (currentRequestId === peekRequestId) {
+            elements.bamPath.disabled = false;
+            elements.btnBrowse.disabled = false;
+        }
     }
 }
 
@@ -189,7 +235,43 @@ async function generateQC() {
     const bamPath = elements.bamPath.value.trim();
     if (!bamPath) return;
 
+    elements.btnGenerate.disabled = true;
+
     const { tag, modStrand } = parseModFilter(elements.modFilter.value);
+
+    const sampleFraction = parseFloat(elements.sampleFraction.value);
+    const windowSize = parseInt(elements.windowSize.value, 10);
+
+    if (
+        Number.isNaN(sampleFraction) ||
+        sampleFraction < 0.01 ||
+        sampleFraction > 100
+    ) {
+        alert("Sample fraction must be a number between 0.01 and 100.");
+        elements.btnGenerate.disabled = false;
+        return;
+    }
+
+    if (Number.isNaN(windowSize) || windowSize < 1) {
+        alert("Window size must be a number of at least 1.");
+        elements.btnGenerate.disabled = false;
+        return;
+    }
+
+    const readLengthBinWidth = parseInt(
+        elements.readLengthGranularity.value,
+        10,
+    );
+
+    if (
+        !Number.isFinite(readLengthBinWidth) ||
+        readLengthBinWidth < 1 ||
+        readLengthBinWidth !== Math.floor(readLengthBinWidth)
+    ) {
+        alert("Read length granularity must be a positive integer.");
+        elements.btnGenerate.disabled = false;
+        return;
+    }
 
     const config = {
         bamPath,
@@ -197,8 +279,9 @@ async function generateQC() {
         tag,
         modStrand,
         region: elements.region.value.trim() || undefined,
-        sampleFraction: parseFloat(elements.sampleFraction.value),
-        windowSize: parseInt(elements.windowSize.value, 10),
+        sampleFraction,
+        windowSize,
+        readLengthBinWidth,
     };
 
     elements.loadingOverlay.classList.remove("hidden");
@@ -209,6 +292,7 @@ async function generateQC() {
         console.error("Error generating QC:", error);
         alert(`Error generating QC: ${error}`);
         elements.loadingOverlay.classList.add("hidden");
+        elements.btnGenerate.disabled = false;
     }
 }
 
@@ -238,6 +322,9 @@ elements.bamPath.addEventListener("keypress", async (e) => {
 for (const radio of elements.sourceTypeRadios) {
     radio.addEventListener("change", () => {
         updateFileInputMode();
+        peekRequestId++;
+        elements.bamPath.disabled = false;
+        elements.btnBrowse.disabled = false;
         elements.bamPath.value = "";
         elements.fileInfoContent.innerHTML =
             '<p class="placeholder-text">Will load upon BAM file specification</p>';

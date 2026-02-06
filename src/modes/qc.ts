@@ -45,7 +45,10 @@ export function registerIpcHandlers() {
     });
 
     ipcMain.handle("generate-qc", async (_event, config: QCConfig) => {
-        console.log("Generating QC with config:", config);
+        console.log("Generating QC with config:", {
+            ...config,
+            sampleFraction: config.sampleFraction / 100,
+        });
         qcData = await generateQCData(config);
         console.log("QC data generated");
 
@@ -57,19 +60,5 @@ export function registerIpcHandlers() {
 
     ipcMain.handle("get-qc-data", () => {
         return qcData;
-    });
-
-    ipcMain.handle("qc-go-back", () => {
-        // Go back to landing
-        mainWindow?.loadFile(
-            resolve(__dirname, "..", "renderer", "landing", "landing.html"),
-        );
-        mainWindow?.setSize(500, 400);
-    });
-
-    ipcMain.handle("qc-go-back-to-config", () => {
-        mainWindow?.loadFile(
-            resolve(__dirname, "..", "renderer", "qc", "qc-config.html"),
-        );
     });
 }

@@ -2,7 +2,7 @@
 
 import { appendFileSync, existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { ipcMain } from "electron";
+import { dialog, ipcMain } from "electron";
 import { parseBedFile } from "../lib/bed-parser";
 import {
     type ContigSizes,
@@ -74,6 +74,9 @@ export function parseSwipeArgs(args: string[]): SwipeCliArgs {
                     console.error(`Invalid window size: ${next}`);
                     process.exit(1);
                 }
+            } else {
+                console.error("Missing value for --win");
+                process.exit(1);
             }
         }
     }
@@ -120,6 +123,17 @@ export async function initialize(args: SwipeCliArgs): Promise<void> {
     appState.rejectedCount = 0;
 
     if (existsSync(cliArgs.outputPath)) {
+        const { response } = await dialog.showMessageBox({
+            type: "warning",
+            buttons: ["Overwrite", "Cancel"],
+            defaultId: 1,
+            title: "File exists",
+            message: `Output file already exists:\n${cliArgs.outputPath}`,
+            detail: "Do you want to overwrite it?",
+        });
+        if (response === 1) {
+            throw new Error("User cancelled: output file exists");
+        }
         unlinkSync(cliArgs.outputPath);
     }
     writeFileSync(cliArgs.outputPath, "", "utf-8");

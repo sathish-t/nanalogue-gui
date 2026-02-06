@@ -393,3 +393,106 @@ input[type="number"]:focus {
 .stats-panel.expanded .stats-expanded {
     display: grid;
 }
+
+/* Informational message shown when no data is available for a chart. */
+.no-data-message {
+    align-items: center;
+    background: #f8f8f8;
+    border: 1px dashed #ccc;
+    border-radius: 8px;
+    color: #888;
+    display: flex;
+    font-size: 14px;
+    justify-content: center;
+    min-height: 200px;
+    padding: 24px;
+    text-align: center;
+}
+
+/* Warning banner shown when reads exceeded the histogram range. */
+.exceeded-warning {
+    background: #fff3e0;
+    border: 1px solid #ffcc80;
+    border-radius: 6px;
+    color: #e65100;
+    font-size: 13px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+}
+
+/* Probability range filter container below the probability chart. */
+.probability-filter {
+    margin-top: 12px;
+    padding: 0 4px;
+}
+
+/* Checkbox toggle label for the probability range filter. */
+.filter-toggle {
+    align-items: center;
+    color: #666;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 13px;
+    gap: 6px;
+}
+
+/* Inline row of range filter inputs and apply button. */
+.filter-inputs {
+    align-items: center;
+    display: flex;
+    font-size: 13px;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+/* Label text within the filter inputs row. */
+.filter-inputs label {
+    color: #666;
+}
+
+/* Narrow number inputs for the low and high range bounds. */
+.filter-inputs input[type="number"] {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    padding: 4px 8px;
+    width: 80px;
+}
+
+/* Small inline button to apply the probability range filter. */
+.small-button {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    color: #666;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 12px;
+}
+
+/* Darker state on small button hover. */
+.small-button:hover {
+    background: #eee;
+    border-color: #ccc;
+}
+
+/* Error message shown below the filter inputs. */
+.filter-error {
+    color: #d32f2f;
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+/* Generic hidden class to toggle visibility. */
+.probability-filter .hidden {
+    display: none;
+}
+
+/* Dropdown styling for the read length granularity selector. */
+#read-length-granularity {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    padding: 10px 12px;
+    width: 100%;
+}

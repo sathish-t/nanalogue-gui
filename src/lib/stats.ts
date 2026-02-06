@@ -143,6 +143,34 @@ export interface HistogramBin {
 }
 
 /**
+ * Computes the minimum value in an array using iteration instead of spread.
+ *
+ * @param values - The array of numbers to find the minimum of.
+ * @returns The minimum value in the array.
+ */
+function iterativeMin(values: number[]): number {
+    let min = values[0];
+    for (let i = 1; i < values.length; i++) {
+        if (values[i] < min) min = values[i];
+    }
+    return min;
+}
+
+/**
+ * Computes the maximum value in an array using iteration instead of spread.
+ *
+ * @param values - The array of numbers to find the maximum of.
+ * @returns The maximum value in the array.
+ */
+function iterativeMax(values: number[]): number {
+    let max = values[0];
+    for (let i = 1; i < values.length; i++) {
+        if (values[i] > max) max = values[i];
+    }
+    return max;
+}
+
+/**
  * Distribute numeric values into fixed-width histogram bins and count occurrences.
  *
  * @param values - The array of numbers to bin.
@@ -158,11 +186,12 @@ export function binHistogram(
     maxVal?: number,
 ): HistogramBin[] {
     if (values.length === 0) return [];
+    if (binSize <= 0) return [];
 
-    const min = minVal ?? Math.min(...values);
-    const max = maxVal ?? Math.max(...values);
+    const min = minVal ?? iterativeMin(values);
+    const max = maxVal ?? iterativeMax(values);
 
-    const numBins = Math.ceil((max - min) / binSize);
+    const numBins = Math.max(1, Math.ceil((max - min) / binSize));
     const bins: HistogramBin[] = [];
 
     for (let i = 0; i < numBins; i++) {
@@ -209,9 +238,10 @@ export interface YieldBin {
  */
 export function binYield(lengths: number[], binSize: number): YieldBin[] {
     if (lengths.length === 0) return [];
+    if (binSize <= 0) return [];
 
-    const max = Math.max(...lengths);
-    const numBins = Math.ceil(max / binSize);
+    const max = iterativeMax(lengths);
+    const numBins = Math.max(1, Math.ceil(max / binSize));
     const bins: YieldBin[] = [];
 
     for (let i = 0; i < numBins; i++) {

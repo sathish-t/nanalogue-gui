@@ -3,13 +3,23 @@
 export {};
 
 /**
+ * Result returned by mode launch IPC handlers.
+ */
+interface LaunchResult {
+    /** Whether the launch succeeded. */
+    success: boolean;
+    /** The reason for failure when success is false. */
+    reason?: string;
+}
+
+/**
  * Defines the preload API exposed to the landing page renderer for launching application modes.
  */
 interface LandingApi {
     /** Launches the swipe mode for interactive read annotation review. */
-    launchSwipe: () => Promise<void>;
+    launchSwipe: () => Promise<LaunchResult>;
     /** Launches the QC mode for generating quality control reports. */
-    launchQC: () => Promise<void>;
+    launchQC: () => Promise<LaunchResult>;
 }
 
 /** The preload API instance retrieved from the window object for invoking main process actions. */
@@ -24,9 +34,27 @@ const btnSwipe = document.getElementById("btn-swipe") as HTMLButtonElement;
 const btnQC = document.getElementById("btn-qc") as HTMLButtonElement;
 
 btnSwipe.addEventListener("click", async () => {
-    await api.launchSwipe();
+    try {
+        const result = await api.launchSwipe();
+        if (!result.success) {
+            alert(
+                `Failed to launch swipe mode: ${result.reason ?? "Unknown error"}`,
+            );
+        }
+    } catch (error) {
+        alert(`Failed to launch swipe mode: ${String(error)}`);
+    }
 });
 
 btnQC.addEventListener("click", async () => {
-    await api.launchQC();
+    try {
+        const result = await api.launchQC();
+        if (!result.success) {
+            alert(
+                `Failed to launch QC mode: ${result.reason ?? "Unknown error"}`,
+            );
+        }
+    } catch (error) {
+        alert(`Failed to launch QC mode: ${String(error)}`);
+    }
 });

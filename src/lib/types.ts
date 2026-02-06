@@ -57,6 +57,8 @@ export interface PlotData {
         /** The end position of the expanded region. */
         end: number;
     };
+    /** Warning message if annotation coordinates were clamped to contig bounds. */
+    clampWarning?: string;
 }
 
 /**
@@ -137,6 +139,8 @@ export interface QCConfig {
     sampleFraction: number;
     /** The size of the aggregation window in base pairs. */
     windowSize: number;
+    /** The bin width for the read length histogram in base pairs. */
+    readLengthBinWidth: number;
 }
 
 /**
@@ -155,31 +159,27 @@ export interface PeekResult {
  * Holds all computed quality-control metrics and distributions for a BAM file.
  */
 export interface QCData {
-    /** The array of individual read lengths in base pairs. */
-    readLengths: number[];
     /** Summary statistics computed over the read length distribution. */
     readLengthStats: import("./stats").Stats;
     /** The histogram bins for the read length distribution. */
     readLengthHistogram: import("./stats").HistogramBin[];
     /** The cumulative yield bins sorted by read length. */
     yieldByLength: import("./stats").YieldBin[];
+    /** The bin width used for the read length histogram. */
+    readLengthBinWidth: number;
+    /** The number of reads that exceeded the histogram's maximum representable length. */
+    exceededReadLengths: number;
 
-    /** The array of whole-read modification density values. */
-    wholeReadDensities: number[];
     /** Summary statistics computed over the whole-read density distribution. */
     wholeReadDensityStats: import("./stats").Stats;
     /** The histogram bins for the whole-read density distribution. */
     wholeReadDensityHistogram: import("./stats").HistogramBin[];
 
-    /** The array of windowed modification density values. */
-    windowedDensities: number[];
     /** Summary statistics computed over the windowed density distribution. */
     windowedDensityStats: import("./stats").Stats;
     /** The histogram bins for the windowed density distribution. */
     windowedDensityHistogram: import("./stats").HistogramBin[];
 
-    /** The array of raw modification probability values. */
-    rawProbabilities: number[];
     /** Summary statistics computed over the raw probability distribution. */
     rawProbabilityStats: import("./stats").Stats;
     /** The histogram bins for the raw probability distribution. */

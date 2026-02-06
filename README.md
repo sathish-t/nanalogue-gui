@@ -36,7 +36,7 @@ npm install -g @nanalogue/gui
 Or for development:
 
 ```bash
-git clone https://github.com/DNAReplicationLab/nanalogue-gui.git
+git clone https://github.com/sathish-t/nanalogue-gui.git
 cd nanalogue-gui
 npm install
 ```

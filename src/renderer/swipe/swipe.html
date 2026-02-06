@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Content Security Policy restricting scripts and styles to same-origin. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
   <title>nanalogue-swipe</title>
   <!-- Shared styles providing the swipe mode layout and components. -->
   <link rel="stylesheet" href="../shared/styles.css">
@@ -19,6 +19,9 @@
     <header id="title-bar">
       <h1 id="plot-title">Loading...</h1>
     </header>
+
+    <!-- Warning banner shown when annotation coordinates were clamped to contig bounds. -->
+    <div id="clamp-warning" class="hidden"></div>
 
     <!-- Main chart area where the signal data is plotted. -->
     <main id="chart-container">
@@ -72,6 +75,8 @@
 
   <!-- Chart.js library for rendering signal trace plots. -->
   <script src="../shared/chart.umd.js"></script>
+  <!-- Chart.js annotation plugin for highlighting the annotation region. -->
+  <script src="../shared/chartjs-plugin-annotation.min.js"></script>
   <!-- Bundled swipe mode script handling keyboard input and chart rendering. -->
   <script src="swipe.js"></script>
 </body>

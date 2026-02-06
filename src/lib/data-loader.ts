@@ -36,7 +36,7 @@ export async function loadContigSizes(bamPath: string): Promise<ContigSizes> {
  * @param tsv - The raw TSV string output from the windowReads command.
  * @returns An array of parsed window read rows, skipping the header and incomplete lines.
  */
-function parseWindowReadsTsv(tsv: string): WindowReadRow[] {
+export function parseWindowReadsTsv(tsv: string): WindowReadRow[] {
     const lines = tsv.trim().split("\n");
     if (lines.length < 2) {
         return [];
@@ -53,8 +53,22 @@ function parseWindowReadsTsv(tsv: string): WindowReadRow[] {
 
         const ref_win_start = parseInt(fields[1], 10);
         const ref_win_end = parseInt(fields[2], 10);
+        const win_val = parseFloat(fields[4]);
 
         if (ref_win_start === -1 || ref_win_end === -1) {
+            continue;
+        }
+
+        if (
+            !Number.isFinite(ref_win_start) ||
+            !Number.isFinite(ref_win_end) ||
+            !Number.isFinite(win_val)
+        ) {
+            continue;
+        }
+
+        // Drop rows with invalid window bounds (zero-width, negative-width, or negative start)
+        if (ref_win_start < 0 || ref_win_start >= ref_win_end) {
             continue;
         }
 
@@ -63,7 +77,7 @@ function parseWindowReadsTsv(tsv: string): WindowReadRow[] {
             ref_win_start,
             ref_win_end,
             read_id: fields[3],
-            win_val: parseFloat(fields[4]),
+            win_val,
             strand: fields[5],
             base: fields[6],
             mod_strand: fields[7],
@@ -98,8 +112,19 @@ export async function loadPlotData(
         throw new Error(`Contig ${annotation.contig} not found in BAM file`);
     }
 
+    let clampWarning: string | undefined;
+    if (annotation.end > contigSize) {
+        clampWarning = `Annotation end (${annotation.end.toLocaleString()}) clamped to contig length (${contigSize.toLocaleString()})`;
+    }
+
     const expandedStart = Math.max(0, annotation.start - REGION_EXPANSION);
     const expandedEnd = Math.min(contigSize, annotation.end + REGION_EXPANSION);
+
+    if (expandedStart >= expandedEnd) {
+        throw new Error(
+            `Annotation ${annotation.readId} on ${annotation.contig}:${annotation.start}-${annotation.end} is outside contig bounds (size: ${contigSize})`,
+        );
+    }
 
     const region = `${annotation.contig}:${expandedStart}-${expandedEnd}`;
     const modRegion = region;
@@ -134,6 +159,7 @@ export async function loadPlotData(
     const rawPoints: PlotDataPoint[] = [];
     for (const record of modRecords) {
         if (record.alignment_type === "unmapped") continue;
+        if (!record.mod_table) continue;
         for (const entry of record.mod_table) {
             for (const [, refPos, probability] of entry.data) {
                 if (refPos === -1) continue;
@@ -158,5 +184,6 @@ export async function loadPlotData(
             start: expandedStart,
             end: expandedEnd,
         },
+        clampWarning,
     };
 }

@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Vitest test framework (v4.0.18) with `npm run test` and `npm run test:watch`
+- Unit tests for all library modules: bed-parser, data-loader, histogram, qc-loader, stats
+- `RunningHistogram` streaming accumulator class (`src/lib/histogram.ts`) that bins values
+  on the fly with running statistics, avoiding raw array storage
+- Configurable read length histogram resolution in QC mode (1 / 10 / 100 / 1000 bp)
+- Probability range filter in QC results (toggle, low/high bounds, apply)
+- Yield summary panel in QC results showing Total Yield and N50
+- "No data" placeholder messages when histogram data is empty
+- Exceeded-reads warning banner when reads overflow the histogram range
+- Error/empty state page in QC results with "Back to config" button
+- Input validation for QC config: sample fraction, window size, read length bin width
+- Stale-request guard for BAM peek to discard out-of-order responses
+- Output file overwrite confirmation dialog in swipe mode
+- Initialization guard in swipe mode to prevent actions before data loads
+- Clamp warning banner in swipe mode when annotation coordinates exceed contig bounds
+- `clampWarning` field on `PlotData` type
+- `chartjs-plugin-annotation` dependency (^3.1.0) for annotation region highlighting
+- `LaunchResult` return type for mode launch IPC handlers with error alerts on landing page
+
+### Changed
+- QC loader refactored from raw array accumulation to four streaming `RunningHistogram`
+  instances, significantly reducing memory usage for large BAM files
+- Raw arrays (`readLengths`, `wholeReadDensities`, `windowedDensities`, `rawProbabilities`)
+  removed from `QCData` type; replaced with pre-binned histogram and stats fields
+- `readLengthBinWidth` and `exceededReadLengths` added to `QCData` and `QCConfig` types
+- Probability normalization uses `Math.min(prob / 255, 1 - Number.EPSILON)` clamping so
+  raw 255 maps into last bin [0.99, 1.00) instead of overflowing
+- `binHistogram` and `binYield` use iterative min/max instead of `Math.min(...spread)` to
+  prevent stack overflow on large arrays (200K+ elements)
+- `parseWindowedDensities` upgraded from `!isNaN` to `Number.isFinite` (catches Infinity)
+- QC navigation handlers (`qc-go-back`, `qc-go-back-to-config`) moved from `modes/qc.ts`
+  to `main.ts` to use the centralized `resizeAndLoadMode` helper
+- `innerHTML` assignments replaced with DOM element creation in QC config to prevent XSS
+- Stats panel toggle moved from inline `onclick` to `addEventListener`
+- Adaptive label formatting on histograms: auto-detect decimal places from bin width;
+  yield labels use K/M suffixes for finer resolutions
+- Generate button disabled during QC generation to prevent double-submit
+- Sample fraction warning text updated to mention crash risk
+- Repository URL corrected from `DNAReplicationLab` to `sathish-t` in README
+- `parseWindowReadsTsv` and `parseWindowedDensities` exported for testability
+
+### Fixed
+- BED parser now validates `0 <= start < end` for coordinates (previously accepted
+  negative, zero-width, and reversed intervals)
+- `parseWindowReadsTsv` now rejects zero-width windows, negative-start rows, and
+  non-finite values
+- `loadPlotData` skips records with missing `mod_table` instead of crashing
+- `loadPlotData` clamps annotation end to contig size instead of requesting out-of-bounds
+- `binHistogram` and `binYield` return empty array for zero or negative bin size instead
+  of infinite loop
+- `--win` CLI flag now reports an error when no value follows
+
+### Security
+- Removed `'unsafe-inline'` from `script-src` in Content Security Policy on all four
+  HTML pages (landing, qc-config, qc-results, swipe)
+
+### Dependencies
+- Added: `chartjs-plugin-annotation` ^3.1.0, `vitest` ^4.0.18
+- Updated: `@biomejs/biome` ^2.3.13 → ^2.3.14, `electron` ^40.1.0 → ^40.2.1,
+  `esbuild` ^0.27.2 → ^0.27.3
+
+### Infrastructure
+- Set `ELECTRON_NO_DCONF=1` in launcher to suppress dconf warnings on Linux
+- Added `docs/` to `.gitignore`
+- Excluded `*.test.ts` from TypeScript compilation in `tsconfig.json`
+
 ## [0.1.0] - 2026-02-06
 
 ### Added

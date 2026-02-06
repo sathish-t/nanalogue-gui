@@ -42,6 +42,13 @@ export function parseBedFile(bedPath: string): BedAnnotation[] {
             continue;
         }
 
+        if (start < 0 || end < 0 || start >= end) {
+            console.warn(
+                `Skipping line ${i + 1}: coordinates must satisfy 0 <= start < end (got start=${start}, end=${end})`,
+            );
+            continue;
+        }
+
         if (!readId) {
             console.warn(`Skipping line ${i + 1}: missing read_id in column 4`);
             continue;

@@ -1,8 +1,20 @@
 // QC data loader using nanalogue-node
 
 import { bamMods, peek, readInfo, windowReads } from "@nanalogue/node";
-import { binHistogram, binYield, calculateStats } from "./stats";
+import { RunningHistogram } from "./histogram";
 import type { PeekResult, QCConfig, QCData } from "./types";
+
+/**
+ * Maps a read length bin width to the maximum read length the histogram covers.
+ *
+ * @param binWidth - The read length bin width in base pairs.
+ * @returns The maximum representable read length in base pairs.
+ */
+function maxReadLengthForBinWidth(binWidth: number): number {
+    if (binWidth >= 1000) return 3_000_000;
+    if (binWidth >= 10) return 300_000;
+    return 30_000;
+}
 
 /**
  * Peeks at a BAM file to retrieve contig names and available modification types.
@@ -36,6 +48,9 @@ export async function peekBam(
 /**
  * Generates comprehensive QC data including read lengths, modification densities, and histograms.
  *
+ * Uses streaming histograms to bin values on the fly, avoiding retention of
+ * large raw arrays in memory.
+ *
  * @param config - The QC configuration specifying the BAM file, sampling, region, and modification parameters.
  * @returns A promise that resolves to the full QC dataset with statistics and histograms.
  */
@@ -49,52 +64,93 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
         modStrand: config.modStrand,
     };
 
+    const readLengthBinWidth = config.readLengthBinWidth;
+    const readLengthMax = maxReadLengthForBinWidth(readLengthBinWidth);
+
+    // Streaming histograms — bin values on the fly instead of accumulating raw arrays
+    const readLengthHist = new RunningHistogram(
+        readLengthBinWidth,
+        readLengthMax,
+    );
+    const wholeReadDensityHist = new RunningHistogram(0.01, 1.0);
+    const rawProbabilityHist = new RunningHistogram(0.01, 1.0);
+    const windowedDensityHist = new RunningHistogram(0.01, 1.0);
+
     // Get read info for length statistics
     console.log("Loading read info...");
     const reads = await readInfo(baseOptions);
 
-    const readLengths = reads
-        .filter((r) => r.alignment_type !== "unmapped")
-        .map(
-            (r) =>
-                (
-                    r as {
-                        /** The aligned length of the read in base pairs. */
-                        alignment_length: number;
-                    }
-                ).alignment_length,
-        );
+    let droppedLengths = 0;
+    for (const r of reads) {
+        if (r.alignment_type === "unmapped") continue;
+        const length = (
+            r as {
+                /** The aligned length of the read in base pairs. */
+                alignment_length: number;
+            }
+        ).alignment_length;
+        if (Number.isFinite(length)) {
+            readLengthHist.add(length);
+        } else {
+            droppedLengths++;
+        }
+    }
 
-    console.log(`  Got ${readLengths.length} reads`);
+    if (droppedLengths > 0) {
+        console.warn(
+            `Dropped ${droppedLengths} reads with non-finite alignment_length`,
+        );
+    }
+
+    console.log(`  Got ${readLengthHist.count} reads`);
+
+    if (readLengthHist.exceededCount > 0) {
+        console.warn(
+            `${readLengthHist.exceededCount} reads exceeded the maximum histogram range (${readLengthMax} bp)`,
+        );
+    }
 
     // Get modification data
     console.log("Loading modification data...");
     const modRecords = await bamMods(baseOptions);
 
-    // Calculate whole-read densities (mean probability per read)
-    const wholeReadDensities: number[] = [];
-    const allProbabilities: number[] = [];
+    let loggedMissingModTable = false;
+    let readsWithMods = 0;
 
     for (const record of modRecords) {
         if (record.alignment_type === "unmapped") continue;
 
-        const probs: number[] = [];
+        if (!record.mod_table) {
+            if (!loggedMissingModTable) {
+                console.warn("Some records lack modification data, skipping");
+                loggedMissingModTable = true;
+            }
+            continue;
+        }
+
+        let probSum = 0;
+        let probCount = 0;
+
         for (const entry of record.mod_table) {
             for (const [, , prob] of entry.data) {
-                const normalizedProb = prob / 255;
-                probs.push(normalizedProb);
-                allProbabilities.push(normalizedProb);
+                // Normalize raw 0-255 probabilities to 0-1 scale, clamping 255 into [0.99, 1.00]
+                const normalizedProb = Math.min(prob / 255, 1 - Number.EPSILON);
+                rawProbabilityHist.add(normalizedProb);
+                probSum += normalizedProb;
+                probCount++;
             }
         }
 
-        if (probs.length > 0) {
-            const meanProb = probs.reduce((a, b) => a + b, 0) / probs.length;
-            wholeReadDensities.push(meanProb);
+        if (probCount > 0) {
+            wholeReadDensityHist.add(
+                Math.min(probSum / probCount, 1 - Number.EPSILON),
+            );
+            readsWithMods++;
         }
     }
 
-    console.log(`  Got ${wholeReadDensities.length} reads with modifications`);
-    console.log(`  Got ${allProbabilities.length} modification calls`);
+    console.log(`  Got ${readsWithMods} reads with modifications`);
+    console.log(`  Got ${rawProbabilityHist.count} modification calls`);
 
     // Get windowed densities
     console.log("Loading windowed densities...");
@@ -105,49 +161,27 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
     });
 
     const windowedDensities = parseWindowedDensities(windowedTsv);
-    console.log(`  Got ${windowedDensities.length} windows`);
+    for (const density of windowedDensities) {
+        windowedDensityHist.add(Math.min(density, 1 - Number.EPSILON));
+    }
+    console.log(`  Got ${windowedDensityHist.count} windows`);
 
-    // Calculate statistics and histograms
-    const readLengthStats = calculateStats(readLengths, true);
-    const readLengthHistogram = binHistogram(readLengths, 5000);
-    const yieldByLength = binYield(readLengths, 5000);
-
-    const wholeReadDensityStats = calculateStats(wholeReadDensities);
-    const wholeReadDensityHistogram = binHistogram(
-        wholeReadDensities,
-        0.02,
-        0,
-        1,
-    );
-
-    const windowedDensityStats = calculateStats(windowedDensities);
-    const windowedDensityHistogram = binHistogram(
-        windowedDensities,
-        0.02,
-        0,
-        1,
-    );
-
-    const rawProbabilityStats = calculateStats(allProbabilities);
-    const rawProbabilityHistogram = binHistogram(allProbabilities, 0.02, 0, 1);
-
+    // Extract statistics and histogram bins from streaming accumulators
     return {
-        readLengths,
-        readLengthStats,
-        readLengthHistogram,
-        yieldByLength,
+        readLengthStats: readLengthHist.toStats(true),
+        readLengthHistogram: readLengthHist.toBins(),
+        yieldByLength: readLengthHist.toYieldBins(),
+        readLengthBinWidth,
+        exceededReadLengths: readLengthHist.exceededCount,
 
-        wholeReadDensities,
-        wholeReadDensityStats,
-        wholeReadDensityHistogram,
+        wholeReadDensityStats: wholeReadDensityHist.toStats(false),
+        wholeReadDensityHistogram: wholeReadDensityHist.toBins(),
 
-        windowedDensities,
-        windowedDensityStats,
-        windowedDensityHistogram,
+        windowedDensityStats: windowedDensityHist.toStats(false),
+        windowedDensityHistogram: windowedDensityHist.toBins(),
 
-        rawProbabilities: allProbabilities,
-        rawProbabilityStats,
-        rawProbabilityHistogram,
+        rawProbabilityStats: rawProbabilityHist.toStats(false),
+        rawProbabilityHistogram: rawProbabilityHist.toBins(),
     };
 }
 
@@ -157,20 +191,29 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
  * @param tsv - The raw TSV string output from the windowReads command.
  * @returns An array of numeric modification density values from the windowed data.
  */
-function parseWindowedDensities(tsv: string): number[] {
+export function parseWindowedDensities(tsv: string): number[] {
     const lines = tsv.trim().split("\n");
     if (lines.length < 2) return [];
 
     const densities: number[] = [];
+    let droppedCount = 0;
 
     for (let i = 1; i < lines.length; i++) {
         const fields = lines[i].split("\t");
         if (fields.length >= 5) {
             const winVal = parseFloat(fields[4]);
-            if (!Number.isNaN(winVal)) {
+            if (Number.isFinite(winVal)) {
                 densities.push(winVal);
+            } else {
+                droppedCount++;
             }
         }
+    }
+
+    if (droppedCount > 0) {
+        console.warn(
+            `parseWindowedDensities: dropped ${droppedCount} rows with non-finite density values`,
+        );
     }
 
     return densities;

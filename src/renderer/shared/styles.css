@@ -260,3 +260,16 @@ body {
     font-size: 13px;
     font-variant-numeric: tabular-nums;
 }
+
+/* Warning banner for annotation coordinate clamping. */
+#clamp-warning {
+    background: #fff8e1;
+    color: #e65100;
+    font-size: 12px;
+    padding: 4px 24px;
+}
+
+/* Hidden utility class for the clamp warning. */
+#clamp-warning.hidden {
+    display: none;
+}

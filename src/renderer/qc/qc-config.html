@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Content Security Policy restricting scripts and styles to same-origin. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
   <title>QC Configuration - nanalogue-gui</title>
   <!-- Shared base styles and QC-specific styles. -->
   <link rel="stylesheet" href="../shared/styles.css">
@@ -65,6 +65,18 @@
         <input type="text" id="region" placeholder="e.g. chrI:1000-50000">
       </section>
 
+      <!-- Read length histogram granularity selection. -->
+      <section class="config-section">
+        <h2>Read length histogram resolution</h2>
+        <label for="read-length-granularity" class="visually-hidden">Read length histogram resolution</label>
+        <select id="read-length-granularity">
+          <option value="1">Very fine (1 bp)</option>
+          <option value="10">Fine (10 bp)</option>
+          <option value="100">Standard (100 bp)</option>
+          <option value="1000" selected>Coarse (1000 bp)</option>
+        </select>
+      </section>
+
       <!-- Percentage of reads to sample for QC analysis. -->
       <section class="config-section">
         <h2>Sample fraction</h2>
@@ -73,7 +85,7 @@
           <input type="number" id="sample-fraction" value="0.1" min="0.01" max="100" step="0.1">
           <span class="unit">%</span>
         </div>
-        <p class="hint warning">Setting to 100% on large files/regions may cause unresponsiveness or heavy data download for URLs.</p>
+        <p class="hint warning">Setting to 100% on large files/regions may cause the program to crash or become unresponsive, or cause heavy data download for URLs.</p>
       </section>
 
       <!-- Window size for the windowed analogue density calculation. -->

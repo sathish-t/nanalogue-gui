@@ -85,6 +85,10 @@ interface QCData {
     readLengthHistogram: HistogramBin[];
     /** Yield bins bucketed by read length. */
     yieldByLength: YieldBin[];
+    /** The bin width used for the read length histogram. */
+    readLengthBinWidth: number;
+    /** The number of reads that exceeded the histogram range. */
+    exceededReadLengths: number;
     /** Summary statistics for whole-read analogue density. */
     wholeReadDensityStats: Stats;
     /** Histogram bins for the whole-read density distribution. */
@@ -120,6 +124,9 @@ const api = (
 ).api;
 const charts: Map<string, ChartInstance> = new Map();
 
+/** Stores the full raw probability histogram bins for range filtering. */
+let fullProbabilityBins: HistogramBin[] = [];
+
 /**
  * Formats a number into a human-readable string with optional SI suffixes.
  *
@@ -139,6 +146,49 @@ function formatNumber(n: number, decimals = 2): string {
         return `${(n / 1_000).toFixed(decimals)}K`;
     }
     return n.toFixed(decimals);
+}
+
+/**
+ * Formats a yield chart bin label adaptively based on the read length bin width.
+ *
+ * @param binStart - The start value of the bin.
+ * @param binWidth - The bin width used for the read length histogram.
+ * @returns The formatted label string.
+ */
+function formatYieldLabel(binStart: number, binWidth: number): string {
+    if (binWidth >= 1000) {
+        return formatNumber(binStart, 0);
+    }
+    if (binWidth >= 100) {
+        if (binStart >= 1_000_000) {
+            return `${(binStart / 1_000_000).toFixed(1)}M`;
+        }
+        if (binStart >= 1_000) {
+            return `${(binStart / 1_000).toFixed(1)}K`;
+        }
+        return binStart.toString();
+    }
+    // binWidth <= 10: raw numbers with thousand separators
+    return binStart.toLocaleString();
+}
+
+/**
+ * Replaces a canvas element with a no-data message when there is nothing to chart.
+ *
+ * @param canvasId - The DOM element ID of the canvas to replace.
+ * @param message - The message to display in place of the chart.
+ */
+function showNoData(canvasId: string, message: string): void {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const container = canvas.parentElement;
+    if (!container) return;
+
+    const noDataDiv = document.createElement("div");
+    noDataDiv.className = "no-data-message";
+    noDataDiv.textContent = message;
+    container.replaceChild(noDataDiv, canvas);
 }
 
 /**
@@ -180,7 +230,7 @@ function renderStatsPanel(
     container.innerHTML = `
     <div class="stats-header">
       <h3>Summary Statistics</h3>
-      <button class="stats-toggle" onclick="this.parentElement.parentElement.classList.toggle('expanded'); this.textContent = this.textContent.includes('Show') ? 'Hide all stats' : 'Show all stats';">
+      <button class="stats-toggle">
         Show all stats
       </button>
     </div>
@@ -198,6 +248,58 @@ function renderStatsPanel(
     </div>
     <div class="stats-grid stats-expanded">
       ${expandedStats
+          .map(
+              (s) => `
+        <div class="stat-item">
+          <span class="label">${s.label}:</span>
+          <span class="value">${s.value}</span>
+        </div>
+      `,
+          )
+          .join("")}
+    </div>
+  `;
+
+    const toggleBtn = container.querySelector(".stats-toggle");
+    if (toggleBtn) {
+        toggleBtn.addEventListener("click", () => {
+            container.classList.toggle("expanded");
+            toggleBtn.textContent = toggleBtn.textContent?.includes("Show")
+                ? "Hide all stats"
+                : "Show all stats";
+        });
+    }
+}
+
+/**
+ * Renders a minimal yield summary showing total yield and N50.
+ *
+ * @param containerId - The DOM element ID of the container to render into.
+ * @param yieldBins - The yield bins bucketed by read length.
+ * @param readLengthStats - The read length stats containing the N50 value.
+ */
+function renderYieldSummary(
+    containerId: string,
+    yieldBins: YieldBin[],
+    readLengthStats: Stats,
+): void {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    let totalYield = 0;
+    for (const bin of yieldBins) {
+        totalYield += bin.yield;
+    }
+
+    const items = [{ label: "Total Yield", value: formatNumber(totalYield) }];
+
+    if (readLengthStats.n50 !== undefined) {
+        items.push({ label: "N50", value: formatNumber(readLengthStats.n50) });
+    }
+
+    container.innerHTML = `
+    <div class="stats-grid">
+      ${items
           .map(
               (s) => `
         <div class="stat-item">
@@ -237,7 +339,18 @@ function renderHistogram(
 
     charts.get(canvasId)?.destroy();
 
-    const labels = bins.map((b) => `${formatNumber(b.binStart, 0)}`);
+    // Auto-detect decimal places from bin width
+    const binWidth = bins.length >= 2 ? bins[1].binStart - bins[0].binStart : 1;
+    let labelDecimals = 0;
+    if (binWidth < 0.01) {
+        labelDecimals = 3;
+    } else if (binWidth < 0.1) {
+        labelDecimals = 2;
+    } else if (binWidth < 1) {
+        labelDecimals = 1;
+    }
+
+    const labels = bins.map((b) => b.binStart.toFixed(labelDecimals));
     const data = bins.map((b) => b.count);
 
     const chart = new Chart(ctx, {
@@ -279,12 +392,17 @@ function renderHistogram(
  * Renders a yield bar chart on the specified canvas element.
  *
  * Plots yield in bases per read-length bin. Destroys any existing chart on the
- * same canvas before creating the new one.
+ * same canvas before creating the new one. Label formatting adapts to the bin width.
  *
  * @param canvasId - The DOM element ID of the target canvas.
  * @param bins - The yield bin data to plot.
+ * @param binWidth - The bin width used for the read length histogram.
  */
-function renderYieldChart(canvasId: string, bins: YieldBin[]): void {
+function renderYieldChart(
+    canvasId: string,
+    bins: YieldBin[],
+    binWidth: number,
+): void {
     const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
     if (!canvas) return;
 
@@ -293,7 +411,7 @@ function renderYieldChart(canvasId: string, bins: YieldBin[]): void {
 
     charts.get(canvasId)?.destroy();
 
-    const labels = bins.map((b) => `${formatNumber(b.binStart, 0)}`);
+    const labels = bins.map((b) => formatYieldLabel(b.binStart, binWidth));
     const data = bins.map((b) => b.yield);
 
     const chart = new Chart(ctx, {
@@ -365,6 +483,89 @@ function setupTabs(): void {
 }
 
 /**
+ * Sets up the probability range filter toggle and apply button.
+ */
+function setupProbabilityFilter(): void {
+    const toggle = document.getElementById(
+        "probability-filter-toggle",
+    ) as HTMLInputElement | null;
+    const inputsContainer = document.getElementById(
+        "probability-filter-inputs",
+    );
+    const lowInput = document.getElementById(
+        "probability-filter-low",
+    ) as HTMLInputElement | null;
+    const highInput = document.getElementById(
+        "probability-filter-high",
+    ) as HTMLInputElement | null;
+    const applyBtn = document.getElementById("probability-filter-apply");
+    const errorEl = document.getElementById("probability-filter-error");
+
+    if (
+        !toggle ||
+        !inputsContainer ||
+        !lowInput ||
+        !highInput ||
+        !applyBtn ||
+        !errorEl
+    ) {
+        return;
+    }
+
+    toggle.addEventListener("change", () => {
+        if (toggle.checked) {
+            inputsContainer.classList.remove("hidden");
+        } else {
+            inputsContainer.classList.add("hidden");
+            errorEl.classList.add("hidden");
+            // Restore full histogram
+            renderHistogram(
+                "chart-probability",
+                fullProbabilityBins,
+                "Modification Probability",
+            );
+        }
+    });
+
+    applyBtn.addEventListener("click", () => {
+        const low = parseFloat(lowInput.value);
+        const high = parseFloat(highInput.value);
+
+        if (
+            Number.isNaN(low) ||
+            Number.isNaN(high) ||
+            low < 0 ||
+            high > 1 ||
+            low >= high
+        ) {
+            errorEl.textContent =
+                "Low must be less than high, both between 0 and 1.";
+            errorEl.classList.remove("hidden");
+            return;
+        }
+
+        errorEl.classList.add("hidden");
+
+        // Filter bins that overlap with the requested range
+        const filteredBins = fullProbabilityBins.filter((b) => {
+            return b.binEnd > low && b.binStart < high;
+        });
+
+        if (filteredBins.length === 0) {
+            errorEl.textContent = "No bins in the specified range.";
+            errorEl.classList.remove("hidden");
+            return;
+        }
+
+        renderHistogram(
+            "chart-probability",
+            filteredBins,
+            "Modification Probability",
+        );
+    });
+}
+
+/**
  * Loads QC data from the main process and renders all charts and statistics.
  *
  * Populates charts and stats panels across all tabs including read lengths,
@@ -372,44 +573,157 @@ function setupTabs(): void {
  * page loads.
  */
 async function initialize(): Promise<void> {
-    const data = await api.getQCData();
+    try {
+        const data = await api.getQCData();
 
-    // Read lengths tab
-    renderHistogram(
-        "chart-read-lengths",
-        data.readLengthHistogram,
-        "Read Length (bp)",
-    );
-    renderStatsPanel("stats-read-lengths", data.readLengthStats, true);
+        if (!data) {
+            showErrorState(
+                "No QC data available",
+                "Run a QC analysis from the configuration page first.",
+            );
+            return;
+        }
 
-    // Yield tab
-    renderYieldChart("chart-yield", data.yieldByLength);
-    renderStatsPanel("stats-yield", data.readLengthStats, true);
+        // Show warning if reads exceeded the histogram range
+        if (data.exceededReadLengths > 0) {
+            const warningDiv = document.createElement("div");
+            warningDiv.className = "exceeded-warning";
+            warningDiv.textContent = `${data.exceededReadLengths} read(s) exceeded the histogram range. Consider using a coarser resolution setting.`;
+            const readLengthsTab = document.getElementById("tab-read-lengths");
+            if (readLengthsTab) {
+                readLengthsTab.insertBefore(
+                    warningDiv,
+                    readLengthsTab.firstChild,
+                );
+            }
+        }
 
-    // Density tab
-    renderHistogram(
-        "chart-whole-density",
-        data.wholeReadDensityHistogram,
-        "Analogue Density",
-    );
-    renderStatsPanel("stats-whole-density", data.wholeReadDensityStats);
+        // Read lengths tab
+        if (data.readLengthHistogram.length === 0) {
+            showNoData("chart-read-lengths", "No read length data available.");
+        } else {
+            renderHistogram(
+                "chart-read-lengths",
+                data.readLengthHistogram,
+                "Read Length (bp)",
+            );
+        }
+        renderStatsPanel("stats-read-lengths", data.readLengthStats, true);
 
-    renderHistogram(
-        "chart-windowed-density",
-        data.windowedDensityHistogram,
-        "Windowed Density",
-    );
-    renderStatsPanel("stats-windowed-density", data.windowedDensityStats);
+        // Yield tab
+        if (data.yieldByLength.length === 0) {
+            showNoData("chart-yield", "No yield data available.");
+        } else {
+            renderYieldChart(
+                "chart-yield",
+                data.yieldByLength,
+                data.readLengthBinWidth,
+            );
+        }
+        renderYieldSummary(
+            "stats-yield",
+            data.yieldByLength,
+            data.readLengthStats,
+        );
 
-    // Probability tab
-    renderHistogram(
-        "chart-probability",
-        data.rawProbabilityHistogram,
-        "Modification Probability",
-    );
-    renderStatsPanel("stats-probability", data.rawProbabilityStats);
+        // Density tab
+        if (data.wholeReadDensityHistogram.length === 0) {
+            showNoData(
+                "chart-whole-density",
+                "No modification density data available.",
+            );
+        } else {
+            renderHistogram(
+                "chart-whole-density",
+                data.wholeReadDensityHistogram,
+                "Analogue Density",
+            );
+        }
+        renderStatsPanel("stats-whole-density", data.wholeReadDensityStats);
 
-    setupTabs();
+        if (
+            !data.windowedDensityStats ||
+            data.windowedDensityStats.count === 0
+        ) {
+            showNoData(
+                "chart-windowed-density",
+                "No windowed density data available for the selected parameters.",
+            );
+            const statsContainer = document.getElementById(
+                "stats-windowed-density",
+            );
+            if (statsContainer) {
+                statsContainer.textContent = "";
+            }
+        } else {
+            renderHistogram(
+                "chart-windowed-density",
+                data.windowedDensityHistogram,
+                "Windowed Density",
+            );
+            renderStatsPanel(
+                "stats-windowed-density",
+                data.windowedDensityStats,
+            );
+        }
+
+        // Probability tab
+        fullProbabilityBins = data.rawProbabilityHistogram;
+        if (data.rawProbabilityHistogram.length === 0) {
+            showNoData(
+                "chart-probability",
+                "No modification probability data available.",
+            );
+        } else {
+            renderHistogram(
+                "chart-probability",
+                data.rawProbabilityHistogram,
+                "Modification Probability",
+            );
+        }
+        renderStatsPanel("stats-probability", data.rawProbabilityStats);
+
+        setupProbabilityFilter();
+        setupTabs();
+    } catch (error) {
+        console.error("Failed to initialize QC results:", error);
+        showErrorState("Failed to load QC results", String(error));
+    }
+}
+
+/**
+ * Renders an error or empty state on the page with a back-to-config button.
+ *
+ * @param title - The heading text for the error state.
+ * @param message - The descriptive message shown below the heading.
+ */
+function showErrorState(title: string, message: string): void {
+    const main = document.querySelector("main");
+    if (!main) return;
+
+    main.textContent = "";
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "no-data-message";
+    wrapper.style.display = "flex";
+    wrapper.style.flexDirection = "column";
+    wrapper.style.alignItems = "center";
+    wrapper.style.padding = "2rem";
+    wrapper.style.gap = "1rem";
+
+    const h2 = document.createElement("h2");
+    h2.textContent = title;
+
+    const p = document.createElement("p");
+    p.textContent = message;
+
+    const btn = document.createElement("button");
+    btn.className = "primary-button";
+    btn.textContent = "Back to config";
+    btn.addEventListener("click", () => api.goBackToConfig());
+
+    wrapper.append(h2, p, btn);
+    main.appendChild(wrapper);
 }
 
 // Back button

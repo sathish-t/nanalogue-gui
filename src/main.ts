@@ -243,6 +243,27 @@ ipcMain.handle(
     },
 );
 
+// QC navigation IPC handlers (registered here to use resizeAndLoadMode)
+ipcMain.handle(
+    "qc-go-back",
+    /**
+     * Handles the qc-go-back IPC request by switching back to the landing page.
+     */
+    () => {
+        resizeAndLoadMode("landing");
+    },
+);
+
+ipcMain.handle(
+    "qc-go-back-to-config",
+    /**
+     * Handles the qc-go-back-to-config IPC request by switching back to the QC config page.
+     */
+    () => {
+        resizeAndLoadMode("qc");
+    },
+);
+
 // Register mode IPC handlers
 swipeModule.registerIpcHandlers();
 qcModule.registerIpcHandlers();

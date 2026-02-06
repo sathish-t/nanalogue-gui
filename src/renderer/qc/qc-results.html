@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Content Security Policy restricting scripts and styles to same-origin. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
   <title>QC Results - nanalogue-gui</title>
   <!-- Shared base styles and QC-specific styles. -->
   <link rel="stylesheet" href="../shared/styles.css">
@@ -66,6 +66,20 @@
       <div id="tab-probability" class="tab-content">
         <div class="chart-container">
           <canvas id="chart-probability"></canvas>
+        </div>
+        <div class="probability-filter" id="probability-filter">
+          <label class="filter-toggle">
+            <input type="checkbox" id="probability-filter-toggle">
+            Filter range
+          </label>
+          <div class="filter-inputs hidden" id="probability-filter-inputs">
+            <label for="probability-filter-low">Low:</label>
+            <input type="number" id="probability-filter-low" value="0.05" min="0" max="1" step="0.01">
+            <label for="probability-filter-high">High:</label>
+            <input type="number" id="probability-filter-high" value="1.00" min="0" max="1" step="0.01">
+            <button type="button" id="probability-filter-apply" class="small-button">Apply</button>
+          </div>
+          <p class="filter-error hidden" id="probability-filter-error"></p>
         </div>
         <div class="stats-panel" id="stats-probability"></div>
       </div>

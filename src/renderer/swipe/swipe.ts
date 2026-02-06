@@ -115,6 +115,9 @@ interface PlotData {
         /** The end position of the expanded viewing region in base pairs. */
         end: number;
     };
+
+    /** Warning message if annotation coordinates were clamped to contig bounds. */
+    clampWarning?: string;
 }
 
 /**
@@ -143,6 +146,7 @@ const api = (
 
 let chart: ChartInstance | null = null;
 let isProcessing = false;
+let isInitialized = false;
 
 /**
  * Cached references to the DOM elements used throughout the swipe UI.
@@ -174,6 +178,9 @@ const elements = {
 
     /** The overlay element used for the accept and reject flash animations. */
     flashOverlay: document.getElementById("flash-overlay") as HTMLElement,
+
+    /** The warning banner shown when annotation coordinates are clamped. */
+    clampWarning: document.getElementById("clamp-warning") as HTMLElement,
 };
 
 /**
@@ -238,6 +245,20 @@ function updateTitle(plotData: PlotData | null) {
         elements.title.textContent = `Showing ${annotation.contig}:${annotation.start.toLocaleString()}-${annotation.end.toLocaleString()} on read id ${annotation.readId}`;
     } else {
         elements.title.textContent = "No data";
+    }
+}
+
+/**
+ * Shows or hides the clamp warning banner based on the plot data.
+ *
+ * @param plotData - The plot data that may contain a clamp warning, or null to hide.
+ */
+function updateClampWarning(plotData: PlotData | null) {
+    if (plotData?.clampWarning) {
+        elements.clampWarning.textContent = plotData.clampWarning;
+        elements.clampWarning.classList.remove("hidden");
+    } else {
+        elements.clampWarning.classList.add("hidden");
     }
 }
 
@@ -416,6 +437,7 @@ async function handleAction(action: "accept" | "reject") {
         updateProgress(result.state);
 
         if (result.done) {
+            updateClampWarning(null);
             showDone(result.state);
         } else if (
             result.plotData &&
@@ -424,9 +446,11 @@ async function handleAction(action: "accept" | "reject") {
         ) {
             hideLoading();
             updateTitle(result.plotData);
+            updateClampWarning(result.plotData);
             renderChart(result.plotData);
         } else {
             updateTitle(result.plotData ?? null);
+            updateClampWarning(result.plotData ?? null);
             showNoData();
         }
     } catch (error) {
@@ -450,6 +474,7 @@ async function initialize() {
         if (state.totalCount === 0) {
             elements.title.textContent = "No annotations to review";
             hideLoading();
+            isInitialized = true;
             return;
         }
 
@@ -462,19 +487,26 @@ async function initialize() {
         ) {
             hideLoading();
             updateTitle(plotData);
+            updateClampWarning(plotData);
             renderChart(plotData);
         } else {
             updateTitle(plotData);
+            updateClampWarning(plotData);
             showNoData();
         }
+
+        isInitialized = true;
     } catch (error) {
         console.error("Error initializing:", error);
         elements.title.textContent = "Error loading data";
         hideLoading();
+        isInitialized = true;
     }
 }
 
 document.addEventListener("keydown", (event) => {
+    if (!isInitialized) return;
+
     if (event.key === "ArrowRight") {
         event.preventDefault();
         handleAction("accept");
@@ -488,11 +520,17 @@ const rejectButton = document.querySelector(".control-hint.left");
 const acceptButton = document.querySelector(".control-hint.right");
 
 if (rejectButton) {
-    rejectButton.addEventListener("click", () => handleAction("reject"));
+    rejectButton.addEventListener("click", () => {
+        if (!isInitialized) return;
+        handleAction("reject");
+    });
 }
 
 if (acceptButton) {
-    acceptButton.addEventListener("click", () => handleAction("accept"));
+    acceptButton.addEventListener("click", () => {
+        if (!isInitialized) return;
+        handleAction("accept");
+    });
 }
 
 initialize();

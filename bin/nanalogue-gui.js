@@ -8,7 +8,8 @@ const electronPath = require('electron');
 const mainScript = path.join(__dirname, '..', 'dist', 'main.js');
 
 const child = spawn(electronPath, [mainScript, ...process.argv.slice(2)], {
-  stdio: 'inherit'
+  stdio: 'inherit',
+  env: { ...process.env, ELECTRON_NO_DCONF: '1' }
 });
 
 child.on('close', (code) => {
