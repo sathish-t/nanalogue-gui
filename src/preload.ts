@@ -23,6 +23,65 @@ contextBridge.exposeInMainWorld("api", {
      */
     launchQC: () => ipcRenderer.invoke("launch-qc"),
 
+    // Swipe config
+
+    /**
+     * Open a native file dialog for selecting a BAM file for swipe mode.
+     *
+     * @returns A promise that resolves with the selected file path, or null if cancelled.
+     */
+    swipePickBam: () => ipcRenderer.invoke("swipe-pick-bam"),
+
+    /**
+     * Open a native file dialog for selecting a BED annotations file for swipe mode.
+     *
+     * @returns A promise that resolves with the selected file path, or null if cancelled.
+     */
+    swipePickBed: () => ipcRenderer.invoke("swipe-pick-bed"),
+
+    /**
+     * Open a native save dialog for selecting the output BED file path.
+     *
+     * @returns A promise that resolves with the selected file path, or null if cancelled.
+     */
+    swipePickOutput: () => ipcRenderer.invoke("swipe-pick-output"),
+
+    /**
+     * Count the number of non-empty lines in a BED file.
+     *
+     * @param filePath - The path to the BED file.
+     * @returns A promise that resolves with the line count.
+     */
+    swipeCountBedLines: (filePath: string) =>
+        ipcRenderer.invoke("swipe-count-bed-lines", filePath),
+
+    /**
+     * Check whether a file exists at the given path.
+     *
+     * @param filePath - The path to check.
+     * @returns A promise that resolves with true if the file exists.
+     */
+    swipeCheckFileExists: (filePath: string) =>
+        ipcRenderer.invoke("swipe-check-file-exists", filePath),
+
+    /**
+     * Initialize swipe mode and navigate to the swipe review interface.
+     *
+     * @param bamPath - The path to the BAM file.
+     * @param bedPath - The path to the BED annotations file.
+     * @param outputPath - The path for the output BED file.
+     * @returns A promise that resolves with a result object indicating success or failure.
+     */
+    swipeStart: (bamPath: string, bedPath: string, outputPath: string) =>
+        ipcRenderer.invoke("swipe-start", bamPath, bedPath, outputPath),
+
+    /**
+     * Navigate back to the landing page from the swipe config screen.
+     *
+     * @returns A promise that resolves when navigation is complete.
+     */
+    swipeGoBack: () => ipcRenderer.invoke("swipe-go-back"),
+
     // Swipe mode
 
     /**

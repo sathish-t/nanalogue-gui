@@ -9,7 +9,7 @@ const mainScript = path.join(__dirname, '..', 'dist', 'main.js');
 
 const child = spawn(electronPath, [mainScript, ...process.argv.slice(2)], {
   stdio: 'inherit',
-  env: { ...process.env, ELECTRON_NO_DCONF: '1' }
+  env: { ...process.env, GSETTINGS_BACKEND: process.env.GSETTINGS_BACKEND ?? 'memory' }
 });
 
 child.on('close', (code) => {

@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error/empty state page in QC results with "Back to config" button
 - Input validation for QC config: sample fraction, window size, read length bin width
 - Stale-request guard for BAM peek to discard out-of-order responses
+- Swipe configuration page with file browsing, BAM peek summary, BED line count,
+  output overwrite confirmation, and same-file input/output validation
+- Streaming BED line counter (`line-counter.ts`) with tests
+- `isBedHeaderLine()` for `track`/`browser` header detection, with tests
+- Range filters on whole-read and windowed density histograms in QC results
+- Output file path shown on swipe completion screen
+- Same-file guard preventing output from overwriting input BED
 - Output file overwrite confirmation dialog in swipe mode
 - Initialization guard in swipe mode to prevent actions before data loads
 - Clamp warning banner in swipe mode when annotation coordinates exceed contig bounds
@@ -45,7 +52,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adaptive label formatting on histograms: auto-detect decimal places from bin width;
   yield labels use K/M suffixes for finer resolutions
 - Generate button disabled during QC generation to prevent double-submit
-- Sample fraction warning text updated to mention crash risk
+- Swipe launch refactored from sequential native dialogs to config page
+- `setupProbabilityFilter` generalized to `setupHistogramFilter` for reuse
+- Histogram/yield charts trim leading/trailing zero-count bins
+- Chart animations disabled for faster rendering
+- QC config wording: "forward strand" → "basecalled strand"
+- Sample fraction warning text updated
 - Repository URL corrected from `DNAReplicationLab` to `sathish-t` in README
 - `parseWindowReadsTsv` and `parseWindowedDensities` exported for testability
 
@@ -70,7 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `esbuild` ^0.27.2 → ^0.27.3
 
 ### Infrastructure
-- Set `ELECTRON_NO_DCONF=1` in launcher to suppress dconf warnings on Linux
+- `GSETTINGS_BACKEND=memory` replaces `ELECTRON_NO_DCONF=1` for GSettings suppression
 - Added `docs/` to `.gitignore`
 - Excluded `*.test.ts` from TypeScript compilation in `tsconfig.json`
 

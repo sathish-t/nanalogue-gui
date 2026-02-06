@@ -1,6 +1,12 @@
 // Swipe mode module - handles annotation review workflow
 
-import { appendFileSync, existsSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+    appendFileSync,
+    existsSync,
+    realpathSync,
+    unlinkSync,
+    writeFileSync,
+} from "node:fs";
 import { resolve } from "node:path";
 import { dialog, ipcMain } from "electron";
 import { parseBedFile } from "../lib/bed-parser";
@@ -98,10 +104,31 @@ export function parseSwipeArgs(args: string[]): SwipeCliArgs {
  * Initializes the swipe mode by loading contig sizes, parsing annotations, and preparing the output file.
  *
  * @param args - The validated swipe CLI arguments containing file paths and window size.
+ * @param skipOverwriteConfirm - Whether to skip the overwrite confirmation dialog (used when the GUI config page already warned the user).
  * @returns A promise that resolves when initialization is complete.
  */
-export async function initialize(args: SwipeCliArgs): Promise<void> {
+export async function initialize(
+    args: SwipeCliArgs,
+    skipOverwriteConfirm = false,
+): Promise<void> {
     cliArgs = args;
+
+    // Guard against output path being the same as input BED path
+    const resolvedBed = realpathSync(cliArgs.bedPath);
+    const resolvedOutput = resolve(cliArgs.outputPath);
+    if (
+        existsSync(cliArgs.outputPath) &&
+        realpathSync(cliArgs.outputPath) === resolvedBed
+    ) {
+        throw new Error(
+            "Output path resolves to the same file as the input BED path. Choose a different output file to avoid data loss.",
+        );
+    }
+    if (resolvedOutput === resolvedBed) {
+        throw new Error(
+            "Output path resolves to the same file as the input BED path. Choose a different output file to avoid data loss.",
+        );
+    }
 
     console.log("Loading data...");
     console.log(`  BAM: ${cliArgs.bamPath}`);
@@ -121,18 +148,21 @@ export async function initialize(args: SwipeCliArgs): Promise<void> {
     appState.currentIndex = 0;
     appState.acceptedCount = 0;
     appState.rejectedCount = 0;
+    appState.outputPath = cliArgs.outputPath;
 
     if (existsSync(cliArgs.outputPath)) {
-        const { response } = await dialog.showMessageBox({
-            type: "warning",
-            buttons: ["Overwrite", "Cancel"],
-            defaultId: 1,
-            title: "File exists",
-            message: `Output file already exists:\n${cliArgs.outputPath}`,
-            detail: "Do you want to overwrite it?",
-        });
-        if (response === 1) {
-            throw new Error("User cancelled: output file exists");
+        if (!skipOverwriteConfirm) {
+            const { response } = await dialog.showMessageBox({
+                type: "warning",
+                buttons: ["Overwrite", "Cancel"],
+                defaultId: 1,
+                title: "File exists",
+                message: `Output file already exists:\n${cliArgs.outputPath}`,
+                detail: "Do you want to overwrite it?",
+            });
+            if (response === 1) {
+                throw new Error("User cancelled: output file exists");
+            }
         }
         unlinkSync(cliArgs.outputPath);
     }

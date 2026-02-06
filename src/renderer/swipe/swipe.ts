@@ -52,6 +52,9 @@ interface AppState {
 
     /** The number of annotations that have been rejected so far. */
     rejectedCount: number;
+
+    /** The file path where accepted annotations are being written. */
+    outputPath?: string;
 }
 
 /**
@@ -181,6 +184,9 @@ const elements = {
 
     /** The warning banner shown when annotation coordinates are clamped. */
     clampWarning: document.getElementById("clamp-warning") as HTMLElement,
+
+    /** The element displaying the output file path after completion. */
+    outputInfo: document.getElementById("output-info") as HTMLElement,
 };
 
 /**
@@ -218,6 +224,9 @@ function showDone(state: AppState) {
     elements.noDataMessage.classList.add("hidden");
     elements.doneMessage.classList.remove("hidden");
     elements.summary.textContent = `Accepted: ${state.acceptedCount} | Rejected: ${state.rejectedCount}`;
+    if (state.outputPath) {
+        elements.outputInfo.textContent = `Results saved to: ${state.outputPath}`;
+    }
 }
 
 /**

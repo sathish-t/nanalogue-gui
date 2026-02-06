@@ -103,6 +103,8 @@ export interface AppState {
     acceptedCount: number;
     /** The number of annotations the user has rejected so far. */
     rejectedCount: number;
+    /** The file path where accepted annotations are being written. */
+    outputPath?: string;
 }
 
 /**

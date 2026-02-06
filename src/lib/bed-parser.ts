@@ -4,10 +4,30 @@ import { readFileSync } from "node:fs";
 import type { BedAnnotation } from "./types";
 
 /**
+ * Checks whether a line is a BED header or comment line.
+ * Matches `#` comments and the `track`/`browser` keywords when followed by
+ * whitespace or at end-of-line, so contigs like `track1` are not skipped.
+ *
+ * @param line - The trimmed line to check.
+ * @returns True if the line is a header or comment.
+ */
+export function isBedHeaderLine(line: string): boolean {
+    return (
+        line.startsWith("#") ||
+        line === "track" ||
+        line.startsWith("track ") ||
+        line.startsWith("track\t") ||
+        line === "browser" ||
+        line.startsWith("browser ") ||
+        line.startsWith("browser\t")
+    );
+}
+
+/**
  * Parses a BED file and returns an array of annotations with contig, coordinates, and read ID.
  *
  * @param bedPath - The filesystem path to the BED file to parse.
- * @returns An array of parsed BED annotations, skipping malformed or comment lines.
+ * @returns An array of parsed BED annotations, skipping malformed or header lines.
  */
 export function parseBedFile(bedPath: string): BedAnnotation[] {
     const content = readFileSync(bedPath, "utf-8");
@@ -17,7 +37,7 @@ export function parseBedFile(bedPath: string): BedAnnotation[] {
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
 
-        if (!line || line.startsWith("#")) {
+        if (!line || isBedHeaderLine(line)) {
             continue;
         }
 

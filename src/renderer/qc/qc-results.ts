@@ -127,6 +127,42 @@ const charts: Map<string, ChartInstance> = new Map();
 /** Stores the full raw probability histogram bins for range filtering. */
 let fullProbabilityBins: HistogramBin[] = [];
 
+/** Stores the full whole-read density histogram bins for range filtering. */
+let fullWholeReadDensityBins: HistogramBin[] = [];
+
+/** Stores the full windowed density histogram bins for range filtering. */
+let fullWindowedDensityBins: HistogramBin[] = [];
+
+/**
+ * Trims leading and trailing zero-count bins from a histogram bin array.
+ *
+ * @param bins - The histogram bins to trim.
+ * @returns A new array with leading and trailing zero-count bins removed.
+ */
+function trimZeroHistogramBins(bins: HistogramBin[]): HistogramBin[] {
+    if (bins.length === 0) return bins;
+    let start = 0;
+    while (start < bins.length && bins[start].count === 0) start++;
+    let end = bins.length - 1;
+    while (end > start && bins[end].count === 0) end--;
+    return bins.slice(start, end + 1);
+}
+
+/**
+ * Trims leading and trailing zero-yield bins from a yield bin array.
+ *
+ * @param bins - The yield bins to trim.
+ * @returns A new array with leading and trailing zero-yield bins removed.
+ */
+function trimZeroYieldBins(bins: YieldBin[]): YieldBin[] {
+    if (bins.length === 0) return bins;
+    let start = 0;
+    while (start < bins.length && bins[start].yield === 0) start++;
+    let end = bins.length - 1;
+    while (end > start && bins[end].yield === 0) end--;
+    return bins.slice(start, end + 1);
+}
+
 /**
  * Formats a number into a human-readable string with optional SI suffixes.
  *
@@ -340,7 +376,10 @@ function renderHistogram(
     charts.get(canvasId)?.destroy();
 
     // Auto-detect decimal places from bin width
-    const binWidth = bins.length >= 2 ? bins[1].binStart - bins[0].binStart : 1;
+    const binWidth =
+        bins.length >= 2
+            ? bins[1].binStart - bins[0].binStart
+            : bins[0].binEnd - bins[0].binStart;
     let labelDecimals = 0;
     if (binWidth < 0.01) {
         labelDecimals = 3;
@@ -367,6 +406,7 @@ function renderHistogram(
             ],
         },
         options: {
+            animation: false,
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
@@ -428,6 +468,7 @@ function renderYieldChart(
             ],
         },
         options: {
+            animation: false,
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
@@ -483,23 +524,44 @@ function setupTabs(): void {
 }
 
 /**
- * Sets up the probability range filter toggle and apply button.
+ * Sets up a histogram range filter toggle and apply button for the given ID prefix.
+ *
+ * @param idPrefix - The ID prefix for the filter DOM elements (e.g. "probability-filter").
+ * @param getFullBins - A function returning the full unfiltered histogram bins.
+ * @param chartId - The DOM element ID of the chart canvas to re-render.
+ * @param xLabel - The x-axis label for the chart.
+ * @param statsPanelId - The DOM element ID of the stats panel to annotate when filtered.
  */
-function setupProbabilityFilter(): void {
+function setupHistogramFilter(
+    idPrefix: string,
+    getFullBins: () => HistogramBin[],
+    chartId: string,
+    xLabel: string,
+    statsPanelId: string,
+): void {
+    const filterContainer = document.getElementById(idPrefix);
+
+    // Hide filter controls when there is no data to filter
+    if (getFullBins().length === 0) {
+        if (filterContainer) {
+            filterContainer.classList.add("hidden");
+        }
+        return;
+    }
+
     const toggle = document.getElementById(
-        "probability-filter-toggle",
+        `${idPrefix}-toggle`,
     ) as HTMLInputElement | null;
-    const inputsContainer = document.getElementById(
-        "probability-filter-inputs",
-    );
+    const inputsContainer = document.getElementById(`${idPrefix}-inputs`);
     const lowInput = document.getElementById(
-        "probability-filter-low",
+        `${idPrefix}-low`,
     ) as HTMLInputElement | null;
     const highInput = document.getElementById(
-        "probability-filter-high",
+        `${idPrefix}-high`,
     ) as HTMLInputElement | null;
-    const applyBtn = document.getElementById("probability-filter-apply");
-    const errorEl = document.getElementById("probability-filter-error");
+    const applyBtn = document.getElementById(`${idPrefix}-apply`);
+    const errorEl = document.getElementById(`${idPrefix}-error`);
+    const statsPanel = document.getElementById(statsPanelId);
 
     if (
         !toggle ||
@@ -512,18 +574,36 @@ function setupProbabilityFilter(): void {
         return;
     }
 
+    /**
+     * Adds or removes the "(all reads)" annotation on the stats panel.
+     *
+     * @param show - Whether to show the annotation.
+     */
+    function setStatsAnnotation(show: boolean): void {
+        if (!statsPanel) return;
+        const existing = statsPanel.querySelector(".stats-filter-note");
+        if (show && !existing) {
+            const note = document.createElement("span");
+            note.className = "stats-filter-note";
+            note.textContent = " (all reads)";
+            note.style.fontWeight = "normal";
+            note.style.color = "#999";
+            note.style.fontSize = "12px";
+            statsPanel.prepend(note);
+        } else if (!show && existing) {
+            existing.remove();
+        }
+    }
+
     toggle.addEventListener("change", () => {
         if (toggle.checked) {
             inputsContainer.classList.remove("hidden");
         } else {
             inputsContainer.classList.add("hidden");
             errorEl.classList.add("hidden");
+            setStatsAnnotation(false);
             // Restore full histogram
-            renderHistogram(
-                "chart-probability",
-                fullProbabilityBins,
-                "Modification Probability",
-            );
+            renderHistogram(chartId, getFullBins(), xLabel);
         }
     });
 
@@ -547,7 +627,7 @@ function setupProbabilityFilter(): void {
         errorEl.classList.add("hidden");
 
         // Filter bins that overlap with the requested range
-        const filteredBins = fullProbabilityBins.filter((b) => {
+        const filteredBins = getFullBins().filter((b) => {
             return b.binEnd > low && b.binStart < high;
         });
 
@@ -557,11 +637,8 @@ function setupProbabilityFilter(): void {
             return;
         }
 
-        renderHistogram(
-            "chart-probability",
-            filteredBins,
-            "Modification Probability",
-        );
+        renderHistogram(chartId, filteredBins, xLabel);
+        setStatsAnnotation(true);
     });
 }
 
@@ -604,7 +681,7 @@ async function initialize(): Promise<void> {
         } else {
             renderHistogram(
                 "chart-read-lengths",
-                data.readLengthHistogram,
+                trimZeroHistogramBins(data.readLengthHistogram),
                 "Read Length (bp)",
             );
         }
@@ -616,7 +693,7 @@ async function initialize(): Promise<void> {
         } else {
             renderYieldChart(
                 "chart-yield",
-                data.yieldByLength,
+                trimZeroYieldBins(data.yieldByLength),
                 data.readLengthBinWidth,
             );
         }
@@ -627,6 +704,7 @@ async function initialize(): Promise<void> {
         );
 
         // Density tab
+        fullWholeReadDensityBins = data.wholeReadDensityHistogram;
         if (data.wholeReadDensityHistogram.length === 0) {
             showNoData(
                 "chart-whole-density",
@@ -645,6 +723,7 @@ async function initialize(): Promise<void> {
             !data.windowedDensityStats ||
             data.windowedDensityStats.count === 0
         ) {
+            fullWindowedDensityBins = [];
             showNoData(
                 "chart-windowed-density",
                 "No windowed density data available for the selected parameters.",
@@ -656,6 +735,7 @@ async function initialize(): Promise<void> {
                 statsContainer.textContent = "";
             }
         } else {
+            fullWindowedDensityBins = data.windowedDensityHistogram;
             renderHistogram(
                 "chart-windowed-density",
                 data.windowedDensityHistogram,
@@ -683,7 +763,27 @@ async function initialize(): Promise<void> {
         }
         renderStatsPanel("stats-probability", data.rawProbabilityStats);
 
-        setupProbabilityFilter();
+        setupHistogramFilter(
+            "probability-filter",
+            () => fullProbabilityBins,
+            "chart-probability",
+            "Modification Probability",
+            "stats-probability",
+        );
+        setupHistogramFilter(
+            "whole-density-filter",
+            () => fullWholeReadDensityBins,
+            "chart-whole-density",
+            "Analogue Density",
+            "stats-whole-density",
+        );
+        setupHistogramFilter(
+            "windowed-density-filter",
+            () => fullWindowedDensityBins,
+            "chart-windowed-density",
+            "Windowed Density",
+            "stats-windowed-density",
+        );
         setupTabs();
     } catch (error) {
         console.error("Failed to initialize QC results:", error);

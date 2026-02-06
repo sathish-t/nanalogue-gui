@@ -1,7 +1,12 @@
 // Electron main process for nanalogue-gui with multi-mode support
 
+// Suppress dconf warnings on Linux/WSL by using in-memory GSettings backend
+process.env.GSETTINGS_BACKEND ??= "memory";
+
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import { countBedDataLines } from "./lib/line-counter";
 import * as qcModule from "./modes/qc";
 import * as swipeModule from "./modes/swipe";
 
@@ -175,58 +180,148 @@ function parseCliArgs(): ParsedCliResult {
 ipcMain.handle(
     "launch-swipe",
     /**
-     * Handles the launch-swipe IPC request by prompting the user for file paths and initializing swipe mode.
+     * Handles the launch-swipe IPC request by navigating to the swipe configuration page.
      *
      * @returns A result object indicating success or failure with an optional reason.
      */
     async () => {
         if (!mainWindow) return { success: false, reason: "No window" };
 
-        const bamResult = await dialog.showOpenDialog(mainWindow, {
+        const { width, height } = getWindowSize("swipe");
+        mainWindow.setSize(width, height);
+        mainWindow.center();
+        mainWindow.setTitle("nanalogue-swipe");
+        mainWindow.loadFile(
+            resolve(__dirname, "renderer", "swipe", "swipe-config.html"),
+        );
+        return { success: true };
+    },
+);
+
+// Swipe config page IPC handlers
+
+ipcMain.handle(
+    "swipe-pick-bam",
+    /**
+     * Opens a native file dialog for selecting a BAM file.
+     *
+     * @returns The selected file path, or null if cancelled.
+     */
+    async () => {
+        if (!mainWindow) return null;
+        const result = await dialog.showOpenDialog(mainWindow, {
             title: "Select BAM file",
             filters: [{ name: "BAM files", extensions: ["bam"] }],
             properties: ["openFile"],
         });
+        if (result.canceled || result.filePaths.length === 0) return null;
+        return result.filePaths[0];
+    },
+);
 
-        if (bamResult.canceled || bamResult.filePaths.length === 0) {
-            return { success: false, reason: "canceled" };
-        }
-
-        const bedResult = await dialog.showOpenDialog(mainWindow, {
+ipcMain.handle(
+    "swipe-pick-bed",
+    /**
+     * Opens a native file dialog for selecting a BED annotations file.
+     *
+     * @returns The selected file path, or null if cancelled.
+     */
+    async () => {
+        if (!mainWindow) return null;
+        const result = await dialog.showOpenDialog(mainWindow, {
             title: "Select BED annotations file",
             filters: [{ name: "BED files", extensions: ["bed"] }],
             properties: ["openFile"],
         });
+        if (result.canceled || result.filePaths.length === 0) return null;
+        return result.filePaths[0];
+    },
+);
 
-        if (bedResult.canceled || bedResult.filePaths.length === 0) {
-            return { success: false, reason: "canceled" };
-        }
-
-        const outputResult = await dialog.showSaveDialog(mainWindow, {
+ipcMain.handle(
+    "swipe-pick-output",
+    /**
+     * Opens a native save dialog for selecting the output BED file path.
+     *
+     * @returns The selected file path, or null if cancelled.
+     */
+    async () => {
+        if (!mainWindow) return null;
+        const result = await dialog.showSaveDialog(mainWindow, {
             title: "Select output BED file",
             filters: [{ name: "BED files", extensions: ["bed"] }],
             defaultPath: "accepted_annotations.bed",
         });
+        if (result.canceled || !result.filePath) return null;
+        return result.filePath;
+    },
+);
 
-        if (outputResult.canceled || !outputResult.filePath) {
-            return { success: false, reason: "canceled" };
-        }
+ipcMain.handle(
+    "swipe-count-bed-lines",
+    /**
+     * Counts BED data lines, skipping header and comment lines.
+     *
+     * @param _event - The IPC event (unused).
+     * @param filePath - The path to the BED file.
+     * @returns The number of data lines.
+     */
+    async (_event, filePath: string) => {
+        return countBedDataLines(filePath);
+    },
+);
 
+ipcMain.handle(
+    "swipe-check-file-exists",
+    /**
+     * Checks whether a file exists at the given path.
+     *
+     * @param _event - The IPC event (unused).
+     * @param filePath - The path to check.
+     * @returns True if the file exists, false otherwise.
+     */
+    (_event, filePath: string) => {
+        return existsSync(filePath);
+    },
+);
+
+ipcMain.handle(
+    "swipe-start",
+    /**
+     * Initializes the swipe module with the provided file paths and navigates to the swipe UI.
+     *
+     * @param _event - The IPC event (unused).
+     * @param bamPath - The path to the BAM file.
+     * @param bedPath - The path to the BED annotations file.
+     * @param outputPath - The path for the output BED file.
+     * @returns A result object indicating success or failure.
+     */
+    async (_event, bamPath: string, bedPath: string, outputPath: string) => {
         const swipeArgs: swipeModule.SwipeCliArgs = {
-            bamPath: bamResult.filePaths[0],
-            bedPath: bedResult.filePaths[0],
-            outputPath: outputResult.filePath,
+            bamPath,
+            bedPath,
+            outputPath,
             windowSize: 300,
         };
 
         try {
-            await swipeModule.initialize(swipeArgs);
+            await swipeModule.initialize(swipeArgs, true);
             resizeAndLoadMode("swipe");
             return { success: true };
         } catch (error) {
             console.error("Failed to initialize swipe mode:", error);
-            return { success: false, reason: "initialization_failed" };
+            return { success: false, reason: String(error) };
         }
+    },
+);
+
+ipcMain.handle(
+    "swipe-go-back",
+    /**
+     * Navigates back to the landing page from the swipe config screen.
+     */
+    () => {
+        resizeAndLoadMode("landing");
     },
 );
 

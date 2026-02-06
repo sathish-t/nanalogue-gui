@@ -44,6 +44,30 @@ describe("parseBedFile", () => {
         expect(result).toHaveLength(1);
     });
 
+    it("skips track header lines", () => {
+        const path = writeTempBed("track name=example\nchr1\t100\t200\tread1");
+        const result = parseBedFile(path);
+        expect(result).toHaveLength(1);
+    });
+
+    it("skips browser header lines", () => {
+        const path = writeTempBed(
+            "browser position chr1:100-200\nchr1\t100\t200\tread1",
+        );
+        const result = parseBedFile(path);
+        expect(result).toHaveLength(1);
+    });
+
+    it("does not skip contigs starting with track or browser", () => {
+        const path = writeTempBed(
+            "track1\t100\t200\tread1\nbrowserX\t300\t400\tread2",
+        );
+        const result = parseBedFile(path);
+        expect(result).toHaveLength(2);
+        expect(result[0].contig).toBe("track1");
+        expect(result[1].contig).toBe("browserX");
+    });
+
     it("skips lines with insufficient columns", () => {
         const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
         const path = writeTempBed("chr1\t100\t200\nchr1\t100\t200\tread1");
