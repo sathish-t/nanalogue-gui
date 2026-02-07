@@ -70,6 +70,9 @@ const elements = {
     /** Input field for the modification type filter string. */
     modFilter: document.getElementById("mod-filter") as HTMLInputElement,
 
+    /** Validation hint shown when mod filter is empty or invalid. */
+    modFilterHint: document.getElementById("mod-filter-hint") as HTMLElement,
+
     /** Input field for the genomic region specification. */
     region: document.getElementById("region") as HTMLInputElement,
 
@@ -127,6 +130,28 @@ function updateFileInputMode() {
 }
 
 /**
+ * Enables or disables the Generate button based on whether a BAM is loaded and the mod filter is valid.
+ */
+function updateGenerateButton(): void {
+    const bamLoaded = peekResult !== null;
+    const modFilterValid = Boolean(
+        parseModFilter(elements.modFilter.value).tag,
+    );
+    elements.btnGenerate.disabled = !bamLoaded || !modFilterValid;
+
+    if (bamLoaded && !modFilterValid) {
+        const trimmed = elements.modFilter.value.trim();
+        elements.modFilterHint.textContent =
+            trimmed.length > 0
+                ? "Invalid format \u2014 use +TAG or -TAG (e.g. +T, -m)"
+                : "Required \u2014 enter a modification tag to proceed";
+        elements.modFilterHint.classList.remove("hidden");
+    } else {
+        elements.modFilterHint.classList.add("hidden");
+    }
+}
+
+/**
  * Loads and displays peek information from the specified BAM file or URL.
  *
  * @returns A promise that resolves when the peek information has been loaded and displayed.
@@ -150,6 +175,14 @@ async function loadPeekInfo() {
         if (currentRequestId !== peekRequestId) return;
 
         peekResult = result;
+
+        // Auto-populate mod filter with first detected modification
+        if (
+            peekResult.modifications.length > 0 &&
+            !parseModFilter(elements.modFilter.value).tag
+        ) {
+            elements.modFilter.value = peekResult.modifications[0];
+        }
 
         const contigsText = peekResult.contigs.join(", ");
         const contigsSuffix =
@@ -196,7 +229,7 @@ async function loadPeekInfo() {
             moreInfoBtn,
         );
 
-        elements.btnGenerate.disabled = false;
+        updateGenerateButton();
     } catch (error) {
         // Discard stale error if a newer request was issued
         if (currentRequestId !== peekRequestId) return;
@@ -327,6 +360,10 @@ async function generateQC() {
     elements.btnGenerate.disabled = true;
 
     const { tag, modStrand } = parseModFilter(elements.modFilter.value);
+    if (!tag) {
+        updateGenerateButton();
+        return;
+    }
 
     const sampleFraction = parseFloat(elements.sampleFraction.value);
     const windowSize = parseInt(elements.windowSize.value, 10);
@@ -421,6 +458,10 @@ for (const radio of elements.sourceTypeRadios) {
         peekResult = null;
     });
 }
+
+elements.modFilter.addEventListener("input", () => {
+    updateGenerateButton();
+});
 
 elements.btnGenerate.addEventListener("click", generateQC);
 

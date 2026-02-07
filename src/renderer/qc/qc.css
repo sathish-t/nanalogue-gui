@@ -483,8 +483,8 @@ input[type="number"]:focus {
     margin-top: 4px;
 }
 
-/* Generic hidden class to toggle visibility. */
-.probability-filter .hidden {
+/* Hidden utility class for toggling visibility. */
+.hidden {
     display: none;
 }
 
