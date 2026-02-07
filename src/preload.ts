@@ -70,10 +70,31 @@ contextBridge.exposeInMainWorld("api", {
      * @param bamPath - The path to the BAM file.
      * @param bedPath - The path to the BED annotations file.
      * @param outputPath - The path for the output BED file.
+     * @param modTag - The modification tag code to filter by.
+     * @param modStrand - The strand convention for modification calls.
+     * @param flankingRegion - The number of base pairs to expand the region by on each side.
+     * @param showAnnotationHighlight - Whether to show the annotation region highlight box.
      * @returns A promise that resolves with a result object indicating success or failure.
      */
-    swipeStart: (bamPath: string, bedPath: string, outputPath: string) =>
-        ipcRenderer.invoke("swipe-start", bamPath, bedPath, outputPath),
+    swipeStart: (
+        bamPath: string,
+        bedPath: string,
+        outputPath: string,
+        modTag?: string,
+        modStrand?: "bc" | "bc_comp",
+        flankingRegion?: number,
+        showAnnotationHighlight?: boolean,
+    ) =>
+        ipcRenderer.invoke(
+            "swipe-start",
+            bamPath,
+            bedPath,
+            outputPath,
+            modTag,
+            modStrand,
+            flankingRegion,
+            showAnnotationHighlight,
+        ),
 
     /**
      * Navigate back to the landing page from the swipe config screen.

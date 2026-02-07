@@ -1,6 +1,6 @@
 // Swipe configuration page renderer
 
-export {};
+import { parseModFilter } from "../../lib/mod-filter";
 
 /**
  * Result returned by the peek-bam IPC handler.
@@ -47,6 +47,10 @@ interface SwipeConfigApi {
         bamPath: string,
         bedPath: string,
         outputPath: string,
+        modTag?: string,
+        modStrand?: "bc" | "bc_comp",
+        flankingRegion?: number,
+        showAnnotationHighlight?: boolean,
     ) => Promise<LaunchResult>;
     /** Navigates back to the landing page. */
     swipeGoBack: () => Promise<void>;
@@ -102,6 +106,22 @@ const elements = {
     overwriteCheckbox: document.getElementById(
         "overwrite-checkbox",
     ) as HTMLInputElement,
+    /** Modification filter input. */
+    modFilter: document.getElementById("mod-filter") as HTMLInputElement,
+    /** Validation hint shown when mod filter is empty. */
+    modFilterHint: document.getElementById("mod-filter-hint") as HTMLElement,
+    /** Flanking region input. */
+    flankingRegion: document.getElementById(
+        "flanking-region",
+    ) as HTMLInputElement,
+    /** Annotation highlight checkbox. */
+    showAnnotationHighlight: document.getElementById(
+        "show-annotation-highlight",
+    ) as HTMLInputElement,
+    /** Annotation highlight section container. */
+    annotationHighlightSection: document.getElementById(
+        "annotation-highlight-section",
+    ) as HTMLElement,
     /** Loading overlay. */
     loadingOverlay: document.getElementById("loading-overlay") as HTMLElement,
 };
@@ -300,8 +320,8 @@ function updateSummary(): void {
 }
 
 /**
- * Checks whether all three file paths are filled and enables/disables the start button.
- * Also blocks start when the output path matches the input BED path.
+ * Checks whether all three file paths are filled and enables/disables the start button and dependent fields.
+ * Also blocks start when the output path matches the input BED path or when the mod filter is empty.
  */
 function updateStartButton(): void {
     const allFilled =
@@ -328,7 +348,39 @@ function updateStartButton(): void {
     }
 
     const overwriteOk = !outputFileExists || elements.overwriteCheckbox.checked;
-    elements.btnStart.disabled = !allFilled || !overwriteOk || sameAsBed;
+    const modFilterValid = Boolean(
+        parseModFilter(elements.modFilter.value).tag,
+    );
+
+    // Enable flanking region when all paths are valid
+    elements.flankingRegion.disabled = !(
+        allFilled &&
+        overwriteOk &&
+        !sameAsBed
+    );
+
+    // Enable annotation highlight when all conditions for starting are met
+    const canStart = allFilled && overwriteOk && !sameAsBed;
+    elements.showAnnotationHighlight.disabled = !canStart;
+    elements.showAnnotationHighlight.parentElement?.classList.toggle(
+        "is-disabled",
+        !canStart,
+    );
+
+    // Show validation hint when mod filter is invalid and other conditions are met
+    if (allFilled && overwriteOk && !sameAsBed && !modFilterValid) {
+        const trimmed = elements.modFilter.value.trim();
+        elements.modFilterHint.textContent =
+            trimmed.length > 0
+                ? "Invalid format \u2014 use +TAG or -TAG (e.g. +T, -m)"
+                : "Required \u2014 enter a modification tag to proceed";
+        elements.modFilterHint.classList.remove("hidden");
+    } else {
+        elements.modFilterHint.classList.add("hidden");
+    }
+
+    elements.btnStart.disabled =
+        !allFilled || !overwriteOk || sameAsBed || !modFilterValid;
 }
 
 // Browse BAM
@@ -347,6 +399,17 @@ elements.btnBrowseBam.addEventListener("click", async () => {
         bamPeekResult = null;
     }
     if (path !== elements.bamPath.value) return;
+
+    // Auto-populate mod filter with first detected modification
+    if (
+        bamPeekResult &&
+        bamPeekResult.modifications.length > 0 &&
+        !parseModFilter(elements.modFilter.value).tag
+    ) {
+        elements.modFilter.value = bamPeekResult.modifications[0];
+        updateStartButton();
+    }
+
     updateSummary();
 });
 
@@ -404,6 +467,11 @@ elements.overwriteCheckbox.addEventListener("change", () => {
     updateStartButton();
 });
 
+// Modification filter input
+elements.modFilter.addEventListener("input", () => {
+    updateStartButton();
+});
+
 // Start swiping
 elements.btnStart.addEventListener("click", async () => {
     const bamPath = elements.bamPath.value;
@@ -412,12 +480,27 @@ elements.btnStart.addEventListener("click", async () => {
 
     if (!bamPath || !bedPath || !outputPath) return;
 
+    const { tag: modTag, modStrand } = parseModFilter(elements.modFilter.value);
+    const rawFlanking = parseInt(elements.flankingRegion.value, 10);
+    const flankingRegion = Number.isFinite(rawFlanking)
+        ? Math.max(0, Math.floor(rawFlanking))
+        : 1000;
+    const showAnnotationHighlight = elements.showAnnotationHighlight.checked;
+
     elements.btnStart.disabled = true;
     elements.btnBack.disabled = true;
     elements.loadingOverlay.classList.remove("hidden");
 
     try {
-        const result = await api.swipeStart(bamPath, bedPath, outputPath);
+        const result = await api.swipeStart(
+            bamPath,
+            bedPath,
+            outputPath,
+            modTag,
+            modStrand,
+            flankingRegion,
+            showAnnotationHighlight,
+        );
         if (!result.success) {
             elements.loadingOverlay.classList.add("hidden");
             elements.btnBack.disabled = false;

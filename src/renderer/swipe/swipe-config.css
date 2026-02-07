@@ -77,6 +77,22 @@
     margin-top: 6px;
 }
 
+/* Label row for the annotation highlight checkbox. */
+.annotation-highlight-label {
+    align-items: center;
+    color: #333;
+    cursor: pointer;
+    display: flex;
+    font-size: 14px;
+    gap: 8px;
+}
+
+/* Muted cursor when the annotation highlight checkbox is disabled. */
+.annotation-highlight-label.is-disabled {
+    color: #999;
+    cursor: default;
+}
+
 /* Button to open the full BAM details dialog from the summary. */
 #btn-more-info {
     margin-top: 10px;

@@ -58,6 +58,32 @@
         </label>
       </section>
 
+      <!-- Modification filter input for selecting which mod type and strand to view. -->
+      <section class="config-section">
+        <h2>Modification filter</h2>
+        <label for="mod-filter" class="visually-hidden">Modification filter</label>
+        <input type="text" id="mod-filter" placeholder="e.g. +T, -m, +a">
+        <!-- Hint explaining the strand sign convention. -->
+        <p class="hint">+ = basecalled strand, - = opposite strand</p>
+        <!-- Validation hint shown when the mod filter is empty. -->
+        <p class="hint warning hidden" id="mod-filter-hint">Required &mdash; enter a modification tag to proceed</p>
+      </section>
+
+      <!-- Flanking region size controlling how many bp to show around each annotation. -->
+      <section class="config-section">
+        <h2>Flanking region (bp)</h2>
+        <label for="flanking-region" class="visually-hidden">Flanking region in base pairs</label>
+        <input type="number" id="flanking-region" value="1000" min="0" disabled>
+      </section>
+
+      <!-- Annotation highlight toggle. -->
+      <section class="config-section" id="annotation-highlight-section">
+        <label class="annotation-highlight-label">
+          <input type="checkbox" id="show-annotation-highlight" checked disabled>
+          Show annotation highlight
+        </label>
+      </section>
+
       <!-- Summary panel populated after files are selected. -->
       <section class="config-section" id="summary-section">
         <h2>Summary</h2>

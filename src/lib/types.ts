@@ -105,6 +105,8 @@ export interface AppState {
     rejectedCount: number;
     /** The file path where accepted annotations are being written. */
     outputPath?: string;
+    /** Whether to show the annotation region highlight box on the chart. */
+    showAnnotationHighlight?: boolean;
 }
 
 /**

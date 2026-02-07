@@ -29,11 +29,22 @@ export interface SwipeCliArgs {
     outputPath: string;
     /** Window size in base pairs around each annotation for the signal plot. */
     windowSize: number;
+    /** Modification tag code to filter by (e.g. "m", "a", "T"). */
+    modTag?: string;
+    /** Strand convention for modification calls. */
+    modStrand?: "bc" | "bc_comp";
+    /** Number of base pairs to expand the annotation region by on each side. */
+    regionExpansion?: number;
+    /** Whether to show the annotation region highlight box on the chart. */
+    showAnnotationHighlight?: boolean;
 }
 
 let annotations: BedAnnotation[] = [];
 let contigSizes: ContigSizes = {};
 let cliArgs: SwipeCliArgs | null = null;
+let modTag: string | undefined;
+let modStrand: "bc" | "bc_comp" | undefined;
+let regionExpansion: number | undefined;
 const appState: AppState = {
     currentIndex: 0,
     totalCount: 0,
@@ -112,6 +123,10 @@ export async function initialize(
     skipOverwriteConfirm = false,
 ): Promise<void> {
     cliArgs = args;
+    modTag = args.modTag;
+    modStrand = args.modStrand;
+    regionExpansion = args.regionExpansion;
+    appState.showAnnotationHighlight = args.showAnnotationHighlight;
 
     // Guard against output path being the same as input BED path
     const resolvedBed = realpathSync(cliArgs.bedPath);
@@ -191,6 +206,7 @@ async function loadCurrentPlotData(): Promise<PlotData | null> {
             annotation,
             contigSizes,
             cliArgs.windowSize,
+            { modTag, modStrand, regionExpansion },
         );
     } catch (error) {
         console.error(

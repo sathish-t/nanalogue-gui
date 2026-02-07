@@ -55,6 +55,9 @@ interface AppState {
 
     /** The file path where accepted annotations are being written. */
     outputPath?: string;
+
+    /** Whether to show the annotation region highlight box on the chart. */
+    showAnnotationHighlight?: boolean;
 }
 
 /**
@@ -150,6 +153,7 @@ const api = (
 let chart: ChartInstance | null = null;
 let isProcessing = false;
 let isInitialized = false;
+let showAnnotationHighlight = true;
 
 /**
  * Cached references to the DOM elements used throughout the swipe UI.
@@ -370,16 +374,18 @@ function renderChart(plotData: PlotData) {
                     },
                 },
                 annotation: {
-                    annotations: {
-                        regionBox: {
-                            type: "box",
-                            xMin: annotation.start,
-                            xMax: annotation.end,
-                            backgroundColor: "rgba(76, 175, 80, 0.15)",
-                            borderColor: "rgba(76, 175, 80, 0.6)",
-                            borderWidth: 1,
-                        },
-                    },
+                    annotations: showAnnotationHighlight
+                        ? {
+                              regionBox: {
+                                  type: "box",
+                                  xMin: annotation.start,
+                                  xMax: annotation.end,
+                                  backgroundColor: "rgba(76, 175, 80, 0.15)",
+                                  borderColor: "rgba(76, 175, 80, 0.6)",
+                                  borderWidth: 1,
+                              },
+                          }
+                        : {},
                 },
             },
             scales: {
@@ -478,6 +484,7 @@ async function initialize() {
 
     try {
         const state = await api.getState();
+        showAnnotationHighlight = state.showAnnotationHighlight !== false;
         updateProgress(state);
 
         if (state.totalCount === 0) {

@@ -294,14 +294,31 @@ ipcMain.handle(
      * @param bamPath - The path to the BAM file.
      * @param bedPath - The path to the BED annotations file.
      * @param outputPath - The path for the output BED file.
+     * @param modTag - The modification tag code to filter by.
+     * @param modStrand - The strand convention for modification calls.
+     * @param flankingRegion - The number of base pairs to expand the region by on each side.
+     * @param showAnnotationHighlight - Whether to show the annotation region highlight box.
      * @returns A result object indicating success or failure.
      */
-    async (_event, bamPath: string, bedPath: string, outputPath: string) => {
+    async (
+        _event,
+        bamPath: string,
+        bedPath: string,
+        outputPath: string,
+        modTag?: string,
+        modStrand?: "bc" | "bc_comp",
+        flankingRegion?: number,
+        showAnnotationHighlight?: boolean,
+    ) => {
         const swipeArgs: swipeModule.SwipeCliArgs = {
             bamPath,
             bedPath,
             outputPath,
             windowSize: 300,
+            modTag,
+            modStrand,
+            regionExpansion: flankingRegion,
+            showAnnotationHighlight,
         };
 
         try {
