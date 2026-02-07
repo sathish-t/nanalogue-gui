@@ -488,6 +488,113 @@ input[type="number"]:focus {
     display: none;
 }
 
+/* Button to open the full BAM details dialog. */
+#btn-more-info {
+    margin-top: 10px;
+}
+
+/* Modal dialog for full BAM file details. */
+#more-info-dialog {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    max-height: 80vh;
+    max-width: 600px;
+    padding: 24px;
+    width: 90%;
+}
+
+/* Semi-transparent backdrop behind the dialog. */
+#more-info-dialog::backdrop {
+    background: rgb(0 0 0 / 40%);
+}
+
+/* Heading inside the dialog. */
+#more-info-dialog h2 {
+    color: #333;
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 16px;
+}
+
+/* Section headings inside the dialog content. */
+#more-info-content h3 {
+    color: #333;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 16px 0 8px;
+}
+
+/* First section heading has no top margin. */
+#more-info-content h3:first-child {
+    margin-top: 0;
+}
+
+/* Scrollable content area inside the dialog. */
+#more-info-content {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* Table for contig name-length pairs. */
+.more-info-table {
+    border-collapse: collapse;
+    font-size: 13px;
+    width: 100%;
+}
+
+/* Table header cells. */
+.more-info-table th {
+    background: #f5f5f5;
+    border-bottom: 1px solid #ddd;
+    color: #666;
+    font-weight: 600;
+    padding: 6px 10px;
+    text-align: left;
+}
+
+/* Table body cells. */
+.more-info-table td {
+    border-bottom: 1px solid #eee;
+    color: #333;
+    padding: 5px 10px;
+}
+
+/* Right-align the length column. */
+.more-info-table td:nth-child(2),
+.more-info-table th:nth-child(2) {
+    text-align: right;
+}
+
+/* Simple list for modifications. */
+.more-info-list {
+    color: #333;
+    font-size: 13px;
+    list-style: disc;
+    margin: 0;
+    padding-left: 20px;
+}
+
+/* Spacing between list items. */
+.more-info-list li {
+    margin: 2px 0;
+}
+
+/* Explanatory note about modification strand conventions. */
+.more-info-note {
+    color: #888;
+    font-size: 12px;
+    line-height: 1.5;
+    margin-top: 12px;
+}
+
+/* Close button centered below the dialog content. */
+#more-info-close {
+    display: block;
+    margin: 20px auto 0;
+    padding: 8px 24px;
+}
+
 /* Dropdown styling for the read length granularity selector. */
 #read-length-granularity {
     border: 1px solid #ddd;

@@ -14,6 +14,9 @@ interface PeekResult {
 
     /** List of base modification types detected in the BAM records. */
     modifications: string[];
+
+    /** Full contig-to-length mapping from the BAM header. */
+    allContigs?: Record<string, number>;
 }
 
 /**
@@ -179,7 +182,19 @@ async function loadPeekInfo() {
         modsP.appendChild(modsStrong);
         modsP.appendChild(document.createTextNode(modsText));
 
-        elements.fileInfoContent.append(infoLabel, contigsP, modsP);
+        const moreInfoBtn = document.createElement("button");
+        moreInfoBtn.type = "button";
+        moreInfoBtn.id = "btn-more-info";
+        moreInfoBtn.className = "small-button";
+        moreInfoBtn.textContent = "More info";
+        moreInfoBtn.addEventListener("click", () => showMoreInfoDialog());
+
+        elements.fileInfoContent.append(
+            infoLabel,
+            contigsP,
+            modsP,
+            moreInfoBtn,
+        );
 
         elements.btnGenerate.disabled = false;
     } catch (error) {
@@ -199,6 +214,105 @@ async function loadPeekInfo() {
             elements.btnBrowse.disabled = false;
         }
     }
+}
+
+/**
+ * Formats a contig length into a human-readable string with SI suffixes.
+ *
+ * @param length - The contig length in base pairs.
+ * @returns The formatted length string.
+ */
+function formatContigLength(length: number): string {
+    if (length >= 1_000_000) {
+        return `${(length / 1_000_000).toFixed(2)} Mb`;
+    }
+    if (length >= 1_000) {
+        return `${(length / 1_000).toFixed(1)} kb`;
+    }
+    return `${length} bp`;
+}
+
+/**
+ * Opens the "More info" dialog showing full contig and modification details.
+ */
+function showMoreInfoDialog(): void {
+    if (!peekResult) return;
+
+    const dialog = document.getElementById(
+        "more-info-dialog",
+    ) as HTMLDialogElement | null;
+    const content = document.getElementById("more-info-content");
+    if (!dialog || !content) return;
+    if (dialog.open) return;
+
+    content.textContent = "";
+
+    // Contigs table
+    const contigHeading = document.createElement("h3");
+    contigHeading.textContent = `Contigs (${peekResult.totalContigs})`;
+    content.appendChild(contigHeading);
+
+    const table = document.createElement("table");
+    table.className = "more-info-table";
+
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    const nameHeader = document.createElement("th");
+    nameHeader.textContent = "Name";
+    const lengthHeader = document.createElement("th");
+    lengthHeader.textContent = "Length";
+    headerRow.append(nameHeader, lengthHeader);
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    const sortedContigs = Object.entries(peekResult.allContigs ?? {}).sort(
+        (a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }),
+    );
+    for (const [name, length] of sortedContigs) {
+        const row = document.createElement("tr");
+        const nameCell = document.createElement("td");
+        nameCell.textContent = name;
+        const lengthCell = document.createElement("td");
+        lengthCell.textContent = formatContigLength(length);
+        row.append(nameCell, lengthCell);
+        tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    content.appendChild(table);
+
+    // Modifications list
+    const modsHeading = document.createElement("h3");
+    modsHeading.textContent = "Detected modifications";
+    content.appendChild(modsHeading);
+
+    if (peekResult.modifications.length === 0) {
+        const noneP = document.createElement("p");
+        noneP.className = "placeholder-text";
+        noneP.textContent = "None detected";
+        content.appendChild(noneP);
+    } else {
+        const modsList = document.createElement("ul");
+        modsList.className = "more-info-list";
+        for (const mod of peekResult.modifications) {
+            const li = document.createElement("li");
+            li.textContent = mod;
+            modsList.appendChild(li);
+        }
+        content.appendChild(modsList);
+    }
+
+    const strandNote = document.createElement("p");
+    strandNote.className = "more-info-note";
+    strandNote.textContent =
+        "+ means mods are on the basecalled strand, - means they are on the " +
+        "complementary strand. Some technologies like PacBio and ONT duplex " +
+        "may report mods on two strands, so you may see both + and - in the " +
+        "mods found. Other technologies just report data on the sequenced " +
+        "strand, so in this case you will just see a + in the mods found.";
+    content.appendChild(strandNote);
+
+    dialog.showModal();
 }
 
 /**
@@ -334,6 +448,14 @@ for (const radio of elements.sourceTypeRadios) {
 }
 
 elements.btnGenerate.addEventListener("click", generateQC);
+
+// Close button for the "More info" dialog
+document.getElementById("more-info-close")?.addEventListener("click", () => {
+    const dialog = document.getElementById(
+        "more-info-dialog",
+    ) as HTMLDialogElement | null;
+    dialog?.close();
+});
 
 // Initialize
 updateFileInputMode();

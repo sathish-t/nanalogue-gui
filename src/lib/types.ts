@@ -155,6 +155,8 @@ export interface PeekResult {
     totalContigs: number;
     /** The list of modification types detected in the BAM file. */
     modifications: string[];
+    /** Full contig-to-length mapping from the BAM header. */
+    allContigs: Record<string, number>;
 }
 
 /**

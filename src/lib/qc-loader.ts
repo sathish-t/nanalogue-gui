@@ -43,6 +43,7 @@ export async function peekBam(
         contigs: exampleContigs,
         totalContigs: contigNames.length,
         modifications: [...new Set(modifications)],
+        allContigs: result.contigs,
     };
 }
 
