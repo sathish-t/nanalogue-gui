@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { RunningHistogram } from "./histogram";
-import { parseWindowedDensities } from "./qc-loader";
+import { maxReadLengthForBinWidth, parseWindowedDensities } from "./qc-loader";
 
 describe("parseWindowedDensities", () => {
     it("returns empty array for empty input", () => {
@@ -61,6 +61,30 @@ describe("parseWindowedDensities", () => {
 
         const result = parseWindowedDensities(tsv);
         expect(result).toEqual([0.5, 0.75]);
+    });
+});
+
+describe("maxReadLengthForBinWidth", () => {
+    it("returns 30M for binWidth >= 10000", () => {
+        expect(maxReadLengthForBinWidth(10_000)).toBe(30_000_000);
+        expect(maxReadLengthForBinWidth(50_000)).toBe(30_000_000);
+    });
+
+    it("returns 3M for binWidth >= 1000 and < 10000", () => {
+        expect(maxReadLengthForBinWidth(1000)).toBe(3_000_000);
+        expect(maxReadLengthForBinWidth(5000)).toBe(3_000_000);
+        expect(maxReadLengthForBinWidth(9999)).toBe(3_000_000);
+    });
+
+    it("returns 300K for binWidth >= 10 and < 1000", () => {
+        expect(maxReadLengthForBinWidth(10)).toBe(300_000);
+        expect(maxReadLengthForBinWidth(100)).toBe(300_000);
+        expect(maxReadLengthForBinWidth(999)).toBe(300_000);
+    });
+
+    it("returns 30K for binWidth < 10", () => {
+        expect(maxReadLengthForBinWidth(1)).toBe(30_000);
+        expect(maxReadLengthForBinWidth(9)).toBe(30_000);
     });
 });
 

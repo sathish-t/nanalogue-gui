@@ -10,7 +10,7 @@ import type { PeekResult, QCConfig, QCData } from "./types";
  * @param binWidth - The read length bin width in base pairs.
  * @returns The maximum representable read length in base pairs.
  */
-function maxReadLengthForBinWidth(binWidth: number): number {
+export function maxReadLengthForBinWidth(binWidth: number): number {
     if (binWidth >= 10_000) return 30_000_000;
     if (binWidth >= 1000) return 3_000_000;
     if (binWidth >= 10) return 300_000;
