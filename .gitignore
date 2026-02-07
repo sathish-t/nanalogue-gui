@@ -31,6 +31,8 @@ out/
 # Data files (large BAM/BED files)
 # ===================
 data/
+/*.bam
+/*.bam.bai
 
 # ===================
 # Testing

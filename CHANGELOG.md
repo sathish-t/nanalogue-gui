@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Reusable `<bam-resource-input>` Custom Element for BAM file/URL source selection, with file/URL radio toggle, Browse button, and `bam-selected`/`source-type-changed` events ([`a9defd6`](https://github.com/sathish-t/nanalogue-gui/commit/a9defd6))
+- URL support for BAM source in Swipe config, matching existing QC behavior ([`a9defd6`](https://github.com/sathish-t/nanalogue-gui/commit/a9defd6))
+- `treatAsUrl` threaded through Swipe backend pipeline — `SwipeArgs`, `loadContigSizes`, and `loadPlotData` now support remote BAM URLs ([`a9defd6`](https://github.com/sathish-t/nanalogue-gui/commit/a9defd6))
 - Mod region field in QC config — optional sub-region to restrict modification filtering, with format and overlap validation against the main region ([`8e3cedd`](https://github.com/sathish-t/nanalogue-gui/commit/8e3cedd))
 - Full-region checkbox in QC config — restricts analysis to reads that fully span the specified region ([`35f3b83`](https://github.com/sathish-t/nanalogue-gui/commit/35f3b83))
 - Region validation in QC config — parses and validates genomic region strings against BAM header contigs before generation ([`7a333d9`](https://github.com/sathish-t/nanalogue-gui/commit/7a333d9))
@@ -54,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LaunchResult` return type for mode launch IPC handlers with error alerts on landing page
 
 ### Changed
+- QC and Swipe config pages refactored to use `<bam-resource-input>` Custom Element, replacing inline BAM source HTML and JS ([`a9defd6`](https://github.com/sathish-t/nanalogue-gui/commit/a9defd6))
 - `SwipeCliArgs` renamed to `SwipeArgs` and JSDoc updated to reflect GUI-only usage ([`f0d6428`](https://github.com/sathish-t/nanalogue-gui/commit/f0d6428))
 - README updated to remove CLI usage examples; added Usage section with `npm start` ([`f0d6428`](https://github.com/sathish-t/nanalogue-gui/commit/f0d6428))
 - QC loader refactored from raw array accumulation to four streaming `RunningHistogram`
