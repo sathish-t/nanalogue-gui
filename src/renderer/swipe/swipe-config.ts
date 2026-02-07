@@ -466,10 +466,13 @@ elements.btnStart.addEventListener("click", async () => {
     if (!bamPath || !bedPath || !outputPath) return;
 
     const { tag: modTag, modStrand } = parseModFilter(elements.modFilter.value);
-    const rawFlanking = parseInt(elements.flankingRegion.value, 10);
-    const flankingRegion = Number.isFinite(rawFlanking)
-        ? Math.max(0, Math.floor(rawFlanking))
-        : 1000;
+    const rawFlanking = Number(elements.flankingRegion.value);
+    if (!Number.isInteger(rawFlanking) || rawFlanking < 0) {
+        alert("Flanking region must be a non-negative integer.");
+        elements.btnStart.disabled = false;
+        return;
+    }
+    const flankingRegion = rawFlanking;
     const showAnnotationHighlight = elements.showAnnotationHighlight.checked;
 
     elements.btnStart.disabled = true;

@@ -137,6 +137,13 @@ describe("swipe-config.html", () => {
             expect(input?.value).toBe("1000");
         });
 
+        it("has a minimum value of 0", () => {
+            const doc = loadTemplate();
+            const input =
+                doc.querySelector<HTMLInputElement>("#flanking-region");
+            expect(input?.min).toBe("0");
+        });
+
         it("starts disabled", () => {
             const doc = loadTemplate();
             const input =
