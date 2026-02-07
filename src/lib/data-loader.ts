@@ -22,11 +22,15 @@ export interface ContigSizes {
 /**
  * Loads contig names and their sizes from a BAM file header.
  *
- * @param bamPath - The filesystem path to the BAM file.
+ * @param bamPath - The filesystem path or URL to the BAM file.
+ * @param treatAsUrl - Whether to treat the BAM path as a remote URL.
  * @returns A promise that resolves to a mapping of contig names to sizes.
  */
-export async function loadContigSizes(bamPath: string): Promise<ContigSizes> {
-    const result = await peek({ bamPath });
+export async function loadContigSizes(
+    bamPath: string,
+    treatAsUrl?: boolean,
+): Promise<ContigSizes> {
+    const result = await peek({ bamPath, treatAsUrl });
     return result.contigs;
 }
 
@@ -101,6 +105,8 @@ export interface LoadPlotDataOptions {
     modTag?: string;
     /** The strand convention for modification calls. */
     modStrand?: "bc" | "bc_comp";
+    /** Whether to treat the BAM path as a remote URL. */
+    treatAsUrl?: boolean;
 }
 
 /**
@@ -124,6 +130,7 @@ export async function loadPlotData(
         regionExpansion: rawExpansion = REGION_EXPANSION,
         modTag,
         modStrand,
+        treatAsUrl,
     } = options;
     const regionExpansion = Number.isFinite(rawExpansion)
         ? Math.max(0, Math.floor(rawExpansion))
@@ -155,6 +162,7 @@ export async function loadPlotData(
     const [tsv, modRecords] = await Promise.all([
         windowReads({
             bamPath,
+            treatAsUrl,
             region,
             modRegion,
             readIdSet: [annotation.readId],
@@ -166,6 +174,7 @@ export async function loadPlotData(
         }),
         bamMods({
             bamPath,
+            treatAsUrl,
             region,
             modRegion,
             readIdSet: [annotation.readId],

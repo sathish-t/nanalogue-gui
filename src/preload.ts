@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld("api", {
      * @param modStrand - The strand convention for modification calls.
      * @param flankingRegion - The number of base pairs to expand the region by on each side.
      * @param showAnnotationHighlight - Whether to show the annotation region highlight box.
+     * @param treatAsUrl - Whether to treat the BAM path as a remote URL.
      * @returns A promise that resolves with a result object indicating success or failure.
      */
     swipeStart: (
@@ -84,6 +85,7 @@ contextBridge.exposeInMainWorld("api", {
         modStrand?: "bc" | "bc_comp",
         flankingRegion?: number,
         showAnnotationHighlight?: boolean,
+        treatAsUrl?: boolean,
     ) =>
         ipcRenderer.invoke(
             "swipe-start",
@@ -94,6 +96,7 @@ contextBridge.exposeInMainWorld("api", {
             modStrand,
             flankingRegion,
             showAnnotationHighlight,
+            treatAsUrl,
         ),
 
     /**

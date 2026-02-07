@@ -3,6 +3,8 @@
 import { formatContigLength } from "../../lib/format-utils";
 import { parseModFilter } from "../../lib/mod-filter";
 import { parseRegion, validateModRegionOverlap } from "../../lib/region-parser";
+import type { BamSelectedDetail } from "../shared/bam-resource-input";
+import "../shared/bam-resource-input";
 
 /**
  * Result returned from peeking into a BAM file header and first records.
@@ -49,20 +51,21 @@ const api = (
 ).api;
 
 /**
+ * BAM source custom element reference.
+ */
+const bamSource = document.getElementById(
+    "bam-source",
+) as import("../shared/bam-resource-input").BamResourceInput;
+
+/**
  * Collection of DOM element references used by the QC config form.
  */
 const elements = {
     /** Button that navigates back to the previous page. */
     btnBack: document.getElementById("btn-back") as HTMLButtonElement,
 
-    /** Button that opens the native file browser dialog. */
-    btnBrowse: document.getElementById("btn-browse") as HTMLButtonElement,
-
     /** Button that triggers QC report generation. */
     btnGenerate: document.getElementById("btn-generate") as HTMLButtonElement,
-
-    /** Input field for the BAM file path or URL. */
-    bamPath: document.getElementById("bam-path") as HTMLInputElement,
 
     /** Container element that displays BAM file peek information. */
     fileInfoContent: document.getElementById(
@@ -99,43 +102,13 @@ const elements = {
 
     /** Overlay element shown while QC generation is in progress. */
     loadingOverlay: document.getElementById("loading-overlay") as HTMLElement,
-
-    /** Radio button group for selecting between file and URL source types. */
-    sourceTypeRadios: Array.from(
-        document.querySelectorAll('input[name="source-type"]'),
-    ) as HTMLInputElement[],
 };
-
-/** Tracks whether the current source type is a URL. */
-let isUrl = false;
 
 /** Stores the most recent BAM peek result, or null if none has been loaded. */
 let peekResult: PeekResult | null = null;
 
 /** Monotonically increasing counter to guard against stale peek responses. */
 let peekRequestId = 0;
-
-/**
- * Reads the currently selected source type from the radio button group.
- *
- * @returns The selected source type, either "file" or "url".
- */
-function getSourceType(): "file" | "url" {
-    for (const radio of elements.sourceTypeRadios) {
-        if (radio.checked) return radio.value as "file" | "url";
-    }
-    return "file";
-}
-
-/**
- * Updates the file input mode based on the selected source type.
- */
-function updateFileInputMode() {
-    isUrl = getSourceType() === "url";
-    elements.bamPath.readOnly = !isUrl;
-    elements.btnBrowse.style.display = isUrl ? "none" : "block";
-    elements.bamPath.placeholder = isUrl ? "Enter BAM URL" : "Select BAM file";
-}
 
 /**
  * Enables or disables the Generate button based on whether a BAM is loaded and the mod filter is valid.
@@ -165,7 +138,7 @@ function updateGenerateButton(): void {
  * @returns A promise that resolves when the peek information has been loaded and displayed.
  */
 async function loadPeekInfo() {
-    const bamPath = elements.bamPath.value.trim();
+    const bamPath = bamSource.value.trim();
     if (!bamPath) return;
 
     const currentRequestId = ++peekRequestId;
@@ -173,11 +146,10 @@ async function loadPeekInfo() {
     elements.fileInfoContent.innerHTML =
         '<p class="loading-text">Loading...</p>';
     elements.btnGenerate.disabled = true;
-    elements.bamPath.disabled = true;
-    elements.btnBrowse.disabled = true;
+    bamSource.disabled = true;
 
     try {
-        const result = await api.peekBam(bamPath, isUrl);
+        const result = await api.peekBam(bamPath, bamSource.isUrl);
 
         // Discard stale response if a newer request was issued
         if (currentRequestId !== peekRequestId) return;
@@ -251,8 +223,7 @@ async function loadPeekInfo() {
     } finally {
         // Only re-enable input if this is still the latest request
         if (currentRequestId === peekRequestId) {
-            elements.bamPath.disabled = false;
-            elements.btnBrowse.disabled = false;
+            bamSource.disabled = false;
         }
     }
 }
@@ -346,7 +317,7 @@ function showMoreInfoDialog(): void {
  * @returns A promise that resolves when QC generation completes or an error is handled.
  */
 async function generateQC() {
-    const bamPath = elements.bamPath.value.trim();
+    const bamPath = bamSource.value.trim();
     if (!bamPath) return;
 
     elements.btnGenerate.disabled = true;
@@ -441,7 +412,7 @@ async function generateQC() {
     const region = regionInput || undefined;
     const config = {
         bamPath,
-        treatAsUrl: isUrl,
+        treatAsUrl: bamSource.isUrl,
         tag,
         modStrand,
         region,
@@ -467,39 +438,30 @@ async function generateQC() {
 // Event listeners
 elements.btnBack.addEventListener("click", () => api.goBack());
 
-elements.btnBrowse.addEventListener("click", async () => {
-    const path = await api.selectFile();
-    if (path) {
-        elements.bamPath.value = path;
+// Wire the BAM source element to the file picker API
+
+/**
+ * Opens a native file dialog and returns the selected path.
+ *
+ * @returns A promise resolving to the selected file path, or null if cancelled.
+ */
+bamSource.selectFileFn = () => api.selectFile();
+
+bamSource.addEventListener("bam-selected", async (e) => {
+    const { value } = (e as CustomEvent<BamSelectedDetail>).detail;
+    if (value.trim()) {
         await loadPeekInfo();
     }
 });
 
-elements.bamPath.addEventListener("change", async () => {
-    if (isUrl && elements.bamPath.value.trim()) {
-        await loadPeekInfo();
-    }
+bamSource.addEventListener("source-type-changed", () => {
+    peekRequestId++;
+    bamSource.disabled = false;
+    elements.fileInfoContent.innerHTML =
+        '<p class="placeholder-text">Will load upon BAM file specification</p>';
+    elements.btnGenerate.disabled = true;
+    peekResult = null;
 });
-
-elements.bamPath.addEventListener("keypress", async (e) => {
-    if (e.key === "Enter" && isUrl) {
-        await loadPeekInfo();
-    }
-});
-
-for (const radio of elements.sourceTypeRadios) {
-    radio.addEventListener("change", () => {
-        updateFileInputMode();
-        peekRequestId++;
-        elements.bamPath.disabled = false;
-        elements.btnBrowse.disabled = false;
-        elements.bamPath.value = "";
-        elements.fileInfoContent.innerHTML =
-            '<p class="placeholder-text">Will load upon BAM file specification</p>';
-        elements.btnGenerate.disabled = true;
-        peekResult = null;
-    });
-}
 
 elements.modFilter.addEventListener("input", () => {
     updateGenerateButton();
@@ -522,6 +484,3 @@ document.getElementById("more-info-close")?.addEventListener("click", () => {
     ) as HTMLDialogElement | null;
     dialog?.close();
 });
-
-// Initialize
-updateFileInputMode();

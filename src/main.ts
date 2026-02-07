@@ -245,6 +245,7 @@ ipcMain.handle(
      * @param modStrand - The strand convention for modification calls.
      * @param flankingRegion - The number of base pairs to expand the region by on each side.
      * @param showAnnotationHighlight - Whether to show the annotation region highlight box.
+     * @param treatAsUrl - Whether to treat the BAM path as a remote URL.
      * @returns A result object indicating success or failure.
      */
     async (
@@ -256,6 +257,7 @@ ipcMain.handle(
         modStrand?: "bc" | "bc_comp",
         flankingRegion?: number,
         showAnnotationHighlight?: boolean,
+        treatAsUrl?: boolean,
     ) => {
         const swipeArgs: swipeModule.SwipeArgs = {
             bamPath,
@@ -266,6 +268,7 @@ ipcMain.handle(
             modStrand,
             regionExpansion: flankingRegion,
             showAnnotationHighlight,
+            treatAsUrl,
         };
 
         try {

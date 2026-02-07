@@ -37,6 +37,8 @@ export interface SwipeArgs {
     regionExpansion?: number;
     /** Whether to show the annotation region highlight box on the chart. */
     showAnnotationHighlight?: boolean;
+    /** Whether to treat the BAM path as a remote URL rather than a local file. */
+    treatAsUrl?: boolean;
 }
 
 let annotations: BedAnnotation[] = [];
@@ -93,7 +95,7 @@ export async function initialize(
     console.log(`  Window size: ${cliArgs.windowSize}`);
 
     console.log("Reading contig sizes...");
-    contigSizes = await loadContigSizes(cliArgs.bamPath);
+    contigSizes = await loadContigSizes(cliArgs.bamPath, cliArgs.treatAsUrl);
     console.log(`  Found ${Object.keys(contigSizes).length} contigs`);
 
     console.log("Parsing BED file...");
@@ -147,7 +149,12 @@ async function loadCurrentPlotData(): Promise<PlotData | null> {
             annotation,
             contigSizes,
             cliArgs.windowSize,
-            { modTag, modStrand, regionExpansion },
+            {
+                modTag,
+                modStrand,
+                regionExpansion,
+                treatAsUrl: cliArgs.treatAsUrl,
+            },
         );
     } catch (error) {
         console.error(

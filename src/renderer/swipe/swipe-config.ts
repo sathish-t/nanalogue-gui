@@ -2,6 +2,8 @@
 
 import { formatContigLength } from "../../lib/format-utils";
 import { parseModFilter } from "../../lib/mod-filter";
+import type { BamSelectedDetail } from "../shared/bam-resource-input";
+import "../shared/bam-resource-input";
 
 /**
  * Result returned by the peek-bam IPC handler.
@@ -52,6 +54,7 @@ interface SwipeConfigApi {
         modStrand?: "bc" | "bc_comp",
         flankingRegion?: number,
         showAnnotationHighlight?: boolean,
+        treatAsUrl?: boolean,
     ) => Promise<LaunchResult>;
     /** Navigates back to the landing page. */
     swipeGoBack: () => Promise<void>;
@@ -68,19 +71,20 @@ const api = (
 ).api;
 
 /**
+ * BAM source custom element reference.
+ */
+const bamSource = document.getElementById(
+    "bam-source",
+) as import("../shared/bam-resource-input").BamResourceInput;
+
+/**
  * Cached references to DOM elements used throughout the config page.
  */
 const elements = {
-    /** BAM file path input. */
-    bamPath: document.getElementById("bam-path") as HTMLInputElement,
     /** BED file path input. */
     bedPath: document.getElementById("bed-path") as HTMLInputElement,
     /** Output file path input. */
     outputPath: document.getElementById("output-path") as HTMLInputElement,
-    /** Browse button for BAM file. */
-    btnBrowseBam: document.getElementById(
-        "btn-browse-bam",
-    ) as HTMLButtonElement,
     /** Browse button for BED file. */
     btnBrowseBed: document.getElementById(
         "btn-browse-bed",
@@ -310,7 +314,7 @@ function updateSummary(): void {
  */
 function updateStartButton(): void {
     const allFilled =
-        elements.bamPath.value.length > 0 &&
+        bamSource.value.length > 0 &&
         elements.bedPath.value.length > 0 &&
         elements.outputPath.value.length > 0;
 
@@ -368,22 +372,29 @@ function updateStartButton(): void {
         !allFilled || !overwriteOk || sameAsBed || !modFilterValid;
 }
 
-// Browse BAM
-elements.btnBrowseBam.addEventListener("click", async () => {
-    const path = await api.swipePickBam();
-    if (!path) return;
+// Wire the BAM source element to the file picker API
 
-    elements.bamPath.value = path;
+/**
+ * Opens a native file dialog and returns the selected BAM path.
+ *
+ * @returns A promise resolving to the selected file path, or null if cancelled.
+ */
+bamSource.selectFileFn = () => api.swipePickBam();
+
+bamSource.addEventListener("bam-selected", async (e) => {
+    const { value, isUrl } = (e as CustomEvent<BamSelectedDetail>).detail;
+    if (!value.trim()) return;
+
     updateStartButton();
 
     // Peek at BAM for summary
     try {
-        bamPeekResult = await api.peekBam(path, false);
+        bamPeekResult = await api.peekBam(value, isUrl);
     } catch (error) {
         console.error("Failed to peek BAM:", error);
         bamPeekResult = null;
     }
-    if (path !== elements.bamPath.value) return;
+    if (value !== bamSource.value) return;
 
     // Auto-populate mod filter with first detected modification
     if (
@@ -395,6 +406,12 @@ elements.btnBrowseBam.addEventListener("click", async () => {
         updateStartButton();
     }
 
+    updateSummary();
+});
+
+bamSource.addEventListener("source-type-changed", () => {
+    bamPeekResult = null;
+    updateStartButton();
     updateSummary();
 });
 
@@ -459,7 +476,7 @@ elements.modFilter.addEventListener("input", () => {
 
 // Start swiping
 elements.btnStart.addEventListener("click", async () => {
-    const bamPath = elements.bamPath.value;
+    const bamPath = bamSource.value;
     const bedPath = elements.bedPath.value;
     const outputPath = elements.outputPath.value;
 
@@ -474,6 +491,7 @@ elements.btnStart.addEventListener("click", async () => {
     }
     const flankingRegion = rawFlanking;
     const showAnnotationHighlight = elements.showAnnotationHighlight.checked;
+    const treatAsUrl = bamSource.isUrl;
 
     elements.btnStart.disabled = true;
     elements.btnBack.disabled = true;
@@ -488,6 +506,7 @@ elements.btnStart.addEventListener("click", async () => {
             modStrand,
             flankingRegion,
             showAnnotationHighlight,
+            treatAsUrl,
         );
         if (!result.success) {
             elements.loadingOverlay.classList.add("hidden");

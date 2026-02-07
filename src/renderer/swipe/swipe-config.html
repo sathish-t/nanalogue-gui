@@ -21,14 +21,11 @@
     </header>
 
     <main>
-      <!-- BAM file selection. -->
+      <!-- BAM source selection: local file or remote URL. -->
       <section class="config-section">
-        <h2>BAM file</h2>
-        <div class="file-input-row">
-          <label for="bam-path" class="visually-hidden">BAM file path</label>
-          <input type="text" id="bam-path" placeholder="Select a BAM file" readonly>
-          <button type="button" id="btn-browse-bam">Browse</button>
-        </div>
+        <h2>BAM Source</h2>
+        <!-- Reusable BAM source input with file/URL toggle. -->
+        <bam-resource-input id="bam-source"></bam-resource-input>
       </section>
 
       <!-- BED annotations file selection. -->

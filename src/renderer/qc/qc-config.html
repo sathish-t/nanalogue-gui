@@ -23,23 +23,8 @@
       <!-- BAM source selection: local file or remote URL. -->
       <section class="config-section">
         <h2>BAM Source</h2>
-        <!-- Radio toggle between local file and URL input modes. -->
-        <div class="source-toggle">
-          <label>
-            <input type="radio" name="source-type" value="file" checked>
-            Local file
-          </label>
-          <label>
-            <input type="radio" name="source-type" value="url">
-            URL
-          </label>
-        </div>
-        <!-- File path input with a browse button for local file selection. -->
-        <div class="file-input-row">
-          <label for="bam-path" class="visually-hidden">BAM path</label>
-          <input type="text" id="bam-path" placeholder="Select or enter BAM path" readonly>
-          <button type="button" id="btn-browse">Browse</button>
-        </div>
+        <!-- Reusable BAM source input with file/URL toggle. -->
+        <bam-resource-input id="bam-source"></bam-resource-input>
       </section>
 
       <!-- Panel displaying metadata from the selected BAM file. -->
