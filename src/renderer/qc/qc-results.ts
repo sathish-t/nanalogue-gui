@@ -360,12 +360,14 @@ function renderYieldSummary(
  * @param bins - The histogram bin data to plot.
  * @param xLabel - The label text for the x-axis.
  * @param yLabel - The label text for the y-axis.
+ * @param formatLabel - Optional custom formatter for bin labels.
  */
 function renderHistogram(
     canvasId: string,
     bins: HistogramBin[],
     xLabel: string,
     yLabel: string = "Count",
+    formatLabel?: (binStart: number) => string,
 ): void {
     const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
     if (!canvas) return;
@@ -389,7 +391,9 @@ function renderHistogram(
         labelDecimals = 1;
     }
 
-    const labels = bins.map((b) => b.binStart.toFixed(labelDecimals));
+    const labels = formatLabel
+        ? bins.map((b) => formatLabel(b.binStart))
+        : bins.map((b) => b.binStart.toFixed(labelDecimals));
     const data = bins.map((b) => b.count);
 
     const chart = new Chart(ctx, {
@@ -679,10 +683,13 @@ async function initialize(): Promise<void> {
         if (data.readLengthHistogram.length === 0) {
             showNoData("chart-read-lengths", "No read length data available.");
         } else {
+            const binWidth = data.readLengthBinWidth;
             renderHistogram(
                 "chart-read-lengths",
                 trimZeroHistogramBins(data.readLengthHistogram),
                 "Read Length (bp)",
+                "Count",
+                (binStart) => formatYieldLabel(binStart, binWidth),
             );
         }
         renderStatsPanel("stats-read-lengths", data.readLengthStats, true);
