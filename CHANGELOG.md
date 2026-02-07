@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Shared `parseModFilter` module extracted from QC config for reuse across modes ([`f996a1e`](https://github.com/sathish-t/nanalogue-gui/commit/f996a1e))
+- Mod filter validation and auto-populate in QC config — field is now required ([`f255285`](https://github.com/sathish-t/nanalogue-gui/commit/f255285))
+- `LoadPlotDataOptions` for passing mod tag, strand, and region expansion to data-loader ([`eeefbe1`](https://github.com/sathish-t/nanalogue-gui/commit/eeefbe1))
+- "More info" BAM details dialog in Swipe config with contig table and modifications list ([`ca16a9d`](https://github.com/sathish-t/nanalogue-gui/commit/ca16a9d))
+- Mod filter, flanking region, and annotation highlight toggle in Swipe config ([`4dd4fde`](https://github.com/sathish-t/nanalogue-gui/commit/4dd4fde))
 - "Very coarse" (10 kb) read length bin width option ([`6fbfa22`](https://github.com/sathish-t/nanalogue-gui/commit/6fbfa22))
 - "More info" dialog showing full BAM file details — contig table with lengths and
   detected modifications list ([`dd769ac`](https://github.com/sathish-t/nanalogue-gui/commit/dd769ac))
