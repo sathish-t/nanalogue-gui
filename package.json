@@ -3,9 +3,6 @@
   "version": "0.1.0",
   "description": "GUI tools for nanopore data analysis",
   "main": "dist/main.js",
-  "bin": {
-    "nanalogue-gui": "./bin/nanalogue-gui.js"
-  },
   "scripts": {
     "build": "tsc && npm run build:renderer && npm run copy-assets",
     "build:renderer": "npm run build:landing && npm run build:swipe && npm run build:qc",

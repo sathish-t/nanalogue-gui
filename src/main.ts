@@ -19,16 +19,6 @@ let currentMode: AppMode = "landing";
 let mainWindow: BrowserWindow | null = null;
 
 /**
- * The result of parsing command-line arguments into a mode and optional swipe configuration.
- */
-interface ParsedCliResult {
-    /** The application mode determined from CLI arguments. */
-    mode: AppMode;
-    /** Optional swipe-specific arguments when launching in swipe mode. */
-    swipeArgs?: swipeModule.SwipeCliArgs;
-}
-
-/**
  * Returns the window dimensions appropriate for the given application mode.
  *
  * @param mode - The application mode to determine window size for.
@@ -131,49 +121,6 @@ function resizeAndLoadMode(mode: AppMode) {
     mainWindow.center();
     mainWindow.setTitle(getWindowTitle(mode));
     mainWindow.loadFile(getHtmlPath(mode));
-}
-
-/**
- * Parses process command-line arguments to determine the application mode and options.
- *
- * @returns The parsed CLI result containing the mode and any mode-specific arguments.
- */
-function parseCliArgs(): ParsedCliResult {
-    const args = process.argv.slice(2);
-
-    if (args.length === 0) {
-        return { mode: "landing" };
-    }
-
-    const firstArg = args[0].toLowerCase();
-
-    if (firstArg === "swipe") {
-        const swipeArgs = swipeModule.parseSwipeArgs(args.slice(1));
-        return { mode: "swipe", swipeArgs };
-    }
-
-    if (firstArg === "qc") {
-        return { mode: "qc" };
-    }
-
-    // Legacy mode: direct args without subcommand (backward compatibility)
-    // Treat as swipe mode if 3+ args provided
-    if (args.length >= 3) {
-        const swipeArgs = swipeModule.parseSwipeArgs(args);
-        return { mode: "swipe", swipeArgs };
-    }
-
-    // Unknown command
-    console.error("Usage: nanalogue-gui [swipe|qc] [options]");
-    console.error("");
-    console.error("Commands:");
-    console.error(
-        "  swipe <bam> <bed> <output> [--win]  Review annotations with swipe interface",
-    );
-    console.error("  qc                                   Launch QC mode");
-    console.error("");
-    console.error("Run without arguments to show the landing page.");
-    process.exit(1);
 }
 
 // Landing page IPC handlers
@@ -310,7 +257,7 @@ ipcMain.handle(
         flankingRegion?: number,
         showAnnotationHighlight?: boolean,
     ) => {
-        const swipeArgs: swipeModule.SwipeCliArgs = {
+        const swipeArgs: swipeModule.SwipeArgs = {
             bamPath,
             bedPath,
             outputPath,
@@ -380,19 +327,8 @@ ipcMain.handle(
 swipeModule.registerIpcHandlers();
 qcModule.registerIpcHandlers();
 
-app.whenReady().then(async () => {
-    const { mode, swipeArgs } = parseCliArgs();
-
-    if (mode === "swipe" && swipeArgs) {
-        try {
-            await swipeModule.initialize(swipeArgs);
-        } catch (error) {
-            console.error("Failed to initialize swipe mode:", error);
-            process.exit(1);
-        }
-    }
-
-    createWindow(mode);
+app.whenReady().then(() => {
+    createWindow("landing");
 });
 
 app.on("window-all-closed", () => {

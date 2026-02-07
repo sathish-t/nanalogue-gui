@@ -13,8 +13,8 @@ interactive visualisation and curation workflows.
 
 - [Requirements](#requirements)
 - [Installation](#installation)
+- [Usage](#usage)
 - [Modes](#modes)
-  - [Landing](#landing)
   - [Swipe](#swipe)
   - [QC](#qc)
 - [Development](#development)
@@ -30,46 +30,33 @@ interactive visualisation and curation workflows.
 ## Installation
 
 ```bash
-npm install -g @nanalogue/gui
-```
-
-Or for development:
-
-```bash
 git clone https://github.com/sathish-t/nanalogue-gui.git
 cd nanalogue-gui
 npm install
 ```
 
-## Modes
-
-The application has three modes: a landing page for mode selection, a swipe mode
-for annotation curation, and a QC mode for quality control analysis.
-
-### Landing
-
-The default mode when launched without arguments. Presents buttons to launch
-either Swipe or QC mode.
+## Usage
 
 ```bash
-nanalogue-gui
+npm start
 ```
+
+This launches the landing page where you can choose between Swipe and QC modes.
+
+## Modes
 
 ### Swipe
 
 Interactive annotation curation. Displays modification signal plots for each
 annotation in a BED file, allowing the user to accept or reject each one.
 
-```bash
-nanalogue-gui swipe <bam> <bed> <output> [--win SIZE]
-```
-
-| Argument | Description |
-|----------|-------------|
-| `<bam>` | Path to BAM/Mod-BAM file |
-| `<bed>` | Path to BED file with annotations to review |
-| `<output>` | Path for output BED file (accepted annotations) |
-| `--win SIZE` | Window size in bases (default: 300) |
+The configuration screen allows setting:
+- BAM file path
+- BED annotations file path
+- Output file path
+- Modification filter (e.g., `+T`, `-m`)
+- Flanking region size (base pairs)
+- Annotation highlight visibility
 
 Controls:
 - **Right arrow** or **Accept button**: accept the annotation
@@ -80,11 +67,7 @@ Controls:
 Quality control analysis of BAM/Mod-BAM files. Generates interactive charts
 covering read lengths, yield, analogue density, and modification probabilities.
 
-```bash
-nanalogue-gui qc
-```
-
-The QC configuration screen allows setting:
+The configuration screen allows setting:
 - BAM source (local file or URL)
 - Modification filter (e.g., `+T`, `-m`)
 - Genomic region (e.g., `chrI:1000-50000`)

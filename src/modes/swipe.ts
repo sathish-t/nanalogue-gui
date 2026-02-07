@@ -18,9 +18,9 @@ import {
 import type { AppState, BedAnnotation, PlotData } from "../lib/types";
 
 /**
- * Command-line arguments for the swipe annotation review mode.
+ * Configuration arguments for the swipe annotation review mode.
  */
-export interface SwipeCliArgs {
+export interface SwipeArgs {
     /** Path to the BAM file containing nanopore signal data. */
     bamPath: string;
     /** Path to the BED file containing base modification annotations. */
@@ -41,7 +41,7 @@ export interface SwipeCliArgs {
 
 let annotations: BedAnnotation[] = [];
 let contigSizes: ContigSizes = {};
-let cliArgs: SwipeCliArgs | null = null;
+let cliArgs: SwipeArgs | null = null;
 let modTag: string | undefined;
 let modStrand: "bc" | "bc_comp" | undefined;
 let regionExpansion: number | undefined;
@@ -53,65 +53,6 @@ const appState: AppState = {
 };
 
 /**
- * Parses command-line arguments for swipe mode and validates input files.
- *
- * @param args - The positional and optional arguments following the swipe subcommand.
- * @returns The parsed and validated swipe CLI arguments.
- */
-export function parseSwipeArgs(args: string[]): SwipeCliArgs {
-    if (args.length < 3) {
-        console.error(
-            "Usage: nanalogue-swipe swipe <bam_file> <annotations_bed> <output_file> [--win <size>]",
-        );
-        console.error("");
-        console.error("Arguments:");
-        console.error("  bam_file        Path to BAM file");
-        console.error("  annotations_bed Path to BED file with annotations");
-        console.error(
-            "  output_file     Path for output BED file (accepted annotations)",
-        );
-        console.error("  --win, -w       Window size in bp (default: 300)");
-        process.exit(1);
-    }
-
-    const bamPath = resolve(args[0]);
-    const bedPath = resolve(args[1]);
-    const outputPath = resolve(args[2]);
-    let windowSize = 300;
-
-    for (let i = 3; i < args.length; i++) {
-        if (args[i] === "--win" || args[i] === "-w") {
-            const next = args[i + 1];
-            if (next) {
-                const parsed = parseInt(next, 10);
-                if (!Number.isNaN(parsed) && parsed > 0) {
-                    windowSize = parsed;
-                    i++;
-                } else {
-                    console.error(`Invalid window size: ${next}`);
-                    process.exit(1);
-                }
-            } else {
-                console.error("Missing value for --win");
-                process.exit(1);
-            }
-        }
-    }
-
-    if (!existsSync(bamPath)) {
-        console.error(`BAM file not found: ${bamPath}`);
-        process.exit(1);
-    }
-
-    if (!existsSync(bedPath)) {
-        console.error(`BED file not found: ${bedPath}`);
-        process.exit(1);
-    }
-
-    return { bamPath, bedPath, outputPath, windowSize };
-}
-
-/**
  * Initializes the swipe mode by loading contig sizes, parsing annotations, and preparing the output file.
  *
  * @param args - The validated swipe CLI arguments containing file paths and window size.
@@ -119,7 +60,7 @@ export function parseSwipeArgs(args: string[]): SwipeCliArgs {
  * @returns A promise that resolves when initialization is complete.
  */
 export async function initialize(
-    args: SwipeCliArgs,
+    args: SwipeArgs,
     skipOverwriteConfirm = false,
 ): Promise<void> {
     cliArgs = args;
