@@ -1,6 +1,6 @@
 // QC config page renderer
 
-export {};
+import { parseModFilter } from "../../lib/mod-filter";
 
 /**
  * Result returned from peeking into a BAM file header and first records.
@@ -313,31 +313,6 @@ function showMoreInfoDialog(): void {
     content.appendChild(strandNote);
 
     dialog.showModal();
-}
-
-/**
- * Parses a modification filter string into a tag and strand direction.
- *
- * @param filter - The modification filter string, optionally prefixed with "+" or "-".
- * @returns An object containing the parsed tag and modification strand direction.
- */
-function parseModFilter(filter: string): {
-    /** The modification tag code extracted from the filter string. */
-    tag?: string;
-    /** The modification strand direction parsed from the sign prefix. */
-    modStrand?: "bc" | "bc_comp";
-} {
-    const trimmed = filter.trim();
-    if (!trimmed) return {};
-
-    const match = trimmed.match(/^([+-])(.+)$/);
-    if (!match) return { tag: trimmed };
-
-    const [, sign, tag] = match;
-    return {
-        tag,
-        modStrand: sign === "+" ? "bc" : "bc_comp",
-    };
 }
 
 /**
