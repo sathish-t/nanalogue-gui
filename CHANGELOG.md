@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Shared `format-utils` module with formatting and histogram-trimming functions extracted from renderer pages ([`c3919eb`](https://github.com/sathish-t/nanalogue-gui/commit/c3919ebb755282e3fe106eac94881a6f2c5bd038))
+- Unit tests for `maxReadLengthForBinWidth` covering all bin-width tiers ([`dabdcb1`](https://github.com/sathish-t/nanalogue-gui/commit/dabdcb1084b8ab643b2af99b75fb25ee59fcf50c))
+- jsdom test suites for landing, qc-results, swipe-config, and swipe HTML templates ([`4f33b1d`](https://github.com/sathish-t/nanalogue-gui/commit/4f33b1df3c05bb9c67e10f18581fd01f02d1330e))
 - Shared `parseModFilter` module extracted from QC config for reuse across modes ([`f996a1e`](https://github.com/sathish-t/nanalogue-gui/commit/f996a1e))
 - Mod filter validation and auto-populate in QC config — field is now required ([`f255285`](https://github.com/sathish-t/nanalogue-gui/commit/f255285))
 - `LoadPlotDataOptions` for passing mod tag, strand, and region expansion to data-loader ([`eeefbe1`](https://github.com/sathish-t/nanalogue-gui/commit/eeefbe1))
