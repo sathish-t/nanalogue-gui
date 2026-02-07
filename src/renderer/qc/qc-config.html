@@ -65,6 +65,11 @@
         <h2>Region <span class="optional">(optional)</span></h2>
         <label for="region" class="visually-hidden">Region</label>
         <input type="text" id="region" placeholder="e.g. chr3, chrI:1000-50000">
+        <!-- Checkbox to restrict to reads fully spanning the region. -->
+        <label class="checkbox-label" id="full-region-label">
+          <input type="checkbox" id="full-region" disabled>
+          Restrict to reads that pass through region completely
+        </label>
       </section>
 
       <!-- Read length histogram granularity selection. -->

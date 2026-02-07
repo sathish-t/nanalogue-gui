@@ -78,6 +78,9 @@ const elements = {
     /** Input field for the genomic region specification. */
     region: document.getElementById("region") as HTMLInputElement,
 
+    /** Checkbox to restrict to reads that fully span the region. */
+    fullRegion: document.getElementById("full-region") as HTMLInputElement,
+
     /** Input field for the sampling fraction value. */
     sampleFraction: document.getElementById(
         "sample-fraction",
@@ -395,12 +398,14 @@ async function generateQC() {
         }
     }
 
+    const region = regionInput || undefined;
     const config = {
         bamPath,
         treatAsUrl: isUrl,
         tag,
         modStrand,
-        region: regionInput || undefined,
+        region,
+        fullRegion: region ? elements.fullRegion.checked : undefined,
         sampleFraction,
         windowSize,
         readLengthBinWidth,
@@ -457,6 +462,14 @@ for (const radio of elements.sourceTypeRadios) {
 
 elements.modFilter.addEventListener("input", () => {
     updateGenerateButton();
+});
+
+elements.region.addEventListener("input", () => {
+    const hasRegion = elements.region.value.trim().length > 0;
+    elements.fullRegion.disabled = !hasRegion;
+    if (!hasRegion) {
+        elements.fullRegion.checked = false;
+    }
 });
 
 elements.btnGenerate.addEventListener("click", generateQC);

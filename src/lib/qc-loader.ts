@@ -57,14 +57,20 @@ export async function peekBam(
  * @returns A promise that resolves to the full QC dataset with statistics and histograms.
  */
 export async function generateQCData(config: QCConfig): Promise<QCData> {
-    const baseOptions = {
+    const sharedOptions = {
         bamPath: config.bamPath,
         treatAsUrl: config.treatAsUrl,
         sampleFraction: config.sampleFraction / 100, // Convert percentage to fraction
-        region: config.region,
         tag: config.tag,
         modStrand: config.modStrand,
     };
+    const baseOptions = config.region
+        ? {
+              ...sharedOptions,
+              region: config.region,
+              fullRegion: config.fullRegion,
+          }
+        : sharedOptions;
 
     const readLengthBinWidth = config.readLengthBinWidth;
     const readLengthMax = maxReadLengthForBinWidth(readLengthBinWidth);

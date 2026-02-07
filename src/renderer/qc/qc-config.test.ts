@@ -62,6 +62,16 @@ describe("qc-config.html", () => {
             expect(input?.placeholder).toContain("chrI:1000-50000");
         });
 
+        it("has a full-region checkbox that starts unchecked and disabled", () => {
+            const doc = loadTemplate();
+            const checkbox =
+                doc.querySelector<HTMLInputElement>("#full-region");
+            expect(checkbox).not.toBeNull();
+            expect(checkbox?.type).toBe("checkbox");
+            expect(checkbox?.checked).toBe(false);
+            expect(checkbox?.disabled).toBe(true);
+        });
+
         it("has a sample-fraction number input defaulting to 0.1", () => {
             const doc = loadTemplate();
             const input =
