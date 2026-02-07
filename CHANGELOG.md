@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- "Very coarse" (10 kb) read length bin width option ([`6fbfa22`](https://github.com/sathish-t/nanalogue-gui/commit/6fbfa22))
+- "More info" dialog showing full BAM file details — contig table with lengths and
+  detected modifications list ([`dd769ac`](https://github.com/sathish-t/nanalogue-gui/commit/dd769ac))
+- Custom label formatting on read length histogram using K/M suffixes
+  ([`afb8a0c`](https://github.com/sathish-t/nanalogue-gui/commit/afb8a0c))
+- jsdom test suite for `qc-config.html` template structure and default form state
+  ([`fce13eb`](https://github.com/sathish-t/nanalogue-gui/commit/fce13eb))
 - Vitest test framework (v4.0.18) with `npm run test` and `npm run test:watch`
 - Unit tests for all library modules: bed-parser, data-loader, histogram, qc-loader, stats
 - `RunningHistogram` streaming accumulator class (`src/lib/histogram.ts`) that bins values
@@ -77,7 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   HTML pages (landing, qc-config, qc-results, swipe)
 
 ### Dependencies
-- Added: `chartjs-plugin-annotation` ^3.1.0, `vitest` ^4.0.18
+- Added: `chartjs-plugin-annotation` ^3.1.0, `jsdom` ^26.1.0, `vitest` ^4.0.18
 - Updated: `@biomejs/biome` ^2.3.13 → ^2.3.14, `electron` ^40.1.0 → ^40.2.1,
   `esbuild` ^0.27.2 → ^0.27.3
 
