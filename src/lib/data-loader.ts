@@ -92,12 +92,25 @@ export function parseWindowReadsTsv(tsv: string): WindowReadRow[] {
 }
 
 /**
+ * Options for filtering and configuring how plot data is loaded.
+ */
+export interface LoadPlotDataOptions {
+    /** The number of base pairs to expand the annotation region by on each side. */
+    regionExpansion?: number;
+    /** The modification tag code to filter by (e.g. "m", "a", "T"). */
+    modTag?: string;
+    /** The strand convention for modification calls. */
+    modStrand?: "bc" | "bc_comp";
+}
+
+/**
  * Loads windowed and raw modification plot data for a given annotation region from a BAM file.
  *
  * @param bamPath - The filesystem path to the BAM file.
  * @param annotation - The BED annotation defining the region and read to query.
  * @param contigSizes - A mapping of contig names to their sizes for bounds checking.
  * @param windowSize - The window size in base pairs for aggregating modification data.
+ * @param options - Optional filtering and region expansion configuration.
  * @returns A promise that resolves to the plot data containing raw and windowed points.
  */
 export async function loadPlotData(
@@ -105,7 +118,17 @@ export async function loadPlotData(
     annotation: BedAnnotation,
     contigSizes: ContigSizes,
     windowSize: number,
+    options: LoadPlotDataOptions = {},
 ): Promise<PlotData> {
+    const {
+        regionExpansion: rawExpansion = REGION_EXPANSION,
+        modTag,
+        modStrand,
+    } = options;
+    const regionExpansion = Number.isFinite(rawExpansion)
+        ? Math.max(0, Math.floor(rawExpansion))
+        : REGION_EXPANSION;
+
     const contigSize = contigSizes[annotation.contig];
 
     if (contigSize === undefined) {
@@ -117,8 +140,8 @@ export async function loadPlotData(
         clampWarning = `Annotation end (${annotation.end.toLocaleString()}) clamped to contig length (${contigSize.toLocaleString()})`;
     }
 
-    const expandedStart = Math.max(0, annotation.start - REGION_EXPANSION);
-    const expandedEnd = Math.min(contigSize, annotation.end + REGION_EXPANSION);
+    const expandedStart = Math.max(0, annotation.start - regionExpansion);
+    const expandedEnd = Math.min(contigSize, annotation.end + regionExpansion);
 
     if (expandedStart >= expandedEnd) {
         throw new Error(
@@ -137,12 +160,18 @@ export async function loadPlotData(
             readIdSet: [annotation.readId],
             win: windowSize,
             step: windowSize,
+            ...(modTag !== undefined && { tag: modTag }),
+            ...(modTag !== undefined &&
+                modStrand !== undefined && { modStrand }),
         }),
         bamMods({
             bamPath,
             region,
             modRegion,
             readIdSet: [annotation.readId],
+            ...(modTag !== undefined && { tag: modTag }),
+            ...(modTag !== undefined &&
+                modStrand !== undefined && { modStrand }),
         }),
     ]);
 
