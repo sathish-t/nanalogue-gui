@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Mod region field in QC config — optional sub-region to restrict modification filtering, with format and overlap validation against the main region ([`8e3cedd`](https://github.com/sathish-t/nanalogue-gui/commit/8e3cedd))
+- Full-region checkbox in QC config — restricts analysis to reads that fully span the specified region ([`35f3b83`](https://github.com/sathish-t/nanalogue-gui/commit/35f3b83))
+- Region validation in QC config — parses and validates genomic region strings against BAM header contigs before generation ([`7a333d9`](https://github.com/sathish-t/nanalogue-gui/commit/7a333d9))
 - Input validation for flanking region in Swipe config — rejects non-integers, fractions, and negative values with an alert dialog ([`44a55c6`](https://github.com/sathish-t/nanalogue-gui/commit/44a55c6))
 - Shared `format-utils` module with formatting and histogram-trimming functions extracted from renderer pages ([`c3919eb`](https://github.com/sathish-t/nanalogue-gui/commit/c3919ebb755282e3fe106eac94881a6f2c5bd038))
 - Unit tests for `maxReadLengthForBinWidth` covering all bin-width tiers ([`dabdcb1`](https://github.com/sathish-t/nanalogue-gui/commit/dabdcb1084b8ab643b2af99b75fb25ee59fcf50c))
