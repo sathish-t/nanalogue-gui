@@ -53,11 +53,13 @@ describe("qc-config.html", () => {
             expect(input?.type).toBe("text");
         });
 
-        it("has a region text input", () => {
+        it("has a region text input with placeholder showing both formats", () => {
             const doc = loadTemplate();
             const input = doc.querySelector<HTMLInputElement>("#region");
             expect(input).not.toBeNull();
             expect(input?.type).toBe("text");
+            expect(input?.placeholder).toContain("chr3");
+            expect(input?.placeholder).toContain("chrI:1000-50000");
         });
 
         it("has a sample-fraction number input defaulting to 0.1", () => {

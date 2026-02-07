@@ -2,6 +2,7 @@
 
 import { formatContigLength } from "../../lib/format-utils";
 import { parseModFilter } from "../../lib/mod-filter";
+import { parseRegion } from "../../lib/region-parser";
 
 /**
  * Result returned from peeking into a BAM file header and first records.
@@ -384,12 +385,22 @@ async function generateQC() {
         return;
     }
 
+    const regionInput = elements.region.value.trim();
+    if (regionInput && peekResult?.allContigs) {
+        const regionResult = parseRegion(regionInput, peekResult.allContigs);
+        if (!regionResult.valid) {
+            alert(`Invalid region: ${regionResult.reason}`);
+            elements.btnGenerate.disabled = false;
+            return;
+        }
+    }
+
     const config = {
         bamPath,
         treatAsUrl: isUrl,
         tag,
         modStrand,
-        region: elements.region.value.trim() || undefined,
+        region: regionInput || undefined,
         sampleFraction,
         windowSize,
         readLengthBinWidth,
