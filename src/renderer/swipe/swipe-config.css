@@ -77,6 +77,11 @@
     margin-top: 6px;
 }
 
+/* Button to open the full BAM details dialog from the summary. */
+#btn-more-info {
+    margin-top: 10px;
+}
+
 /* Hidden utility class for toggling visibility. */
 .hidden {
     display: none;
