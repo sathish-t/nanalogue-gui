@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Input validation for flanking region in Swipe config — rejects non-integers, fractions, and negative values with an alert dialog ([`44a55c6`](https://github.com/sathish-t/nanalogue-gui/commit/44a55c6))
 - Shared `format-utils` module with formatting and histogram-trimming functions extracted from renderer pages ([`c3919eb`](https://github.com/sathish-t/nanalogue-gui/commit/c3919ebb755282e3fe106eac94881a6f2c5bd038))
 - Unit tests for `maxReadLengthForBinWidth` covering all bin-width tiers ([`dabdcb1`](https://github.com/sathish-t/nanalogue-gui/commit/dabdcb1084b8ab643b2af99b75fb25ee59fcf50c))
 - jsdom test suites for landing, qc-results, swipe-config, and swipe HTML templates ([`4f33b1d`](https://github.com/sathish-t/nanalogue-gui/commit/4f33b1df3c05bb9c67e10f18581fd01f02d1330e))
@@ -50,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LaunchResult` return type for mode launch IPC handlers with error alerts on landing page
 
 ### Changed
+- `SwipeCliArgs` renamed to `SwipeArgs` and JSDoc updated to reflect GUI-only usage ([`f0d6428`](https://github.com/sathish-t/nanalogue-gui/commit/f0d6428))
+- README updated to remove CLI usage examples; added Usage section with `npm start` ([`f0d6428`](https://github.com/sathish-t/nanalogue-gui/commit/f0d6428))
 - QC loader refactored from raw array accumulation to four streaming `RunningHistogram`
   instances, significantly reducing memory usage for large BAM files
 - Raw arrays (`readLengths`, `wholeReadDensities`, `windowedDensities`, `rawProbabilities`)
@@ -75,6 +78,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sample fraction warning text updated
 - Repository URL corrected from `DNAReplicationLab` to `sathish-t` in README
 - `parseWindowReadsTsv` and `parseWindowedDensities` exported for testability
+
+### Removed
+- CLI entry point (`bin/nanalogue-gui.js`) and `"bin"` field from `package.json` — the application is now GUI-only ([`f0d6428`](https://github.com/sathish-t/nanalogue-gui/commit/f0d6428))
+- `parseCliArgs` from `main.ts` and `parseSwipeArgs` from `modes/swipe.ts` — app always launches to the landing page ([`f0d6428`](https://github.com/sathish-t/nanalogue-gui/commit/f0d6428))
 
 ### Fixed
 - BED parser now validates `0 <= start < end` for coordinates (previously accepted
