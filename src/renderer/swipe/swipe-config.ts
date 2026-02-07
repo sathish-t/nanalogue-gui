@@ -1,5 +1,6 @@
 // Swipe configuration page renderer
 
+import { formatContigLength } from "../../lib/format-utils";
 import { parseModFilter } from "../../lib/mod-filter";
 
 /**
@@ -149,22 +150,6 @@ function createSummaryLine(label: string, value: string): HTMLParagraphElement {
     p.appendChild(strong);
     p.appendChild(document.createTextNode(value));
     return p;
-}
-
-/**
- * Formats a contig length into a human-readable string with SI suffixes.
- *
- * @param length - The contig length in base pairs.
- * @returns The formatted length string.
- */
-function formatContigLength(length: number): string {
-    if (length >= 1_000_000) {
-        return `${(length / 1_000_000).toFixed(2)} Mb`;
-    }
-    if (length >= 1_000) {
-        return `${(length / 1_000).toFixed(1)} kb`;
-    }
-    return `${length} bp`;
 }
 
 /**
