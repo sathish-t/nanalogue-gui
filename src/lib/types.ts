@@ -139,6 +139,8 @@ export interface QCConfig {
     modStrand?: "bc" | "bc_comp";
     /** The optional genomic region to restrict the analysis to. */
     region?: string;
+    /** Optional genomic sub-region to restrict modification filtering. */
+    modRegion?: string;
     /** Whether to only include reads that fully span the specified region. Undefined when no region is set. */
     fullRegion: boolean | undefined;
     /** The fraction of reads to sample for the QC analysis. */

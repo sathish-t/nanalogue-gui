@@ -62,6 +62,15 @@ describe("qc-config.html", () => {
             expect(input?.placeholder).toContain("chrI:1000-50000");
         });
 
+        it("has a mod-region text input with placeholder", () => {
+            const doc = loadTemplate();
+            const input = doc.querySelector<HTMLInputElement>("#mod-region");
+            expect(input).not.toBeNull();
+            expect(input?.type).toBe("text");
+            expect(input?.placeholder).toContain("chr3");
+            expect(input?.placeholder).toContain("chrI:2000-40000");
+        });
+
         it("has a full-region checkbox that starts unchecked and disabled", () => {
             const doc = loadTemplate();
             const checkbox =

@@ -63,6 +63,7 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
         sampleFraction: config.sampleFraction / 100, // Convert percentage to fraction
         tag: config.tag,
         modStrand: config.modStrand,
+        modRegion: config.modRegion,
     };
     const baseOptions = config.region
         ? {

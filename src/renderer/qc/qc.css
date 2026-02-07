@@ -68,10 +68,25 @@
     margin-bottom: 8px;
 }
 
+/* Additional top margin for secondary headings within the same section. */
+.config-section h2 ~ h2 {
+    margin-top: 16px;
+}
+
 /* De-emphasized text for optional field indicators. */
 .config-section .optional {
     color: #888;
     font-weight: 400;
+}
+
+/* Checkbox label styled smaller than section headings. */
+.config-section .checkbox-label {
+    color: #666;
+    cursor: pointer;
+    display: flex;
+    font-size: 12px;
+    gap: 6px;
+    margin-top: 8px;
 }
 
 /* Horizontal radio button group for toggling between file and URL source. */

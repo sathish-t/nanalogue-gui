@@ -1,7 +1,11 @@
 // Tests for parseRegion — validates genomic region strings against known contigs.
 
 import { describe, expect, it } from "vitest";
-import { parseRegion } from "./region-parser";
+import {
+    parseRegion,
+    type ValidRegion,
+    validateModRegionOverlap,
+} from "./region-parser";
 
 /** Sample contig map for testing. */
 const contigs: Record<string, number> = {
@@ -162,5 +166,97 @@ describe("parseRegion", () => {
                 expect(result.end).toBe(200);
             }
         });
+    });
+});
+
+describe("validateModRegionOverlap", () => {
+    it("passes when both are contig-only on the same contig", () => {
+        const region: ValidRegion = { valid: true, contig: "chr1" };
+        const modRegion: ValidRegion = { valid: true, contig: "chr1" };
+        expect(validateModRegionOverlap(region, modRegion)).toBeNull();
+    });
+
+    it("fails when contigs differ", () => {
+        const region: ValidRegion = { valid: true, contig: "chr1" };
+        const modRegion: ValidRegion = { valid: true, contig: "chr3" };
+        const result = validateModRegionOverlap(region, modRegion);
+        expect(result).toContain("does not match");
+    });
+
+    it("passes when both have ranges and modRegion overlaps", () => {
+        const region: ValidRegion = {
+            valid: true,
+            contig: "chr1",
+            start: 1000,
+            end: 5000,
+        };
+        const modRegion: ValidRegion = {
+            valid: true,
+            contig: "chr1",
+            start: 2000,
+            end: 4000,
+        };
+        expect(validateModRegionOverlap(region, modRegion)).toBeNull();
+    });
+
+    it("fails when modRegion is entirely before region", () => {
+        const region: ValidRegion = {
+            valid: true,
+            contig: "chr1",
+            start: 5000,
+            end: 10000,
+        };
+        const modRegion: ValidRegion = {
+            valid: true,
+            contig: "chr1",
+            start: 1000,
+            end: 3000,
+        };
+        const result = validateModRegionOverlap(region, modRegion);
+        expect(result).toContain("does not overlap");
+    });
+
+    it("fails when modRegion is entirely after region", () => {
+        const region: ValidRegion = {
+            valid: true,
+            contig: "chr1",
+            start: 1000,
+            end: 3000,
+        };
+        const modRegion: ValidRegion = {
+            valid: true,
+            contig: "chr1",
+            start: 5000,
+            end: 10000,
+        };
+        const result = validateModRegionOverlap(region, modRegion);
+        expect(result).toContain("does not overlap");
+    });
+
+    it("passes when modRegion shares a boundary with region (inclusive endpoints)", () => {
+        const region: ValidRegion = {
+            valid: true,
+            contig: "chr1",
+            start: 1000,
+            end: 5000,
+        };
+        const modRegion: ValidRegion = {
+            valid: true,
+            contig: "chr1",
+            start: 5000,
+            end: 8000,
+        };
+        expect(validateModRegionOverlap(region, modRegion)).toBeNull();
+    });
+
+    it("passes when one is contig-only and other has range (contig match sufficient)", () => {
+        const region: ValidRegion = {
+            valid: true,
+            contig: "chr1",
+            start: 1000,
+            end: 5000,
+        };
+        const modRegion: ValidRegion = { valid: true, contig: "chr1" };
+        expect(validateModRegionOverlap(region, modRegion)).toBeNull();
     });
 });

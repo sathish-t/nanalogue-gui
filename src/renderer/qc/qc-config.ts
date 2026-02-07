@@ -2,7 +2,7 @@
 
 import { formatContigLength } from "../../lib/format-utils";
 import { parseModFilter } from "../../lib/mod-filter";
-import { parseRegion } from "../../lib/region-parser";
+import { parseRegion, validateModRegionOverlap } from "../../lib/region-parser";
 
 /**
  * Result returned from peeking into a BAM file header and first records.
@@ -80,6 +80,9 @@ const elements = {
 
     /** Checkbox to restrict to reads that fully span the region. */
     fullRegion: document.getElementById("full-region") as HTMLInputElement,
+
+    /** Input field for the optional modification sub-region. */
+    modRegion: document.getElementById("mod-region") as HTMLInputElement,
 
     /** Input field for the sampling fraction value. */
     sampleFraction: document.getElementById(
@@ -398,6 +401,43 @@ async function generateQC() {
         }
     }
 
+    const modRegionInput = elements.modRegion.value.trim();
+    let modRegionStr: string | undefined;
+    if (modRegionInput) {
+        if (!regionInput) {
+            alert("Mod region requires a region to be set.");
+            elements.btnGenerate.disabled = false;
+            return;
+        }
+        if (peekResult?.allContigs) {
+            const modRegionResult = parseRegion(
+                modRegionInput,
+                peekResult.allContigs,
+            );
+            if (!modRegionResult.valid) {
+                alert(`Invalid mod region: ${modRegionResult.reason}`);
+                elements.btnGenerate.disabled = false;
+                return;
+            }
+            const regionResult = parseRegion(
+                regionInput,
+                peekResult.allContigs,
+            );
+            if (regionResult.valid) {
+                const overlapError = validateModRegionOverlap(
+                    regionResult,
+                    modRegionResult,
+                );
+                if (overlapError) {
+                    alert(overlapError);
+                    elements.btnGenerate.disabled = false;
+                    return;
+                }
+            }
+        }
+        modRegionStr = modRegionInput;
+    }
+
     const region = regionInput || undefined;
     const config = {
         bamPath,
@@ -405,6 +445,7 @@ async function generateQC() {
         tag,
         modStrand,
         region,
+        modRegion: modRegionStr,
         fullRegion: region ? elements.fullRegion.checked : undefined,
         sampleFraction,
         windowSize,

@@ -70,6 +70,10 @@
           <input type="checkbox" id="full-region" disabled>
           Restrict to reads that pass through region completely
         </label>
+        <!-- Optional sub-region to restrict modification filtering. -->
+        <label for="mod-region" class="visually-hidden">Restrict mods to region</label>
+        <h2>Restrict mods to region <span class="optional">(optional)</span></h2>
+        <input type="text" id="mod-region" placeholder="e.g. chr3, chrI:2000-40000">
       </section>
 
       <!-- Read length histogram granularity selection. -->

@@ -4,7 +4,7 @@
 /**
  * Successful region parse result with contig name and optional 1-based coordinates.
  */
-interface ValidRegion {
+export interface ValidRegion {
     /** Whether the parse succeeded. */
     valid: true;
     /** The matched contig/reference name. */
@@ -154,4 +154,33 @@ export function parseRegion(
         valid: false,
         reason: `Unknown reference sequence: "${str}".`,
     };
+}
+
+/**
+ * Checks that a mod region overlaps with the main region.
+ *
+ * Both arguments must be valid parsed regions. Returns null when the
+ * mod region is acceptable, or a human-readable error string when it
+ * is not (different contig, or disjoint coordinate ranges).
+ *
+ * @param region - The main analysis region.
+ * @param modRegion - The modification-filtering sub-region.
+ * @returns Null if valid, or an error message string if invalid.
+ */
+export function validateModRegionOverlap(
+    region: ValidRegion,
+    modRegion: ValidRegion,
+): string | null {
+    if (region.contig !== modRegion.contig) {
+        return `Mod region contig "${modRegion.contig}" does not match region contig "${region.contig}".`;
+    }
+    // When one or both lack start/end, contig match alone is sufficient
+    if (!region.start || !region.end || !modRegion.start || !modRegion.end) {
+        return null;
+    }
+    // Both have coordinate ranges (inclusive endpoints) — reject if completely disjoint
+    if (modRegion.end < region.start || modRegion.start > region.end) {
+        return `Mod region ${modRegion.contig}:${modRegion.start}-${modRegion.end} does not overlap with region ${region.contig}:${region.start}-${region.end}.`;
+    }
+    return null;
 }
