@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Dedicated jsdom tests for the `<bam-resource-input>` custom element covering DOM structure, state, mode switching, and events ([`313b587`](https://github.com/sathish-t/nanalogue-gui/commit/313b587183feec08dc538259fc50299c5adec4f4))
+- Reusable `<mod-filter-input>` custom element extracting duplicated modification filter UI from QC and Swipe config pages, with 29 jsdom tests ([`44b87ec`](https://github.com/sathish-t/nanalogue-gui/commit/44b87ece1de6d8d373b41c43d66a8ff0b3f74208))
 - Reusable `<bam-resource-input>` Custom Element for BAM file/URL source selection, with file/URL radio toggle, Browse button, and `bam-selected`/`source-type-changed` events ([`a9defd6`](https://github.com/sathish-t/nanalogue-gui/commit/a9defd6))
 - URL support for BAM source in Swipe config, matching existing QC behavior ([`a9defd6`](https://github.com/sathish-t/nanalogue-gui/commit/a9defd6))
 - `treatAsUrl` threaded through Swipe backend pipeline — `SwipeArgs`, `loadContigSizes`, and `loadPlotData` now support remote BAM URLs ([`a9defd6`](https://github.com/sathish-t/nanalogue-gui/commit/a9defd6))
