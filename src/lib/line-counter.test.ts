@@ -1,10 +1,10 @@
-// Unit tests for streaming BED data line counter
+// Unit tests for streaming line counting utilities
 
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { countBedDataLines } from "./line-counter";
+import { countBedDataLines, countNonEmptyLines } from "./line-counter";
 
 /**
  * Creates a temporary file with the given content and returns its path.
@@ -92,5 +92,27 @@ describe("countBedDataLines", () => {
             "chr1\t100\t200\tread1\r\nchr2\t300\t400\tread2\r\n",
         );
         expect(await countBedDataLines(path)).toBe(2);
+    });
+});
+
+describe("countNonEmptyLines", () => {
+    it("counts non-empty lines in a file", async () => {
+        const path = writeTempFile("read1\nread2\nread3\n");
+        expect(await countNonEmptyLines(path)).toBe(3);
+    });
+
+    it("skips empty and whitespace-only lines", async () => {
+        const path = writeTempFile("read1\n\n  \nread2\n");
+        expect(await countNonEmptyLines(path)).toBe(2);
+    });
+
+    it("returns 0 for an empty file", async () => {
+        const path = writeTempFile("");
+        expect(await countNonEmptyLines(path)).toBe(0);
+    });
+
+    it("handles CRLF line endings", async () => {
+        const path = writeTempFile("line1\r\nline2\r\n");
+        expect(await countNonEmptyLines(path)).toBe(2);
     });
 });
