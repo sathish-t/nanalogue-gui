@@ -38,21 +38,10 @@
         </div>
       </section>
 
-      <!-- Output file selection. -->
+      <!-- Output file selection with overwrite confirmation. -->
       <section class="config-section">
         <h2>Output file</h2>
-        <div class="file-input-row">
-          <label for="output-path" class="visually-hidden">Output file path</label>
-          <input type="text" id="output-path" placeholder="Select output BED file location" readonly>
-          <button type="button" id="btn-browse-output">Browse</button>
-        </div>
-        <!-- Inline warning shown when the output file already exists. -->
-        <p class="file-exists-warning hidden" id="file-exists-warning">File exists &mdash; will be overwritten.</p>
-        <!-- Confirmation checkbox requiring explicit acknowledgement before overwriting. -->
-        <label class="overwrite-confirm hidden" id="overwrite-confirm">
-          <input type="checkbox" id="overwrite-checkbox">
-          I understand this file will be overwritten
-        </label>
+        <output-file-input id="output-source"></output-file-input>
       </section>
 
       <!-- Modification filter input for selecting which mod type and strand to view. -->

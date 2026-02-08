@@ -51,12 +51,10 @@ describe("swipe-config.html", () => {
             expect(input?.readOnly).toBe(true);
         });
 
-        it("has a readonly output path text input", () => {
+        it("has an output-file-input custom element", () => {
             const doc = loadTemplate();
-            const input = doc.querySelector<HTMLInputElement>("#output-path");
-            expect(input).not.toBeNull();
-            expect(input?.type).toBe("text");
-            expect(input?.readOnly).toBe(true);
+            const el = doc.querySelector("output-file-input#output-source");
+            expect(el).not.toBeNull();
         });
     });
 
@@ -66,39 +64,6 @@ describe("swipe-config.html", () => {
             const btn = doc.querySelector<HTMLButtonElement>("#btn-browse-bed");
             expect(btn).not.toBeNull();
             expect(btn?.type).toBe("button");
-        });
-
-        it("has a browse button for output file", () => {
-            const doc = loadTemplate();
-            const btn =
-                doc.querySelector<HTMLButtonElement>("#btn-browse-output");
-            expect(btn).not.toBeNull();
-            expect(btn?.type).toBe("button");
-        });
-    });
-
-    describe("overwrite confirmation", () => {
-        it("has a file-exists warning that starts hidden", () => {
-            const doc = loadTemplate();
-            const warning = doc.querySelector("#file-exists-warning");
-            expect(warning).not.toBeNull();
-            expect(warning?.classList.contains("hidden")).toBe(true);
-        });
-
-        it("has an overwrite confirmation label that starts hidden", () => {
-            const doc = loadTemplate();
-            const confirm = doc.querySelector("#overwrite-confirm");
-            expect(confirm).not.toBeNull();
-            expect(confirm?.classList.contains("hidden")).toBe(true);
-        });
-
-        it("has an overwrite checkbox", () => {
-            const doc = loadTemplate();
-            const checkbox = doc.querySelector<HTMLInputElement>(
-                "#overwrite-checkbox",
-            );
-            expect(checkbox).not.toBeNull();
-            expect(checkbox?.type).toBe("checkbox");
         });
     });
 

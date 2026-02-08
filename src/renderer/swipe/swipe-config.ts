@@ -1,10 +1,15 @@
 // Swipe configuration page renderer
 
 import { formatContigLength } from "../../lib/format-utils";
-import type { BamSelectedDetail } from "../shared/bam-resource-input";
+import type {
+    BamResourceInput,
+    BamSelectedDetail,
+} from "../shared/bam-resource-input";
 import "../shared/bam-resource-input";
 import type { ModFilterInput } from "../shared/mod-filter-input";
 import "../shared/mod-filter-input";
+import type { OutputFileInput } from "../shared/output-file-input";
+import "../shared/output-file-input";
 
 /**
  * Result returned by the peek-bam IPC handler.
@@ -74,9 +79,7 @@ const api = (
 /**
  * BAM source custom element reference.
  */
-const bamSource = document.getElementById(
-    "bam-source",
-) as import("../shared/bam-resource-input").BamResourceInput;
+const bamSource = document.getElementById("bam-source") as BamResourceInput;
 
 /**
  * Modification filter custom element reference.
@@ -84,20 +87,21 @@ const bamSource = document.getElementById(
 const modFilter = document.getElementById("mod-filter") as ModFilterInput;
 
 /**
+ * Output file selection custom element reference.
+ */
+const outputSource = document.getElementById(
+    "output-source",
+) as OutputFileInput;
+
+/**
  * Cached references to DOM elements used throughout the config page.
  */
 const elements = {
     /** BED file path input. */
     bedPath: document.getElementById("bed-path") as HTMLInputElement,
-    /** Output file path input. */
-    outputPath: document.getElementById("output-path") as HTMLInputElement,
     /** Browse button for BED file. */
     btnBrowseBed: document.getElementById(
         "btn-browse-bed",
-    ) as HTMLButtonElement,
-    /** Browse button for output file. */
-    btnBrowseOutput: document.getElementById(
-        "btn-browse-output",
     ) as HTMLButtonElement,
     /** Start swiping button. */
     btnStart: document.getElementById("btn-start") as HTMLButtonElement,
@@ -105,18 +109,6 @@ const elements = {
     btnBack: document.getElementById("btn-back") as HTMLButtonElement,
     /** File summary panel. */
     fileSummary: document.getElementById("file-summary") as HTMLElement,
-    /** File exists warning text. */
-    fileExistsWarning: document.getElementById(
-        "file-exists-warning",
-    ) as HTMLElement,
-    /** Overwrite confirmation label container. */
-    overwriteConfirm: document.getElementById(
-        "overwrite-confirm",
-    ) as HTMLElement,
-    /** Overwrite confirmation checkbox. */
-    overwriteCheckbox: document.getElementById(
-        "overwrite-checkbox",
-    ) as HTMLInputElement,
     /** Flanking region input. */
     flankingRegion: document.getElementById(
         "flanking-region",
@@ -132,9 +124,6 @@ const elements = {
     /** Loading overlay. */
     loadingOverlay: document.getElementById("loading-overlay") as HTMLElement,
 };
-
-/** Tracks whether the selected output file already exists. */
-let outputFileExists = false;
 
 /** Stores the BAM peek result for display in the summary. */
 let bamPeekResult: PeekResult | null = null;
@@ -318,27 +307,27 @@ function updateStartButton(): void {
     const allFilled =
         bamSource.value.length > 0 &&
         elements.bedPath.value.length > 0 &&
-        elements.outputPath.value.length > 0;
+        outputSource.value.length > 0;
 
     const sameAsBed =
-        allFilled && elements.outputPath.value === elements.bedPath.value;
+        allFilled && outputSource.value === elements.bedPath.value;
 
     if (sameAsBed) {
-        elements.fileExistsWarning.textContent =
-            "Output path cannot be the same as the input BED file.";
-        elements.fileExistsWarning.classList.remove("hidden");
-        elements.overwriteConfirm.classList.add("hidden");
-    } else if (outputFileExists) {
-        elements.fileExistsWarning.textContent =
-            "This file already exists and will be overwritten.";
-        elements.fileExistsWarning.classList.remove("hidden");
-        elements.overwriteConfirm.classList.remove("hidden");
+        outputSource.showWarning(
+            "Output path cannot be the same as the input BED file.",
+            true,
+        );
+    } else if (outputSource.requiresOverwrite) {
+        outputSource.showWarning(
+            "This file already exists and will be overwritten.",
+            false,
+        );
     } else {
-        elements.fileExistsWarning.classList.add("hidden");
-        elements.overwriteConfirm.classList.add("hidden");
+        outputSource.hideWarning();
     }
 
-    const overwriteOk = !outputFileExists || elements.overwriteCheckbox.checked;
+    const overwriteOk =
+        !outputSource.requiresOverwrite || outputSource.overwriteConfirmed;
 
     // Enable flanking region when all paths are valid
     elements.flankingRegion.disabled = !(
@@ -370,6 +359,19 @@ function updateStartButton(): void {
  * @returns A promise resolving to the selected file path, or null if cancelled.
  */
 bamSource.selectFileFn = () => api.swipePickBam();
+/**
+ * Opens a native save dialog and returns the selected output path.
+ *
+ * @returns A promise resolving to the selected file path, or null if cancelled.
+ */
+outputSource.selectFileFn = () => api.swipePickOutput();
+/**
+ * Checks whether a file already exists at the given path.
+ *
+ * @param p - The file path to check.
+ * @returns A promise resolving to true if the file exists.
+ */
+outputSource.checkExistsFn = (p) => api.swipeCheckFileExists(p);
 
 bamSource.addEventListener("bam-selected", async (e) => {
     const { value, isUrl } = (e as CustomEvent<BamSelectedDetail>).detail;
@@ -419,40 +421,9 @@ elements.btnBrowseBed.addEventListener("click", async () => {
     updateSummary();
 });
 
-// Browse output
-elements.btnBrowseOutput.addEventListener("click", async () => {
-    const path = await api.swipePickOutput();
-    if (!path) return;
-
-    elements.outputPath.value = path;
-    elements.btnStart.disabled = true;
-
-    // Check if output file exists and show overwrite confirmation if needed
-    elements.overwriteCheckbox.checked = false;
-    let exists = false;
-    try {
-        exists = await api.swipeCheckFileExists(path);
-    } catch (error) {
-        console.error("Failed to check file exists:", error);
-    }
-    if (path !== elements.outputPath.value) return;
-    outputFileExists = exists;
-    if (outputFileExists) {
-        elements.fileExistsWarning.textContent =
-            "This file already exists and will be overwritten.";
-        elements.fileExistsWarning.classList.remove("hidden");
-        elements.overwriteConfirm.classList.remove("hidden");
-    } else {
-        elements.fileExistsWarning.classList.add("hidden");
-        elements.overwriteConfirm.classList.add("hidden");
-    }
-    updateStartButton();
-});
-
-// Overwrite confirmation checkbox
-elements.overwriteCheckbox.addEventListener("change", () => {
-    updateStartButton();
-});
+// Output file selection and overwrite confirmation events
+outputSource.addEventListener("output-selected", () => updateStartButton());
+outputSource.addEventListener("overwrite-confirmed", () => updateStartButton());
 
 // Modification filter input
 modFilter.addEventListener("mod-filter-changed", () => {
@@ -463,7 +434,7 @@ modFilter.addEventListener("mod-filter-changed", () => {
 elements.btnStart.addEventListener("click", async () => {
     const bamPath = bamSource.value;
     const bedPath = elements.bedPath.value;
-    const outputPath = elements.outputPath.value;
+    const outputPath = outputSource.value;
 
     if (!bamPath || !bedPath || !outputPath) return;
 
