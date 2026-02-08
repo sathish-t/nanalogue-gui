@@ -1,9 +1,10 @@
 // Swipe configuration page renderer
 
 import { formatContigLength } from "../../lib/format-utils";
-import { parseModFilter } from "../../lib/mod-filter";
 import type { BamSelectedDetail } from "../shared/bam-resource-input";
 import "../shared/bam-resource-input";
+import type { ModFilterInput } from "../shared/mod-filter-input";
+import "../shared/mod-filter-input";
 
 /**
  * Result returned by the peek-bam IPC handler.
@@ -78,6 +79,11 @@ const bamSource = document.getElementById(
 ) as import("../shared/bam-resource-input").BamResourceInput;
 
 /**
+ * Modification filter custom element reference.
+ */
+const modFilter = document.getElementById("mod-filter") as ModFilterInput;
+
+/**
  * Cached references to DOM elements used throughout the config page.
  */
 const elements = {
@@ -111,10 +117,6 @@ const elements = {
     overwriteCheckbox: document.getElementById(
         "overwrite-checkbox",
     ) as HTMLInputElement,
-    /** Modification filter input. */
-    modFilter: document.getElementById("mod-filter") as HTMLInputElement,
-    /** Validation hint shown when mod filter is empty. */
-    modFilterHint: document.getElementById("mod-filter-hint") as HTMLElement,
     /** Flanking region input. */
     flankingRegion: document.getElementById(
         "flanking-region",
@@ -337,9 +339,6 @@ function updateStartButton(): void {
     }
 
     const overwriteOk = !outputFileExists || elements.overwriteCheckbox.checked;
-    const modFilterValid = Boolean(
-        parseModFilter(elements.modFilter.value).tag,
-    );
 
     // Enable flanking region when all paths are valid
     elements.flankingRegion.disabled = !(
@@ -356,20 +355,11 @@ function updateStartButton(): void {
         !canStart,
     );
 
-    // Show validation hint when mod filter is invalid and other conditions are met
-    if (allFilled && overwriteOk && !sameAsBed && !modFilterValid) {
-        const trimmed = elements.modFilter.value.trim();
-        elements.modFilterHint.textContent =
-            trimmed.length > 0
-                ? "Invalid format \u2014 use +TAG or -TAG (e.g. +T, -m)"
-                : "Required \u2014 enter a modification tag to proceed";
-        elements.modFilterHint.classList.remove("hidden");
-    } else {
-        elements.modFilterHint.classList.add("hidden");
-    }
+    // Show validation hint when all file conditions are met
+    modFilter.showValidation = allFilled && overwriteOk && !sameAsBed;
 
     elements.btnStart.disabled =
-        !allFilled || !overwriteOk || sameAsBed || !modFilterValid;
+        !allFilled || !overwriteOk || sameAsBed || !modFilter.isValid;
 }
 
 // Wire the BAM source element to the file picker API
@@ -397,13 +387,8 @@ bamSource.addEventListener("bam-selected", async (e) => {
     if (value !== bamSource.value) return;
 
     // Auto-populate mod filter with first detected modification
-    if (
-        bamPeekResult &&
-        bamPeekResult.modifications.length > 0 &&
-        !parseModFilter(elements.modFilter.value).tag
-    ) {
-        elements.modFilter.value = bamPeekResult.modifications[0];
-        updateStartButton();
+    if (bamPeekResult) {
+        modFilter.autoPopulate(bamPeekResult.modifications);
     }
 
     updateSummary();
@@ -470,7 +455,7 @@ elements.overwriteCheckbox.addEventListener("change", () => {
 });
 
 // Modification filter input
-elements.modFilter.addEventListener("input", () => {
+modFilter.addEventListener("mod-filter-changed", () => {
     updateStartButton();
 });
 
@@ -482,7 +467,7 @@ elements.btnStart.addEventListener("click", async () => {
 
     if (!bamPath || !bedPath || !outputPath) return;
 
-    const { tag: modTag, modStrand } = parseModFilter(elements.modFilter.value);
+    const { tag: modTag, modStrand } = modFilter;
     const rawFlanking = Number(elements.flankingRegion.value);
     if (!Number.isInteger(rawFlanking) || rawFlanking < 0) {
         alert("Flanking region must be a non-negative integer.");

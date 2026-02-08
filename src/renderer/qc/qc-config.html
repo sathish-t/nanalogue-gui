@@ -37,12 +37,8 @@
 
       <!-- Modification type filter (e.g. +T for basecalled-strand thymidine). -->
       <section class="config-section">
-        <h2>Modification filter</h2>
-        <label for="mod-filter" class="visually-hidden">Modification filter</label>
-        <input type="text" id="mod-filter" placeholder="e.g. +T, -m, +a">
-        <p class="hint">+ = basecalled strand, - = opposite strand</p>
-        <!-- Validation hint shown when the mod filter is invalid. -->
-        <p class="hint warning hidden" id="mod-filter-hint">Required &mdash; enter a modification tag to proceed</p>
+        <!-- Reusable modification filter input with validation. -->
+        <mod-filter-input id="mod-filter"></mod-filter-input>
       </section>
 
       <!-- Optional genomic region to restrict QC analysis. -->

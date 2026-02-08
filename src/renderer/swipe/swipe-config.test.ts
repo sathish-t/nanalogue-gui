@@ -37,12 +37,10 @@ describe("swipe-config.html", () => {
     });
 
     describe("file inputs", () => {
-        it("has a readonly BAM path text input", () => {
+        it("has a bam-resource-input custom element", () => {
             const doc = loadTemplate();
-            const input = doc.querySelector<HTMLInputElement>("#bam-path");
-            expect(input).not.toBeNull();
-            expect(input?.type).toBe("text");
-            expect(input?.readOnly).toBe(true);
+            const el = doc.querySelector("bam-resource-input#bam-source");
+            expect(el).not.toBeNull();
         });
 
         it("has a readonly BED path text input", () => {
@@ -63,13 +61,6 @@ describe("swipe-config.html", () => {
     });
 
     describe("browse buttons", () => {
-        it("has a browse button for BAM file", () => {
-            const doc = loadTemplate();
-            const btn = doc.querySelector<HTMLButtonElement>("#btn-browse-bam");
-            expect(btn).not.toBeNull();
-            expect(btn?.type).toBe("button");
-        });
-
         it("has a browse button for BED file", () => {
             const doc = loadTemplate();
             const btn = doc.querySelector<HTMLButtonElement>("#btn-browse-bed");
@@ -112,18 +103,10 @@ describe("swipe-config.html", () => {
     });
 
     describe("modification filter", () => {
-        it("has a mod-filter text input", () => {
+        it("has a mod-filter-input custom element", () => {
             const doc = loadTemplate();
-            const input = doc.querySelector<HTMLInputElement>("#mod-filter");
-            expect(input).not.toBeNull();
-            expect(input?.type).toBe("text");
-        });
-
-        it("has a validation hint that starts hidden", () => {
-            const doc = loadTemplate();
-            const hint = doc.querySelector("#mod-filter-hint");
-            expect(hint).not.toBeNull();
-            expect(hint?.classList.contains("hidden")).toBe(true);
+            const el = doc.querySelector("mod-filter-input#mod-filter");
+            expect(el).not.toBeNull();
         });
     });
 

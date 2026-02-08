@@ -1,10 +1,11 @@
 // QC config page renderer
 
 import { formatContigLength } from "../../lib/format-utils";
-import { parseModFilter } from "../../lib/mod-filter";
 import { parseRegion, validateModRegionOverlap } from "../../lib/region-parser";
 import type { BamSelectedDetail } from "../shared/bam-resource-input";
 import "../shared/bam-resource-input";
+import type { ModFilterInput } from "../shared/mod-filter-input";
+import "../shared/mod-filter-input";
 
 /**
  * Result returned from peeking into a BAM file header and first records.
@@ -58,6 +59,11 @@ const bamSource = document.getElementById(
 ) as import("../shared/bam-resource-input").BamResourceInput;
 
 /**
+ * Modification filter custom element reference.
+ */
+const modFilter = document.getElementById("mod-filter") as ModFilterInput;
+
+/**
  * Collection of DOM element references used by the QC config form.
  */
 const elements = {
@@ -71,12 +77,6 @@ const elements = {
     fileInfoContent: document.getElementById(
         "file-info-content",
     ) as HTMLElement,
-
-    /** Input field for the modification type filter string. */
-    modFilter: document.getElementById("mod-filter") as HTMLInputElement,
-
-    /** Validation hint shown when mod filter is empty or invalid. */
-    modFilterHint: document.getElementById("mod-filter-hint") as HTMLElement,
 
     /** Input field for the genomic region specification. */
     region: document.getElementById("region") as HTMLInputElement,
@@ -115,21 +115,8 @@ let peekRequestId = 0;
  */
 function updateGenerateButton(): void {
     const bamLoaded = peekResult !== null;
-    const modFilterValid = Boolean(
-        parseModFilter(elements.modFilter.value).tag,
-    );
-    elements.btnGenerate.disabled = !bamLoaded || !modFilterValid;
-
-    if (bamLoaded && !modFilterValid) {
-        const trimmed = elements.modFilter.value.trim();
-        elements.modFilterHint.textContent =
-            trimmed.length > 0
-                ? "Invalid format \u2014 use +TAG or -TAG (e.g. +T, -m)"
-                : "Required \u2014 enter a modification tag to proceed";
-        elements.modFilterHint.classList.remove("hidden");
-    } else {
-        elements.modFilterHint.classList.add("hidden");
-    }
+    modFilter.showValidation = bamLoaded;
+    elements.btnGenerate.disabled = !bamLoaded || !modFilter.isValid;
 }
 
 /**
@@ -157,12 +144,7 @@ async function loadPeekInfo() {
         peekResult = result;
 
         // Auto-populate mod filter with first detected modification
-        if (
-            peekResult.modifications.length > 0 &&
-            !parseModFilter(elements.modFilter.value).tag
-        ) {
-            elements.modFilter.value = peekResult.modifications[0];
-        }
+        modFilter.autoPopulate(peekResult.modifications);
 
         const contigsText = peekResult.contigs.join(", ");
         const contigsSuffix =
@@ -322,7 +304,7 @@ async function generateQC() {
 
     elements.btnGenerate.disabled = true;
 
-    const { tag, modStrand } = parseModFilter(elements.modFilter.value);
+    const { tag, modStrand } = modFilter;
     if (!tag) {
         updateGenerateButton();
         return;
@@ -463,7 +445,7 @@ bamSource.addEventListener("source-type-changed", () => {
     peekResult = null;
 });
 
-elements.modFilter.addEventListener("input", () => {
+modFilter.addEventListener("mod-filter-changed", () => {
     updateGenerateButton();
 });
 

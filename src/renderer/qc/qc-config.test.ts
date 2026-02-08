@@ -22,35 +22,16 @@ function loadTemplate(): Document {
 
 describe("qc-config.html", () => {
     describe("form inputs", () => {
-        it("has a BAM path text input", () => {
+        it("has a bam-resource-input custom element", () => {
             const doc = loadTemplate();
-            const input = doc.querySelector<HTMLInputElement>("#bam-path");
-            expect(input).not.toBeNull();
-            expect(input?.type).toBe("text");
-            expect(input?.readOnly).toBe(true);
+            const el = doc.querySelector("bam-resource-input#bam-source");
+            expect(el).not.toBeNull();
         });
 
-        it("has source-type radios with file checked by default", () => {
+        it("has a mod-filter-input custom element", () => {
             const doc = loadTemplate();
-            const radios = doc.querySelectorAll<HTMLInputElement>(
-                'input[name="source-type"]',
-            );
-            expect(radios).toHaveLength(2);
-            const fileRadio = doc.querySelector<HTMLInputElement>(
-                'input[name="source-type"][value="file"]',
-            );
-            const urlRadio = doc.querySelector<HTMLInputElement>(
-                'input[name="source-type"][value="url"]',
-            );
-            expect(fileRadio?.checked).toBe(true);
-            expect(urlRadio?.checked).toBe(false);
-        });
-
-        it("has a modification filter text input", () => {
-            const doc = loadTemplate();
-            const input = doc.querySelector<HTMLInputElement>("#mod-filter");
-            expect(input).not.toBeNull();
-            expect(input?.type).toBe("text");
+            const el = doc.querySelector("mod-filter-input#mod-filter");
+            expect(el).not.toBeNull();
         });
 
         it("has a region text input with placeholder showing both formats", () => {
@@ -132,13 +113,6 @@ describe("qc-config.html", () => {
         it("has a back button", () => {
             const doc = loadTemplate();
             const btn = doc.querySelector<HTMLButtonElement>("#btn-back");
-            expect(btn).not.toBeNull();
-            expect(btn?.type).toBe("button");
-        });
-
-        it("has a browse button", () => {
-            const doc = loadTemplate();
-            const btn = doc.querySelector<HTMLButtonElement>("#btn-browse");
             expect(btn).not.toBeNull();
             expect(btn?.type).toBe("button");
         });

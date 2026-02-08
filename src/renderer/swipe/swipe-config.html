@@ -57,13 +57,8 @@
 
       <!-- Modification filter input for selecting which mod type and strand to view. -->
       <section class="config-section">
-        <h2>Modification filter</h2>
-        <label for="mod-filter" class="visually-hidden">Modification filter</label>
-        <input type="text" id="mod-filter" placeholder="e.g. +T, -m, +a">
-        <!-- Hint explaining the strand sign convention. -->
-        <p class="hint">+ = basecalled strand, - = opposite strand</p>
-        <!-- Validation hint shown when the mod filter is empty. -->
-        <p class="hint warning hidden" id="mod-filter-hint">Required &mdash; enter a modification tag to proceed</p>
+        <!-- Reusable modification filter input with validation. -->
+        <mod-filter-input id="mod-filter"></mod-filter-input>
       </section>
 
       <!-- Flanking region size controlling how many bp to show around each annotation. -->
