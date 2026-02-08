@@ -324,6 +324,18 @@ input[type="number"]:focus {
     margin-bottom: 16px;
 }
 
+/* Flex row containing a density section heading and its action button. */
+.density-heading-row {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Remove bottom margin when heading is inside a heading row. */
+.density-heading-row .density-heading {
+    margin-bottom: 0;
+}
+
 /* Density heading with additional top margin for vertical separation. */
 .density-heading-spaced {
     color: #333;

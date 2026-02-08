@@ -238,4 +238,38 @@ describe("qc-results.html", () => {
             expect(heading?.textContent).toContain("Windowed");
         });
     });
+
+    describe("download button", () => {
+        it("has a download button for whole-read density", () => {
+            const doc = loadTemplate();
+            const btn = doc.querySelector<HTMLButtonElement>(
+                "#btn-download-whole-density",
+            );
+            expect(btn).not.toBeNull();
+            expect(btn?.type).toBe("button");
+        });
+
+        it("has default text of 'Download reads'", () => {
+            const doc = loadTemplate();
+            const btn = doc.querySelector("#btn-download-whole-density");
+            expect(btn?.textContent?.trim()).toBe("Download reads");
+        });
+
+        it("is inside the density-heading-row container", () => {
+            const doc = loadTemplate();
+            const row = doc.querySelector(".density-heading-row");
+            expect(row).not.toBeNull();
+            const btn = row?.querySelector("#btn-download-whole-density");
+            expect(btn).not.toBeNull();
+        });
+
+        it("has the heading and button as siblings in the heading row", () => {
+            const doc = loadTemplate();
+            const row = doc.querySelector(".density-heading-row");
+            const heading = row?.querySelector(".density-heading");
+            const btn = row?.querySelector("#btn-download-whole-density");
+            expect(heading).not.toBeNull();
+            expect(btn).not.toBeNull();
+        });
+    });
 });
