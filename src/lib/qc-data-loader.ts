@@ -1,5 +1,6 @@
 // QC data loader using nanalogue-node
 
+import { writeFileSync } from "node:fs";
 import { bamMods, peek, readInfo, windowReads } from "@nanalogue/node";
 import { RunningHistogram } from "./histogram";
 import type { PeekResult, QCConfig, QCData } from "./types";
@@ -15,6 +16,22 @@ export function maxReadLengthForBinWidth(binWidth: number): number {
     if (binWidth >= 1000) return 3_000_000;
     if (binWidth >= 10) return 300_000;
     return 30_000;
+}
+
+/**
+ * Writes a TSV file with the given header and data rows.
+ *
+ * @param filePath - The filesystem path to write the TSV file to.
+ * @param header - The tab-separated header line.
+ * @param rows - The data rows, each as a tab-separated string.
+ */
+export function writeTsvFile(
+    filePath: string,
+    header: string,
+    rows: string[],
+): void {
+    const content = [header, ...rows].join("\n");
+    writeFileSync(filePath, `${content}\n`, "utf-8");
 }
 
 /**
