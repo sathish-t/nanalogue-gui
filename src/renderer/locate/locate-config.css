@@ -1,0 +1,110 @@
+/* Styles for the locate reads configuration page. */
+
+/* Full-viewport flex container for the locate config page. */
+#locate-config-app {
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Header bar with horizontal layout. */
+#locate-config-app header {
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    gap: 16px;
+    padding: 16px 24px;
+}
+
+/* Page title within the header. */
+#locate-config-app header h1 {
+    color: #333;
+    font-size: 18px;
+    font-weight: 500;
+}
+
+/* Scrollable main content area for the configuration form. */
+#locate-config-app main {
+    flex: 1;
+    margin: 0 auto;
+    max-width: 600px;
+    overflow-y: auto;
+    padding: 24px;
+    width: 100%;
+}
+
+/* Info banner about performance considerations for large or remote BAM files. */
+.disclaimer-info {
+    background: #fff3e0;
+    border: 1px solid #ffcc80;
+    border-radius: 6px;
+    color: #e65100;
+    font-size: 13px;
+    margin-bottom: 24px;
+    padding: 12px 16px;
+}
+
+/* Summary panel displaying BAM and read ID file information. */
+.file-summary {
+    background: #f8f8f8;
+    border-radius: 8px;
+    color: #666;
+    font-size: 14px;
+    padding: 16px;
+}
+
+/* Compact spacing for paragraphs within the summary. */
+.file-summary p {
+    margin: 4px 0;
+}
+
+/* Inline warning displayed when the output file already exists. */
+.file-exists-warning {
+    color: #e65100;
+    font-size: 12px;
+    margin-top: 6px;
+}
+
+/* Confirmation label shown alongside the overwrite warning. */
+.overwrite-confirm {
+    align-items: center;
+    color: #e65100;
+    cursor: pointer;
+    display: flex;
+    font-size: 12px;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+/* Results content area shown after successful BED generation. */
+.results-content {
+    background: #e8f5e9;
+    border: 1px solid #a5d6a7;
+    border-radius: 6px;
+    font-size: 14px;
+    padding: 16px;
+}
+
+/* Compact spacing for paragraphs within the results. */
+.results-content p {
+    margin: 4px 0;
+}
+
+/* Muted note text within the results panel. */
+.results-content .results-note {
+    color: #666;
+    font-size: 12px;
+    font-style: italic;
+    margin-top: 8px;
+}
+
+/* Button to open the full BAM details dialog from the summary. */
+#btn-more-info {
+    margin-top: 10px;
+}
+
+/* Hidden utility class for toggling visibility. */
+.hidden {
+    display: none;
+}

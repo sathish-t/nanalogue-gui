@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Content Security Policy restricting scripts and styles to same-origin. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>Locate Reads - nanalogue-gui</title>
+  <!-- Shared base styles, QC component styles, and locate config page styles. -->
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="stylesheet" href="../qc/qc.css">
+  <link rel="stylesheet" href="locate-config.css">
+</head>
+<body>
+  <!-- Locate reads configuration page root container. -->
+  <div id="locate-config-app">
+    <!-- Header with back navigation and page title. -->
+    <header>
+      <button type="button" id="btn-back" class="back-button">&larr; Back</button>
+      <h1>Locate Reads</h1>
+    </header>
+
+    <main>
+      <!-- Disclaimer about performance with large or remote BAM files. -->
+      <div class="disclaimer-info">
+        If the BAM file is large, this operation may take some time. If the file
+        is remote, a significant amount of data may be downloaded. Specifying a
+        region of interest speeds up processing and significantly reduces
+        download sizes.
+      </div>
+
+      <!-- BAM source selection: local file or remote URL. -->
+      <section class="config-section">
+        <h2>BAM Source</h2>
+        <bam-resource-input id="bam-source"></bam-resource-input>
+      </section>
+
+      <!-- Read ID file selection. -->
+      <section class="config-section">
+        <h2>Read ID file</h2>
+        <!-- Row containing the read ID path input and browse button. -->
+        <div class="file-input-row">
+          <label for="read-id-path" class="visually-hidden">Read ID file path</label>
+          <input type="text" id="read-id-path" placeholder="Select a text file with one read ID per line" readonly>
+          <button type="button" id="btn-browse-read-ids">Browse</button>
+        </div>
+      </section>
+
+      <!-- Optional genomic region to constrain the search. -->
+      <section class="config-section">
+        <h2>Region <span class="optional">(optional)</span></h2>
+        <label for="region" class="visually-hidden">Region</label>
+        <input type="text" id="region" placeholder="e.g. chr3, chrI:1000-50000">
+        <!-- Checkbox to restrict to reads fully spanning the region. -->
+        <label class="checkbox-label" id="full-region-label">
+          <input type="checkbox" id="full-region" disabled>
+          Restrict to reads that pass through region completely
+        </label>
+      </section>
+
+      <!-- Output BED file selection with overwrite confirmation. -->
+      <section class="config-section">
+        <h2>Output BED file</h2>
+        <output-file-input id="output-source"></output-file-input>
+      </section>
+
+      <!-- Summary panel populated after files are selected. -->
+      <section class="config-section" id="summary-section">
+        <h2>Summary</h2>
+        <!-- Panel showing BAM metadata and read ID count. -->
+        <div class="file-summary" id="file-summary">
+          <p class="placeholder-text">Select files above to see a summary</p>
+        </div>
+      </section>
+
+      <!-- Submit button to generate the BED file. -->
+      <div class="action-row">
+        <button type="button" id="btn-generate" class="primary-button" disabled>Generate BED file</button>
+      </div>
+
+      <!-- Full-screen loading overlay shown during BED generation. -->
+      <div id="loading-overlay" class="hidden">
+        <div class="spinner"></div>
+        <p>Generating BED file...</p>
+      </div>
+
+      <!-- Results panel shown after successful BED generation. -->
+      <section class="config-section hidden" id="results-section">
+        <h2>Results</h2>
+        <!-- Content area for generation result details. -->
+        <div class="results-content" id="results-content"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Dialog showing full BAM file metadata (contigs and modifications). -->
+  <dialog id="more-info-dialog">
+    <h2>BAM File Details</h2>
+    <!-- Scrollable content area for contig table and modifications list. -->
+    <div id="more-info-content"></div>
+    <button type="button" id="more-info-close" class="primary-button">Close</button>
+  </dialog>
+
+  <!-- Bundled locate config script handling file selection and BED generation. -->
+  <script src="locate-config.js"></script>
+</body>
+</html>
