@@ -14,7 +14,7 @@ import {
     type ContigSizes,
     loadContigSizes,
     loadPlotData,
-} from "../lib/data-loader";
+} from "../lib/swipe-data-loader";
 import type { AppState, BedAnnotation, PlotData } from "../lib/types";
 
 /**

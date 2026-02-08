@@ -1,8 +1,11 @@
-// Unit tests for QC loader utilities
+// Unit tests for qc-data-loader utilities
 
 import { describe, expect, it } from "vitest";
 import { RunningHistogram } from "./histogram";
-import { maxReadLengthForBinWidth, parseWindowedDensities } from "./qc-loader";
+import {
+    maxReadLengthForBinWidth,
+    parseWindowedDensities,
+} from "./qc-data-loader";
 
 describe("parseWindowedDensities", () => {
     it("returns empty array for empty input", () => {

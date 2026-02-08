@@ -1,4 +1,4 @@
-// Data loader using nanalogue-node for nanalogue-swipe
+// Swipe data loader using nanalogue-node
 
 import { bamMods, peek, windowReads } from "@nanalogue/node";
 import type {

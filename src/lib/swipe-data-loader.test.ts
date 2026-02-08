@@ -1,7 +1,7 @@
-// Unit tests for data-loader utilities
+// Unit tests for swipe-data-loader utilities
 
 import { describe, expect, it } from "vitest";
-import { parseWindowReadsTsv } from "./data-loader";
+import { parseWindowReadsTsv } from "./swipe-data-loader";
 
 const HEADER =
     "contig\tref_win_start\tref_win_end\tread_id\twin_val\tstrand\tbase\tmod_strand\tmod_type\twin_start\twin_end\tbasecall_qual";

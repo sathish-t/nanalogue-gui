@@ -2,7 +2,7 @@
 
 import { resolve } from "node:path";
 import { type BrowserWindow, dialog, ipcMain } from "electron";
-import { generateQCData, peekBam } from "../lib/qc-loader";
+import { generateQCData, peekBam } from "../lib/qc-data-loader";
 import type { QCConfig, QCData } from "../lib/types";
 
 let qcData: QCData | null = null;
