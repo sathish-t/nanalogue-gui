@@ -338,5 +338,6 @@ app.on("window-all-closed", () => {
     if (currentMode === "swipe") {
         swipeModule.printSummary();
     }
+    qcModule.cleanup();
     app.quit();
 });

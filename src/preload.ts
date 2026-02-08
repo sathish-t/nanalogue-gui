@@ -181,6 +181,29 @@ contextBridge.exposeInMainWorld("api", {
     getQCData: () => ipcRenderer.invoke("get-qc-data"),
 
     /**
+     * Download per-read QC data as a TSV, optionally filtered by density range.
+     *
+     * @param tempTsvPath - The path to the temporary TSV file generated during QC.
+     * @param filterMin - The inclusive lower bound for filtering (undefined to skip filtering).
+     * @param filterMax - The exclusive upper bound for filtering (undefined to skip filtering).
+     * @param valueColumnIndex - The zero-based column index containing the value to filter on.
+     * @returns A promise that resolves with true if the file was saved, false if cancelled.
+     */
+    downloadQCReads: (
+        tempTsvPath: string,
+        filterMin?: number,
+        filterMax?: number,
+        valueColumnIndex?: number,
+    ) =>
+        ipcRenderer.invoke(
+            "download-qc-reads",
+            tempTsvPath,
+            filterMin,
+            filterMax,
+            valueColumnIndex,
+        ),
+
+    /**
      * Navigate back from the QC results screen to the QC configuration screen.
      *
      * @returns A promise that resolves when navigation is complete.
