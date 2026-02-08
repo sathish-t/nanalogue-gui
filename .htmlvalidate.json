@@ -68,7 +68,7 @@
         "no-self-closing": ["error", { "ignoreForeign": false }],
         "no-style-tag": ["error", { "allowTemplate": false }],
         "no-trailing-whitespace": "error",
-        "no-unknown-elements": ["error", { "exclude": ["bam-resource-input", "mod-filter-input"] }],
+        "no-unknown-elements": ["error", { "exclude": ["bam-resource-input", "mod-filter-input", "output-file-input"] }],
         "no-unused-disable": "error",
         "no-utf8-bom": "error",
         "prefer-button": "error",
