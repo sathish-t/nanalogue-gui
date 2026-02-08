@@ -1,4 +1,6 @@
-// Type definitions for nanalogue-swipe
+// Type definitions shared across nanalogue-gui modes
+
+import type { HistogramBin, Stats, YieldBin } from "./stats";
 
 /**
  * Represents a single annotation row parsed from a BED file.
@@ -170,28 +172,28 @@ export interface PeekResult {
  */
 export interface QCData {
     /** Summary statistics computed over the read length distribution. */
-    readLengthStats: import("./stats").Stats;
+    readLengthStats: Stats;
     /** The histogram bins for the read length distribution. */
-    readLengthHistogram: import("./stats").HistogramBin[];
+    readLengthHistogram: HistogramBin[];
     /** The cumulative yield bins sorted by read length. */
-    yieldByLength: import("./stats").YieldBin[];
+    yieldByLength: YieldBin[];
     /** The bin width used for the read length histogram. */
     readLengthBinWidth: number;
     /** The number of reads that exceeded the histogram's maximum representable length. */
     exceededReadLengths: number;
 
     /** Summary statistics computed over the whole-read density distribution. */
-    wholeReadDensityStats: import("./stats").Stats;
+    wholeReadDensityStats: Stats;
     /** The histogram bins for the whole-read density distribution. */
-    wholeReadDensityHistogram: import("./stats").HistogramBin[];
+    wholeReadDensityHistogram: HistogramBin[];
 
     /** Summary statistics computed over the windowed density distribution. */
-    windowedDensityStats: import("./stats").Stats;
+    windowedDensityStats: Stats;
     /** The histogram bins for the windowed density distribution. */
-    windowedDensityHistogram: import("./stats").HistogramBin[];
+    windowedDensityHistogram: HistogramBin[];
 
     /** Summary statistics computed over the raw probability distribution. */
-    rawProbabilityStats: import("./stats").Stats;
+    rawProbabilityStats: Stats;
     /** The histogram bins for the raw probability distribution. */
-    rawProbabilityHistogram: import("./stats").HistogramBin[];
+    rawProbabilityHistogram: HistogramBin[];
 }
