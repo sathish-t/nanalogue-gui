@@ -209,4 +209,88 @@ contextBridge.exposeInMainWorld("api", {
      * @returns A promise that resolves when navigation is complete.
      */
     goBackToConfig: () => ipcRenderer.invoke("qc-go-back-to-config"),
+
+    // Locate reads
+
+    /**
+     * Launch the locate reads mode.
+     *
+     * @returns A promise that resolves when the locate window is opened.
+     */
+    launchLocate: () => ipcRenderer.invoke("launch-locate"),
+
+    /**
+     * Open a native file dialog for selecting a BAM file in locate mode.
+     *
+     * @returns A promise that resolves with the selected file path, or null if cancelled.
+     */
+    locatePickBam: () => ipcRenderer.invoke("locate-pick-bam"),
+
+    /**
+     * Open a native file dialog for selecting a read ID text file.
+     *
+     * @returns A promise that resolves with the selected file path, or null if cancelled.
+     */
+    locatePickReadIds: () => ipcRenderer.invoke("locate-pick-read-ids"),
+
+    /**
+     * Open a native save dialog for selecting the output BED file path.
+     *
+     * @returns A promise that resolves with the selected file path, or null if cancelled.
+     */
+    locatePickOutput: () => ipcRenderer.invoke("locate-pick-output"),
+
+    /**
+     * Check whether a file exists at the given path.
+     *
+     * @param filePath - The path to check.
+     * @returns A promise that resolves with true if the file exists.
+     */
+    locateCheckFileExists: (filePath: string) =>
+        ipcRenderer.invoke("locate-check-file-exists", filePath),
+
+    /**
+     * Count the number of non-empty lines in a read ID file.
+     *
+     * @param filePath - The path to the read ID file.
+     * @returns A promise that resolves with the line count.
+     */
+    locateCountReadIds: (filePath: string) =>
+        ipcRenderer.invoke("locate-count-read-ids", filePath),
+
+    /**
+     * Generate a BED file from read IDs found in a BAM file.
+     *
+     * @param bamPath - The path or URL to the BAM file.
+     * @param readIdPath - The path to the read ID text file.
+     * @param outputPath - The path for the output BED file.
+     * @param treatAsUrl - Whether to treat the BAM path as a remote URL.
+     * @param region - Optional genomic region to constrain the search.
+     * @param fullRegion - Whether to restrict to reads spanning the full region.
+     * @returns A promise that resolves with the locate result summary.
+     */
+    locateGenerateBed: (
+        bamPath: string,
+        readIdPath: string,
+        outputPath: string,
+        treatAsUrl: boolean,
+        region?: string,
+        fullRegion?: boolean,
+    ) =>
+        ipcRenderer.invoke(
+            "locate-generate-bed",
+            bamPath,
+            readIdPath,
+            outputPath,
+            treatAsUrl,
+            region,
+            fullRegion,
+        ),
+
+    /**
+     * Navigate back to the landing page from the locate config screen.
+     *
+     * @returns A promise that resolves when navigation is complete.
+     */
+    locateGoBack: () => ipcRenderer.invoke("locate-go-back"),
 });
