@@ -85,10 +85,21 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
     const rawProbabilityHist = new RunningHistogram(0.01, 1.0);
     const windowedDensityHist = new RunningHistogram(0.01, 1.0);
 
-    // Get read info for length statistics
-    console.log("Loading read info...");
-    const reads = await readInfo(baseOptions);
+    // Load all three data sources in parallel
+    console.log(
+        "Loading read info, modification data, and windowed densities...",
+    );
+    const [reads, modRecords, windowedTsv] = await Promise.all([
+        readInfo(baseOptions),
+        bamMods(baseOptions),
+        windowReads({
+            ...baseOptions,
+            win: config.windowSize,
+            step: config.windowSize,
+        }),
+    ]);
 
+    // Process read lengths
     let droppedLengths = 0;
     for (const r of reads) {
         if (r.alignment_type === "unmapped") continue;
@@ -119,10 +130,7 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
         );
     }
 
-    // Get modification data
-    console.log("Loading modification data...");
-    const modRecords = await bamMods(baseOptions);
-
+    // Process modification data
     let loggedMissingModTable = false;
     let readsWithMods = 0;
 
@@ -161,14 +169,7 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
     console.log(`  Got ${readsWithMods} reads with modifications`);
     console.log(`  Got ${rawProbabilityHist.count} modification calls`);
 
-    // Get windowed densities
-    console.log("Loading windowed densities...");
-    const windowedTsv = await windowReads({
-        ...baseOptions,
-        win: config.windowSize,
-        step: config.windowSize,
-    });
-
+    // Process windowed densities
     const windowedDensities = parseWindowedDensities(windowedTsv);
     for (const density of windowedDensities) {
         windowedDensityHist.add(Math.min(density, 1 - Number.EPSILON));
