@@ -23,10 +23,12 @@
     letter-spacing: -0.5px;
 }
 
-/* Horizontal row of mode selection buttons. */
+/* Horizontal row of mode selection buttons with wrapping for narrow windows. */
 #mode-selection {
     display: flex;
+    flex-wrap: wrap;
     gap: 24px;
+    justify-content: center;
 }
 
 /* Large card-style button for selecting an application mode. */

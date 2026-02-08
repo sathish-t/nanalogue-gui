@@ -20,6 +20,8 @@ interface LandingApi {
     launchSwipe: () => Promise<LaunchResult>;
     /** Launches the QC mode for generating quality control reports. */
     launchQC: () => Promise<LaunchResult>;
+    /** Launches the locate reads mode for converting read IDs to BED format. */
+    launchLocate: () => Promise<LaunchResult>;
 }
 
 /** The preload API instance retrieved from the window object for invoking main process actions. */
@@ -32,6 +34,7 @@ const api = (
 
 const btnSwipe = document.getElementById("btn-swipe") as HTMLButtonElement;
 const btnQC = document.getElementById("btn-qc") as HTMLButtonElement;
+const btnLocate = document.getElementById("btn-locate") as HTMLButtonElement;
 
 btnSwipe.addEventListener("click", async () => {
     try {
@@ -56,5 +59,18 @@ btnQC.addEventListener("click", async () => {
         }
     } catch (error) {
         alert(`Failed to launch QC mode: ${String(error)}`);
+    }
+});
+
+btnLocate.addEventListener("click", async () => {
+    try {
+        const result = await api.launchLocate();
+        if (!result.success) {
+            alert(
+                `Failed to launch locate mode: ${result.reason ?? "Unknown error"}`,
+            );
+        }
+    } catch (error) {
+        alert(`Failed to launch locate mode: ${String(error)}`);
     }
 });

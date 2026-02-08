@@ -63,10 +63,26 @@ describe("landing.html", () => {
             expect(desc?.textContent).toContain("QC");
         });
 
-        it("has exactly 2 mode buttons", () => {
+        it("has a locate mode button", () => {
+            const doc = loadTemplate();
+            const btn = doc.querySelector<HTMLButtonElement>("#btn-locate");
+            expect(btn).not.toBeNull();
+            expect(btn?.type).toBe("button");
+        });
+
+        it("locate button has a title and description", () => {
+            const doc = loadTemplate();
+            const btn = doc.querySelector("#btn-locate");
+            const title = btn?.querySelector(".mode-title");
+            const desc = btn?.querySelector(".mode-description");
+            expect(title?.textContent).toBe("Locate reads");
+            expect(desc?.textContent).toContain("BED");
+        });
+
+        it("has exactly 3 mode buttons", () => {
             const doc = loadTemplate();
             const buttons = doc.querySelectorAll(".mode-button");
-            expect(buttons).toHaveLength(2);
+            expect(buttons).toHaveLength(3);
         });
     });
 
