@@ -8,12 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Locate reads mode: BAM + read ID file to BED conversion with region filtering, overwrite confirmation, and results display ([`bfe3e25`](https://github.com/sathish-t/nanalogue-gui/commit/bfe3e25c74966bfe9425c998f4cafc50a07706f3))
+- Locate reads button on landing page ([`e260085`](https://github.com/sathish-t/nanalogue-gui/commit/e26008584dab6adcd4af4b3340bc398c494ab749))
+- Locate reads renderer page with BAM peek, read ID count, region filter, and BED generation ([`4378f0b`](https://github.com/sathish-t/nanalogue-gui/commit/4378f0b1ee24f86e5ec9fcddc2be989d99a1e114))
+- Reusable `<output-file-input>` custom element for output file selection with overwrite confirmation ([`66d9dd4`](https://github.com/sathish-t/nanalogue-gui/commit/66d9dd4d8103b3c18bc36a3044857f861deed6d8))
+- `locate-data-loader` module for parsing read ID files and generating BED lines ([`26bb243`](https://github.com/sathish-t/nanalogue-gui/commit/26bb243d35c3c455b7e861745182d313dee897de))
+- `countNonEmptyLines` streaming line counter for text files ([`9e2f5d6`](https://github.com/sathish-t/nanalogue-gui/commit/9e2f5d6c7d9abf01d05b8db0def3a214376cb0bb))
 - Download button for per-read whole-read density data with filter-aware labeling ([`aeb5c1a`](https://github.com/sathish-t/nanalogue-gui/commit/aeb5c1ad31c6a43b81ec9415b1ca7fda2296ef56))
 - TSV download IPC handler with path validation, overwrite confirmation, and stream error handling ([`a22a20f`](https://github.com/sathish-t/nanalogue-gui/commit/a22a20f2be32c6008572e2a837fd50af7a81a8ab))
 - Per-read density TSV generation during QC analysis ([`5ccf5a9`](https://github.com/sathish-t/nanalogue-gui/commit/5ccf5a93727bddd6fba007d4e344188f626b204e))
 - `writeTsvFile` utility for batch TSV file writing ([`dd5fa4d`](https://github.com/sathish-t/nanalogue-gui/commit/dd5fa4dc1d140ed2420ce690ed087bc953b06c0f))
 
 ### Changed
+- Swipe config uses `<output-file-input>` element instead of inline output file handling ([`790f345`](https://github.com/sathish-t/nanalogue-gui/commit/790f3456a7cfc8265cf25b1b0eefd3dcb449aa45))
 - Parallelizes QC data retrieval for read info, modifications, and windowed densities ([`f213a0b`](https://github.com/sathish-t/nanalogue-gui/commit/f213a0b2d41c134653a26ea961fb4480a7e8f8b4))
 - Narrows region to annotation bounds in swipe mode ([`cd3f9c6`](https://github.com/sathish-t/nanalogue-gui/commit/cd3f9c667eade39a0a1fcb18fc69ac5e68b2003f))
 - Renames data loaders by mode for clarity ([`84ea2d1`](https://github.com/sathish-t/nanalogue-gui/commit/84ea2d1a184945df9e91d2f8705376ee4891088a))
