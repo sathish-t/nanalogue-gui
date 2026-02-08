@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Download button for per-read whole-read density data with filter-aware labeling ([`aeb5c1a`](https://github.com/sathish-t/nanalogue-gui/commit/aeb5c1ad31c6a43b81ec9415b1ca7fda2296ef56))
+- TSV download IPC handler with path validation, overwrite confirmation, and stream error handling ([`a22a20f`](https://github.com/sathish-t/nanalogue-gui/commit/a22a20f2be32c6008572e2a837fd50af7a81a8ab))
+- Per-read density TSV generation during QC analysis ([`5ccf5a9`](https://github.com/sathish-t/nanalogue-gui/commit/5ccf5a93727bddd6fba007d4e344188f626b204e))
+- `writeTsvFile` utility for batch TSV file writing ([`dd5fa4d`](https://github.com/sathish-t/nanalogue-gui/commit/dd5fa4dc1d140ed2420ce690ed087bc953b06c0f))
+
+### Changed
+- Parallelizes QC data retrieval for read info, modifications, and windowed densities ([`f213a0b`](https://github.com/sathish-t/nanalogue-gui/commit/f213a0b2d41c134653a26ea961fb4480a7e8f8b4))
+- Narrows region to annotation bounds in swipe mode ([`cd3f9c6`](https://github.com/sathish-t/nanalogue-gui/commit/cd3f9c667eade39a0a1fcb18fc69ac5e68b2003f))
+- Renames data loaders by mode for clarity ([`84ea2d1`](https://github.com/sathish-t/nanalogue-gui/commit/84ea2d1a184945df9e91d2f8705376ee4891088a))
+- QCData type uses top-level import type instead of inline imports ([`7800f4d`](https://github.com/sathish-t/nanalogue-gui/commit/7800f4d450e0309483783240f554d921cd6a83a1))
 - Dedicated jsdom tests for the `<bam-resource-input>` custom element covering DOM structure, state, mode switching, and events ([`313b587`](https://github.com/sathish-t/nanalogue-gui/commit/313b587183feec08dc538259fc50299c5adec4f4))
 - Reusable `<mod-filter-input>` custom element extracting duplicated modification filter UI from QC and Swipe config pages, with 29 jsdom tests ([`44b87ec`](https://github.com/sathish-t/nanalogue-gui/commit/44b87ece1de6d8d373b41c43d66a8ff0b3f74208))
 - Reusable `<bam-resource-input>` Custom Element for BAM file/URL source selection, with file/URL radio toggle, Browse button, and `bam-selected`/`source-type-changed` events ([`a9defd6`](https://github.com/sathish-t/nanalogue-gui/commit/a9defd6))
