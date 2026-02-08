@@ -156,8 +156,8 @@ export async function loadPlotData(
         );
     }
 
-    const region = `${annotation.contig}:${expandedStart}-${expandedEnd}`;
-    const modRegion = region;
+    const region = `${annotation.contig}:${annotation.start}-${Math.min(annotation.end, contigSize)}`;
+    const modRegion = `${annotation.contig}:${expandedStart}-${expandedEnd}`;
 
     const [tsv, modRecords] = await Promise.all([
         windowReads({
@@ -165,6 +165,7 @@ export async function loadPlotData(
             treatAsUrl,
             region,
             modRegion,
+            fullRegion: true,
             readIdSet: [annotation.readId],
             win: windowSize,
             step: windowSize,
@@ -177,6 +178,7 @@ export async function loadPlotData(
             treatAsUrl,
             region,
             modRegion,
+            fullRegion: true,
             readIdSet: [annotation.readId],
             ...(modTag !== undefined && { tag: modTag }),
             ...(modTag !== undefined &&
