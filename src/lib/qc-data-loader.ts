@@ -1,6 +1,8 @@
 // QC data loader using nanalogue-node
 
-import { writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { bamMods, peek, readInfo, windowReads } from "@nanalogue/node";
 import { RunningHistogram } from "./histogram";
 import type { PeekResult, QCConfig, QCData } from "./types";
@@ -147,9 +149,11 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
         );
     }
 
-    // Process modification data
+    // Process modification data, collecting per-read densities for batch TSV write
     let loggedMissingModTable = false;
     let readsWithMods = 0;
+    let tsvPath: string | undefined;
+    const densityRows: string[] = [];
 
     for (const record of modRecords) {
         if (record.alignment_type === "unmapped") continue;
@@ -176,15 +180,27 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
         }
 
         if (probCount > 0) {
-            wholeReadDensityHist.add(
-                Math.min(probSum / probCount, 1 - Number.EPSILON),
-            );
+            // Clamp density consistently for both histogram and TSV output
+            const density = Math.min(probSum / probCount, 1 - Number.EPSILON);
+            wholeReadDensityHist.add(density);
+            densityRows.push(`${record.read_id}\t${density}`);
             readsWithMods++;
         }
     }
 
+    // Batch-write TSV only when there are mod-bearing reads (avoids empty temp dirs)
+    if (densityRows.length > 0) {
+        const tsvTempDir = mkdtempSync(join(tmpdir(), "nanalogue-qc-"));
+        tsvPath = join(tsvTempDir, "whole_read_density.tsv");
+        writeTsvFile(tsvPath, "read_id\twhole_read_density", densityRows);
+    }
+
     console.log(`  Got ${readsWithMods} reads with modifications`);
     console.log(`  Got ${rawProbabilityHist.count} modification calls`);
+
+    if (tsvPath) {
+        console.log(`  Wrote per-read density TSV to ${tsvPath}`);
+    }
 
     // Process windowed densities
     const windowedDensities = parseWindowedDensities(windowedTsv);
@@ -209,6 +225,8 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
 
         rawProbabilityStats: rawProbabilityHist.toStats(false),
         rawProbabilityHistogram: rawProbabilityHist.toBins(),
+
+        wholeReadDensityTsvPath: tsvPath,
     };
 }
 
