@@ -146,20 +146,23 @@ jobs:
           MOUNT_DIR=$(hdiutil attach "$DMG" -nobrowse | grep -oE '/Volumes/.*')
           APP=$(find "$MOUNT_DIR" -name "*.app" -maxdepth 1 | head -1)
 
-          # Strip quarantine attribute so Gatekeeper does not block the unsigned app
-          xattr -cr "$APP"
+          # Copy app to a writable location since the DMG is mounted read-only
+          cp -R "$APP" /tmp/test-app.app
+          hdiutil detach "$MOUNT_DIR" || true
 
-          open -a "$APP"
+          # Strip quarantine attribute so Gatekeeper does not block the unsigned app
+          xattr -cr /tmp/test-app.app
+
+          open -a /tmp/test-app.app
           sleep 30
           screencapture screenshot.png
-          hdiutil detach "$MOUNT_DIR" || true
 
       # Linux smoke test
       - name: Install test dependencies (Linux)
         if: matrix.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb imagemagick libfuse2
+          sudo apt-get install -y xvfb imagemagick libfuse2 openbox
 
       - name: Launch AppImage and capture screenshot (Linux)
         if: matrix.os == 'Linux'
@@ -167,6 +170,9 @@ jobs:
           APPIMAGE=$(ls binaries/*.AppImage | head -1)
           chmod +x "$APPIMAGE"
           xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" bash -c '
+            # Start a window manager so the app window is mapped and visible
+            openbox &
+            sleep 2
             "$0" --no-sandbox --disable-gpu &
             APP_PID=$!
             sleep 30
