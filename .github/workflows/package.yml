@@ -145,8 +145,12 @@ jobs:
           DMG=$(ls binaries/*.dmg | head -1)
           MOUNT_DIR=$(hdiutil attach "$DMG" -nobrowse | grep -oE '/Volumes/.*')
           APP=$(find "$MOUNT_DIR" -name "*.app" -maxdepth 1 | head -1)
-          open -a "$APP" &
-          sleep 10
+
+          # Strip quarantine attribute so Gatekeeper does not block the unsigned app
+          xattr -cr "$APP"
+
+          open -a "$APP"
+          sleep 30
           screencapture screenshot.png
           hdiutil detach "$MOUNT_DIR" || true
 
@@ -163,9 +167,9 @@ jobs:
           APPIMAGE=$(ls binaries/*.AppImage | head -1)
           chmod +x "$APPIMAGE"
           xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" bash -c '
-            "$0" &
+            "$0" --no-sandbox --disable-gpu &
             APP_PID=$!
-            sleep 10
+            sleep 30
             import -window root screenshot.png
             kill $APP_PID 2>/dev/null || true
           ' "$APPIMAGE"
