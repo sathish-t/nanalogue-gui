@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-02-09
+
 ### Added
 
 **Locate reads feature:** New mode for converting BAM files + read ID file to BED format with region filtering, overwrite confirmation, and results display. Includes landing page button, dedicated renderer page with BAM peek and read ID count, `locate-data-loader` module for parsing and BED generation, and `countNonEmptyLines` streaming line counter utility. ([`e260085`](https://github.com/sathish-t/nanalogue-gui/commit/e26008584dab6adcd4af4b3340bc398c494ab749), [`4378f0b`](https://github.com/sathish-t/nanalogue-gui/commit/4378f0b1ee24f86e5ec9fcddc2be989d99a1e114), [`26bb243`](https://github.com/sathish-t/nanalogue-gui/commit/26bb243d35c3c455b7e861745182d313dee897de), [`9e2f5d6`](https://github.com/sathish-t/nanalogue-gui/commit/9e2f5d6c7d9abf01d05b8db0def3a214376cb0bb))
