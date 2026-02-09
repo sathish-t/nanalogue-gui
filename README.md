@@ -17,6 +17,7 @@ interactive visualisation and curation workflows.
 - [Modes](#modes)
   - [Swipe](#swipe)
   - [QC](#qc)
+  - [Locate Reads](#locate-reads)
 - [Development](#development)
 - [Versioning](#versioning)
 - [Changelog](#changelog)
@@ -41,7 +42,8 @@ npm install
 npm start
 ```
 
-This launches the landing page where you can choose between Swipe and QC modes.
+This launches the landing page where you can choose between Swipe, QC, and
+Locate Reads modes.
 
 ## Modes
 
@@ -79,6 +81,28 @@ QC result tabs:
 - **Yield Curve**: cumulative yield by read count
 - **Analogue Density**: whole-read and windowed density histograms
 - **Raw Probability**: modification probability distribution
+
+### Locate Reads
+
+Converts a list of read IDs into a BED file by looking up their genomic
+coordinates in a BAM file. Useful for finding where specific reads of interest
+map in the genome.
+
+The configuration screen allows setting:
+- BAM source (local file or URL)
+- Read ID file (plain text, one read ID per line)
+- Region (optional, e.g., `chr3` or `chrI:1000-50000`) to speed up processing
+- Full region checkbox to restrict to reads that completely span the region
+- Output BED file path
+
+Output is tab-separated BED6 (contig, start, end, read_id, score, strand):
+```
+chr1	100	600	read_abc	1000	+
+chr2	200	700	read_def	1000	-
+```
+
+After generation, a summary shows the number of BED entries written, read IDs
+not found in the BAM, and unmapped reads excluded from the output.
 
 ## Development
 
