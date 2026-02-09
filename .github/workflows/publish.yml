@@ -151,10 +151,22 @@ jobs:
       #   with:
       #     path: artifacts
 
+      - name: Check if version already published
+        id: check-version
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          if npm view "@nanalogue/gui@$VERSION" version 2>/dev/null; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "Version $VERSION already published to npm — skipping"
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            echo "Version $VERSION not yet published — proceeding"
+          fi
+
       - name: Publish to npm (dry run)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        if: ${{ steps.check-version.outputs.already_published == 'false' && github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: npm publish --dry-run --provenance --access public
 
       - name: Publish to npm
-        if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run) }}
+        if: ${{ steps.check-version.outputs.already_published == 'false' && (github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)) }}
         run: npm publish --provenance --access public
