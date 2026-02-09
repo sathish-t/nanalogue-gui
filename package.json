@@ -3,6 +3,9 @@
   "version": "0.1.2",
   "description": "GUI tools for nanopore data analysis",
   "main": "dist/main.js",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc && npm run build:renderer && npm run copy-assets",
     "build:renderer": "npm run build:landing && npm run build:swipe && npm run build:qc && npm run build:locate",
