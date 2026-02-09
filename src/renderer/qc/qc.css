@@ -387,6 +387,13 @@ input[type="number"]:focus {
     text-decoration: underline;
 }
 
+/* Small note below the stats header clarifying data semantics. */
+.alignment-note {
+    color: #888;
+    font-size: 11px;
+    margin: 8px 0;
+}
+
 /* Responsive grid layout for individual stat key-value pairs. */
 .stats-grid {
     display: grid;

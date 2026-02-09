@@ -187,11 +187,13 @@ function showNoData(canvasId: string, message: string): void {
  * @param containerId - The DOM element ID of the container to render into.
  * @param stats - The summary statistics to display.
  * @param showN50 - Whether to include the N50 metric in the essential stats.
+ * @param note - Optional small note rendered below the header.
  */
 function renderStatsPanel(
     containerId: string,
     stats: Stats,
     showN50: boolean = false,
+    note?: string,
 ): void {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -214,6 +216,8 @@ function renderStatsPanel(
         { label: "Std Dev", value: formatNumber(stats.stddev) },
     ];
 
+    const noteHtml = note ? `<p class="alignment-note">${note}</p>` : "";
+
     container.innerHTML = `
     <div class="stats-header">
       <h3>Summary Statistics</h3>
@@ -221,6 +225,7 @@ function renderStatsPanel(
         Show all stats
       </button>
     </div>
+    ${noteHtml}
     <div class="stats-grid">
       ${essentialStats
           .map(
@@ -264,11 +269,13 @@ function renderStatsPanel(
  * @param containerId - The DOM element ID of the container to render into.
  * @param yieldBins - The yield bins bucketed by read length.
  * @param readLengthStats - The read length stats containing the N50 value.
+ * @param note - Optional small note rendered below the summary.
  */
 function renderYieldSummary(
     containerId: string,
     yieldBins: YieldBin[],
     readLengthStats: Stats,
+    note?: string,
 ): void {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -284,6 +291,8 @@ function renderYieldSummary(
         items.push({ label: "N50", value: formatNumber(readLengthStats.n50) });
     }
 
+    const noteHtml = note ? `<p class="alignment-note">${note}</p>` : "";
+
     container.innerHTML = `
     <div class="stats-grid">
       ${items
@@ -297,6 +306,7 @@ function renderYieldSummary(
           )
           .join("")}
     </div>
+    ${noteHtml}
   `;
 }
 
@@ -660,7 +670,12 @@ async function initialize(): Promise<void> {
                 (binStart) => formatYieldLabel(binStart, binWidth),
             );
         }
-        renderStatsPanel("stats-read-lengths", data.readLengthStats, true);
+        renderStatsPanel(
+            "stats-read-lengths",
+            data.readLengthStats,
+            true,
+            "Lengths shown are alignment lengths, not basecalled read lengths.",
+        );
 
         // Yield tab
         if (data.yieldByLength.length === 0) {
@@ -676,6 +691,7 @@ async function initialize(): Promise<void> {
             "stats-yield",
             data.yieldByLength,
             data.readLengthStats,
+            "Data in view based on alignment length, not basecalled read lengths.",
         );
 
         // Density tab
