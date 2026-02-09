@@ -72,15 +72,11 @@
       "package.json"
     ],
     "mac": {
-      "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] }
-      ],
+      "target": "dmg",
       "category": "public.app-category.education"
     },
     "linux": {
-      "target": [
-        { "target": "AppImage", "arch": ["x64", "arm64"] }
-      ],
+      "target": "AppImage",
       "category": "Science"
     }
   }

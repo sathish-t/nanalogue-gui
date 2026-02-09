@@ -153,6 +153,10 @@ jobs:
           # Strip quarantine attribute so Gatekeeper does not block the unsigned app
           xattr -cr /tmp/test-app.app
 
+          # Verify the binary matches the expected architecture
+          MAIN_BIN=$(find /tmp/test-app.app/Contents/MacOS -type f | head -1)
+          echo "Binary architecture: $(file "$MAIN_BIN")"
+
           open -a /tmp/test-app.app
           sleep 30
           screencapture screenshot.png
@@ -173,9 +177,17 @@ jobs:
             # Start a window manager so the app window is mapped and visible
             openbox &
             sleep 2
-            "$0" --no-sandbox --disable-gpu &
+            "$0" --no-sandbox --disable-gpu --ozone-platform=x11 &
             APP_PID=$!
             sleep 30
+
+            # Verify the app process is still running
+            if kill -0 $APP_PID 2>/dev/null; then
+              echo "App process $APP_PID is running"
+            else
+              echo "WARNING: App process $APP_PID exited early"
+            fi
+
             import -window root screenshot.png
             kill $APP_PID 2>/dev/null || true
           ' "$APPIMAGE"
