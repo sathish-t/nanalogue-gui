@@ -1,19 +1,13 @@
-# Publish workflow for nanalogue-gui
-# Builds on all platforms, then publishes to npm
-# Triggers on GitHub Release or manual dispatch (dry-run)
+# Release workflow for nanalogue-gui
+# Validates version tag and builds on all platforms
+# Triggers on GitHub Release or manual dispatch
 
-name: Publish
+name: Release
 
 on:
   release:
     types: [published]
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: "Dry run (build & validate without publishing)"
-        required: true
-        default: true
-        type: boolean
 
 jobs:
   version-check:
@@ -103,70 +97,5 @@ jobs:
             '
 
       # TODO: When electron-builder is configured, upload platform-specific
-      # binaries (DMG for macOS, AppImage for Linux) as artifacts here.
-      #
-      # - name: Build Electron binaries
-      #   run: npm run dist
-      #
-      # - name: Upload artifact
-      #   uses: actions/upload-artifact@v6
-      #   with:
-      #     name: electron-${{ matrix.target }}
-      #     path: out/**/*
-      #     if-no-files-found: error
-
-  publish:
-    name: Publish to npm
-    runs-on: ubuntu-latest
-    needs: build
-    environment: publish
-    permissions:
-      contents: read
-      id-token: write # OIDC trusted publishing
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-          cache: "npm"
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Update npm for OIDC support
-        run: npm install -g npm@latest
-
-      - name: Install npm dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      # TODO: When electron-builder is configured, download and attach
-      # platform binaries to the GitHub Release here.
-      #
-      # - name: Download all artifacts
-      #   uses: actions/download-artifact@v7
-      #   with:
-      #     path: artifacts
-
-      - name: Check if version already published
-        id: check-version
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-          if npm view "@nanalogue/gui@$VERSION" version 2>/dev/null; then
-            echo "already_published=true" >> "$GITHUB_OUTPUT"
-            echo "Version $VERSION already published to npm — skipping"
-          else
-            echo "already_published=false" >> "$GITHUB_OUTPUT"
-            echo "Version $VERSION not yet published — proceeding"
-          fi
-
-      - name: Publish to npm (dry run)
-        if: ${{ steps.check-version.outputs.already_published == 'false' && github.event_name == 'workflow_dispatch' && inputs.dry_run }}
-        run: npm publish --dry-run --provenance --access public
-
-      - name: Publish to npm
-        if: ${{ steps.check-version.outputs.already_published == 'false' && (github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)) }}
-        run: npm publish --provenance --access public
+      # binaries (DMG for macOS, AppImage for Linux) as artifacts here,
+      # then add a job to download and attach them to the GitHub Release.
