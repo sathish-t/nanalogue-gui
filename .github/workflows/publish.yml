@@ -13,15 +13,19 @@ jobs:
   version-check:
     name: Verify versions match
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
     steps:
       - uses: actions/checkout@v6
       - name: Check tag matches version
+        id: check
         if: github.event_name == 'release'
         run: |
           TAG="${{ github.event.release.tag_name }}"
           TAG_V="${TAG#v}"
           V=$(jq -r '.version' package.json)
           [ "$TAG_V" = "$V" ] || { echo "Tag $TAG_V != package.json $V"; exit 1; }
+          echo "version=$TAG_V" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build (${{ matrix.target }})
@@ -96,6 +100,11 @@ jobs:
               npm test
             '
 
-      # TODO: When electron-builder is configured, upload platform-specific
-      # binaries (DMG for macOS, AppImage for Linux) as artifacts here,
-      # then add a job to download and attach them to the GitHub Release.
+  package:
+    name: Package binaries
+    needs: [version-check, build]
+    uses: ./.github/workflows/package.yml
+    with:
+      version: ${{ needs.version-check.outputs.version }}
+    permissions:
+      contents: write

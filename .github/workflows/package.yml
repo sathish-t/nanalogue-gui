@@ -1,0 +1,191 @@
+# Reusable packaging workflow for nanalogue-gui
+# Builds platform binaries (macOS DMG, Linux AppImage) and optionally attaches to a GitHub release
+
+name: Package
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: "Release version without v prefix (e.g. 0.1.2)"
+        required: false
+        type: string
+
+jobs:
+  package:
+    name: Package (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macOS x64
+            runner: macos-15-intel
+            arch: x64
+          - platform: macOS ARM
+            runner: macos-latest
+            arch: arm64
+          - platform: Linux x64
+            runner: ubuntu-latest
+            arch: x64
+          - platform: Linux ARM
+            runner: ubuntu-24.04-arm
+            arch: arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install libfuse2 (Linux AppImage requirement)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Build distributable
+        run: npx electron-builder --publish never --${{ matrix.arch }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.arch }}-${{ runner.os }}
+          path: |
+            out/*.dmg
+            out/*.AppImage
+          if-no-files-found: error
+
+  attach:
+    name: Attach binaries to release
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          merge-multiple: true
+          path: binaries
+
+      - name: List downloaded binaries
+        run: ls -lh binaries/
+
+      - name: Verify version has no v prefix
+        if: inputs.version != ''
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          case "$VERSION" in
+            v*) echo "Error: version must not start with v (got '$VERSION')"; exit 1 ;;
+          esac
+
+      - name: Attach to GitHub release
+        if: inputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: gh release upload "v${VERSION}" binaries/* --repo "${{ github.repository }}"
+
+  smoke-test:
+    name: Smoke test (${{ matrix.platform }})
+    needs: attach
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macOS x64
+            runner: macos-15-intel
+            os: macOS
+            arch: x64
+          - platform: macOS ARM
+            runner: macos-latest
+            os: macOS
+            arch: arm64
+          - platform: Linux x64
+            runner: ubuntu-latest
+            os: Linux
+            arch: x64
+          - platform: Linux ARM
+            runner: ubuntu-24.04-arm
+            os: Linux
+            arch: arm64
+
+    steps:
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-${{ matrix.arch }}-${{ matrix.os }}
+          path: binaries
+
+      - name: List binaries
+        run: ls -lh binaries/
+
+      # macOS smoke test
+      - name: Mount DMG and launch app (macOS)
+        if: matrix.os == 'macOS'
+        run: |
+          DMG=$(ls binaries/*.dmg | head -1)
+          MOUNT_DIR=$(hdiutil attach "$DMG" -nobrowse | grep -oE '/Volumes/.*')
+          APP=$(find "$MOUNT_DIR" -name "*.app" -maxdepth 1 | head -1)
+          open -a "$APP" &
+          sleep 10
+          screencapture screenshot.png
+          hdiutil detach "$MOUNT_DIR" || true
+
+      # Linux smoke test
+      - name: Install test dependencies (Linux)
+        if: matrix.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb imagemagick libfuse2
+
+      - name: Launch AppImage and capture screenshot (Linux)
+        if: matrix.os == 'Linux'
+        run: |
+          APPIMAGE=$(ls binaries/*.AppImage | head -1)
+          chmod +x "$APPIMAGE"
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" bash -c '
+            "$0" &
+            APP_PID=$!
+            sleep 10
+            import -window root screenshot.png
+            kill $APP_PID 2>/dev/null || true
+          ' "$APPIMAGE"
+
+      - name: Upload screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-${{ matrix.platform }}
+          path: screenshot.png
+          if-no-files-found: warn
+
+      - name: Attach screenshot to release
+        if: inputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          PLATFORM_RAW: ${{ matrix.platform }}
+        run: |
+          if [ -f screenshot.png ]; then
+            PLATFORM=$(echo "$PLATFORM_RAW" | tr ' ' '-' | tr '[:upper:]' '[:lower:]')
+            mv screenshot.png "screenshot-${PLATFORM}.png"
+            gh release upload "v${VERSION}" "screenshot-${PLATFORM}.png" --repo "${{ github.repository }}" || true
+          fi

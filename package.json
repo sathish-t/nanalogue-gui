@@ -27,6 +27,7 @@
     "lint:css": "stylelint \"src/**/*.css\"",
     "lint:css:fix": "stylelint --fix \"src/**/*.css\"",
     "lint:html": "html-validate \"src/**/*.html\"",
+    "dist": "electron-builder",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -41,6 +42,7 @@
     "@stylistic/stylelint-plugin": "^5.0.1",
     "@types/node": "^22.0.0",
     "electron": "^40.2.1",
+    "electron-builder": "^26.7.0",
     "esbuild": "^0.27.3",
     "eslint": "^9.39.2",
     "eslint-plugin-jsdoc": "^62.5.2",
@@ -57,5 +59,29 @@
     "node": ">= 22"
   },
   "author": "Sathish Thiyagarajan",
-  "license": "MIT"
+  "license": "MIT",
+  "build": {
+    "appId": "com.nanalogue.gui",
+    "productName": "nanalogue-gui",
+    "directories": {
+      "output": "out"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] }
+      ],
+      "category": "public.app-category.education"
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64", "arm64"] }
+      ],
+      "category": "Science"
+    }
+  }
 }
