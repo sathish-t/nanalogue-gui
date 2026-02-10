@@ -1,13 +1,18 @@
 /* Styles for the landing page mode selection screen. */
 
+/* Allow vertical overflow so the window can auto-fit to content height. */
+body {
+    overflow-y: auto;
+}
+
 /* Full-viewport centered layout for the landing page. */
 #landing-app {
     align-items: center;
     background: #fff;
     display: flex;
     flex-direction: column;
-    height: 100vh;
     justify-content: center;
+    min-height: 100vh;
 }
 
 /* Spacing below the header to separate it from mode buttons. */

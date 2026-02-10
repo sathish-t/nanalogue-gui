@@ -31,7 +31,7 @@ function getWindowSize(mode: AppMode): {
     height: number;
 } {
     if (mode === "landing") {
-        return { width: 700, height: 400 };
+        return { width: 700, height: 500 };
     }
     return { width: 1000, height: 700 };
 }
@@ -80,6 +80,39 @@ function getWindowTitle(mode: AppMode): string {
 }
 
 /**
+ * Measures the rendered content height and resizes the window to fit.
+ *
+ * @param win - The BrowserWindow whose height should adapt to content.
+ */
+async function fitToContent(win: BrowserWindow): Promise<void> {
+    const contentHeight: number = await win.webContents.executeJavaScript(
+        "document.documentElement.scrollHeight",
+    );
+    const [contentWidth] = win.getContentSize();
+    win.setContentSize(contentWidth, contentHeight);
+    win.center();
+    if (!win.isVisible()) win.show();
+}
+
+/**
+ * Adjusts a window's height to match its rendered content.
+ * Runs immediately if the page already loaded, otherwise waits for did-finish-load.
+ *
+ * @param win - The BrowserWindow whose height should adapt to content.
+ */
+function autoFitHeight(win: BrowserWindow): void {
+    if (!win.webContents.isLoading()) {
+        fitToContent(win);
+        return;
+    }
+    win.webContents.once("did-finish-load", () => {
+        // Guard against mode changes that happened while the page was loading
+        if (currentMode !== "landing") return;
+        fitToContent(win);
+    });
+}
+
+/**
  * Creates the main BrowserWindow configured for the specified application mode.
  *
  * @param mode - The application mode to initialize the window for.
@@ -93,6 +126,7 @@ function createWindow(mode: AppMode) {
     mainWindow = new BrowserWindow({
         width,
         height,
+        show: mode !== "landing",
         autoHideMenuBar: true,
         webPreferences: {
             preload: resolve(__dirname, "preload.js"),
@@ -103,6 +137,11 @@ function createWindow(mode: AppMode) {
     });
 
     mainWindow.loadFile(getHtmlPath(mode));
+
+    // Auto-fit the landing page so the window matches its content height
+    if (mode === "landing") {
+        autoFitHeight(mainWindow);
+    }
 
     // Set main window reference for mode modules
     qcModule.setMainWindow(mainWindow);
@@ -130,6 +169,11 @@ function resizeAndLoadMode(mode: AppMode) {
     mainWindow.center();
     mainWindow.setTitle(getWindowTitle(mode));
     mainWindow.loadFile(getHtmlPath(mode));
+
+    // Auto-fit the landing page so the window matches its content height
+    if (mode === "landing") {
+        autoFitHeight(mainWindow);
+    }
 }
 
 // Landing page IPC handlers
