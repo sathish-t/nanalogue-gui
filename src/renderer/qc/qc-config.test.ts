@@ -62,13 +62,13 @@ describe("qc-config.html", () => {
             expect(checkbox?.disabled).toBe(true);
         });
 
-        it("has a sample-fraction number input defaulting to 0.1", () => {
+        it("has a sample-fraction number input defaulting to 5", () => {
             const doc = loadTemplate();
             const input =
                 doc.querySelector<HTMLInputElement>("#sample-fraction");
             expect(input).not.toBeNull();
             expect(input?.type).toBe("number");
-            expect(input?.value).toBe("0.1");
+            expect(input?.value).toBe("5");
         });
 
         it("has a window-size number input defaulting to 300", () => {
