@@ -28,12 +28,13 @@ body {
     letter-spacing: -0.5px;
 }
 
-/* Horizontal row of mode selection buttons with wrapping for narrow windows. */
+/* Two-column grid of mode selection buttons, collapsing to one column on narrow windows. */
 #mode-selection {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
     gap: 24px;
+    grid-template-columns: repeat(auto-fit, 200px);
     justify-content: center;
+    max-width: 424px;
 }
 
 /* Large card-style button for selecting an application mode. */
@@ -78,4 +79,44 @@ body {
     font-size: 13px;
     line-height: 1.4;
     text-align: center;
+}
+
+/* Version dialog styled to match the app aesthetic. */
+#version-dialog {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    max-width: 420px;
+    padding: 24px;
+}
+
+/* Semi-transparent backdrop behind the version dialog. */
+#version-dialog::backdrop {
+    background: rgb(0 0 0 / 40%);
+}
+
+/* Version text line inside the dialog. */
+#version-dialog p {
+    color: #333;
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 12px;
+}
+
+/* Link to nanalogue.com styled with the standard link color. */
+#nanalogue-link {
+    color: #1a73e8;
+    text-decoration: underline;
+}
+
+/* Close button centered below the dialog content. */
+.version-close-button {
+    background: #f8f8f8;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    display: block;
+    font-size: 14px;
+    margin: 12px auto 0;
+    padding: 8px 24px;
 }

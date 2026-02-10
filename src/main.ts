@@ -3,9 +3,9 @@
 // Suppress dconf warnings on Linux/WSL by using in-memory GSettings backend
 process.env.GSETTINGS_BACKEND ??= "memory";
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import { countBedDataLines, countNonEmptyLines } from "./lib/line-counter";
 import * as qcModule from "./modes/qc";
 import * as swipeModule from "./modes/swipe";
@@ -17,6 +17,13 @@ type AppMode = "landing" | "swipe" | "qc" | "locate";
 
 let currentMode: AppMode = "landing";
 let mainWindow: BrowserWindow | null = null;
+
+/** The application version read from package.json at startup. */
+const APP_VERSION: string = (
+    JSON.parse(
+        readFileSync(resolve(__dirname, "..", "package.json"), "utf-8"),
+    ) as Record<string, string>
+).version;
 
 /**
  * Returns the window dimensions appropriate for the given application mode.
@@ -343,6 +350,42 @@ ipcMain.handle(
     () => {
         resizeAndLoadMode("landing");
     },
+);
+
+ipcMain.handle(
+    "open-external-url",
+    /**
+     * Opens a URL in the user's default OS browser after validating it uses a safe scheme.
+     * Only http: and https: URLs are allowed; all others are rejected.
+     *
+     * @param _event - The IPC event (unused).
+     * @param url - The URL to open externally.
+     * @returns A promise that resolves when the URL has been handed off to the OS.
+     */
+    (_event: unknown, url: string) => {
+        let parsed: URL;
+        try {
+            parsed = new URL(url);
+        } catch {
+            throw new Error(`Malformed URL: ${url}`);
+        }
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            throw new Error(
+                `Blocked URL with unsupported scheme: ${parsed.protocol}`,
+            );
+        }
+        return shell.openExternal(url);
+    },
+);
+
+ipcMain.handle(
+    "get-app-version",
+    /**
+     * Returns the application version from package.json.
+     *
+     * @returns The version string.
+     */
+    () => APP_VERSION,
 );
 
 ipcMain.handle(

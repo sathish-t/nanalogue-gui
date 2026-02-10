@@ -18,7 +18,7 @@
       <h1>nanalogue-gui</h1>
     </header>
 
-    <!-- Mode selection buttons that launch the chosen application mode. -->
+    <!-- Mode selection buttons in a two-column grid layout. -->
     <main id="mode-selection">
       <!-- Opens the swipe mode for manual annotation curation. -->
       <button type="button" id="btn-swipe" class="mode-button">
@@ -37,8 +37,22 @@
         <span class="mode-title">Locate reads</span>
         <span class="mode-description">Convert list of read IDs to BED</span>
       </button>
+
+      <!-- Shows an alert with the current application version. -->
+      <button type="button" id="btn-version" class="mode-button">
+        <span class="mode-title">Version</span>
+        <span class="mode-description">Show version and documentation</span>
+      </button>
     </main>
   </div>
+
+  <!-- Dialog displaying the application version and documentation link. -->
+  <dialog id="version-dialog">
+    <p id="version-text"></p>
+    <p>For more functionality (command-line utility, python/rust/node.js package)
+      and documentation, check out <a id="nanalogue-link" href="https://www.nanalogue.com">nanalogue.com</a></p>
+    <button type="button" id="version-dialog-close" class="version-close-button">Close</button>
+  </dialog>
 
   <!-- Bundled landing page script handling mode button click events. -->
   <script src="landing.js"></script>

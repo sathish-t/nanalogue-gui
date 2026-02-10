@@ -79,10 +79,26 @@ describe("landing.html", () => {
             expect(desc?.textContent).toContain("BED");
         });
 
-        it("has exactly 3 mode buttons", () => {
+        it("has a version button", () => {
+            const doc = loadTemplate();
+            const btn = doc.querySelector<HTMLButtonElement>("#btn-version");
+            expect(btn).not.toBeNull();
+            expect(btn?.type).toBe("button");
+        });
+
+        it("version button has a title and description", () => {
+            const doc = loadTemplate();
+            const btn = doc.querySelector("#btn-version");
+            const title = btn?.querySelector(".mode-title");
+            const desc = btn?.querySelector(".mode-description");
+            expect(title?.textContent).toBe("Version");
+            expect(desc?.textContent).toContain("version");
+        });
+
+        it("has exactly 4 mode buttons", () => {
             const doc = loadTemplate();
             const buttons = doc.querySelectorAll(".mode-button");
-            expect(buttons).toHaveLength(3);
+            expect(buttons).toHaveLength(4);
         });
     });
 
