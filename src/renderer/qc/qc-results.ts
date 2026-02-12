@@ -106,8 +106,6 @@ interface QCData {
     rawProbabilityStats: Stats;
     /** Histogram bins for the raw probability distribution. */
     rawProbabilityHistogram: HistogramBin[];
-    /** Path to the temp TSV with per-read whole-read density values. */
-    wholeReadDensityTsvPath?: string;
 }
 
 /**
@@ -118,13 +116,6 @@ interface QCResultsApi {
     getQCData: () => Promise<QCData>;
     /** Navigates the user back to the configuration page. */
     goBackToConfig: () => Promise<void>;
-    /** Downloads per-read QC data as a TSV, optionally filtered by density range. */
-    downloadQCReads: (
-        tempTsvPath: string,
-        filterMin?: number,
-        filterMax?: number,
-        valueColumnIndex?: number,
-    ) => Promise<boolean>;
 }
 
 /**
@@ -146,18 +137,6 @@ let fullWholeReadDensityBins: HistogramBin[] = [];
 
 /** Stores the full windowed density histogram bins for range filtering. */
 let fullWindowedDensityBins: HistogramBin[] = [];
-
-/** Path to the temp TSV for per-read whole-read density download. */
-let wholeReadDensityTsvPath: string | undefined;
-
-/** Whether the whole-read density filter is currently active. */
-let isWholeReadFilterActive = false;
-
-/** Inclusive lower bound of the active whole-read density filter. */
-let wholeReadFilterMin: number | undefined;
-
-/** Exclusive upper bound of the active whole-read density filter. */
-let wholeReadFilterMax: number | undefined;
 
 /**
  * Replaces a canvas element with a no-data message when there is nothing to chart.
@@ -489,19 +468,6 @@ function setupTabs(): void {
 }
 
 /**
- * Callback invoked when the histogram filter state changes.
- *
- * @param active - Whether the filter is currently active.
- * @param low - The inclusive lower bound of the filter range (only when active).
- * @param high - The exclusive upper bound of the filter range (only when active).
- */
-type FilterChangeCallback = (
-    active: boolean,
-    low?: number,
-    high?: number,
-) => void;
-
-/**
  * Sets up a histogram range filter toggle and apply button for the given ID prefix.
  *
  * @param idPrefix - The ID prefix for the filter DOM elements (e.g. "probability-filter").
@@ -509,7 +475,6 @@ type FilterChangeCallback = (
  * @param chartId - The DOM element ID of the chart canvas to re-render.
  * @param xLabel - The x-axis label for the chart.
  * @param statsPanelId - The DOM element ID of the stats panel to annotate when filtered.
- * @param onFilterChange - Optional callback invoked when the filter is applied or cleared.
  */
 function setupHistogramFilter(
     idPrefix: string,
@@ -517,7 +482,6 @@ function setupHistogramFilter(
     chartId: string,
     xLabel: string,
     statsPanelId: string,
-    onFilterChange?: FilterChangeCallback,
 ): void {
     const filterContainer = document.getElementById(idPrefix);
 
@@ -584,7 +548,6 @@ function setupHistogramFilter(
             setStatsAnnotation(false);
             // Restore full histogram
             renderHistogram(chartId, getFullBins(), xLabel);
-            onFilterChange?.(false);
         }
     });
 
@@ -620,7 +583,6 @@ function setupHistogramFilter(
 
         renderHistogram(chartId, filteredBins, xLabel);
         setStatsAnnotation(true);
-        onFilterChange?.(true, low, high);
     });
 }
 
@@ -710,38 +672,6 @@ async function initialize(): Promise<void> {
         }
         renderStatsPanel("stats-whole-density", data.wholeReadDensityStats);
 
-        // Set up download button for per-read density data
-        wholeReadDensityTsvPath = data.wholeReadDensityTsvPath;
-        const downloadBtn = document.getElementById(
-            "btn-download-whole-density",
-        ) as HTMLButtonElement | null;
-        if (downloadBtn) {
-            if (!wholeReadDensityTsvPath) {
-                downloadBtn.classList.add("hidden");
-            } else {
-                downloadBtn.addEventListener("click", async () => {
-                    if (!wholeReadDensityTsvPath) return;
-                    downloadBtn.disabled = true;
-                    try {
-                        await api.downloadQCReads(
-                            wholeReadDensityTsvPath,
-                            isWholeReadFilterActive
-                                ? wholeReadFilterMin
-                                : undefined,
-                            isWholeReadFilterActive
-                                ? wholeReadFilterMax
-                                : undefined,
-                            1,
-                        );
-                    } catch (error) {
-                        console.error("Failed to download reads:", error);
-                    } finally {
-                        downloadBtn.disabled = false;
-                    }
-                });
-            }
-        }
-
         if (
             !data.windowedDensityStats ||
             data.windowedDensityStats.count === 0
@@ -799,16 +729,6 @@ async function initialize(): Promise<void> {
             "chart-whole-density",
             "Analogue Density",
             "stats-whole-density",
-            (active, low, high) => {
-                isWholeReadFilterActive = active;
-                wholeReadFilterMin = low;
-                wholeReadFilterMax = high;
-                if (downloadBtn) {
-                    downloadBtn.textContent = active
-                        ? "Download filtered reads"
-                        : "Download reads";
-                }
-            },
         );
         setupHistogramFilter(
             "windowed-density-filter",
