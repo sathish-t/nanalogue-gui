@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version button and dialog on landing page with link to nanalogue.com, external URL opens in OS browser ([`0b0dee6`](https://github.com/sathish-t/nanalogue-gui/commit/0b0dee655f35d7ab2fdb195de7264dbf22c8e8eb))
 - Auto-fit landing page height to rendered content with mode-change guard ([`dd3d790`](https://github.com/sathish-t/nanalogue-gui/commit/dd3d790dfa61863cf9a64330aee22890a36d2f22))
 
+### Removed
+
+- Per-read whole-read density TSV download button and backing functionality from QC results, including `writeTsvFile` utility, `filterAndWriteTsv` stream filter, `download-qc-reads` IPC handler, temp directory lifecycle, and preload bridge ([`bf10174`](https://github.com/sathish-t/nanalogue-gui/commit/bf1017471dcad04099e1b85f4e6c68b9dda05862), [`da9dd59`](https://github.com/sathish-t/nanalogue-gui/commit/da9dd593adf62ea256f3489ee51dbf32e3d6a83e), [`c495608`](https://github.com/sathish-t/nanalogue-gui/commit/c4956083efd5fa3de8aade7917acc617c0575b63))
+
 ## [0.1.2] - 2026-02-09
 
 ### Added
