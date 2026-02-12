@@ -1,8 +1,5 @@
 // QC data loader using nanalogue-node
 
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { bamMods, peek, readInfo, windowReads } from "@nanalogue/node";
 import { RunningHistogram } from "./histogram";
 import type { PeekResult, QCConfig, QCData } from "./types";
@@ -18,22 +15,6 @@ export function maxReadLengthForBinWidth(binWidth: number): number {
     if (binWidth >= 1000) return 3_000_000;
     if (binWidth >= 10) return 300_000;
     return 30_000;
-}
-
-/**
- * Writes a TSV file with the given header and data rows.
- *
- * @param filePath - The filesystem path to write the TSV file to.
- * @param header - The tab-separated header line.
- * @param rows - The data rows, each as a tab-separated string.
- */
-export function writeTsvFile(
-    filePath: string,
-    header: string,
-    rows: string[],
-): void {
-    const content = [header, ...rows].join("\n");
-    writeFileSync(filePath, `${content}\n`, "utf-8");
 }
 
 /**
@@ -149,11 +130,9 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
         );
     }
 
-    // Process modification data, collecting per-read densities for batch TSV write
+    // Process modification data
     let loggedMissingModTable = false;
     let readsWithMods = 0;
-    let tsvPath: string | undefined;
-    const densityRows: string[] = [];
 
     for (const record of modRecords) {
         if (record.alignment_type === "unmapped") continue;
@@ -180,27 +159,15 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
         }
 
         if (probCount > 0) {
-            // Clamp density consistently for both histogram and TSV output
-            const density = Math.min(probSum / probCount, 1 - Number.EPSILON);
-            wholeReadDensityHist.add(density);
-            densityRows.push(`${record.read_id}\t${density}`);
+            wholeReadDensityHist.add(
+                Math.min(probSum / probCount, 1 - Number.EPSILON),
+            );
             readsWithMods++;
         }
     }
 
-    // Batch-write TSV only when there are mod-bearing reads (avoids empty temp dirs)
-    if (densityRows.length > 0) {
-        const tsvTempDir = mkdtempSync(join(tmpdir(), "nanalogue-qc-"));
-        tsvPath = join(tsvTempDir, "whole_read_density.tsv");
-        writeTsvFile(tsvPath, "read_id\twhole_read_density", densityRows);
-    }
-
     console.log(`  Got ${readsWithMods} reads with modifications`);
     console.log(`  Got ${rawProbabilityHist.count} modification calls`);
-
-    if (tsvPath) {
-        console.log(`  Wrote per-read density TSV to ${tsvPath}`);
-    }
 
     // Process windowed densities
     const windowedDensities = parseWindowedDensities(windowedTsv);
@@ -225,8 +192,6 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
 
         rawProbabilityStats: rawProbabilityHist.toStats(false),
         rawProbabilityHistogram: rawProbabilityHist.toBins(),
-
-        wholeReadDensityTsvPath: tsvPath,
     };
 }
 

@@ -1,14 +1,10 @@
 // Unit tests for qc-data-loader utilities
 
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { RunningHistogram } from "./histogram";
 import {
     maxReadLengthForBinWidth,
     parseWindowedDensities,
-    writeTsvFile,
 } from "./qc-data-loader";
 
 describe("parseWindowedDensities", () => {
@@ -145,38 +141,5 @@ describe("probability normalization", () => {
 
         const bins = hist.toBins();
         expect(bins.length).toBe(100);
-    });
-});
-
-describe("writeTsvFile", () => {
-    /**
-     * Creates a temporary file path for test output.
-     *
-     * @returns A unique file path in a temporary directory.
-     */
-    function tempPath(): string {
-        const dir = mkdtempSync(join(tmpdir(), "tsv-test-"));
-        return join(dir, "test.tsv");
-    }
-
-    it("writes header and data rows", () => {
-        const path = tempPath();
-        writeTsvFile(path, "col_a\tcol_b", ["x\t1", "y\t2"]);
-        const content = readFileSync(path, "utf-8");
-        expect(content).toBe("col_a\tcol_b\nx\t1\ny\t2\n");
-    });
-
-    it("writes header only when rows are empty", () => {
-        const path = tempPath();
-        writeTsvFile(path, "col_a\tcol_b", []);
-        const content = readFileSync(path, "utf-8");
-        expect(content).toBe("col_a\tcol_b\n");
-    });
-
-    it("writes single row correctly", () => {
-        const path = tempPath();
-        writeTsvFile(path, "id\tval", ["read1\t0.5"]);
-        const content = readFileSync(path, "utf-8");
-        expect(content).toBe("id\tval\nread1\t0.5\n");
     });
 });

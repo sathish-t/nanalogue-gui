@@ -196,7 +196,4 @@ export interface QCData {
     rawProbabilityStats: Stats;
     /** The histogram bins for the raw probability distribution. */
     rawProbabilityHistogram: HistogramBin[];
-
-    /** Path to the temp TSV with per-read whole-read density values. */
-    wholeReadDensityTsvPath?: string;
 }
