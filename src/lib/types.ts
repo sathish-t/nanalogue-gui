@@ -147,6 +147,8 @@ export interface QCConfig {
     fullRegion: boolean | undefined;
     /** The fraction of reads to sample for the QC analysis. */
     sampleFraction: number;
+    /** The random seed for deterministic subsampling. */
+    sampleSeed: number;
     /** The size of the aggregation window in base pairs. */
     windowSize: number;
     /** The bin width for the read length histogram in base pairs. */
@@ -196,4 +198,6 @@ export interface QCData {
     rawProbabilityStats: Stats;
     /** The histogram bins for the raw probability distribution. */
     rawProbabilityHistogram: HistogramBin[];
+    /** The random seed used for subsampling, for reproducibility. */
+    sampleSeed: number;
 }

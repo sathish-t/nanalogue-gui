@@ -192,6 +192,8 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
 
         rawProbabilityStats: rawProbabilityHist.toStats(false),
         rawProbabilityHistogram: rawProbabilityHist.toBins(),
+
+        sampleSeed: config.sampleSeed,
     };
 }
 

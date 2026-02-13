@@ -106,6 +106,8 @@ interface QCData {
     rawProbabilityStats: Stats;
     /** Histogram bins for the raw probability distribution. */
     rawProbabilityHistogram: HistogramBin[];
+    /** The random seed used for subsampling. */
+    sampleSeed: number;
 }
 
 /**
