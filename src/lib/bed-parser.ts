@@ -3,6 +3,14 @@
 import { readFileSync } from "node:fs";
 import type { BedAnnotation } from "./types";
 
+/** Result of parsing a BED file, including whether the entry cap was hit. */
+export interface ParseBedResult {
+    /** The parsed annotations, capped at maxEntries. */
+    annotations: BedAnnotation[];
+    /** Whether the file contained more entries than maxEntries. */
+    capped: boolean;
+}
+
 /**
  * Checks whether a line is a BED header or comment line.
  * Matches `#` comments and the `track`/`browser` keywords when followed by
@@ -24,12 +32,18 @@ export function isBedHeaderLine(line: string): boolean {
 }
 
 /**
- * Parses a BED file and returns an array of annotations with contig, coordinates, and read ID.
+ * Parses a BED file and returns annotations with contig, coordinates, and read ID.
+ * When the file contains more than maxEntries valid lines, parsing stops early and
+ * the result is flagged as capped.
  *
  * @param bedPath - The filesystem path to the BED file to parse.
- * @returns An array of parsed BED annotations, skipping malformed or header lines.
+ * @param maxEntries - Maximum number of annotations to return (default 10,000).
+ * @returns The parsed annotations and whether the cap was reached.
  */
-export function parseBedFile(bedPath: string): BedAnnotation[] {
+export function parseBedFile(
+    bedPath: string,
+    maxEntries = 10_000,
+): ParseBedResult {
     const content = readFileSync(bedPath, "utf-8");
     const lines = content.trim().split("\n");
     const annotations: BedAnnotation[] = [];
@@ -81,7 +95,14 @@ export function parseBedFile(bedPath: string): BedAnnotation[] {
             readId,
             rawLine: line,
         });
+
+        if (annotations.length > maxEntries) {
+            return {
+                annotations: annotations.slice(0, maxEntries),
+                capped: true,
+            };
+        }
     }
 
-    return annotations;
+    return { annotations, capped: false };
 }

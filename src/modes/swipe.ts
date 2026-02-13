@@ -99,7 +99,13 @@ export async function initialize(
     console.log(`  Found ${Object.keys(contigSizes).length} contigs`);
 
     console.log("Parsing BED file...");
-    annotations = parseBedFile(cliArgs.bedPath);
+    const parseResult = parseBedFile(cliArgs.bedPath);
+    if (parseResult.capped) {
+        throw new Error(
+            "BED file contains more than 10,000 annotations. Please reduce the file to 10,000 or fewer entries.",
+        );
+    }
+    annotations = parseResult.annotations;
     console.log(`  Found ${annotations.length} annotations`);
 
     appState.totalCount = annotations.length;

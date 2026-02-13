@@ -28,8 +28,8 @@ describe("parseBedFile", () => {
             "chr1\t100\t200\tread1\nchr2\t300\t400\tread2",
         );
         const result = parseBedFile(path);
-        expect(result).toHaveLength(2);
-        expect(result[0]).toEqual({
+        expect(result.annotations).toHaveLength(2);
+        expect(result.annotations[0]).toEqual({
             contig: "chr1",
             start: 100,
             end: 200,
@@ -41,13 +41,13 @@ describe("parseBedFile", () => {
     it("skips comment lines", () => {
         const path = writeTempBed("# header\nchr1\t100\t200\tread1");
         const result = parseBedFile(path);
-        expect(result).toHaveLength(1);
+        expect(result.annotations).toHaveLength(1);
     });
 
     it("skips track header lines", () => {
         const path = writeTempBed("track name=example\nchr1\t100\t200\tread1");
         const result = parseBedFile(path);
-        expect(result).toHaveLength(1);
+        expect(result.annotations).toHaveLength(1);
     });
 
     it("skips browser header lines", () => {
@@ -55,7 +55,7 @@ describe("parseBedFile", () => {
             "browser position chr1:100-200\nchr1\t100\t200\tread1",
         );
         const result = parseBedFile(path);
-        expect(result).toHaveLength(1);
+        expect(result.annotations).toHaveLength(1);
     });
 
     it("does not skip contigs starting with track or browser", () => {
@@ -63,16 +63,16 @@ describe("parseBedFile", () => {
             "track1\t100\t200\tread1\nbrowserX\t300\t400\tread2",
         );
         const result = parseBedFile(path);
-        expect(result).toHaveLength(2);
-        expect(result[0].contig).toBe("track1");
-        expect(result[1].contig).toBe("browserX");
+        expect(result.annotations).toHaveLength(2);
+        expect(result.annotations[0].contig).toBe("track1");
+        expect(result.annotations[1].contig).toBe("browserX");
     });
 
     it("skips lines with insufficient columns", () => {
         const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
         const path = writeTempBed("chr1\t100\t200\nchr1\t100\t200\tread1");
         const result = parseBedFile(path);
-        expect(result).toHaveLength(1);
+        expect(result.annotations).toHaveLength(1);
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("insufficient columns"),
         );
@@ -82,7 +82,7 @@ describe("parseBedFile", () => {
         const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
         const path = writeTempBed("chr1\tabc\t200\tread1");
         const result = parseBedFile(path);
-        expect(result).toHaveLength(0);
+        expect(result.annotations).toHaveLength(0);
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("invalid start/end"),
         );
@@ -92,7 +92,7 @@ describe("parseBedFile", () => {
         const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
         const path = writeTempBed("chr1\t-10\t200\tread1");
         const result = parseBedFile(path);
-        expect(result).toHaveLength(0);
+        expect(result.annotations).toHaveLength(0);
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("0 <= start < end"),
         );
@@ -102,7 +102,7 @@ describe("parseBedFile", () => {
         const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
         const path = writeTempBed("chr1\t10\t-5\tread1");
         const result = parseBedFile(path);
-        expect(result).toHaveLength(0);
+        expect(result.annotations).toHaveLength(0);
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("0 <= start < end"),
         );
@@ -112,7 +112,7 @@ describe("parseBedFile", () => {
         const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
         const path = writeTempBed("chr1\t100\t100\tread1");
         const result = parseBedFile(path);
-        expect(result).toHaveLength(0);
+        expect(result.annotations).toHaveLength(0);
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("0 <= start < end"),
         );
@@ -122,7 +122,7 @@ describe("parseBedFile", () => {
         const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
         const path = writeTempBed("chr1\t300\t100\tread1");
         const result = parseBedFile(path);
-        expect(result).toHaveLength(0);
+        expect(result.annotations).toHaveLength(0);
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("0 <= start < end"),
         );
@@ -131,7 +131,35 @@ describe("parseBedFile", () => {
     it("accepts start=0 as valid", () => {
         const path = writeTempBed("chr1\t0\t100\tread1");
         const result = parseBedFile(path);
-        expect(result).toHaveLength(1);
-        expect(result[0].start).toBe(0);
+        expect(result.annotations).toHaveLength(1);
+        expect(result.annotations[0].start).toBe(0);
+    });
+});
+
+describe("parseBedFile with maxEntries", () => {
+    it("returns capped: false when entries are within limit", () => {
+        const path = writeTempBed(
+            "chr1\t100\t200\tread1\nchr2\t300\t400\tread2",
+        );
+        const result = parseBedFile(path, 10);
+        expect(result.capped).toBe(false);
+        expect(result.annotations).toHaveLength(2);
+    });
+
+    it("returns capped: true when entries exceed limit", () => {
+        const lines = Array.from(
+            { length: 15 },
+            (_, i) => `chr1\t${i * 100}\t${(i + 1) * 100}\tread${i}`,
+        ).join("\n");
+        const path = writeTempBed(lines);
+        const result = parseBedFile(path, 10);
+        expect(result.capped).toBe(true);
+        expect(result.annotations).toHaveLength(10);
+    });
+
+    it("uses default maxEntries of 10000", () => {
+        const path = writeTempBed("chr1\t100\t200\tread1");
+        const result = parseBedFile(path);
+        expect(result.capped).toBe(false);
     });
 });
