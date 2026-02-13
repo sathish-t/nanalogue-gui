@@ -49,7 +49,20 @@ export function registerIpcHandlers() {
             ...config,
             sampleFraction: config.sampleFraction / 100,
         });
-        qcData = await generateQCData(config);
+        /**
+         * Forwards pagination progress from the worker to the renderer.
+         *
+         * @param source - The data source that produced this progress event.
+         * @param count - The running total of records processed so far.
+         */
+        const onProgress = (
+            source: "reads" | "modifications" | "windows",
+            count: number,
+        ) => {
+            mainWindow?.webContents.send("qc-progress", source, count);
+        };
+
+        qcData = await generateQCData(config, onProgress);
         console.log("QC data generated");
 
         // Navigate to results page
