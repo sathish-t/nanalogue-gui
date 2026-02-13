@@ -9,8 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Deterministic `sampleSeed` field on QC config and results for reproducible subsampling ([`fc42269`](https://github.com/sathish-t/nanalogue-gui/commit/fc4226937d9dba193956fff95ecb89eb95a72297))
 - Version button and dialog on landing page with link to nanalogue.com, external URL opens in OS browser ([`0b0dee6`](https://github.com/sathish-t/nanalogue-gui/commit/0b0dee655f35d7ab2fdb195de7264dbf22c8e8eb))
 - Auto-fit landing page height to rendered content with mode-change guard ([`dd3d790`](https://github.com/sathish-t/nanalogue-gui/commit/dd3d790dfa61863cf9a64330aee22890a36d2f22))
+
+### Changed
+
+- Bumps `@nanalogue/node` to ^0.1.3 ([`2f49f16`](https://github.com/sathish-t/nanalogue-gui/commit/2f49f16c5fd5b99033fcee24b43a4ff12a68cc77))
+- Caps BED file parsing at 10k entries ([`ef12920`](https://github.com/sathish-t/nanalogue-gui/commit/ef1292084f853723546a7f04a0f5b46381e3a6d7))
+- Caps read ID parsing at 200k IDs ([`3d117f0`](https://github.com/sathish-t/nanalogue-gui/commit/3d117f0a5893943ef05d21853d47cf5ea63afde6))
+- QC data loading now paginates in 10k-record pages with streaming histograms to reduce peak memory ([`d385b9e`](https://github.com/sathish-t/nanalogue-gui/commit/d385b9ecf0774135d390f8723858fd03fc4f882c))
+- QC generation forwards per-source pagination progress to the renderer via `qc-progress` IPC ([`02b8185`](https://github.com/sathish-t/nanalogue-gui/commit/02b8185ae1a3c696c3bc168c6dee84eca14ddd5c))
 
 ### Removed
 
