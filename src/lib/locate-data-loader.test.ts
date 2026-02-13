@@ -7,40 +7,70 @@ import { generateBedLines, parseReadIds } from "./locate-data-loader";
 describe("parseReadIds", () => {
     it("parses one ID per line", () => {
         const result = parseReadIds("read1\nread2\nread3\n");
-        expect(result).toEqual(["read1", "read2", "read3"]);
+        expect(result.ids).toEqual(["read1", "read2", "read3"]);
     });
 
     it("trims whitespace from lines", () => {
         const result = parseReadIds("  read1  \n\tread2\t\n");
-        expect(result).toEqual(["read1", "read2"]);
+        expect(result.ids).toEqual(["read1", "read2"]);
     });
 
     it("filters out empty lines", () => {
         const result = parseReadIds("read1\n\n\nread2\n\n");
-        expect(result).toEqual(["read1", "read2"]);
+        expect(result.ids).toEqual(["read1", "read2"]);
     });
 
     it("returns empty array for empty input", () => {
-        expect(parseReadIds("")).toEqual([]);
+        expect(parseReadIds("").ids).toEqual([]);
     });
 
     it("returns empty array for whitespace-only input", () => {
-        expect(parseReadIds("  \n  \n  ")).toEqual([]);
+        expect(parseReadIds("  \n  \n  ").ids).toEqual([]);
     });
 
     it("handles input without trailing newline", () => {
         const result = parseReadIds("read1\nread2");
-        expect(result).toEqual(["read1", "read2"]);
+        expect(result.ids).toEqual(["read1", "read2"]);
     });
 
     it("handles Windows line endings", () => {
         const result = parseReadIds("read1\r\nread2\r\n");
-        expect(result).toEqual(["read1", "read2"]);
+        expect(result.ids).toEqual(["read1", "read2"]);
     });
 
     it("deduplicates repeated read IDs", () => {
         const result = parseReadIds("read1\nread2\nread1\nread3\nread2\n");
-        expect(result).toEqual(["read1", "read2", "read3"]);
+        expect(result.ids).toEqual(["read1", "read2", "read3"]);
+    });
+});
+
+describe("parseReadIds with maxIds", () => {
+    it("returns capped: false when IDs are within limit", () => {
+        const result = parseReadIds("read1\nread2\nread3", 10);
+        expect(result.capped).toBe(false);
+        expect(result.ids).toEqual(["read1", "read2", "read3"]);
+    });
+
+    it("returns capped: true when unique IDs exceed limit", () => {
+        const content = Array.from({ length: 15 }, (_, i) => `read${i}`).join(
+            "\n",
+        );
+        const result = parseReadIds(content, 10);
+        expect(result.capped).toBe(true);
+        expect(result.count).toBe(15);
+        expect(result.ids).toEqual([]);
+    });
+
+    it("counts deduplicated IDs for cap check", () => {
+        const content = "read1\nread2\nread1\nread3\nread2";
+        const result = parseReadIds(content, 2);
+        expect(result.capped).toBe(true);
+        expect(result.count).toBe(3);
+    });
+
+    it("uses default maxIds of 200000", () => {
+        const result = parseReadIds("read1\nread2");
+        expect(result.capped).toBe(false);
     });
 });
 

@@ -555,7 +555,13 @@ ipcMain.handle(
         const { readInfo } = await import("@nanalogue/node");
 
         const content = readFileSync(readIdPath, "utf-8");
-        const ids = parseReadIds(content);
+        const parseResult = parseReadIds(content);
+        if (parseResult.capped) {
+            throw new Error(
+                `Read ID file contains ${parseResult.count.toLocaleString()} unique IDs, exceeding the limit of 200,000. Please reduce the file.`,
+            );
+        }
+        const ids = parseResult.ids;
 
         const options = region
             ? { bamPath, treatAsUrl, readIdSet: ids, region, fullRegion }

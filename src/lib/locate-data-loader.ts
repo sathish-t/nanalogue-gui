@@ -2,19 +2,40 @@
 
 import type { ReadInfoRecord } from "@nanalogue/node";
 
+/** Result of parsing read IDs, including whether the ID cap was hit. */
+export interface ParseReadIdsResult {
+    /** The parsed read IDs (empty if capped). */
+    ids: string[];
+    /** The total number of unique read IDs found. */
+    count: number;
+    /** Whether the file contained more unique IDs than maxIds. */
+    capped: boolean;
+}
+
 /**
  * Parses a plain-text string of read IDs, one per line.
- * Trims whitespace and filters out empty lines.
+ * Trims whitespace, filters out empty lines, and deduplicates.
+ * Returns a capped result when unique IDs exceed maxIds.
  *
  * @param content - The raw file content to parse.
- * @returns An array of trimmed, non-empty read ID strings.
+ * @param maxIds - The maximum number of unique IDs allowed (default 200,000).
+ * @returns A result object with the parsed IDs, count, and cap status.
  */
-export function parseReadIds(content: string): string[] {
+export function parseReadIds(
+    content: string,
+    maxIds = 200_000,
+): ParseReadIdsResult {
     const lines = content
         .split("\n")
         .map((line) => line.trim())
         .filter((line) => line.length > 0);
-    return [...new Set(lines)];
+    const unique = [...new Set(lines)];
+
+    if (unique.length > maxIds) {
+        return { ids: [], count: unique.length, capped: true };
+    }
+
+    return { ids: unique, count: unique.length, capped: false };
 }
 
 /**
