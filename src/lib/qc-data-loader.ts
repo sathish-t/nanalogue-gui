@@ -1,8 +1,12 @@
-// QC data loader using nanalogue-node
+// QC data loader: paginated BAM data retrieval with streaming histograms
 
+import type { ReadOptions, WindowOptions } from "@nanalogue/node";
 import { bamMods, peek, readInfo, windowReads } from "@nanalogue/node";
 import { RunningHistogram } from "./histogram";
 import type { PeekResult, QCConfig, QCData } from "./types";
+
+/** Number of reads to fetch per pagination page. */
+const PAGE_SIZE = 10_000;
 
 /**
  * Maps a read length bin width to the maximum read length the histogram covers.
@@ -48,15 +52,246 @@ export async function peekBam(
 }
 
 /**
+ * Paginates through readInfo pages, accumulating alignment lengths into a histogram.
+ *
+ * Skips unmapped reads and warns about non-finite alignment lengths.
+ * Reports progress after each page via the optional callback.
+ *
+ * @param baseOptions - The shared read options (BAM path, filters, sampling).
+ * @param sampleSeed - The random seed for deterministic subsampling across pages.
+ * @param readLengthHist - The histogram accumulator for read alignment lengths.
+ * @param onProgress - Optional callback to report the running read count.
+ */
+async function paginateReadInfo(
+    baseOptions: ReadOptions,
+    sampleSeed: number,
+    readLengthHist: RunningHistogram,
+    onProgress?: (
+        source: "reads" | "modifications" | "windows",
+        count: number,
+    ) => void,
+): Promise<void> {
+    let offset = 0;
+    let totalReads = 0;
+    let droppedLengths = 0;
+
+    // Fetch pages of reads until fewer than PAGE_SIZE records are returned
+    for (;;) {
+        const page = await readInfo({
+            ...baseOptions,
+            sampleSeed,
+            limit: PAGE_SIZE,
+            offset,
+        });
+
+        for (const r of page) {
+            if (r.alignment_type === "unmapped") continue;
+            const length = (
+                r as {
+                    /** The aligned length of the read in base pairs. */
+                    alignment_length: number;
+                }
+            ).alignment_length;
+            if (Number.isFinite(length)) {
+                readLengthHist.add(length);
+            } else {
+                droppedLengths++;
+            }
+        }
+
+        totalReads += page.length;
+        offset += page.length;
+        onProgress?.("reads", totalReads);
+
+        if (page.length < PAGE_SIZE) break;
+    }
+
+    if (droppedLengths > 0) {
+        console.warn(
+            `Dropped ${droppedLengths} reads with non-finite alignment_length`,
+        );
+    }
+
+    console.log(`  Got ${readLengthHist.count} reads`);
+}
+
+/**
+ * Paginates through bamMods pages, accumulating probabilities and whole-read densities.
+ *
+ * Skips unmapped reads and records without modification tables.
+ * Normalizes raw 0-255 probabilities to 0-1 scale.
+ * Reports progress after each page via the optional callback.
+ *
+ * @param baseOptions - The shared read options (BAM path, filters, sampling).
+ * @param sampleSeed - The random seed for deterministic subsampling across pages.
+ * @param rawProbabilityHist - The histogram accumulator for individual modification probabilities.
+ * @param wholeReadDensityHist - The histogram accumulator for per-read average modification density.
+ * @param onProgress - Optional callback to report the running record count.
+ */
+async function paginateBamMods(
+    baseOptions: ReadOptions,
+    sampleSeed: number,
+    rawProbabilityHist: RunningHistogram,
+    wholeReadDensityHist: RunningHistogram,
+    onProgress?: (
+        source: "reads" | "modifications" | "windows",
+        count: number,
+    ) => void,
+): Promise<void> {
+    let offset = 0;
+    let totalRecords = 0;
+    let loggedMissingModTable = false;
+    let readsWithMods = 0;
+
+    // Fetch pages of modification records until fewer than PAGE_SIZE are returned
+    for (;;) {
+        const page = await bamMods({
+            ...baseOptions,
+            sampleSeed,
+            limit: PAGE_SIZE,
+            offset,
+        });
+
+        for (const record of page) {
+            if (record.alignment_type === "unmapped") continue;
+
+            if (!record.mod_table) {
+                if (!loggedMissingModTable) {
+                    console.warn(
+                        "Some records lack modification data, skipping",
+                    );
+                    loggedMissingModTable = true;
+                }
+                continue;
+            }
+
+            let probSum = 0;
+            let probCount = 0;
+
+            for (const entry of record.mod_table) {
+                for (const [, , prob] of entry.data) {
+                    // Normalize raw 0-255 probabilities to 0-1 scale, clamping 255 into [0.99, 1.00]
+                    const normalizedProb = Math.min(
+                        prob / 255,
+                        1 - Number.EPSILON,
+                    );
+                    rawProbabilityHist.add(normalizedProb);
+                    probSum += normalizedProb;
+                    probCount++;
+                }
+            }
+
+            if (probCount > 0) {
+                wholeReadDensityHist.add(
+                    Math.min(probSum / probCount, 1 - Number.EPSILON),
+                );
+                readsWithMods++;
+            }
+        }
+
+        totalRecords += page.length;
+        offset += page.length;
+        onProgress?.("modifications", totalRecords);
+
+        if (page.length < PAGE_SIZE) break;
+    }
+
+    console.log(`  Got ${readsWithMods} reads with modifications`);
+    console.log(`  Got ${rawProbabilityHist.count} modification calls`);
+}
+
+/**
+ * Paginates through windowReads pages, parsing TSV and accumulating densities.
+ *
+ * Each page returns a TSV string. Unique read IDs in column 4 are counted
+ * to determine whether more pages remain.
+ * Reports progress after each page via the optional callback.
+ *
+ * @param baseOptions - The shared read options (BAM path, filters, sampling).
+ * @param sampleSeed - The random seed for deterministic subsampling across pages.
+ * @param windowSize - The window and step size in base pairs.
+ * @param windowedDensityHist - The histogram accumulator for windowed density values.
+ * @param onProgress - Optional callback to report the running read count from windowed data.
+ */
+async function paginateWindowReads(
+    baseOptions: ReadOptions,
+    sampleSeed: number,
+    windowSize: number,
+    windowedDensityHist: RunningHistogram,
+    onProgress?: (
+        source: "reads" | "modifications" | "windows",
+        count: number,
+    ) => void,
+): Promise<void> {
+    // Build window options from the base read options, adding win/step
+    const windowOptions: WindowOptions = {
+        ...baseOptions,
+        win: windowSize,
+        step: windowSize,
+    } as WindowOptions;
+
+    let offset = 0;
+    let totalReads = 0;
+
+    // Fetch pages of windowed TSV until fewer unique reads than PAGE_SIZE are found
+    for (;;) {
+        const tsv = await windowReads({
+            ...windowOptions,
+            sampleSeed,
+            limit: PAGE_SIZE,
+            offset,
+        });
+
+        const lines = tsv.trim().split("\n");
+
+        // A page with only a header (or empty) means no more data
+        if (lines.length < 2) break;
+
+        // Parse densities and accumulate into histogram
+        const densities = parseWindowedDensities(tsv);
+        for (const density of densities) {
+            windowedDensityHist.add(Math.min(density, 1 - Number.EPSILON));
+        }
+
+        // Count unique read IDs in column 4 (index 3) to determine page completeness
+        const uniqueReadIds = new Set<string>();
+        for (let i = 1; i < lines.length; i++) {
+            const fields = lines[i].split("\t");
+            if (fields.length >= 4) {
+                uniqueReadIds.add(fields[3]);
+            }
+        }
+
+        totalReads += uniqueReadIds.size;
+        offset += PAGE_SIZE;
+        onProgress?.("windows", totalReads);
+
+        if (uniqueReadIds.size < PAGE_SIZE) break;
+    }
+
+    console.log(`  Got ${windowedDensityHist.count} windows`);
+}
+
+/**
  * Generates comprehensive QC data including read lengths, modification densities, and histograms.
  *
- * Uses streaming histograms to bin values on the fly, avoiding retention of
+ * Runs three concurrent pagination loops to fetch data in pages of PAGE_SIZE,
+ * using streaming histograms to bin values on the fly and avoid retaining
  * large raw arrays in memory.
  *
  * @param config - The QC configuration specifying the BAM file, sampling, region, and modification parameters.
+ * @param onProgress - Optional callback invoked with the data source name and running count as records are processed.
  * @returns A promise that resolves to the full QC dataset with statistics and histograms.
  */
-export async function generateQCData(config: QCConfig): Promise<QCData> {
+export async function generateQCData(
+    config: QCConfig,
+    onProgress?: (
+        source: "reads" | "modifications" | "windows",
+        count: number,
+    ) => void,
+): Promise<QCData> {
+    const sampleSeed = config.sampleSeed;
+
     const sharedOptions = {
         bamPath: config.bamPath,
         treatAsUrl: config.treatAsUrl,
@@ -65,7 +300,7 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
         modStrand: config.modStrand,
         modRegion: config.modRegion,
     };
-    const baseOptions = config.region
+    const baseOptions: ReadOptions = config.region
         ? {
               ...sharedOptions,
               region: config.region,
@@ -85,96 +320,34 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
     const rawProbabilityHist = new RunningHistogram(0.01, 1.0);
     const windowedDensityHist = new RunningHistogram(0.01, 1.0);
 
-    // Load all three data sources in parallel
+    // Load all three data sources in parallel via paginated loops
     console.log(
         "Loading read info, modification data, and windowed densities...",
     );
-    const [reads, modRecords, windowedTsv] = await Promise.all([
-        readInfo(baseOptions),
-        bamMods(baseOptions),
-        windowReads({
-            ...baseOptions,
-            win: config.windowSize,
-            step: config.windowSize,
-        }),
+
+    await Promise.all([
+        paginateReadInfo(baseOptions, sampleSeed, readLengthHist, onProgress),
+        paginateBamMods(
+            baseOptions,
+            sampleSeed,
+            rawProbabilityHist,
+            wholeReadDensityHist,
+            onProgress,
+        ),
+        paginateWindowReads(
+            baseOptions,
+            sampleSeed,
+            config.windowSize,
+            windowedDensityHist,
+            onProgress,
+        ),
     ]);
-
-    // Process read lengths
-    let droppedLengths = 0;
-    for (const r of reads) {
-        if (r.alignment_type === "unmapped") continue;
-        const length = (
-            r as {
-                /** The aligned length of the read in base pairs. */
-                alignment_length: number;
-            }
-        ).alignment_length;
-        if (Number.isFinite(length)) {
-            readLengthHist.add(length);
-        } else {
-            droppedLengths++;
-        }
-    }
-
-    if (droppedLengths > 0) {
-        console.warn(
-            `Dropped ${droppedLengths} reads with non-finite alignment_length`,
-        );
-    }
-
-    console.log(`  Got ${readLengthHist.count} reads`);
 
     if (readLengthHist.exceededCount > 0) {
         console.warn(
             `${readLengthHist.exceededCount} reads exceeded the maximum histogram range (${readLengthMax} bp)`,
         );
     }
-
-    // Process modification data
-    let loggedMissingModTable = false;
-    let readsWithMods = 0;
-
-    for (const record of modRecords) {
-        if (record.alignment_type === "unmapped") continue;
-
-        if (!record.mod_table) {
-            if (!loggedMissingModTable) {
-                console.warn("Some records lack modification data, skipping");
-                loggedMissingModTable = true;
-            }
-            continue;
-        }
-
-        let probSum = 0;
-        let probCount = 0;
-
-        for (const entry of record.mod_table) {
-            for (const [, , prob] of entry.data) {
-                // Normalize raw 0-255 probabilities to 0-1 scale, clamping 255 into [0.99, 1.00]
-                const normalizedProb = Math.min(prob / 255, 1 - Number.EPSILON);
-                rawProbabilityHist.add(normalizedProb);
-                probSum += normalizedProb;
-                probCount++;
-            }
-        }
-
-        if (probCount > 0) {
-            wholeReadDensityHist.add(
-                Math.min(probSum / probCount, 1 - Number.EPSILON),
-            );
-            readsWithMods++;
-        }
-    }
-
-    console.log(`  Got ${readsWithMods} reads with modifications`);
-    console.log(`  Got ${rawProbabilityHist.count} modification calls`);
-
-    // Process windowed densities
-    const windowedDensities = parseWindowedDensities(windowedTsv);
-    for (const density of windowedDensities) {
-        windowedDensityHist.add(Math.min(density, 1 - Number.EPSILON));
-    }
-    console.log(`  Got ${windowedDensityHist.count} windows`);
 
     // Extract statistics and histogram bins from streaming accumulators
     return {
@@ -193,7 +366,7 @@ export async function generateQCData(config: QCConfig): Promise<QCData> {
         rawProbabilityStats: rawProbabilityHist.toStats(false),
         rawProbabilityHistogram: rawProbabilityHist.toBins(),
 
-        sampleSeed: config.sampleSeed,
+        sampleSeed,
     };
 }
 
