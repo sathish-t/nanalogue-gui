@@ -1,7 +1,7 @@
 // Unit tests for monty-sandbox helper functions (no BAM files needed).
 // Tests resolvePath, toReadOptions, toWindowOptions, gateOutputSize, rejectTreatAsUrl.
 
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -18,9 +18,11 @@ import { buildSandboxPrompt } from "./sandbox-prompt";
 let tmpDir: string;
 
 beforeAll(async () => {
-    tmpDir = await import("node:fs/promises").then((fs) =>
+    const raw = await import("node:fs/promises").then((fs) =>
         fs.mkdtemp(join(tmpdir(), "monty-helpers-test-")),
     );
+    // Resolve symlinks so macOS /var → /private/var matches realpath output
+    tmpDir = await realpath(raw);
     await writeFile(join(tmpDir, "valid.bam"), "dummy");
     await mkdir(join(tmpDir, "subdir"));
     await writeFile(join(tmpDir, "subdir", "nested.bam"), "dummy");

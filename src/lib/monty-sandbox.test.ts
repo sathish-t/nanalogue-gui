@@ -1,7 +1,14 @@
 // Integration tests for monty-sandbox with real BAM fixtures.
 // Uses simulateModBam from @nanalogue/node to generate test BAM files.
 
-import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import {
+    mkdir,
+    readFile,
+    realpath,
+    rm,
+    symlink,
+    writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { simulateModBam } from "@nanalogue/node";
@@ -12,9 +19,11 @@ let allowedDir: string;
 let bamName: string;
 
 beforeAll(async () => {
-    allowedDir = await import("node:fs/promises").then((fs) =>
+    const raw = await import("node:fs/promises").then((fs) =>
         fs.mkdtemp(join(tmpdir(), "monty-sandbox-test-")),
     );
+    // Resolve symlinks so macOS /var → /private/var matches realpath output
+    allowedDir = await realpath(raw);
     const configPath = resolve(
         __dirname,
         "../../tests/data/simulation_configs/simple_bam.json",
