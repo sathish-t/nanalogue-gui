@@ -1,0 +1,529 @@
+/* Styles for the AI Chat BAM analysis interface. */
+
+/* Full-height layout with flex column for the chat page. */
+#ai-chat-app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Header bar with title and action buttons. */
+#ai-chat-header {
+    align-items: center;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px;
+}
+
+/* Header title styling. */
+#ai-chat-header h1 {
+    color: #333;
+    font-size: 18px;
+    font-weight: 500;
+    margin: 0;
+}
+
+/* Container for header action buttons. */
+#header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Compact button style for header actions. */
+.header-button {
+    background: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 6px 12px;
+}
+
+/* Hover state for header buttons. */
+.header-button:hover {
+    background: #eee;
+}
+
+/* Focus state for keyboard accessibility on header buttons. */
+.header-button:focus-visible {
+    outline: 2px solid #1a73e8;
+    outline-offset: 2px;
+}
+
+/* Configuration panel with collapsible settings. */
+#config-panel {
+    border-bottom: 1px solid #e0e0e0;
+    padding: 12px 16px;
+}
+
+/* Configuration section heading. */
+#config-panel h2 {
+    color: #333;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 8px;
+}
+
+/* Configuration input row layout. */
+.config-row {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+/* Label width for consistent alignment. */
+.config-row label {
+    color: #555;
+    font-size: 13px;
+    min-width: 100px;
+}
+
+/* Text input styling for config fields. */
+.config-row input[type="text"],
+.config-row input[type="password"],
+.config-row input[type="number"] {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    flex: 1;
+    font-size: 13px;
+    padding: 6px 8px;
+}
+
+/* Small button for config row actions (Browse, Fetch). */
+.config-row button {
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 6px 10px;
+    white-space: nowrap;
+}
+
+/* Dialog action buttons. */
+.dialog-actions button {
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 8px 16px;
+}
+
+/* Dialog button hover state. */
+.dialog-actions button:hover {
+    background: #e0e0e0;
+}
+
+/* Hover state for config row buttons. */
+.config-row button:hover {
+    background: #e0e0e0;
+}
+
+/* Wrapper for model input and its custom dropdown. */
+#model-input-wrapper {
+    flex: 1;
+    position: relative;
+}
+
+/* Model input inherits full width of wrapper. */
+#model-input-wrapper input {
+    width: 100%;
+}
+
+/* Custom scrollable dropdown for model selection. */
+#model-dropdown {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+    left: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    z-index: 10;
+}
+
+/* Individual option in the model dropdown. */
+.model-option {
+    cursor: pointer;
+    font-size: 13px;
+    padding: 6px 8px;
+}
+
+/* Hover state for model dropdown options. */
+.model-option:hover {
+    background: #e3f2fd;
+}
+
+/* Inline status message for fetch results. */
+.status-message {
+    color: #888;
+    font-size: 12px;
+    margin: 4px 0;
+    min-height: 16px;
+}
+
+/* Connection status indicator. */
+.status-indicator {
+    color: #888;
+    font-size: 12px;
+    margin: 4px 0;
+}
+
+/* Advanced Options button inline with config. */
+#btn-advanced {
+    background: none;
+    border: none;
+    color: #1a73e8;
+    cursor: pointer;
+    font-size: 12px;
+    margin-top: 4px;
+    padding: 0;
+    text-decoration: underline;
+}
+
+/* Scrollable chat message area. */
+#chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+/* Individual chat messages container. */
+#chat-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* User message bubble styling. */
+.chat-msg-user {
+    align-self: flex-end;
+    background: #e3f2fd;
+    border-radius: 12px;
+    max-width: 80%;
+    padding: 10px 14px;
+}
+
+/* User message label. */
+.chat-msg-user .msg-label {
+    color: #1565c0;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+/* Assistant message bubble styling. */
+.chat-msg-assistant {
+    align-self: flex-start;
+    background: #f5f5f5;
+    border-radius: 12px;
+    max-width: 80%;
+    padding: 10px 14px;
+}
+
+/* Assistant message label. */
+.chat-msg-assistant .msg-label {
+    color: #333;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+/* Message text content. */
+.msg-text {
+    color: #333;
+    font-size: 14px;
+    line-height: 1.5;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+/* Error message styling. */
+.chat-msg-error {
+    align-self: flex-start;
+    background: #fde8e8;
+    border-radius: 12px;
+    color: #c62828;
+    max-width: 80%;
+    padding: 10px 14px;
+}
+
+/* Loading spinner container. */
+#chat-spinner {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+/* Spinner text. */
+#spinner-text {
+    color: #888;
+    font-size: 13px;
+}
+
+/* CSS spinner animation. */
+#chat-spinner::before {
+    animation: spin 1s linear infinite;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    border-top-color: #1a73e8;
+    content: "";
+    display: inline-block;
+    height: 16px;
+    width: 16px;
+}
+
+/* Spinner rotation keyframes. */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Collapsible code panel container. */
+#code-panel {
+    border-top: 1px solid #e0e0e0;
+}
+
+/* Toggle button for expanding/collapsing code panel. */
+.panel-toggle {
+    background: #fafafa;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 8px 16px;
+    text-align: left;
+    width: 100%;
+}
+
+/* Hover state for the toggle button. */
+.panel-toggle:hover {
+    background: #f0f0f0;
+}
+
+/* Code panel content area. */
+#code-panel-content {
+    background: #f5f5f5;
+    padding: 12px 16px;
+}
+
+/* Pre-formatted code display. */
+#code-display {
+    background: #1e1e1e;
+    border-radius: 6px;
+    color: #d4d4d4;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    max-height: 200px;
+    overflow-wrap: break-word;
+    overflow-y: auto;
+    padding: 12px;
+    white-space: pre-wrap;
+}
+
+/* Pagination controls for code panel. */
+#code-pagination {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+/* Page navigation buttons. */
+#code-pagination button {
+    background: #e0e0e0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+}
+
+/* Page indicator text. */
+#code-page-indicator {
+    color: #888;
+    font-size: 12px;
+}
+
+/* Disclaimer text in the code panel. */
+.code-disclaimer {
+    color: #888;
+    font-size: 11px;
+    margin: 4px 0 0;
+}
+
+/* Input bar at the bottom of the chat. */
+#input-bar {
+    align-items: center;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+}
+
+/* Message text input field. */
+#input-message {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    flex: 1;
+    font-size: 14px;
+    padding: 8px 12px;
+}
+
+/* Send and Cancel button styling. */
+#btn-send,
+#btn-cancel {
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 8px 16px;
+}
+
+/* Send button color. */
+#btn-send {
+    background: #1a73e8;
+    color: #fff;
+}
+
+/* Send button hover state. */
+#btn-send:hover {
+    background: #1565c0;
+}
+
+/* Send button disabled state. */
+#btn-send:disabled {
+    background: #bbb;
+    cursor: not-allowed;
+}
+
+/* Focus state for keyboard accessibility on send button. */
+#btn-send:focus-visible {
+    outline: 2px solid #1a73e8;
+    outline-offset: 2px;
+}
+
+/* Cancel button color. */
+#btn-cancel {
+    background: #e0e0e0;
+    color: #333;
+}
+
+/* Cancel button hover state. */
+#btn-cancel:hover {
+    background: #ccc;
+}
+
+/* Focus state for keyboard accessibility on cancel button. */
+#btn-cancel:focus-visible {
+    outline: 2px solid #1a73e8;
+    outline-offset: 2px;
+}
+
+/* Utility class to hide elements. */
+.hidden {
+    display: none;
+}
+
+/* Advanced Options dialog styling. */
+#advanced-dialog {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    max-width: 420px;
+    padding: 24px;
+}
+
+/* Semi-transparent backdrop behind the advanced dialog. */
+#advanced-dialog::backdrop {
+    background: rgb(0 0 0 / 40%);
+}
+
+/* Dialog heading. */
+#advanced-dialog h2 {
+    color: #333;
+    font-size: 16px;
+    margin: 0 0 16px;
+}
+
+/* Dialog input row layout. */
+.dialog-row {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+/* Dialog label width. */
+.dialog-row label {
+    color: #555;
+    font-size: 13px;
+    min-width: 180px;
+}
+
+/* Dialog number input styling. */
+.dialog-row input[type="number"] {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    padding: 6px 8px;
+    width: 120px;
+}
+
+/* Warning text for sandbox limit fields. */
+.dialog-warning {
+    color: #f57c00;
+    font-size: 12px;
+    margin: 12px 0 8px;
+}
+
+/* Dialog action button container. */
+.dialog-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
+/* Consent dialog styling. */
+#consent-dialog {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    max-width: 460px;
+    padding: 24px;
+}
+
+/* Semi-transparent backdrop behind the consent dialog. */
+#consent-dialog::backdrop {
+    background: rgb(0 0 0 / 40%);
+}
+
+/* Consent dialog heading. */
+#consent-dialog h2 {
+    color: #333;
+    font-size: 16px;
+    margin: 0 0 12px;
+}
+
+/* Consent dialog body text. */
+#consent-dialog p {
+    color: #333;
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0 0 8px;
+}
+
+/* Bold origin text in consent dialog. */
+.consent-origin-text {
+    font-weight: 600;
+}

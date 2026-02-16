@@ -95,10 +95,10 @@ describe("landing.html", () => {
             expect(desc?.textContent).toContain("version");
         });
 
-        it("has exactly 4 mode buttons", () => {
+        it("has exactly 5 mode buttons", () => {
             const doc = loadTemplate();
             const buttons = doc.querySelectorAll(".mode-button");
-            expect(buttons).toHaveLength(4);
+            expect(buttons).toHaveLength(5);
         });
     });
 

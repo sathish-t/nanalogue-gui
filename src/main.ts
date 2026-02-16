@@ -7,13 +7,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import { countBedDataLines, countNonEmptyLines } from "./lib/line-counter";
+import * as aiChatModule from "./modes/ai-chat";
 import * as qcModule from "./modes/qc";
 import * as swipeModule from "./modes/swipe";
 
 /**
  * The application mode representing the current screen of the GUI.
  */
-type AppMode = "landing" | "swipe" | "qc" | "locate";
+type AppMode = "landing" | "swipe" | "qc" | "locate" | "ai-chat";
 
 let currentMode: AppMode = "landing";
 let mainWindow: BrowserWindow | null = null;
@@ -64,6 +65,8 @@ function getHtmlPath(mode: AppMode): string {
                 "locate",
                 "locate-config.html",
             );
+        case "ai-chat":
+            return resolve(__dirname, "renderer", "ai-chat", "ai-chat.html");
     }
 }
 
@@ -83,6 +86,8 @@ function getWindowTitle(mode: AppMode): string {
             return "nanalogue-qc";
         case "locate":
             return "nanalogue-locate";
+        case "ai-chat":
+            return "nanalogue-ai-chat";
     }
 }
 
@@ -152,6 +157,7 @@ function createWindow(mode: AppMode) {
 
     // Set main window reference for mode modules
     qcModule.setMainWindow(mainWindow);
+    aiChatModule.setMainWindow(mainWindow);
 
     mainWindow.on("closed", () => {
         mainWindow = null;
@@ -171,6 +177,7 @@ function resizeAndLoadMode(mode: AppMode) {
 
     // Update module window references when changing modes
     qcModule.setMainWindow(mainWindow);
+    aiChatModule.setMainWindow(mainWindow);
 
     mainWindow.setSize(width, height);
     mainWindow.center();
@@ -590,9 +597,33 @@ ipcMain.handle(
     },
 );
 
+ipcMain.handle(
+    "launch-ai-chat",
+    /**
+     * Handles the launch-ai-chat IPC request by switching to AI Chat mode.
+     *
+     * @returns A result object indicating success.
+     */
+    async () => {
+        resizeAndLoadMode("ai-chat");
+        return { success: true };
+    },
+);
+
+ipcMain.handle(
+    "ai-chat-go-back-nav",
+    /**
+     * Navigates back to the landing page from the AI Chat screen.
+     */
+    () => {
+        resizeAndLoadMode("landing");
+    },
+);
+
 // Register mode IPC handlers
 swipeModule.registerIpcHandlers();
 qcModule.registerIpcHandlers();
+aiChatModule.registerIpcHandlers();
 
 app.whenReady().then(() => {
     createWindow("landing");

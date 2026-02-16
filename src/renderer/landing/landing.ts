@@ -26,6 +26,8 @@ interface LandingApi {
     launchQC: () => Promise<LaunchResult>;
     /** Launches the locate reads mode for converting read IDs to BED format. */
     launchLocate: () => Promise<LaunchResult>;
+    /** Launches the AI Chat mode for LLM-powered BAM analysis. */
+    launchAiChat: () => Promise<LaunchResult>;
 }
 
 /** The preload API instance retrieved from the window object for invoking main process actions. */
@@ -39,6 +41,7 @@ const api = (
 const btnSwipe = document.getElementById("btn-swipe") as HTMLButtonElement;
 const btnQC = document.getElementById("btn-qc") as HTMLButtonElement;
 const btnLocate = document.getElementById("btn-locate") as HTMLButtonElement;
+const btnAiChat = document.getElementById("btn-ai-chat") as HTMLButtonElement;
 const btnVersion = document.getElementById("btn-version") as HTMLButtonElement;
 
 btnSwipe.addEventListener("click", async () => {
@@ -77,6 +80,19 @@ btnLocate.addEventListener("click", async () => {
         }
     } catch (error) {
         alert(`Failed to launch locate mode: ${String(error)}`);
+    }
+});
+
+btnAiChat.addEventListener("click", async () => {
+    try {
+        const result = await api.launchAiChat();
+        if (!result.success) {
+            alert(
+                `Failed to launch AI Chat mode: ${result.reason ?? "Unknown error"}`,
+            );
+        }
+    } catch (error) {
+        alert(`Failed to launch AI Chat mode: ${String(error)}`);
     }
 });
 

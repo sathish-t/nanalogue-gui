@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Content Security Policy restricting scripts and styles to same-origin. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>AI Chat — BAM File Analysis</title>
+  <!-- Shared base styles used across all renderer pages. -->
+  <link rel="stylesheet" href="../shared/styles.css">
+  <!-- AI Chat page specific styles. -->
+  <link rel="stylesheet" href="ai-chat.css">
+</head>
+<body>
+  <!-- Main container for the AI Chat interface. -->
+  <div id="ai-chat-app">
+    <!-- Header bar with title and action buttons. -->
+    <header id="ai-chat-header">
+      <h1>AI Chat — BAM File Analysis</h1>
+      <!-- Button container for header actions. -->
+      <div id="header-actions">
+        <!-- Resets conversation state without losing connection settings. -->
+        <button type="button" id="btn-new-chat" class="header-button">New Chat</button>
+        <!-- Navigates back to the landing page. -->
+        <button type="button" id="btn-back" class="header-button">Back</button>
+      </div>
+    </header>
+
+    <!-- Configuration panel for LLM connection and directory settings. -->
+    <section id="config-panel">
+      <h2>Configuration</h2>
+
+      <!-- BAM directory selection row. -->
+      <div class="config-row">
+        <label for="input-dir">BAM Directory:</label>
+        <!-- Read-only text field showing the selected directory. -->
+        <input type="text" id="input-dir" readonly placeholder="Select a directory...">
+        <!-- Opens native directory picker. -->
+        <button type="button" id="btn-browse">Browse</button>
+      </div>
+
+      <!-- LLM endpoint URL input. -->
+      <div class="config-row">
+        <label for="input-endpoint">Endpoint:</label>
+        <input type="text" id="input-endpoint" placeholder="http://localhost:11434/v1">
+      </div>
+
+      <!-- API key input (password field, never stored to disk). -->
+      <div class="config-row">
+        <label for="input-api-key">API Key:</label>
+        <input type="password" id="input-api-key" autocomplete="new-password" placeholder="Optional">
+      </div>
+
+      <!-- Model name input with scrollable dropdown and fetch button. -->
+      <div class="config-row">
+        <label for="input-model">Model:</label>
+        <!-- Wrapper for the model input and its custom dropdown. -->
+        <div id="model-input-wrapper">
+          <input type="text" id="input-model" placeholder="e.g. qwen3-coder:7b" autocomplete="off">
+          <!-- Custom scrollable dropdown populated by Fetch Models. -->
+          <div id="model-dropdown" class="hidden"></div>
+        </div>
+        <!-- Queries the endpoint for available models. -->
+        <button type="button" id="btn-fetch-models">Fetch Models</button>
+      </div>
+
+      <!-- Inline status message for fetch models results. -->
+      <div id="fetch-status" class="status-message"></div>
+
+      <!-- Connection status indicator. -->
+      <div id="connection-status" class="status-indicator"></div>
+
+      <!-- Advanced Options button opens the settings dialog. -->
+      <button type="button" id="btn-advanced">Advanced Options</button>
+    </section>
+
+    <!-- Chat message area displaying user and assistant messages. -->
+    <section id="chat-area">
+      <!-- Messages are appended here dynamically. -->
+      <div id="chat-messages"></div>
+      <!-- Loading spinner shown during LLM requests. -->
+      <div id="chat-spinner" class="hidden">
+        <span id="spinner-text">Waiting for LLM...</span>
+      </div>
+    </section>
+
+    <!-- Collapsible panel showing sandbox code from tool calls. -->
+    <section id="code-panel">
+      <!-- Toggle header for expanding/collapsing the code panel. -->
+      <button type="button" id="code-panel-toggle" class="panel-toggle">
+        ▶ Sandboxed Code (for advanced users)
+      </button>
+      <!-- Code panel content, hidden by default. -->
+      <div id="code-panel-content" class="hidden">
+        <!-- Pre-formatted code block. -->
+        <pre id="code-display"></pre>
+        <!-- Pagination controls for navigating tool call code. -->
+        <div id="code-pagination">
+          <button type="button" id="btn-code-prev">◀</button>
+          <span id="code-page-indicator">0 / 0</span>
+          <button type="button" id="btn-code-next">▶</button>
+        </div>
+        <!-- Disclaimer notes about sandbox code. -->
+        <p class="code-disclaimer">Sandbox code is non-deterministic — re-running may produce different results.</p>
+        <p class="code-disclaimer">Runs in Monty (Python-like, not full Python) — may not run in standard Python.</p>
+      </div>
+    </section>
+
+    <!-- Input bar for typing and sending messages. -->
+    <div id="input-bar">
+      <!-- Text input for the user's question. -->
+      <input type="text" id="input-message" aria-label="Message" placeholder="Type your question...">
+      <!-- Send button to submit the message. -->
+      <button type="button" id="btn-send">Send</button>
+      <!-- Cancel button shown during processing. -->
+      <button type="button" id="btn-cancel" class="hidden">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Advanced Options dialog for tuning sandbox and LLM parameters. -->
+  <dialog id="advanced-dialog">
+    <h2>Advanced Options</h2>
+
+    <!-- Context window size in tokens. Min/max values from CONFIG_FIELD_SPECS in src/lib/ai-chat-constants.ts. -->
+    <div class="dialog-row">
+      <label for="opt-context-window">Context window (tokens):</label>
+      <input type="number" id="opt-context-window" value="32000" min="1000" max="2000000">
+    </div>
+
+    <!-- Maximum retries per turn. -->
+    <div class="dialog-row">
+      <label for="opt-max-retries">Max retries:</label>
+      <input type="number" id="opt-max-retries" value="5" min="1" max="20">
+    </div>
+
+    <!-- Warning for sandbox limit fields. -->
+    <p class="dialog-warning">Sandbox limits — change with caution</p>
+
+    <!-- LLM request timeout in seconds. -->
+    <div class="dialog-row">
+      <label for="opt-timeout">Timeout (seconds):</label>
+      <input type="number" id="opt-timeout" value="120" min="10" max="600">
+    </div>
+
+    <!-- Maximum records from read_info. -->
+    <div class="dialog-row">
+      <label for="opt-max-read-info">Max read_info records:</label>
+      <input type="number" id="opt-max-read-info" value="200000" min="100" max="1000000">
+    </div>
+
+    <!-- Maximum records from bam_mods. -->
+    <div class="dialog-row">
+      <label for="opt-max-bam-mods">Max bam_mods records:</label>
+      <input type="number" id="opt-max-bam-mods" value="5000" min="100" max="100000">
+    </div>
+
+    <!-- Maximum records from window_reads. -->
+    <div class="dialog-row">
+      <label for="opt-max-window-reads">Max window_reads records:</label>
+      <input type="number" id="opt-max-window-reads" value="5000" min="100" max="100000">
+    </div>
+
+    <!-- Maximum records from seq_table. -->
+    <div class="dialog-row">
+      <label for="opt-max-seq-table">Max seq_table records:</label>
+      <input type="number" id="opt-max-seq-table" value="5000" min="100" max="100000">
+    </div>
+
+    <!-- Dialog action buttons. -->
+    <div class="dialog-actions">
+      <!-- Resets all fields to default values. -->
+      <button type="button" id="btn-defaults">Defaults</button>
+      <!-- Closes the dialog. -->
+      <button type="button" id="btn-close-advanced">Close</button>
+    </div>
+  </dialog>
+
+  <!-- Endpoint consent dialog for non-localhost endpoints. -->
+  <dialog id="consent-dialog">
+    <h2>Data will be sent to a remote endpoint</h2>
+    <p>Your conversation data (including BAM analysis results) will be sent to:</p>
+    <!-- Origin of the endpoint being connected to. -->
+    <p id="consent-origin" class="consent-origin-text"></p>
+    <p>This data may include read IDs, sequences, modification probabilities,
+      and other information from your BAM files.</p>
+    <!-- Consent dialog action buttons. -->
+    <div class="dialog-actions">
+      <button type="button" id="btn-consent-cancel">Cancel</button>
+      <button type="button" id="btn-consent-accept">I understand</button>
+    </div>
+  </dialog>
+
+  <!-- Bundled AI Chat renderer script. -->
+  <script src="ai-chat.js"></script>
+</body>
+</html>

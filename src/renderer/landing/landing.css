@@ -34,7 +34,7 @@ body {
     gap: 24px;
     grid-template-columns: repeat(auto-fit, 200px);
     justify-content: center;
-    max-width: 424px;
+    max-width: 648px;
 }
 
 /* Large card-style button for selecting an application mode. */
