@@ -30,7 +30,7 @@ out/
 # ===================
 # Data files (large BAM/BED files)
 # ===================
-data/
+temp_data/
 /*.bam
 /*.bam.bai
 

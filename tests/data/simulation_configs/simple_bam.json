@@ -1,0 +1,20 @@
+{
+    "contigs": {
+        "number": 2,
+        "len_range": [10000, 10000]
+    },
+    "reads": [{
+        "number": 1000,
+        "mapq_range": [10, 20],
+        "base_qual_range": [10, 20],
+        "len_range": [0.5, 0.5],
+        "insert_middle": "ATCG",
+        "mods": [{
+            "base": "T",
+            "is_strand_plus": true,
+            "mod_code": "T",
+            "win": [40, 40],
+            "mod_range": [[0.1, 0.2], [0.7, 0.8]]
+        }]
+    }]
+}
