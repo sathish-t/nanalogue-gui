@@ -176,6 +176,21 @@
     margin: 4px 0;
 }
 
+/* Connected state — green. */
+.status-indicator.status-connected {
+    color: #2e7d32;
+}
+
+/* Warning state — amber/orange for unencrypted remote. */
+.status-indicator.status-warning {
+    color: #e65100;
+}
+
+/* Idle state — grey default. */
+.status-indicator.status-idle {
+    color: #888;
+}
+
 /* Advanced Options button inline with config. */
 #btn-advanced {
     background: none;

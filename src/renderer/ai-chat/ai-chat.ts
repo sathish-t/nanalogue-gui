@@ -132,6 +132,9 @@ const btnFetchModels = document.getElementById(
     "btn-fetch-models",
 ) as HTMLButtonElement;
 const fetchStatus = document.getElementById("fetch-status") as HTMLDivElement;
+const connectionStatus = document.getElementById(
+    "connection-status",
+) as HTMLDivElement;
 const btnAdvanced = document.getElementById(
     "btn-advanced",
 ) as HTMLButtonElement;
@@ -202,6 +205,59 @@ let chatStarted = false;
 let pendingConsentResolve: ((accepted: boolean) => void) | null = null;
 /** Fetched model IDs for filtering in the custom dropdown. */
 let fetchedModels: string[] = [];
+/** Origin of the last successfully connected endpoint, or null. */
+let connectedOrigin: string | null = null;
+
+/** Hostnames that count as localhost. */
+const LOCALHOST_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/**
+ * Updates the connection status indicator based on the endpoint URL
+ * and whether the last request succeeded.
+ *
+ * @param connected - Whether we have a confirmed connection.
+ */
+function updateConnectionStatus(connected: boolean): void {
+    const raw = inputEndpoint.value.trim();
+    if (!raw) {
+        connectionStatus.textContent = "";
+        connectionStatus.className = "status-indicator";
+        return;
+    }
+
+    let url: URL;
+    try {
+        url = new URL(raw);
+    } catch {
+        connectionStatus.textContent = "";
+        connectionStatus.className = "status-indicator";
+        return;
+    }
+
+    const isLocal = LOCALHOST_HOSTS.has(url.hostname);
+    const isHttps = url.protocol === "https:";
+
+    let text: string;
+    let cssClass: string;
+
+    if (isLocal) {
+        text = connected ? "\u25cf Connected (local)" : "Local endpoint";
+        cssClass = connected ? "status-connected" : "status-idle";
+    } else if (isHttps) {
+        text = connected
+            ? "\u25cf Connected (remote, HTTPS)"
+            : "Remote endpoint (HTTPS)";
+        cssClass = connected ? "status-connected" : "status-idle";
+    } else {
+        text = connected
+            ? "\u25cf Connected (remote, HTTP) \u2014 unencrypted"
+            : "Remote endpoint (HTTP) \u2014 unencrypted";
+        cssClass = "status-warning";
+    }
+
+    connectionStatus.textContent = text;
+    connectionStatus.className = `status-indicator ${cssClass}`;
+}
 
 /**
  * Populates the custom model dropdown with matching options.
@@ -421,6 +477,22 @@ btnBrowse.addEventListener("click", async () => {
     if (dir) inputDir.value = dir;
 });
 
+// Endpoint input — update connection status and reset if origin changed
+inputEndpoint.addEventListener("input", () => {
+    let originUnchanged = false;
+    try {
+        const newOrigin = new URL(inputEndpoint.value.trim()).origin;
+        if (connectedOrigin && newOrigin === connectedOrigin) {
+            originUnchanged = true;
+        } else if (connectedOrigin && newOrigin !== connectedOrigin) {
+            connectedOrigin = null;
+        }
+    } catch {
+        connectedOrigin = null;
+    }
+    updateConnectionStatus(originUnchanged && connectedOrigin !== null);
+});
+
 // Fetch Models button — query endpoint for model list
 btnFetchModels.addEventListener("click", async () => {
     if (!inputEndpoint.value) {
@@ -430,6 +502,7 @@ btnFetchModels.addEventListener("click", async () => {
     fetchStatus.textContent = "Fetching models...";
     btnFetchModels.disabled = true;
 
+    const requestedEndpoint = inputEndpoint.value.trim();
     let result = await api.aiChatListModels({
         endpointUrl: inputEndpoint.value,
         apiKey: inputApiKey.value,
@@ -464,12 +537,28 @@ btnFetchModels.addEventListener("click", async () => {
 
     btnFetchModels.disabled = false;
 
+    // Only update connection status if endpoint hasn't changed during request
+    const endpointStillMatches =
+        inputEndpoint.value.trim() === requestedEndpoint;
+
     if (result.success && result.models) {
         fetchedModels = result.models;
         showModelDropdown(inputModel.value);
         fetchStatus.textContent = `Found ${result.models.length} model(s).`;
+        if (endpointStillMatches) {
+            try {
+                connectedOrigin = new URL(requestedEndpoint).origin;
+            } catch {
+                connectedOrigin = null;
+            }
+            updateConnectionStatus(true);
+        }
     } else {
         fetchStatus.textContent = result.error ?? "Unknown error";
+        if (endpointStillMatches) {
+            connectedOrigin = null;
+            updateConnectionStatus(false);
+        }
     }
 
     // Auto-dismiss after 8 seconds
@@ -515,6 +604,7 @@ async function sendUserMessage(
     setProcessing(true);
     setSpinner(true, "Waiting for LLM...");
 
+    const requestedEndpoint = inputEndpoint.value.trim();
     const result = await api.aiChatSendMessage({
         endpointUrl: inputEndpoint.value,
         apiKey: inputApiKey.value,
@@ -527,6 +617,10 @@ async function sendUserMessage(
     setProcessing(false);
     setSpinner(false);
 
+    // Only update connection status if endpoint hasn't changed during request
+    const endpointStillMatches =
+        inputEndpoint.value.trim() === requestedEndpoint;
+
     if (result.success) {
         if (result.text) {
             appendMessage("assistant", result.text);
@@ -534,6 +628,14 @@ async function sendUserMessage(
         if (result.steps) {
             codeSteps.push(...result.steps);
             showCodePage(codeSteps.length - 1);
+        }
+        if (endpointStillMatches) {
+            try {
+                connectedOrigin = new URL(requestedEndpoint).origin;
+            } catch {
+                connectedOrigin = null;
+            }
+            updateConnectionStatus(true);
         }
     } else if (result.error === "CONSENT_REQUIRED" && result.origin) {
         // Show consent dialog
@@ -559,6 +661,10 @@ async function sendUserMessage(
         appendMessage("error", "Request cancelled.");
     } else {
         appendMessage("error", result.error ?? "Unknown error occurred.");
+        if (endpointStillMatches) {
+            connectedOrigin = null;
+            updateConnectionStatus(false);
+        }
     }
 }
 
