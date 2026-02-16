@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Monty sandbox wrapper with path traversal guards, output gating, and record limits ([`c24437b`](https://github.com/sathish-t/nanalogue-gui/commit/c24437b13db9b7b6b9fe275b985cf157de10700c))
 - Chat orchestrator with sliding window context, facts extraction, and LLM tool-call loop ([`99eb4ee`](https://github.com/sathish-t/nanalogue-gui/commit/99eb4ee1ecbbc9126b0c124597bb046320d5d154))
 - AI Chat mode and renderer with config panel, consent flow, and collapsible code display ([`d6b7b29`](https://github.com/sathish-t/nanalogue-gui/commit/d6b7b293ecd08a35d225ce7649775c8ef5b43af1))
+- Connection status indicator for AI Chat endpoint showing local/remote, HTTP/HTTPS, and connected state ([`c91002f`](https://github.com/sathish-t/nanalogue-gui/commit/c91002fc1d82d65d09f4f403b54479307adc29d8))
 - Deterministic `sampleSeed` field on QC config and results for reproducible subsampling ([`fc42269`](https://github.com/sathish-t/nanalogue-gui/commit/fc4226937d9dba193956fff95ecb89eb95a72297))
 - Version button and dialog on landing page with link to nanalogue.com, external URL opens in OS browser ([`0b0dee6`](https://github.com/sathish-t/nanalogue-gui/commit/0b0dee655f35d7ab2fdb195de7264dbf22c8e8eb))
 - Auto-fit landing page height to rendered content with mode-change guard ([`dd3d790`](https://github.com/sathish-t/nanalogue-gui/commit/dd3d790dfa61863cf9a64330aee22890a36d2f22))
@@ -28,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Dependencies
 
 - Added: `ai` ^6.0.86, `@ai-sdk/openai-compatible` ^2.0.30, `@pydantic/monty` ^0.0.5, `picomatch` ^4.0.3 ([`8d7edab`](https://github.com/sathish-t/nanalogue-gui/commit/8d7edabfcd133168eb066144488ca9e0e1a34765))
+- Bumps `@pydantic/monty` to ^0.0.6 ([`2a3a7e2`](https://github.com/sathish-t/nanalogue-gui/commit/2a3a7e2919f60c7b7174ff8ac5232e5eebeb0640))
+- Added: `@electron/windows-sign` ^1.2.2 dev dependency for electron-builder ([`231bbe6`](https://github.com/sathish-t/nanalogue-gui/commit/231bbe663a837b5ce8d2d508c4e5a548153454ed))
 
 ### Infrastructure
 
