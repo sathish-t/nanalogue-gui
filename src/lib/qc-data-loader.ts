@@ -8,6 +8,9 @@ import type { PeekResult, QCConfig, QCData } from "./types";
 /** Number of reads to fetch per pagination page. */
 const PAGE_SIZE = 10_000;
 
+/** Smaller page size for bamMods to limit peak memory from large mod tables. */
+const MODS_PAGE_SIZE = 1_000;
+
 /**
  * Maps a read length bin width to the maximum read length the histogram covers.
  *
@@ -75,7 +78,7 @@ async function paginateReadInfo(
     let totalReads = 0;
     let droppedLengths = 0;
 
-    // Fetch pages of reads until fewer than PAGE_SIZE records are returned
+    // Fetch pages of reads until the API returns an empty page
     for (;;) {
         const page = await readInfo({
             ...baseOptions,
@@ -83,6 +86,8 @@ async function paginateReadInfo(
             limit: PAGE_SIZE,
             offset,
         });
+
+        if (page.length === 0) break;
 
         for (const r of page) {
             if (r.alignment_type === "unmapped") continue;
@@ -100,10 +105,8 @@ async function paginateReadInfo(
         }
 
         totalReads += page.length;
-        offset += page.length;
+        offset += PAGE_SIZE;
         onProgress?.("reads", totalReads);
-
-        if (page.length < PAGE_SIZE) break;
     }
 
     if (droppedLengths > 0) {
@@ -143,14 +146,16 @@ async function paginateBamMods(
     let loggedMissingModTable = false;
     let readsWithMods = 0;
 
-    // Fetch pages of modification records until fewer than PAGE_SIZE are returned
+    // Fetch pages of modification records until the API returns an empty page
     for (;;) {
         const page = await bamMods({
             ...baseOptions,
             sampleSeed,
-            limit: PAGE_SIZE,
+            limit: MODS_PAGE_SIZE,
             offset,
         });
+
+        if (page.length === 0) break;
 
         for (const record of page) {
             if (record.alignment_type === "unmapped") continue;
@@ -190,10 +195,8 @@ async function paginateBamMods(
         }
 
         totalRecords += page.length;
-        offset += page.length;
+        offset += MODS_PAGE_SIZE;
         onProgress?.("modifications", totalRecords);
-
-        if (page.length < PAGE_SIZE) break;
     }
 
     console.log(`  Got ${readsWithMods} reads with modifications`);
@@ -233,7 +236,7 @@ async function paginateWindowReads(
     let offset = 0;
     let totalReads = 0;
 
-    // Fetch pages of windowed TSV until fewer unique reads than PAGE_SIZE are found
+    // Fetch pages of windowed TSV until the API returns an empty page
     for (;;) {
         const tsv = await windowReads({
             ...windowOptions,
@@ -253,7 +256,7 @@ async function paginateWindowReads(
             windowedDensityHist.add(Math.min(density, 1 - Number.EPSILON));
         }
 
-        // Count unique read IDs in column 4 (index 3) to determine page completeness
+        // Count unique read IDs for progress reporting
         const uniqueReadIds = new Set<string>();
         for (let i = 1; i < lines.length; i++) {
             const fields = lines[i].split("\t");
@@ -265,8 +268,6 @@ async function paginateWindowReads(
         totalReads += uniqueReadIds.size;
         offset += PAGE_SIZE;
         onProgress?.("windows", totalReads);
-
-        if (uniqueReadIds.size < PAGE_SIZE) break;
     }
 
     console.log(`  Got ${windowedDensityHist.count} windows`);
