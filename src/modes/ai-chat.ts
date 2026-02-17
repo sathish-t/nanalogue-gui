@@ -2,13 +2,13 @@
 // Manages IPC handlers for the LLM-powered BAM analysis chat interface.
 
 import { type BrowserWindow, dialog, ipcMain } from "electron";
-import { MODEL_LIST_TIMEOUT_MS } from "../lib/ai-chat-constants";
 import {
     validateListModels,
     validateSendMessage,
 } from "../lib/ai-chat-ipc-validation";
 import { handleUserMessage } from "../lib/chat-orchestrator";
 import type { AiChatEvent, Fact, HistoryEntry } from "../lib/chat-types";
+import { fetchModels } from "../lib/model-listing";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -84,7 +84,7 @@ export function registerIpcHandlers(): void {
     ipcMain.handle(
         "ai-chat-list-models",
         /**
-         * Queries the endpoint for available models via GET /v1/models.
+         * Queries the endpoint for available models using the provider-appropriate API.
          *
          * @param _event - The IPC event (unused).
          * @param payload - The endpoint URL and API key.
@@ -109,67 +109,7 @@ export function registerIpcHandlers(): void {
                 }
             }
 
-            try {
-                const url = `${endpointUrl.replace(/\/+$/, "")}/models`;
-                const headers: Record<string, string> = {
-                    Accept: "application/json",
-                };
-                if (apiKey) {
-                    headers.Authorization = `Bearer ${apiKey}`;
-                }
-                const response = await fetch(url, {
-                    headers,
-                    signal: AbortSignal.timeout(MODEL_LIST_TIMEOUT_MS),
-                });
-                if (!response.ok) {
-                    if (response.status === 404) {
-                        return {
-                            success: false,
-                            error: "Endpoint does not support model listing — type a model name manually",
-                        };
-                    }
-                    if (response.status === 401 || response.status === 403) {
-                        return {
-                            success: false,
-                            error: "Authentication failed — check your API key",
-                        };
-                    }
-                    return {
-                        success: false,
-                        error: `Unexpected response: ${response.status}`,
-                    };
-                }
-                const body = (await response.json()) as {
-                    /** The list of available models. */
-                    data?: Array<{
-                        /** The model identifier. */
-                        id: string;
-                    }>;
-                };
-                if (!body.data || !Array.isArray(body.data)) {
-                    return {
-                        success: false,
-                        error: "Unexpected response from endpoint",
-                    };
-                }
-                return {
-                    success: true,
-                    models: body.data.map(
-                        (m: {
-                            /** The model identifier. */
-                            id: string;
-                        }) => m.id,
-                    ),
-                };
-            } catch (error) {
-                if (error instanceof Error && error.name === "TimeoutError") {
-                    return { success: false, error: "Request timed out" };
-                }
-                return {
-                    success: false,
-                    error: "Could not reach endpoint",
-                };
-            }
+            return fetchModels(endpointUrl, apiKey);
         },
     );
 
