@@ -270,8 +270,8 @@
     padding: 10px 14px;
 }
 
-/* Loading spinner container. */
-#chat-spinner {
+/* Loading spinner container (visible only when .hidden is absent). */
+#chat-spinner:not(.hidden) {
     align-items: center;
     display: flex;
     gap: 8px;

@@ -708,6 +708,8 @@ btnNewChat.addEventListener("click", async () => {
     codeSteps = [];
     currentCodePage = 0;
     showCodePage(0);
+    setSpinner(false);
+    setProcessing(false);
     unlockAdvancedOptions();
 });
 
@@ -791,7 +793,6 @@ api.onAiChatEvent((event: AiChatEvent) => {
             setSpinner(true, "Processing...");
             break;
         case "llm_request_end":
-            setSpinner(true, "Processing...");
             break;
         case "turn_end":
             setSpinner(false);
