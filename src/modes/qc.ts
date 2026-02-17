@@ -49,6 +49,21 @@ export function registerIpcHandlers() {
             ...config,
             sampleFraction: config.sampleFraction / 100,
         });
+
+        // Resolve read ID file path to an array of IDs
+        if (config.readIdFilePath) {
+            const { readFile } = await import("node:fs/promises");
+            const { parseReadIds } = await import("../lib/locate-data-loader");
+            const content = await readFile(config.readIdFilePath, "utf-8");
+            const parseResult = parseReadIds(content);
+            if (parseResult.capped) {
+                throw new Error(
+                    `Read ID file contains ${parseResult.count.toLocaleString()} unique IDs, exceeding the limit of 200,000.`,
+                );
+            }
+            config.readIdSet = parseResult.ids;
+        }
+
         /**
          * Forwards pagination progress from the worker to the renderer.
          *

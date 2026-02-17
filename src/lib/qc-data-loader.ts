@@ -299,6 +299,29 @@ export async function generateQCData(
         tag: config.tag,
         modStrand: config.modStrand,
         modRegion: config.modRegion,
+        ...(config.mapqFilter !== undefined && {
+            mapqFilter: config.mapqFilter,
+        }),
+        ...(config.excludeMapqUnavail !== undefined && {
+            excludeMapqUnavail: config.excludeMapqUnavail,
+        }),
+        ...(config.readFilter !== undefined && {
+            readFilter: config.readFilter,
+        }),
+        ...(config.minSeqLen !== undefined && { minSeqLen: config.minSeqLen }),
+        ...(config.minAlignLen !== undefined && {
+            minAlignLen: config.minAlignLen,
+        }),
+        ...(config.readIdSet !== undefined && { readIdSet: config.readIdSet }),
+        ...(config.baseQualFilterMod !== undefined && {
+            baseQualFilterMod: config.baseQualFilterMod,
+        }),
+        ...(config.trimReadEndsMod !== undefined && {
+            trimReadEndsMod: config.trimReadEndsMod,
+        }),
+        ...(config.rejectModQualNonInclusive !== undefined && {
+            rejectModQualNonInclusive: config.rejectModQualNonInclusive,
+        }),
     };
     const baseOptions: ReadOptions = config.region
         ? {
