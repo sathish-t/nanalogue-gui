@@ -187,6 +187,29 @@ contextBridge.exposeInMainWorld("api", {
      */
     goBack: () => ipcRenderer.invoke("qc-go-back"),
 
+    /**
+     * Register a listener for QC progress updates during data generation.
+     *
+     * @param callback - Receives the data source name and running record count.
+     * @returns A cleanup function to remove the listener.
+     */
+    onQCProgress: (callback: (source: string, count: number) => void) => {
+        /**
+         * Forwards IPC progress events to the provided callback.
+         *
+         * @param _event - The Electron IPC event (unused).
+         * @param source - The data source name (reads, modifications, windows).
+         * @param count - The running total of records processed.
+         * @returns The result of invoking the callback.
+         */
+        const handler = (_event: unknown, source: string, count: number) =>
+            callback(source, count);
+        ipcRenderer.on("qc-progress", handler);
+        return () => {
+            ipcRenderer.removeListener("qc-progress", handler);
+        };
+    },
+
     // QC results
 
     /**

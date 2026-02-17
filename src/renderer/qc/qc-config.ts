@@ -45,6 +45,11 @@ interface QCApi {
 
     /** Counts non-empty lines in the specified read ID file. */
     locateCountReadIds: (filePath: string) => Promise<number>;
+
+    /** Register a listener for QC progress updates. Returns an unsubscribe function. */
+    onQCProgress: (
+        callback: (source: string, count: number) => void,
+    ) => () => void;
 }
 
 /**
@@ -545,6 +550,26 @@ async function generateQC() {
         rejectModQualNonInclusive,
     };
 
+    const progressLabels: Record<string, string> = {
+        reads: "Loading reads for length data",
+        modifications: "Loading reads for modification data",
+        windows: "Loading reads for window data",
+    };
+
+    // Reset progress counters to base labels before starting a new run
+    for (const [source, label] of Object.entries(progressLabels)) {
+        const el = document.getElementById(`progress-${source}`);
+        if (el) el.textContent = `${label}:`;
+    }
+
+    const removeProgressListener = api.onQCProgress((source, count) => {
+        const el = document.getElementById(`progress-${source}`);
+        if (el) {
+            const label = progressLabels[source] ?? source;
+            el.textContent = `${label}: ${count.toLocaleString()}`;
+        }
+    });
+
     elements.loadingOverlay.classList.remove("hidden");
 
     try {
@@ -554,6 +579,8 @@ async function generateQC() {
         alert(`Error generating QC: ${error}`);
         elements.loadingOverlay.classList.add("hidden");
         elements.btnGenerate.disabled = false;
+    } finally {
+        removeProgressListener();
     }
 }
 
