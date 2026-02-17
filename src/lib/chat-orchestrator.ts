@@ -465,6 +465,8 @@ export async function handleUserMessage(
     text: string;
     /** The list of sandbox execution steps with code and results. */
     steps: Array<{
+        /** The tool call ID from the SDK. */
+        toolCallId: string;
         /** The Python code that was executed. */
         code: string;
         /** The sandbox execution result. */
@@ -525,6 +527,8 @@ export async function handleUserMessage(
 
     // Track steps and cumulative sandbox runtime
     const steps: Array<{
+        /** The tool call ID from the SDK. */
+        toolCallId: string;
         /** The Python code that was executed. */
         code: string;
         /** The sandbox execution result. */
@@ -560,14 +564,20 @@ export async function handleUserMessage(
                  *
                  * @param root0 - The destructured tool call arguments.
                  * @param root0.code - The Python code to execute.
+                 * @param options - SDK execution options including the tool call ID.
+                 * @param options.toolCallId - The unique ID for this tool call.
                  * @returns The serialized sandbox result string.
                  */
-                execute: async ({
-                    code,
-                }: {
-                    /** The Python code to execute. */
-                    code: string;
-                }) => {
+                execute: async (
+                    {
+                        code,
+                    }: {
+                        /** The Python code to execute. */
+                        code: string;
+                    },
+                    /** SDK execution options. */
+                    options: { /** The tool call ID. */ toolCallId: string },
+                ) => {
                     // Check cumulative budget — return as result, not throw, so the LLM
                     // sees it as a tool result instead of triggering retry logic.
                     if (cumulativeSandboxMs >= MAX_CUMULATIVE_SANDBOX_MS) {
@@ -594,7 +604,11 @@ export async function handleUserMessage(
                         type: "tool_execution_end",
                         result: sandboxResult,
                     });
-                    steps.push({ code, result: sandboxResult });
+                    steps.push({
+                        toolCallId: options.toolCallId,
+                        code,
+                        result: sandboxResult,
+                    });
 
                     // Extract facts from successful results
                     extractFacts(
@@ -626,10 +640,8 @@ export async function handleUserMessage(
     const responseText = result.text || "";
 
     // Add assistant messages from the SDK result to history.
-    // Use stepIndex to match each tool call to its recorded execution in
-    // the steps array, avoiding code-text collisions when the same code
-    // is executed more than once with different outcomes.
-    let stepIndex = 0;
+    // Match each tool call to its recorded execution by toolCallId,
+    // which is safe even when parallel tool calls finish out of order.
     if (result.steps) {
         for (const step of result.steps) {
             if (step.toolCalls && step.toolCalls.length > 0) {
@@ -649,8 +661,9 @@ export async function handleUserMessage(
                     const matchingResult = step.toolResults?.find(
                         (tr) => tr.toolCallId === tc.toolCallId,
                     );
-                    const recorded = steps[stepIndex];
-                    stepIndex += 1;
+                    const recorded = steps.find(
+                        (s) => s.toolCallId === tc.toolCallId,
+                    );
                     history.push({
                         role: "tool",
                         tool_call_id: tc.toolCallId,
