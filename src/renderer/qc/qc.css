@@ -27,6 +27,14 @@
     font-weight: 500;
 }
 
+/* Subtle display of the subsampling seed in the results header. */
+.sample-seed-display {
+    color: #999;
+    font-size: 12px;
+    margin: 0;
+    margin-left: auto;
+}
+
 /* Navigation button to return to the previous screen. */
 .back-button {
     background: #f5f5f5;

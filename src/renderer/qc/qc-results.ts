@@ -607,6 +607,11 @@ async function initialize(): Promise<void> {
             return;
         }
 
+        const seedDisplay = document.getElementById("sample-seed-display");
+        if (seedDisplay) {
+            seedDisplay.textContent = `Sample seed: ${data.sampleSeed}`;
+        }
+
         // Show warning if reads exceeded the histogram range
         if (data.exceededReadLengths > 0) {
             const warningDiv = document.createElement("div");
