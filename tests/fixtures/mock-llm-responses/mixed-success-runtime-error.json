@@ -1,0 +1,44 @@
+{
+  "mockResponses": [
+    {
+      "_comment": "Two tool calls: first has valid code, second has code that will throw at runtime in the sandbox",
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "call_1",
+                "type": "function",
+                "function": {
+                  "name": "execute_sandbox_code",
+                  "arguments": "{\"code\":\"1 + 1\"}"
+                }
+              },
+              {
+                "id": "call_2",
+                "type": "function",
+                "function": {
+                  "name": "execute_sandbox_code",
+                  "arguments": "{\"code\":\"undefined_variable\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": "tool_calls"
+        }
+      ]
+    },
+    null
+  ],
+  "expected": {
+    "_note": "Both pass Zod, both reach the sandbox, so both get steps. First succeeds, second fails at runtime. Unlike Zod failures (prefixed 'Invalid input for tool'), runtime errors pass through the echoResultsResponse filter.",
+    "text": "sandbox returned: 2, RuntimeError: NameError: name 'undefined_variable' is not defined",
+    "stepCount": 2,
+    "steps": [
+      { "success": true, "value": 2 },
+      { "success": false }
+    ]
+  }
+}

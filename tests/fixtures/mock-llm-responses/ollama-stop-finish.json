@@ -1,0 +1,32 @@
+{
+  "mockResponses": [
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "call_1",
+                "type": "function",
+                "function": {
+                  "name": "execute_sandbox_code",
+                  "arguments": "{\"code\":\"1 + 1\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": "stop"
+        }
+      ]
+    },
+    null
+  ],
+  "expected": {
+    "text": "sandbox returned: 2",
+    "stepCount": 1,
+    "steps": [{ "success": true, "value": 2 }],
+    "toolMessageCount": 1
+  }
+}
