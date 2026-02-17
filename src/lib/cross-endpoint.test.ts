@@ -50,6 +50,10 @@ interface MockCompletion {
         /** The reason generation stopped. */
         finish_reason: string;
     }>;
+    /** Override HTTP status code (default 200). Used to simulate server errors. */
+    _statusCode?: number;
+    /** Delay in ms before responding. Used to test cancellation. */
+    _delayMs?: number;
 }
 
 /** An OpenAI-compatible message in the request body. */
@@ -171,23 +175,37 @@ async function startMockServer(
                 idx++;
                 const completion =
                     typeof entry === "function" ? entry(body) : entry;
-                res.writeHead(200, {
-                    "Content-Type": "application/json",
-                });
-                res.end(
-                    JSON.stringify({
-                        id: `chatcmpl-${idx}`,
-                        object: "chat.completion",
-                        created: Math.floor(Date.now() / 1000),
-                        model: "test-model",
-                        ...completion,
-                        usage: {
-                            prompt_tokens: 10,
-                            completion_tokens: 10,
-                            total_tokens: 20,
-                        },
-                    }),
-                );
+                const statusCode = completion._statusCode ?? 200;
+                const delayMs = completion._delayMs ?? 0;
+
+                /**
+                 * Sends the HTTP response with the completion body.
+                 */
+                const sendResponse = (): void => {
+                    res.writeHead(statusCode, {
+                        "Content-Type": "application/json",
+                    });
+                    res.end(
+                        JSON.stringify({
+                            id: `chatcmpl-${idx}`,
+                            object: "chat.completion",
+                            created: Math.floor(Date.now() / 1000),
+                            model: "test-model",
+                            ...completion,
+                            usage: {
+                                prompt_tokens: 10,
+                                completion_tokens: 10,
+                                total_tokens: 20,
+                            },
+                        }),
+                    );
+                };
+
+                if (delayMs > 0) {
+                    setTimeout(sendResponse, delayMs);
+                } else {
+                    sendResponse();
+                }
             });
         } else {
             res.writeHead(404);
@@ -307,11 +325,13 @@ describe("cross-endpoint compatibility", () => {
      *
      * @param serverUrl - The mock server base URL.
      * @param message - The user message to send.
+     * @param externalSignal - Optional abort signal for cancellation tests.
      * @returns The orchestrator result, history, facts, and events.
      */
     async function callOrchestrator(
         serverUrl: string,
         message = "compute 1+1",
+        externalSignal?: AbortSignal,
     ): Promise<OrchestratorTestResult> {
         const history: HistoryEntry[] = [];
         const facts: Fact[] = [];
@@ -335,7 +355,7 @@ describe("cross-endpoint compatibility", () => {
             },
             history,
             facts,
-            signal: controller.signal,
+            signal: externalSignal ?? controller.signal,
             dedupCache: new Map(),
         });
 
@@ -451,5 +471,84 @@ describe("cross-endpoint compatibility", () => {
         const { result, history } = await callOrchestrator(mockServer.url);
 
         assertExpected(expected, result, history);
+    });
+
+    it("retries after HTTP 500 and succeeds on next attempt", async () => {
+        const { responses, expected } = loadFixture("http-500-retry");
+        mockServer = await startMockServer(responses);
+
+        const { result, history } = await callOrchestrator(mockServer.url);
+
+        assertExpected(expected, result, history);
+    });
+
+    it("rejects with abort error when signal fires before response", async () => {
+        // Mock server delays its response long enough for the abort to fire
+        const delayedResponse: MockCompletion = {
+            choices: [
+                {
+                    message: { role: "assistant", content: "too late" },
+                    finish_reason: "stop",
+                },
+            ],
+            _delayMs: 5000,
+        };
+        mockServer = await startMockServer([delayedResponse]);
+
+        const controller = new AbortController();
+        // Abort after 100ms — well before the 5s delayed response
+        setTimeout(() => controller.abort(), 100);
+
+        await expect(
+            callOrchestrator(mockServer.url, "hello", controller.signal),
+        ).rejects.toThrow();
+    });
+
+    it("preserves empty history when cancelled before LLM responds", async () => {
+        const delayedResponse: MockCompletion = {
+            choices: [
+                {
+                    message: { role: "assistant", content: "too late" },
+                    finish_reason: "stop",
+                },
+            ],
+            _delayMs: 5000,
+        };
+        mockServer = await startMockServer([delayedResponse]);
+
+        const history: HistoryEntry[] = [];
+        const facts: Fact[] = [];
+        const events: AiChatEvent[] = [];
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 100);
+
+        try {
+            await handleUserMessage({
+                message: "hello",
+                endpointUrl: mockServer.url,
+                apiKey: "",
+                model: "test-model",
+                allowedDir: tmpDir,
+                config: minimalConfig,
+                /**
+                 * Collects events for assertions.
+                 *
+                 * @param e - The event to collect.
+                 */
+                emitEvent: (e: AiChatEvent) => {
+                    events.push(e);
+                },
+                history,
+                facts,
+                signal: controller.signal,
+                dedupCache: new Map(),
+            });
+        } catch {
+            // Expected — abort causes rejection
+        }
+
+        // History should not contain any stale assistant messages
+        const assistantMessages = history.filter((m) => m.role === "assistant");
+        expect(assistantMessages).toHaveLength(0);
     });
 });
