@@ -240,10 +240,13 @@ function updateSummary(): void {
 
     if (bamPeekResult) {
         hasContent = true;
-        const contigList = bamPeekResult.contigs.join(", ");
+        const sortedContigNames = Object.keys(
+            bamPeekResult.allContigs ?? {},
+        ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        const contigList = sortedContigNames.slice(0, 3).join(", ");
         const extra =
-            bamPeekResult.totalContigs > bamPeekResult.contigs.length
-                ? ` (+ ${bamPeekResult.totalContigs - bamPeekResult.contigs.length} more)`
+            sortedContigNames.length > 3
+                ? ` (+ ${sortedContigNames.length - 3} more)`
                 : "";
         elements.fileSummary.appendChild(
             createSummaryLine("Contigs", `${contigList}${extra}`),

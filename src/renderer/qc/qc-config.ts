@@ -146,10 +146,13 @@ async function loadPeekInfo() {
         // Auto-populate mod filter with first detected modification
         modFilter.autoPopulate(peekResult.modifications);
 
-        const contigsText = peekResult.contigs.join(", ");
+        const sortedContigNames = Object.keys(peekResult.allContigs ?? {}).sort(
+            (a, b) => a.localeCompare(b, undefined, { numeric: true }),
+        );
+        const contigsText = sortedContigNames.slice(0, 3).join(", ");
         const contigsSuffix =
-            peekResult.totalContigs > 3
-                ? `, ... (${peekResult.totalContigs} total)`
+            sortedContigNames.length > 3
+                ? `, ... (${sortedContigNames.length} total)`
                 : "";
 
         const modsText =
