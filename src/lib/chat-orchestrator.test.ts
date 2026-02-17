@@ -1,14 +1,19 @@
 // Unit tests for chat orchestrator functions.
 // Tests pruneFailedToolCalls, facts extraction, and context pipeline.
 
-import { describe, expect, it } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     addFact,
     applySlidingWindow,
     dedupKey,
     evictFacts,
+    extractFacts,
     pruneFailedToolCalls,
     renderFactsBlock,
+    runSandboxGuarded,
     transformContext,
 } from "./chat-orchestrator";
 import type { Fact, HistoryEntry } from "./chat-types";
@@ -372,5 +377,108 @@ describe("renderFactsBlock", () => {
         // Should not include internal fields
         expect(block).not.toContain("toolCallId");
         expect(block).not.toContain("timestamp");
+    });
+});
+
+describe("extractFacts", () => {
+    it("extracts file facts from successful result", () => {
+        const facts: Fact[] = [];
+        extractFacts(
+            { success: true, value: 42 },
+            { code: 'x = read_info("test.bam")' },
+            "call_1",
+            facts,
+        );
+        expect(facts).toHaveLength(1);
+        expect(facts[0].type).toBe("file");
+        const fileFact = facts[0] as { /** Filename. */ filename: string };
+        expect(fileFact.filename).toBe("test.bam");
+    });
+
+    it("skips extraction for failed results", () => {
+        const facts: Fact[] = [];
+        extractFacts(
+            { success: false, errorType: "RuntimeError", message: "bad" },
+            { code: 'x = read_info("test.bam")' },
+            "call_1",
+            facts,
+        );
+        expect(facts).toHaveLength(0);
+    });
+
+    it("extracts filter facts from kwargs in successful result", () => {
+        const facts: Fact[] = [];
+        extractFacts(
+            { success: true, value: "ok" },
+            { code: 'window_reads("f.bam", region="chr1:1-100")' },
+            "call_1",
+            facts,
+        );
+        const filterFact = facts.find((f) => f.type === "filter");
+        expect(filterFact).toBeDefined();
+        const desc = (filterFact as { /** Desc. */ description: string })
+            .description;
+        expect(desc).toContain("region=chr1:1-100");
+    });
+
+    it("does not extract filter facts from failed result", () => {
+        const facts: Fact[] = [];
+        extractFacts(
+            { success: false, errorType: "RuntimeError", message: "bad" },
+            { code: 'window_reads("f.bam", region="chr1:1-100")' },
+            "call_1",
+            facts,
+        );
+        expect(facts).toHaveLength(0);
+    });
+});
+
+describe("runSandboxGuarded", () => {
+    let tmpDir: string;
+
+    beforeEach(async () => {
+        tmpDir = await mkdtemp(join(tmpdir(), "sandbox-guard-"));
+    });
+
+    afterEach(async () => {
+        await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it("returns correct result for simple code", async () => {
+        const result = await runSandboxGuarded("1 + 1", tmpDir, {});
+        expect(result.success).toBe(true);
+        expect(result.value).toBe(2);
+    });
+
+    it("serializes concurrent sandbox calls", async () => {
+        const [r1, r2] = await Promise.all([
+            runSandboxGuarded("1 + 1", tmpDir, {}),
+            runSandboxGuarded("2 + 2", tmpDir, {}),
+        ]);
+        expect(r1.success).toBe(true);
+        expect(r1.value).toBe(2);
+        expect(r2.success).toBe(true);
+        expect(r2.value).toBe(4);
+    });
+
+    // The abort-while-waiting path (AbortError when signal fires while
+    // polling for the lock) cannot be tested here because runSandboxCode
+    // uses a blocking native addon that prevents the event loop from
+    // processing setTimeout callbacks during execution. The while-loop
+    // abort mechanism would activate in a truly async implementation.
+
+    it("ignores abort signal when lock is free", async () => {
+        // When the lock is not held, runSandboxGuarded skips the while
+        // loop and runs the sandbox regardless of the abort signal.
+        const controller = new AbortController();
+        controller.abort();
+        const result = await runSandboxGuarded(
+            "1 + 1",
+            tmpDir,
+            {},
+            controller.signal,
+        );
+        expect(result.success).toBe(true);
+        expect(result.value).toBe(2);
     });
 });
