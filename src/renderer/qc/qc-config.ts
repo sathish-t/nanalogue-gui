@@ -39,6 +39,12 @@ interface QCApi {
 
     /** Navigates back to the previous page. */
     goBack: () => Promise<void>;
+
+    /** Opens a native file dialog for selecting a read ID text file. Reuses locate mode handler. */
+    locatePickReadIds: () => Promise<string | null>;
+
+    /** Counts non-empty lines in the specified read ID file. */
+    locateCountReadIds: (filePath: string) => Promise<number>;
 }
 
 /**
@@ -102,7 +108,59 @@ const elements = {
 
     /** Overlay element shown while QC generation is in progress. */
     loadingOverlay: document.getElementById("loading-overlay") as HTMLElement,
+
+    /** Sample seed input for reproducible subsampling. */
+    sampleSeed: document.getElementById("sample-seed") as HTMLInputElement,
+
+    /** MAPQ filter number input. */
+    mapqFilter: document.getElementById("mapq-filter") as HTMLInputElement,
+
+    /** Checkbox to exclude reads with unavailable MAPQ. */
+    excludeMapqUnavail: document.getElementById(
+        "exclude-mapq-unavail",
+    ) as HTMLInputElement,
+
+    /** Read ID file path display input. */
+    readIdPath: document.getElementById("read-id-path") as HTMLInputElement,
+
+    /** Button to browse for a read ID file. */
+    btnBrowseReadIds: document.getElementById(
+        "btn-browse-read-ids",
+    ) as HTMLButtonElement,
+
+    /** Button to clear the selected read ID file. */
+    btnClearReadIds: document.getElementById(
+        "btn-clear-read-ids",
+    ) as HTMLButtonElement,
+
+    /** Text element showing the read ID count. */
+    readIdCount: document.getElementById("read-id-count") as HTMLElement,
+
+    /** Min sequence length input. */
+    minSeqLen: document.getElementById("min-seq-len") as HTMLInputElement,
+
+    /** Min alignment length input. */
+    minAlignLen: document.getElementById("min-align-len") as HTMLInputElement,
+
+    /** Base quality filter for mods input. */
+    baseQualFilterMod: document.getElementById(
+        "base-qual-filter-mod",
+    ) as HTMLInputElement,
+
+    /** Trim read ends for mods input. */
+    trimReadEndsMod: document.getElementById(
+        "trim-read-ends-mod",
+    ) as HTMLInputElement,
+
+    /** Low bound for mod probability rejection. */
+    modProbLow: document.getElementById("mod-prob-low") as HTMLInputElement,
+
+    /** High bound for mod probability rejection. */
+    modProbHigh: document.getElementById("mod-prob-high") as HTMLInputElement,
 };
+
+// Populate the sample seed input with a random default value.
+elements.sampleSeed.value = String(Math.floor(Math.random() * 2 ** 32));
 
 /** Stores the most recent BAM peek result, or null if none has been loaded. */
 let peekResult: PeekResult | null = null;
@@ -297,6 +355,34 @@ function showMoreInfoDialog(): void {
 }
 
 /**
+ * Collects checked alignment type values from the read filter checkboxes.
+ *
+ * @returns A comma-separated string of selected alignment types, or undefined if none are checked.
+ */
+function getReadFilter(): string | undefined {
+    const checkboxes = document.querySelectorAll<HTMLInputElement>(
+        ".read-filter-checkboxes input[type='checkbox']:checked",
+    );
+    if (checkboxes.length === 0) return undefined;
+    return Array.from(checkboxes)
+        .map((cb) => cb.value)
+        .join(",");
+}
+
+/**
+ * Parses a number input value, returning undefined if empty or NaN.
+ *
+ * @param input - The HTML input element to read from.
+ * @returns The parsed number, or undefined if the input is empty or invalid.
+ */
+function parseOptionalNumber(input: HTMLInputElement): number | undefined {
+    const val = input.value.trim();
+    if (val === "") return undefined;
+    const num = Number(val);
+    return Number.isFinite(num) ? num : undefined;
+}
+
+/**
  * Collects form values and triggers QC report generation via the API.
  *
  * @returns A promise that resolves when QC generation completes or an error is handled.
@@ -322,6 +408,13 @@ async function generateQC() {
         sampleFraction > 100
     ) {
         alert("Sample fraction must be a number between 0.01 and 100.");
+        elements.btnGenerate.disabled = false;
+        return;
+    }
+
+    const sampleSeed = parseInt(elements.sampleSeed.value, 10);
+    if (Number.isNaN(sampleSeed) || sampleSeed < 0) {
+        alert("Sample seed must be a non-negative integer.");
         elements.btnGenerate.disabled = false;
         return;
     }
@@ -395,6 +488,40 @@ async function generateQC() {
     }
 
     const region = regionInput || undefined;
+
+    const mapqFilter = parseOptionalNumber(elements.mapqFilter);
+    const excludeMapqUnavail = elements.excludeMapqUnavail.checked || undefined;
+    const readFilter = getReadFilter();
+    const minSeqLen = parseOptionalNumber(elements.minSeqLen);
+    const minAlignLen = parseOptionalNumber(elements.minAlignLen);
+    const readIdFilePath = elements.readIdPath.value.trim() || undefined;
+    const baseQualFilterMod = parseOptionalNumber(elements.baseQualFilterMod);
+    const trimReadEndsMod = parseOptionalNumber(elements.trimReadEndsMod);
+
+    const probLow = parseOptionalNumber(elements.modProbLow);
+    const probHigh = parseOptionalNumber(elements.modProbHigh);
+    const hasLow = probLow !== undefined;
+    const hasHigh = probHigh !== undefined;
+
+    if (hasLow !== hasHigh) {
+        alert("Mod probability filter requires both low and high bounds.");
+        elements.btnGenerate.disabled = false;
+        return;
+    }
+
+    if (hasLow && hasHigh && probLow >= probHigh) {
+        alert(
+            "Mod probability filter: low bound must be less than high bound.",
+        );
+        elements.btnGenerate.disabled = false;
+        return;
+    }
+
+    const rejectModQualNonInclusive =
+        hasLow && hasHigh
+            ? ([probLow, probHigh] as [number, number])
+            : undefined;
+
     const config = {
         bamPath,
         treatAsUrl: bamSource.isUrl,
@@ -404,8 +531,18 @@ async function generateQC() {
         modRegion: modRegionStr,
         fullRegion: region ? elements.fullRegion.checked : undefined,
         sampleFraction,
+        sampleSeed,
         windowSize,
         readLengthBinWidth,
+        mapqFilter,
+        excludeMapqUnavail,
+        readFilter,
+        minSeqLen,
+        minAlignLen,
+        readIdFilePath,
+        baseQualFilterMod,
+        trimReadEndsMod,
+        rejectModQualNonInclusive,
     };
 
     elements.loadingOverlay.classList.remove("hidden");
@@ -461,6 +598,31 @@ elements.region.addEventListener("input", () => {
 });
 
 elements.btnGenerate.addEventListener("click", generateQC);
+
+elements.btnBrowseReadIds.addEventListener("click", async () => {
+    const path = await api.locatePickReadIds();
+    if (!path) return;
+
+    elements.readIdPath.value = path;
+    elements.btnClearReadIds.classList.remove("hidden");
+
+    try {
+        const count = await api.locateCountReadIds(path);
+        // Guard against stale responses from a previous or cleared selection.
+        if (elements.readIdPath.value !== path) return;
+        elements.readIdCount.textContent = `${count.toLocaleString()} read IDs found`;
+    } catch (error) {
+        if (elements.readIdPath.value !== path) return;
+        console.error("Failed to count read IDs:", error);
+        elements.readIdCount.textContent = "Error reading file";
+    }
+});
+
+elements.btnClearReadIds.addEventListener("click", () => {
+    elements.readIdPath.value = "";
+    elements.readIdCount.textContent = "";
+    elements.btnClearReadIds.classList.add("hidden");
+});
 
 // Close button for the "More info" dialog
 document.getElementById("more-info-close")?.addEventListener("click", () => {

@@ -92,6 +92,112 @@
         <p class="hint">Windows are counted in bases of interest (e.g., thymidines), not total genomic bases.</p>
       </section>
 
+      <!-- Collapsible advanced filtering options. -->
+      <details id="advanced-options" class="config-section">
+        <summary><h2 class="advanced-summary-heading">Advanced Options</h2></summary>
+
+        <!-- Mapping quality and alignment type filters. -->
+        <fieldset class="advanced-group">
+          <legend>Mapping Filters</legend>
+          <div class="advanced-row">
+            <label for="mapq-filter">MAPQ filter</label>
+            <div class="input-with-unit">
+              <input type="number" id="mapq-filter" min="0" max="255" step="1" placeholder="e.g. 20">
+            </div>
+          </div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="exclude-mapq-unavail">
+            Exclude reads with unavailable MAPQ
+          </label>
+          <div class="advanced-row">
+            <label>Read filter</label>
+            <div class="read-filter-checkboxes">
+              <label class="checkbox-label"><input type="checkbox" value="primary_forward"> primary_forward</label>
+              <label class="checkbox-label"><input type="checkbox" value="primary_reverse"> primary_reverse</label>
+              <label class="checkbox-label"><input type="checkbox" value="secondary_forward"> secondary_forward</label>
+              <label class="checkbox-label"><input type="checkbox" value="secondary_reverse"> secondary_reverse</label>
+              <label class="checkbox-label"><input type="checkbox" value="supplementary_forward"> supplementary_forward</label>
+              <label class="checkbox-label"><input type="checkbox" value="supplementary_reverse"> supplementary_reverse</label>
+              <label class="checkbox-label"><input type="checkbox" value="unmapped"> unmapped</label>
+            </div>
+          </div>
+        </fieldset>
+
+        <!-- Sequence and alignment length filters. -->
+        <fieldset class="advanced-group">
+          <legend>Length Filters</legend>
+          <div class="advanced-row">
+            <label for="min-seq-len">Min sequence length</label>
+            <div class="input-with-unit">
+              <input type="number" id="min-seq-len" min="0" step="1" placeholder="e.g. 500">
+              <span class="unit">bp</span>
+            </div>
+          </div>
+          <div class="advanced-row">
+            <label for="min-align-len">Min alignment length</label>
+            <div class="input-with-unit">
+              <input type="number" id="min-align-len" min="0" step="1" placeholder="e.g. 300">
+              <span class="unit">bp</span>
+            </div>
+          </div>
+        </fieldset>
+
+        <!-- Read ID file filter. -->
+        <fieldset class="advanced-group">
+          <legend>Read ID Filters</legend>
+          <div class="file-input-row">
+            <label for="read-id-path" class="visually-hidden">Read ID file path</label>
+            <input type="text" id="read-id-path" placeholder="Select a text file with one read ID per line" readonly>
+            <button type="button" id="btn-browse-read-ids" class="small-button">Browse</button>
+            <!-- Button to clear the selected read ID file. Hidden when no file is selected. -->
+            <button type="button" id="btn-clear-read-ids" class="small-button hidden">Clear</button>
+          </div>
+          <p id="read-id-count" class="hint"></p>
+        </fieldset>
+
+        <!-- Base quality, trim, and probability rejection filters for modifications. -->
+        <fieldset class="advanced-group">
+          <legend>Modification Filters</legend>
+          <div class="advanced-row">
+            <label for="base-qual-filter-mod">Base quality filter</label>
+            <div class="input-with-unit">
+              <input type="number" id="base-qual-filter-mod" min="0" max="93" step="1" placeholder="e.g. 10">
+            </div>
+          </div>
+          <div class="advanced-row">
+            <label for="trim-read-ends-mod">Trim read ends</label>
+            <div class="input-with-unit">
+              <input type="number" id="trim-read-ends-mod" min="0" step="1" placeholder="e.g. 50">
+              <span class="unit">bp</span>
+            </div>
+          </div>
+          <div class="advanced-row">
+            <label>Mod probability filter</label>
+            <div class="mod-prob-filter-row">
+              <label for="mod-prob-low" class="visually-hidden">Low probability bound</label>
+              <span>Reject</span>
+              <input type="number" id="mod-prob-low" min="0" max="255" step="1" placeholder="0" class="narrow-input">
+              <label for="mod-prob-high" class="visually-hidden">High probability bound</label>
+              <span>&ndash;</span>
+              <input type="number" id="mod-prob-high" min="0" max="255" step="1" placeholder="255" class="narrow-input">
+              <span class="hint-inline">(both exclusive)</span>
+            </div>
+          </div>
+        </fieldset>
+
+        <!-- Random seed for reproducible subsampling. -->
+        <fieldset class="advanced-group">
+          <legend>Sampling</legend>
+          <div class="advanced-row">
+            <label for="sample-seed">Sample seed</label>
+            <div class="input-with-unit">
+              <input type="number" id="sample-seed" min="0" max="4294967295" step="1">
+            </div>
+          </div>
+          <p class="hint">Only used when sample fraction is below 100%.</p>
+        </fieldset>
+      </details>
+
       <!-- Submit button to start QC generation; disabled until a BAM is selected. -->
       <div class="action-row">
         <button type="button" id="btn-generate" class="primary-button" disabled>Generate QC</button>

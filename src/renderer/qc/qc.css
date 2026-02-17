@@ -625,3 +625,86 @@ input[type="number"]:focus {
     padding: 10px 12px;
     width: 100%;
 }
+
+/* Collapsible advanced options section. */
+#advanced-options {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 12px 16px;
+}
+
+/* Summary row styled as a clickable heading. */
+#advanced-options summary {
+    cursor: pointer;
+    list-style: revert;
+}
+
+/* Inline heading inside the collapsible summary. */
+.advanced-summary-heading {
+    display: inline;
+    margin: 0;
+}
+
+/* Group of related advanced options with light separator. */
+.advanced-group {
+    border: none;
+    border-top: 1px solid #eee;
+    margin-top: 16px;
+    padding: 12px 0 0;
+}
+
+/* Group legend styled as a small heading. */
+.advanced-group legend {
+    color: #333;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0 4px;
+}
+
+/* Row containing a label and input for an advanced option. */
+.advanced-row {
+    margin-top: 10px;
+}
+
+/* Label within an advanced option row. */
+.advanced-row > label {
+    color: #666;
+    display: block;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+/* Grid layout for the read filter checkboxes. */
+.read-filter-checkboxes {
+    display: grid;
+    gap: 4px;
+    grid-template-columns: 1fr 1fr;
+}
+
+/* Inline row for the mod probability rejection inputs. */
+.mod-prob-filter-row {
+    align-items: center;
+    display: flex;
+    font-size: 13px;
+    gap: 6px;
+}
+
+/* Narrow number inputs for probability bounds. */
+.narrow-input {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    padding: 4px 8px;
+    width: 70px;
+}
+
+/* Inline hint text next to form controls. */
+.hint-inline {
+    color: #999;
+    font-size: 12px;
+}
+
+/* Wider input for the sample seed value. */
+#sample-seed {
+    width: 160px;
+}
