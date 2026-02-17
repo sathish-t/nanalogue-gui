@@ -74,14 +74,25 @@ jobs:
       - name: Run tests
         if: ${{ !matrix.use_docker }}
         run: npm test
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       # Linux: Docker container build
       - name: Build and test (Linux via Docker)
         if: ${{ matrix.use_docker }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
+            -e ANTHROPIC_API_KEY \
+            -e GOOGLE_API_KEY \
+            -e OPENAI_API_KEY \
             ${{ matrix.container }} \
             bash -c '
               set -e
