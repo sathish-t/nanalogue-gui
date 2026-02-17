@@ -153,6 +153,26 @@ export interface QCConfig {
     windowSize: number;
     /** The bin width for the read length histogram in base pairs. */
     readLengthBinWidth: number;
+    /** Minimum mapping quality filter. Undefined means no MAPQ filtering. */
+    mapqFilter?: number;
+    /** Exclude reads with unavailable mapping quality. */
+    excludeMapqUnavail?: boolean;
+    /** Comma-separated alignment type filter (e.g. "primary_forward,primary_reverse"). */
+    readFilter?: string;
+    /** Minimum sequence length filter. Undefined means no filtering. */
+    minSeqLen?: number;
+    /** Minimum alignment length filter. Undefined means no filtering. */
+    minAlignLen?: number;
+    /** Path to a file containing read IDs (one per line). Resolved to readIdSet in the main process. */
+    readIdFilePath?: string;
+    /** Resolved array of read IDs. Set by the main process from readIdFilePath. */
+    readIdSet?: string[];
+    /** Base quality threshold for modification calls. */
+    baseQualFilterMod?: number;
+    /** Number of bases to trim from read ends for modification analysis. */
+    trimReadEndsMod?: number;
+    /** Reject modification calls where low < probability < high (0-255 scale). */
+    rejectModQualNonInclusive?: [number, number];
 }
 
 /**
