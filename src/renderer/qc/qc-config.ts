@@ -388,6 +388,18 @@ function parseOptionalNumber(input: HTMLInputElement): number | undefined {
 }
 
 /**
+ * Extracts the region size in bp from a region input string like "chr1:100-600".
+ *
+ * @param regionInput - The raw region string from the form.
+ * @returns The region size in bp, or null if no coordinate range is present.
+ */
+function computeRegionSizeFromInput(regionInput: string): number | null {
+    const match = /^.+:(\d+)-(\d+)$/.exec(regionInput);
+    if (!match) return null;
+    return Number(match[2]) - Number(match[1]);
+}
+
+/**
  * Collects form values and triggers QC report generation via the API.
  *
  * @returns A promise that resolves when QC generation completes or an error is handled.
@@ -554,12 +566,30 @@ async function generateQC() {
         reads: "Loading reads for length data",
         modifications: "Loading reads for modification data",
         windows: "Loading reads for window data",
+        sequences: "Loading reads for sequences",
     };
 
     // Reset progress counters to base labels before starting a new run
     for (const [source, label] of Object.entries(progressLabels)) {
         const el = document.getElementById(`progress-${source}`);
         if (el) el.textContent = `${label}:`;
+    }
+
+    // Show pre-computed skip reason for sequences if applicable
+    const seqProgressEl = document.getElementById("progress-sequences");
+    if (seqProgressEl) {
+        const size = regionInput
+            ? computeRegionSizeFromInput(regionInput)
+            : null;
+        if (size === null) {
+            seqProgressEl.textContent =
+                "Loading reads for sequences: (no region selected)";
+        } else if (size > 500) {
+            seqProgressEl.textContent =
+                "Loading reads for sequences: (region > 500 bp)";
+        } else {
+            seqProgressEl.textContent = "Loading reads for sequences:";
+        }
     }
 
     const removeProgressListener = api.onQCProgress((source, count) => {
