@@ -3,6 +3,7 @@
 // Suppress dconf warnings on Linux/WSL by using in-memory GSettings backend
 process.env.GSETTINGS_BACKEND ??= "memory";
 
+import { type ChildProcess, fork } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
@@ -18,6 +19,36 @@ type AppMode = "landing" | "swipe" | "qc" | "locate" | "ai-chat";
 
 let currentMode: AppMode = "landing";
 let mainWindow: BrowserWindow | null = null;
+
+// --- Global exit failsafe ---
+// Fork a watchdog child process that can force-kill us via SIGKILL.
+// This works even when the main event loop is blocked by native addon calls,
+// because the child process has its own independent event loop.
+let exitWatchdog: ChildProcess | null = null;
+
+/**
+ * Spawns the exit watchdog child process and registers signal handlers.
+ * Called once at startup so the kill switch is always available.
+ */
+function initExitWatchdog() {
+    exitWatchdog = fork(resolve(__dirname, "exit-watchdog.js"), [
+        String(process.pid),
+    ]);
+    exitWatchdog.unref();
+
+    // Ctrl+C or terminal kill — exit immediately
+    process.on("SIGINT", () => process.exit(0));
+    process.on("SIGTERM", () => process.exit(0));
+}
+
+/**
+ * Sends a kill message to the watchdog and also tries process.exit directly.
+ * Belt and suspenders: whichever fires first wins.
+ */
+function forceExit() {
+    exitWatchdog?.send("kill");
+    process.exit(0);
+}
 
 /** The application version read from package.json at startup. */
 const APP_VERSION: string = (
@@ -161,6 +192,13 @@ function createWindow(mode: AppMode) {
 
     mainWindow.on("closed", () => {
         mainWindow = null;
+    });
+
+    // Global failsafe: force-kill the process when the user closes the window.
+    // Sends SIGKILL via the watchdog child process, which works even when the
+    // main event loop is blocked by long-running native addon calls.
+    mainWindow.on("close", () => {
+        forceExit();
     });
 }
 
@@ -626,12 +664,10 @@ qcModule.registerIpcHandlers();
 aiChatModule.registerIpcHandlers();
 
 app.whenReady().then(() => {
+    initExitWatchdog();
     createWindow("landing");
 });
 
 app.on("window-all-closed", () => {
-    if (currentMode === "swipe") {
-        swipeModule.printSummary();
-    }
-    app.quit();
+    forceExit();
 });
