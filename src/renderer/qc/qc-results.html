@@ -28,6 +28,8 @@
         <button type="button" class="tab-button" data-tab="yield">Yield Curve</button>
         <button type="button" class="tab-button" data-tab="density">Analogue Density</button>
         <button type="button" class="tab-button" data-tab="probability">Raw Probability</button>
+        <!-- Tab button for the per-read sequence display. -->
+        <button type="button" class="tab-button" data-tab="sequences">Sequences</button>
       </div>
 
       <!-- Read lengths histogram tab showing aligned read length distribution. -->
@@ -119,6 +121,20 @@
         </div>
         <!-- Statistics panel for raw probability metrics. -->
         <div class="stats-panel" id="stats-probability"></div>
+      </div>
+
+      <!-- Sequence table tab showing per-read sequences with modification highlights. -->
+      <div id="tab-sequences" class="tab-content">
+        <!-- Disclaimers about seqTable constraints and display conventions. -->
+        <p class="seq-disclaimer">
+          For sequence display, region and mod region are set to be the same and only reads passing through the given region in full are used.
+          Deletions are '.', insertions are in lowercase.
+          Modified bases after thresholding are in red.
+          Mouse over each base to see the basecalling quality (not the mod quality). '255' means basecalling quality is missing.
+          Averages reported are performed by converting Q scores into probability of errors, averaging, and then converting back.
+        </p>
+        <!-- Container for skip reason or the sequence table. -->
+        <div id="seq-table-container"></div>
       </div>
     </main>
   </div>

@@ -729,3 +729,143 @@ input[type="number"]:focus {
 #sample-seed {
     width: 160px;
 }
+
+/* Disclaimer text above the sequence table. */
+.seq-disclaimer {
+    color: #888;
+    font-size: 12px;
+    font-style: italic;
+    margin-bottom: 16px;
+}
+
+/* Wrapper providing frozen left columns and horizontal scroll for sequences. */
+.seq-table-wrapper {
+    max-height: 70vh;
+    overflow: auto;
+    position: relative;
+}
+
+/* Full-width sequence table with fixed layout. */
+.seq-table {
+    border-collapse: collapse;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+/* Sequence table specificity requires base selectors before nth-child overrides. */
+/* stylelint-disable no-descending-specificity */
+
+/* Sticky header row that stays visible during vertical scroll. */
+.seq-table thead th {
+    background: #f5f5f5;
+    border-bottom: 1px solid #ddd;
+    color: #666;
+    font-weight: 600;
+    padding: 6px 10px;
+    position: sticky;
+    text-align: left;
+    top: 0;
+    z-index: 2;
+}
+
+/* Table body cells with bottom borders. */
+.seq-table td {
+    border-bottom: 1px solid #eee;
+    color: #333;
+    padding: 5px 10px;
+}
+
+/* Frozen read ID column (first column, above second column for tooltips). */
+.seq-table th:nth-child(1),
+.seq-table td:nth-child(1) {
+    background: #fff;
+    left: 0;
+    position: sticky;
+    z-index: 2;
+}
+
+/* Frozen header cell at intersection of sticky row and column. */
+.seq-table thead th:nth-child(1) {
+    background: #f5f5f5;
+    z-index: 4;
+}
+
+/* Frozen average quality column (second column). */
+.seq-table th:nth-child(2),
+.seq-table td:nth-child(2) {
+    background: #fff;
+    left: 200px;
+    position: sticky;
+    text-align: right;
+    z-index: 1;
+}
+
+/* Frozen header cell for avg quality at intersection. */
+.seq-table thead th:nth-child(2) {
+    background: #f5f5f5;
+    z-index: 3;
+}
+
+/* stylelint-enable no-descending-specificity */
+
+/* Monospace font for the sequence column. */
+.seq-table td:nth-child(3) {
+    font-family: "Courier New", Courier, monospace;
+    letter-spacing: 1px;
+}
+
+/* Read ID cell styled as clickable. */
+.seq-read-id {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: #ccc;
+}
+
+/* Visual hover feedback on read ID. */
+.seq-read-id:hover {
+    color: #06c;
+}
+
+/* Modified base highlighted in red within the sequence. */
+.seq-mod-base {
+    color: #d32f2f;
+    font-weight: 600;
+}
+
+/* Selected row highlight. */
+.seq-table tr.seq-selected {
+    background: #e3f2fd;
+}
+
+/* Selected row frozen cells must also show selection background. */
+.seq-table tr.seq-selected td:nth-child(1),
+.seq-table tr.seq-selected td:nth-child(2) {
+    background: #e3f2fd;
+}
+
+/* Toolbar above the sequence table. */
+.seq-toolbar {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+/* Truncation indicator appended to long sequences. */
+.seq-truncated {
+    color: #999;
+    font-style: italic;
+}
+
+/* Brief tooltip shown after copying a read ID. */
+.seq-copied-tooltip {
+    background: #333;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 11px;
+    padding: 2px 8px;
+    position: absolute;
+    transform: translateY(-100%);
+    white-space: nowrap;
+    z-index: 10;
+}

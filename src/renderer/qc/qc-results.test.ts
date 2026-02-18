@@ -38,10 +38,10 @@ describe("qc-results.html", () => {
     });
 
     describe("tabs", () => {
-        it("has 4 tab buttons", () => {
+        it("has 5 tab buttons", () => {
             const doc = loadTemplate();
             const tabs = doc.querySelectorAll(".tab-button");
-            expect(tabs).toHaveLength(4);
+            expect(tabs).toHaveLength(5);
         });
 
         it("has tab buttons with correct data-tab values", () => {
@@ -55,6 +55,7 @@ describe("qc-results.html", () => {
                 "yield",
                 "density",
                 "probability",
+                "sequences",
             ]);
         });
 
@@ -64,10 +65,10 @@ describe("qc-results.html", () => {
             expect(activeTab?.getAttribute("data-tab")).toBe("read-lengths");
         });
 
-        it("has 4 tab content panels", () => {
+        it("has 5 tab content panels", () => {
             const doc = loadTemplate();
             const panels = doc.querySelectorAll(".tab-content");
-            expect(panels).toHaveLength(4);
+            expect(panels).toHaveLength(5);
         });
 
         it("has read-lengths content panel active by default", () => {
