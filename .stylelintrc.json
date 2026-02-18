@@ -36,7 +36,7 @@
             }
         ],
         "comment-no-empty": true,
-        "comment-pattern": "^[A-Z]",
+        "comment-pattern": "^([A-Z]|stylelint-)",
         "comment-whitespace-inside": "always",
         "comment-word-disallowed-list": ["/^TODO/i", "/^FIXME/i", "/^HACK/i", "/^XXX/i"],
         "container-name-pattern": "^[a-z][a-z0-9-]*$",
