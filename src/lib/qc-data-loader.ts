@@ -3,7 +3,7 @@
 import type { ReadOptions, WindowOptions } from "@nanalogue/node";
 import { bamMods, peek, readInfo, windowReads } from "@nanalogue/node";
 import { RunningHistogram } from "./histogram";
-import type { PeekResult, QCConfig, QCData } from "./types";
+import type { PeekResult, QCConfig, QCData, ReadTypeCounts } from "./types";
 
 /** Number of reads to fetch per pagination page. */
 const PAGE_SIZE = 10_000;
@@ -64,6 +64,7 @@ export async function peekBam(
  * @param sampleSeed - The random seed for deterministic subsampling across pages.
  * @param readLengthHist - The histogram accumulator for read alignment lengths.
  * @param onProgress - Optional callback to report the running read count.
+ * @returns The accumulated read type counts across all pages.
  */
 async function paginateReadInfo(
     baseOptions: ReadOptions,
@@ -73,10 +74,31 @@ async function paginateReadInfo(
         source: "reads" | "modifications" | "windows",
         count: number,
     ) => void,
-): Promise<void> {
+): Promise<ReadTypeCounts> {
     let offset = 0;
     let totalReads = 0;
     let droppedLengths = 0;
+
+    const counts: ReadTypeCounts = {
+        primaryForward: 0,
+        primaryReverse: 0,
+        secondaryForward: 0,
+        secondaryReverse: 0,
+        supplementaryForward: 0,
+        supplementaryReverse: 0,
+        unmapped: 0,
+    };
+
+    /** Maps alignment_type strings to their ReadTypeCounts keys. */
+    const typeToKey: Record<string, keyof ReadTypeCounts> = {
+        primary_forward: "primaryForward",
+        primary_reverse: "primaryReverse",
+        secondary_forward: "secondaryForward",
+        secondary_reverse: "secondaryReverse",
+        supplementary_forward: "supplementaryForward",
+        supplementary_reverse: "supplementaryReverse",
+        unmapped: "unmapped",
+    };
 
     // Fetch pages of reads until the API returns an empty page
     for (;;) {
@@ -90,6 +112,11 @@ async function paginateReadInfo(
         if (page.length === 0) break;
 
         for (const r of page) {
+            const key = typeToKey[r.alignment_type];
+            if (key) {
+                counts[key]++;
+            }
+
             if (r.alignment_type === "unmapped") continue;
             const length = (
                 r as {
@@ -116,6 +143,7 @@ async function paginateReadInfo(
     }
 
     console.log(`  Got ${readLengthHist.count} reads`);
+    return counts;
 }
 
 /**
@@ -349,7 +377,7 @@ export async function generateQCData(
         "Loading read info, modification data, and windowed densities...",
     );
 
-    await Promise.all([
+    const [readTypeCounts] = await Promise.all([
         paginateReadInfo(baseOptions, sampleSeed, readLengthHist, onProgress),
         paginateBamMods(
             baseOptions,
@@ -391,6 +419,7 @@ export async function generateQCData(
         rawProbabilityHistogram: rawProbabilityHist.toBins(),
 
         sampleSeed,
+        readTypeCounts,
     };
 }
 

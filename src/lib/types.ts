@@ -125,6 +125,26 @@ export interface CliArgs {
     windowSize: number;
 }
 
+/**
+ * Counts of reads by alignment type and strand direction.
+ */
+export interface ReadTypeCounts {
+    /** Number of primary alignments on the forward strand. */
+    primaryForward: number;
+    /** Number of primary alignments on the reverse strand. */
+    primaryReverse: number;
+    /** Number of secondary alignments on the forward strand. */
+    secondaryForward: number;
+    /** Number of secondary alignments on the reverse strand. */
+    secondaryReverse: number;
+    /** Number of supplementary alignments on the forward strand. */
+    supplementaryForward: number;
+    /** Number of supplementary alignments on the reverse strand. */
+    supplementaryReverse: number;
+    /** Number of unmapped reads. */
+    unmapped: number;
+}
+
 // QC Types
 
 /**
@@ -220,4 +240,6 @@ export interface QCData {
     rawProbabilityHistogram: HistogramBin[];
     /** The random seed used for subsampling, for reproducibility. */
     sampleSeed: number;
+    /** Counts of reads by alignment type and strand direction. */
+    readTypeCounts: ReadTypeCounts;
 }

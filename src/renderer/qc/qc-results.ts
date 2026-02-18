@@ -81,6 +81,36 @@ interface YieldBin {
 }
 
 /**
+ * A labeled numeric value for display in a stats grid.
+ */
+interface LabeledValue {
+    /** Display label for the statistic. */
+    label: string;
+    /** Numeric value of the statistic. */
+    value: number;
+}
+
+/**
+ * Counts of reads by alignment type and strand direction.
+ */
+interface ReadTypeCounts {
+    /** Number of primary alignments on the forward strand. */
+    primaryForward: number;
+    /** Number of primary alignments on the reverse strand. */
+    primaryReverse: number;
+    /** Number of secondary alignments on the forward strand. */
+    secondaryForward: number;
+    /** Number of secondary alignments on the reverse strand. */
+    secondaryReverse: number;
+    /** Number of supplementary alignments on the forward strand. */
+    supplementaryForward: number;
+    /** Number of supplementary alignments on the reverse strand. */
+    supplementaryReverse: number;
+    /** Number of unmapped reads. */
+    unmapped: number;
+}
+
+/**
  * Complete quality control data returned from the main process.
  */
 interface QCData {
@@ -108,6 +138,8 @@ interface QCData {
     rawProbabilityHistogram: HistogramBin[];
     /** The random seed used for subsampling. */
     sampleSeed: number;
+    /** Counts of reads by alignment type and strand direction. */
+    readTypeCounts: ReadTypeCounts;
 }
 
 /**
@@ -169,12 +201,14 @@ function showNoData(canvasId: string, message: string): void {
  * @param stats - The summary statistics to display.
  * @param showN50 - Whether to include the N50 metric in the essential stats.
  * @param note - Optional small note rendered below the header.
+ * @param readTypeCounts - Optional read type counts to display in the expanded section.
  */
 function renderStatsPanel(
     containerId: string,
     stats: Stats,
     showN50: boolean = false,
     note?: string,
+    readTypeCounts?: ReadTypeCounts,
 ): void {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -232,6 +266,65 @@ function renderStatsPanel(
           .join("")}
     </div>
   `;
+
+    // Append read type counts grid to the expanded section when provided
+    if (readTypeCounts) {
+        const expandedGrid = container.querySelector(".stats-expanded");
+        if (expandedGrid) {
+            const readTypeSection = document.createElement("div");
+            readTypeSection.className = "read-type-counts stats-expanded";
+
+            const heading = document.createElement("h4");
+            heading.className = "read-type-heading";
+            heading.textContent = "Read Types";
+            readTypeSection.appendChild(heading);
+
+            const grid = document.createElement("div");
+            grid.className = "stats-grid";
+
+            /** Label-value pairs for each read type count. */
+            const items: LabeledValue[] = [
+                { label: "Primary fwd", value: readTypeCounts.primaryForward },
+                { label: "Primary rev", value: readTypeCounts.primaryReverse },
+                {
+                    label: "Secondary fwd",
+                    value: readTypeCounts.secondaryForward,
+                },
+                {
+                    label: "Secondary rev",
+                    value: readTypeCounts.secondaryReverse,
+                },
+                {
+                    label: "Suppl. fwd",
+                    value: readTypeCounts.supplementaryForward,
+                },
+                {
+                    label: "Suppl. rev",
+                    value: readTypeCounts.supplementaryReverse,
+                },
+                { label: "Unmapped", value: readTypeCounts.unmapped },
+            ];
+
+            for (const item of items) {
+                const div = document.createElement("div");
+                div.className = "stat-item";
+
+                const labelSpan = document.createElement("span");
+                labelSpan.className = "label";
+                labelSpan.textContent = `${item.label}: `;
+
+                const valueSpan = document.createElement("span");
+                valueSpan.className = "value";
+                valueSpan.textContent = item.value.toLocaleString();
+
+                div.append(labelSpan, valueSpan);
+                grid.appendChild(div);
+            }
+
+            readTypeSection.appendChild(grid);
+            expandedGrid.after(readTypeSection);
+        }
+    }
 
     const toggleBtn = container.querySelector(".stats-toggle");
     if (toggleBtn) {
@@ -609,7 +702,12 @@ async function initialize(): Promise<void> {
 
         const seedDisplay = document.getElementById("sample-seed-display");
         if (seedDisplay) {
-            seedDisplay.textContent = `Sample seed: ${data.sampleSeed}`;
+            seedDisplay.textContent = `Sample seed: ${data.sampleSeed} `;
+            const hint = document.createElement("span");
+            hint.style.color = "#bbb";
+            hint.style.fontSize = "11px";
+            hint.textContent = "(only used if subsampling)";
+            seedDisplay.appendChild(hint);
         }
 
         // Show warning if reads exceeded the histogram range
@@ -644,6 +742,7 @@ async function initialize(): Promise<void> {
             data.readLengthStats,
             true,
             "Lengths shown are alignment lengths, not basecalled read lengths.",
+            data.readTypeCounts,
         );
 
         // Yield tab

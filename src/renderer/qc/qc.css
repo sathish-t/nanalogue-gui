@@ -424,6 +424,19 @@ input[type="number"]:focus {
     display: grid;
 }
 
+/* Heading for the read type counts section inside the expanded stats. */
+.read-type-heading {
+    color: #666;
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0 0 8px;
+}
+
+/* Read type counts section shown alongside expanded stats. */
+.read-type-counts {
+    margin-top: 12px;
+}
+
 /* Informational message shown when no data is available for a chart. */
 .no-data-message {
     align-items: center;
