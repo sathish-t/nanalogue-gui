@@ -145,6 +145,22 @@ export interface ReadTypeCounts {
     unmapped: number;
 }
 
+/**
+ * Represents a single row of sequence data parsed from seqTable output.
+ */
+export interface SeqTableRow {
+    /** The unique read identifier. */
+    readId: string;
+    /** The sequence string with the user's modification tag applied (Z/z for modified bases). */
+    sequence: string;
+    /** The sequence string with no modification tag (all normal bases). */
+    baseSequence: string;
+    /** Per-base quality scores parsed from the period-delimited quality string. */
+    qualities: number[];
+    /** Average quality excluding 255 (missing) values, or null if all are 255. */
+    avgQuality: number | null;
+}
+
 // QC Types
 
 /**
@@ -242,4 +258,8 @@ export interface QCData {
     sampleSeed: number;
     /** Counts of reads by alignment type and strand direction. */
     readTypeCounts: ReadTypeCounts;
+    /** Parsed sequence table rows, undefined when region > 500 bp or not set. */
+    seqTableRows?: SeqTableRow[];
+    /** Human-readable reason why sequence data was skipped. */
+    seqTableSkipReason?: string;
 }
