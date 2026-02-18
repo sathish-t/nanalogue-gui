@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Read type counts (primary/secondary/supplementary/unmapped by strand) in QC results expandable stats panel ([`553b1da`](https://github.com/sathish-t/nanalogue-gui/commit/553b1da5dab409c137f6cb66a51ab40c624a35d2))
+- CRAM file support in all file picker dialogs across QC, Swipe, and Locate modes ([`4ef5c70`](https://github.com/sathish-t/nanalogue-gui/commit/4ef5c70c8bf53373442ca584c48a98cdfea85a14))
 - AI Chat types, IPC validation, and shared config field specs ([`595c9a3`](https://github.com/sathish-t/nanalogue-gui/commit/595c9a391fd721ab0c42614c0946d6cdf9edd033))
 - Monty sandbox wrapper with path traversal guards, output gating, and record limits ([`c24437b`](https://github.com/sathish-t/nanalogue-gui/commit/c24437b13db9b7b6b9fe275b985cf157de10700c))
 - Chat orchestrator with sliding window context, facts extraction, and LLM tool-call loop ([`99eb4ee`](https://github.com/sathish-t/nanalogue-gui/commit/99eb4ee1ecbbc9126b0c124597bb046320d5d154))
