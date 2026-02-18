@@ -97,7 +97,7 @@ describe("BamResourceInput", () => {
         it("shows file placeholder by default", () => {
             const input =
                 el.querySelector<HTMLInputElement>('input[type="text"]');
-            expect(input?.placeholder).toBe("Select BAM file");
+            expect(input?.placeholder).toBe("Select BAM/CRAM file");
         });
     });
 
@@ -177,7 +177,7 @@ describe("BamResourceInput", () => {
             switchToUrlMode();
             const input =
                 el.querySelector<HTMLInputElement>('input[type="text"]');
-            expect(input?.placeholder).toBe("Enter BAM URL");
+            expect(input?.placeholder).toBe("Enter BAM/CRAM URL");
         });
 
         it("clears value on mode switch", () => {

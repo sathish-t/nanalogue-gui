@@ -32,8 +32,13 @@ export function registerIpcHandlers() {
         if (!mainWindow) return null;
 
         const result = await dialog.showOpenDialog(mainWindow, {
-            title: "Select BAM file",
-            filters: [{ name: "BAM files", extensions: ["bam"] }],
+            title: "Select BAM/CRAM file",
+            filters: [
+                {
+                    name: "Alignment files",
+                    extensions: ["bam", "BAM", "cram", "CRAM"],
+                },
+            ],
             properties: ["openFile"],
         });
 

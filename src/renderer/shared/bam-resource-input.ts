@@ -86,7 +86,7 @@ export class BamResourceInput extends HTMLElement {
 
         this.textInput = document.createElement("input");
         this.textInput.type = "text";
-        this.textInput.placeholder = "Select BAM file";
+        this.textInput.placeholder = "Select BAM/CRAM file";
         this.textInput.readOnly = true;
         row.appendChild(this.textInput);
 
@@ -166,8 +166,8 @@ export class BamResourceInput extends HTMLElement {
         this.textInput.readOnly = !urlMode;
         this.browseBtn.style.display = urlMode ? "none" : "block";
         this.textInput.placeholder = urlMode
-            ? "Enter BAM URL"
-            : "Select BAM file";
+            ? "Enter BAM/CRAM URL"
+            : "Select BAM/CRAM file";
         this.textInput.value = "";
 
         this.dispatchEvent(

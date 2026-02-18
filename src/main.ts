@@ -255,15 +255,20 @@ ipcMain.handle(
 ipcMain.handle(
     "swipe-pick-bam",
     /**
-     * Opens a native file dialog for selecting a BAM file.
+     * Opens a native file dialog for selecting a BAM or CRAM file.
      *
      * @returns The selected file path, or null if cancelled.
      */
     async () => {
         if (!mainWindow) return null;
         const result = await dialog.showOpenDialog(mainWindow, {
-            title: "Select BAM file",
-            filters: [{ name: "BAM files", extensions: ["bam"] }],
+            title: "Select BAM/CRAM file",
+            filters: [
+                {
+                    name: "Alignment files",
+                    extensions: ["bam", "BAM", "cram", "CRAM"],
+                },
+            ],
             properties: ["openFile"],
         });
         if (result.canceled || result.filePaths.length === 0) return null;
@@ -485,15 +490,20 @@ ipcMain.handle(
 ipcMain.handle(
     "locate-pick-bam",
     /**
-     * Opens a native file dialog for selecting a BAM file in locate mode.
+     * Opens a native file dialog for selecting a BAM or CRAM file in locate mode.
      *
      * @returns The selected file path, or null if cancelled.
      */
     async () => {
         if (!mainWindow) return null;
         const result = await dialog.showOpenDialog(mainWindow, {
-            title: "Select BAM file",
-            filters: [{ name: "BAM files", extensions: ["bam"] }],
+            title: "Select BAM/CRAM file",
+            filters: [
+                {
+                    name: "Alignment files",
+                    extensions: ["bam", "BAM", "cram", "CRAM"],
+                },
+            ],
             properties: ["openFile"],
         });
         if (result.canceled || result.filePaths.length === 0) return null;
