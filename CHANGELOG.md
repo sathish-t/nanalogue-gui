@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-02-18
 
 ### Added
 
@@ -14,7 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Chat orchestrator with sliding window context, facts extraction, and LLM tool-call loop ([`99eb4ee`](https://github.com/sathish-t/nanalogue-gui/commit/99eb4ee1ecbbc9126b0c124597bb046320d5d154))
 - AI Chat mode and renderer with config panel, consent flow, and collapsible code display ([`d6b7b29`](https://github.com/sathish-t/nanalogue-gui/commit/d6b7b293ecd08a35d225ce7649775c8ef5b43af1))
 - Connection status indicator for AI Chat endpoint showing local/remote, HTTP/HTTPS, and connected state ([`c91002f`](https://github.com/sathish-t/nanalogue-gui/commit/c91002fc1d82d65d09f4f403b54479307adc29d8))
-- Deterministic `sampleSeed` field on QC config and results for reproducible subsampling ([`fc42269`](https://github.com/sathish-t/nanalogue-gui/commit/fc4226937d9dba193956fff95ecb89eb95a72297))
+- Multi-provider model listing for AI Chat with IPC handler ([`4418785`](https://github.com/sathish-t/nanalogue-gui/commit/4418785f42f31662da3e345d2f4237969dce5533), [`06065fb`](https://github.com/sathish-t/nanalogue-gui/commit/06065fbca23ebd53cf71593eb52e7a2bcad3cecd))
+- Deterministic `sampleSeed` field on QC config and results for reproducible subsampling ([`fc42269`](https://github.com/sathish-t/nanalogue-gui/commit/fc4226937d9dba193956fff95ecb89eb95a72297), [`f901faf`](https://github.com/sathish-t/nanalogue-gui/commit/f901faf4000189c13ecf9d823d6530ae22e72dc7))
+- Advanced options UI for QC config: mapping filters (MAPQ, read type), length filters, read ID file picker, modification filters (base quality, trim, probability rejection) ([`383bb7e`](https://github.com/sathish-t/nanalogue-gui/commit/383bb7ef48d1822ac642aada4e0efe0b7e32625c), [`a12b616`](https://github.com/sathish-t/nanalogue-gui/commit/a12b6169e44f42845c211782882cc57ac145d0c6), [`2db3040`](https://github.com/sathish-t/nanalogue-gui/commit/2db3040a26752bc7b10ec4972ee5e24700f84e2a))
+- QC loading overlay shows per-source progress counters for reads, modifications, and windows ([`57f35cd`](https://github.com/sathish-t/nanalogue-gui/commit/57f35cd5e3b9e2727d3775f2ca66a89922f0b1d4))
+- Exit watchdog child process for force-killing the app on window close, even when the main event loop is blocked by native addon calls ([`ecfa1f5`](https://github.com/sathish-t/nanalogue-gui/commit/ecfa1f5837ae5d51a10dcb8a731c1a8b40150149))
 - Version button and dialog on landing page with link to nanalogue.com, external URL opens in OS browser ([`0b0dee6`](https://github.com/sathish-t/nanalogue-gui/commit/0b0dee655f35d7ab2fdb195de7264dbf22c8e8eb))
 - Auto-fit landing page height to rendered content with mode-change guard ([`dd3d790`](https://github.com/sathish-t/nanalogue-gui/commit/dd3d790dfa61863cf9a64330aee22890a36d2f22))
 
@@ -25,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Caps read ID parsing at 200k IDs ([`3d117f0`](https://github.com/sathish-t/nanalogue-gui/commit/3d117f0a5893943ef05d21853d47cf5ea63afde6))
 - QC data loading now paginates in 10k-record pages with streaming histograms to reduce peak memory ([`d385b9e`](https://github.com/sathish-t/nanalogue-gui/commit/d385b9ecf0774135d390f8723858fd03fc4f882c))
 - QC generation forwards per-source pagination progress to the renderer via `qc-progress` IPC ([`02b8185`](https://github.com/sathish-t/nanalogue-gui/commit/02b8185ae1a3c696c3bc168c6dee84eca14ddd5c))
+
+### Fixed
+
+- Pagination break condition now uses empty-page detection instead of comparing returned count to page size, which caused early termination when reads were filtered; bamMods page size reduced to 1,000 to limit peak memory ([`9aca006`](https://github.com/sathish-t/nanalogue-gui/commit/9aca006a047a4479ddffccb27a48940b23c90a21))
+- Tool calls matched by ID instead of array index in chat orchestrator ([`79a72ff`](https://github.com/sathish-t/nanalogue-gui/commit/79a72ff5d68394ba1b6e852cb6f97c49d069d4f3))
+- AI Chat spinner and processing state reset on new chat ([`0036fa3`](https://github.com/sathish-t/nanalogue-gui/commit/0036fa30901a1926227f0e50bd65cb1214e3ea26))
 
 ### Dependencies
 
