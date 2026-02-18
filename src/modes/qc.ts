@@ -76,7 +76,7 @@ export function registerIpcHandlers() {
          * @param count - The running total of records processed so far.
          */
         const onProgress = (
-            source: "reads" | "modifications" | "windows",
+            source: "reads" | "modifications" | "windows" | "sequences",
             count: number,
         ) => {
             mainWindow?.webContents.send("qc-progress", source, count);

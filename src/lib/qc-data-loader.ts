@@ -1,9 +1,21 @@
 // QC data loader: paginated BAM data retrieval with streaming histograms
 
 import type { ReadOptions, WindowOptions } from "@nanalogue/node";
-import { bamMods, peek, readInfo, windowReads } from "@nanalogue/node";
+import {
+    bamMods,
+    peek,
+    readInfo,
+    seqTable,
+    windowReads,
+} from "@nanalogue/node";
 import { RunningHistogram } from "./histogram";
-import type { PeekResult, QCConfig, QCData, ReadTypeCounts } from "./types";
+import type {
+    PeekResult,
+    QCConfig,
+    QCData,
+    ReadTypeCounts,
+    SeqTableRow,
+} from "./types";
 
 /** Number of reads to fetch per pagination page. */
 const PAGE_SIZE = 10_000;
@@ -71,7 +83,7 @@ async function paginateReadInfo(
     sampleSeed: number,
     readLengthHist: RunningHistogram,
     onProgress?: (
-        source: "reads" | "modifications" | "windows",
+        source: "reads" | "modifications" | "windows" | "sequences",
         count: number,
     ) => void,
 ): Promise<ReadTypeCounts> {
@@ -165,7 +177,7 @@ async function paginateBamMods(
     rawProbabilityHist: RunningHistogram,
     wholeReadDensityHist: RunningHistogram,
     onProgress?: (
-        source: "reads" | "modifications" | "windows",
+        source: "reads" | "modifications" | "windows" | "sequences",
         count: number,
     ) => void,
 ): Promise<void> {
@@ -250,7 +262,7 @@ async function paginateWindowReads(
     windowSize: number,
     windowedDensityHist: RunningHistogram,
     onProgress?: (
-        source: "reads" | "modifications" | "windows",
+        source: "reads" | "modifications" | "windows" | "sequences",
         count: number,
     ) => void,
 ): Promise<void> {
@@ -301,6 +313,184 @@ async function paginateWindowReads(
     console.log(`  Got ${windowedDensityHist.count} windows`);
 }
 
+/** Maximum region size (in bp) for which sequence data is fetched. */
+const SEQ_TABLE_MAX_REGION_BP = 500;
+
+/**
+ * Extracts the size in base pairs from a region string like "chr1:100-600".
+ *
+ * @param region - The region string, or undefined if no region is set.
+ * @returns The region size in bp, or null if the region has no coordinate range.
+ */
+export function regionSizeBp(region: string | undefined): number | null {
+    if (!region) return null;
+    const match = /^.+:(\d+)-(\d+)$/.exec(region);
+    if (!match) return null;
+    return Number(match[2]) - Number(match[1]);
+}
+
+/**
+ * Computes the average quality score in probability space, excluding 255 (missing).
+ * Converts Q scores to error probabilities, averages them, then converts back.
+ * Uses min-Q subtraction for numerical stability.
+ *
+ * @param qualities - Array of per-base quality scores.
+ * @returns The probability-averaged quality (rounded), or null if no valid values.
+ */
+export function computeAvgQuality(qualities: number[]): number | null {
+    let qMin = Number.POSITIVE_INFINITY;
+    let count = 0;
+    for (const q of qualities) {
+        if (q !== 255) {
+            if (q < qMin) qMin = q;
+            count++;
+        }
+    }
+    if (count === 0) return null;
+    let sum = 0;
+    for (const q of qualities) {
+        if (q !== 255) {
+            sum += 10 ** (-0.1 * (q - qMin));
+        }
+    }
+    return qMin + Math.round(-10 * Math.log10(sum / count));
+}
+
+/**
+ * A partial sequence table row containing only the fields parsed directly from TSV.
+ */
+interface PartialSeqRow {
+    /** The unique read identifier. */
+    readId: string;
+    /** The sequence string. */
+    sequence: string;
+    /** Per-base quality scores parsed from the period-delimited quality string. */
+    qualities: number[];
+}
+
+/**
+ * Result of fetching sequence table data, containing either rows or a skip reason.
+ */
+interface SeqTableResult {
+    /** The parsed sequence table rows, present when data was fetched successfully. */
+    rows?: SeqTableRow[];
+    /** Human-readable reason why sequence data was skipped. */
+    skipReason?: string;
+}
+
+/**
+ * Parses a TSV string from seqTable into an array of partial row objects.
+ *
+ * Each row contains readId, sequence, and qualities. The baseSequence
+ * and avgQuality fields are left to be filled by the caller.
+ *
+ * @param tsv - The raw TSV string output from seqTable.
+ * @returns An array of objects with readId, sequence, and qualities fields.
+ */
+export function parseSeqTableTsv(tsv: string): PartialSeqRow[] {
+    const trimmed = tsv.trimEnd();
+    if (trimmed.length === 0) return [];
+
+    const lines = trimmed.split("\n");
+    if (lines.length < 2) return [];
+
+    const rows: PartialSeqRow[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.trim().length === 0) continue;
+
+        const fields = line.split("\t");
+        if (fields.length < 3) continue;
+
+        const readId = fields[0];
+        const sequence = fields[1];
+        const rawQual = fields[2];
+        const qualities =
+            rawQual === ""
+                ? []
+                : rawQual.split(".").map(Number).filter(Number.isFinite);
+
+        rows.push({ readId, sequence, qualities });
+    }
+
+    return rows;
+}
+
+/**
+ * Fetches sequence table data by calling seqTable twice: once with the user's tag
+ * and once with tag "1" (no modifications) to detect modified positions.
+ *
+ * Returns early with a skip reason if the region is not set or exceeds the size limit.
+ *
+ * @param config - The QC configuration.
+ * @param sharedOptions - The shared read options built from config.
+ * @param onProgress - Optional callback to report progress.
+ * @returns An object with either rows or a skipReason.
+ */
+async function fetchSeqTable(
+    config: QCConfig,
+    sharedOptions: Record<string, unknown>,
+    onProgress?: (
+        source: "reads" | "modifications" | "windows" | "sequences",
+        count: number,
+    ) => void,
+): Promise<SeqTableResult> {
+    const size = regionSizeBp(config.region);
+
+    if (size === null) {
+        return { skipReason: "no region selected" };
+    }
+
+    if (size > SEQ_TABLE_MAX_REGION_BP) {
+        return { skipReason: `region > ${SEQ_TABLE_MAX_REGION_BP} bp` };
+    }
+
+    // Build seqTable options: wire region, always set fullRegion to true,
+    // and clear modRegion (seqTable uses region as modRegion internally).
+    const seqOptions: ReadOptions = {
+        ...sharedOptions,
+        region: config.region,
+        fullRegion: true,
+        modRegion: undefined,
+        sampleSeed: config.sampleSeed,
+    } as ReadOptions;
+
+    // Call seqTable twice in parallel: with user's tag, and with tag "1" (no mods)
+    const [taggedTsv, baseTsv] = await Promise.all([
+        seqTable(seqOptions),
+        seqTable({
+            ...seqOptions,
+            tag: "1",
+        } as ReadOptions),
+    ]);
+
+    const taggedRows = parseSeqTableTsv(taggedTsv);
+    const baseRows = parseSeqTableTsv(baseTsv);
+
+    // Build a lookup from the base (no-mod) results by readId
+    const baseByReadId = new Map<string, string>();
+    for (const row of baseRows) {
+        baseByReadId.set(row.readId, row.sequence);
+    }
+
+    const result: SeqTableRow[] = [];
+    for (const row of taggedRows) {
+        const baseSequence = baseByReadId.get(row.readId) ?? row.sequence;
+        result.push({
+            readId: row.readId,
+            sequence: row.sequence,
+            baseSequence,
+            qualities: row.qualities,
+            avgQuality: computeAvgQuality(row.qualities),
+        });
+    }
+
+    onProgress?.("sequences", result.length);
+
+    return { rows: result };
+}
+
 /**
  * Generates comprehensive QC data including read lengths, modification densities, and histograms.
  *
@@ -315,7 +505,7 @@ async function paginateWindowReads(
 export async function generateQCData(
     config: QCConfig,
     onProgress?: (
-        source: "reads" | "modifications" | "windows",
+        source: "reads" | "modifications" | "windows" | "sequences",
         count: number,
     ) => void,
 ): Promise<QCData> {
@@ -377,7 +567,7 @@ export async function generateQCData(
         "Loading read info, modification data, and windowed densities...",
     );
 
-    const [readTypeCounts] = await Promise.all([
+    const [readTypeCounts, , , seqResult] = await Promise.all([
         paginateReadInfo(baseOptions, sampleSeed, readLengthHist, onProgress),
         paginateBamMods(
             baseOptions,
@@ -393,6 +583,7 @@ export async function generateQCData(
             windowedDensityHist,
             onProgress,
         ),
+        fetchSeqTable(config, sharedOptions, onProgress),
     ]);
 
     if (readLengthHist.exceededCount > 0) {
@@ -420,6 +611,8 @@ export async function generateQCData(
 
         sampleSeed,
         readTypeCounts,
+        seqTableRows: seqResult.rows,
+        seqTableSkipReason: seqResult.skipReason,
     };
 }
 

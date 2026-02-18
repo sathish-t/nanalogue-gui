@@ -3,8 +3,11 @@
 import { describe, expect, it } from "vitest";
 import { RunningHistogram } from "./histogram";
 import {
+    computeAvgQuality,
     maxReadLengthForBinWidth,
+    parseSeqTableTsv,
     parseWindowedDensities,
+    regionSizeBp,
 } from "./qc-data-loader";
 
 describe("parseWindowedDensities", () => {
@@ -141,5 +144,93 @@ describe("probability normalization", () => {
 
         const bins = hist.toBins();
         expect(bins.length).toBe(100);
+    });
+});
+
+describe("parseSeqTableTsv", () => {
+    /** Verifies basic TSV parsing of read_id, sequence, and qualities columns. */
+    it("parses a simple two-row TSV", () => {
+        const tsv = [
+            "read_id\tsequence\tqualities",
+            "read1\tACGT\t10.20.30.40",
+            "read2\tTGCA\t5.255.15.25",
+        ].join("\n");
+
+        const rows = parseSeqTableTsv(tsv);
+        expect(rows).toHaveLength(2);
+        expect(rows[0].readId).toBe("read1");
+        expect(rows[0].sequence).toBe("ACGT");
+        expect(rows[0].qualities).toEqual([10, 20, 30, 40]);
+        expect(rows[1].readId).toBe("read2");
+        expect(rows[1].qualities).toEqual([5, 255, 15, 25]);
+    });
+
+    /** Verifies that a header-only TSV returns an empty array. */
+    it("returns empty array for header-only TSV", () => {
+        const tsv = "read_id\tsequence\tqualities";
+        expect(parseSeqTableTsv(tsv)).toEqual([]);
+    });
+
+    /** Verifies that an empty string returns an empty array. */
+    it("returns empty array for empty string", () => {
+        expect(parseSeqTableTsv("")).toEqual([]);
+    });
+
+    /** Verifies trailing newlines are handled correctly. */
+    it("handles trailing newlines", () => {
+        const tsv =
+            "read_id\tsequence\tqualities\nread1\tACGT\t10.20.30.40\n\n";
+        const rows = parseSeqTableTsv(tsv);
+        expect(rows).toHaveLength(1);
+    });
+});
+
+describe("computeAvgQuality", () => {
+    /** Verifies probability-based average excluding 255 values. */
+    it("computes probability-based average excluding 255 values", () => {
+        // [10, 20, 30]: min=10, sum=10^0+10^-1+10^-2=1.11, 10+round(-10*log10(1.11/3))=14
+        expect(computeAvgQuality([10, 20, 255, 30])).toBe(14);
+    });
+
+    /** Verifies null is returned when all values are 255. */
+    it("returns null when all values are 255", () => {
+        expect(computeAvgQuality([255, 255, 255])).toBeNull();
+    });
+
+    /** Verifies null for empty array. */
+    it("returns null for empty array", () => {
+        expect(computeAvgQuality([])).toBeNull();
+    });
+
+    /** Verifies single non-255 value returns that value unchanged. */
+    it("handles single value", () => {
+        expect(computeAvgQuality([42])).toBe(42);
+    });
+
+    /** Verifies identical values return the same value. */
+    it("returns same value when all qualities are equal", () => {
+        expect(computeAvgQuality([15, 15, 15])).toBe(15);
+    });
+});
+
+describe("regionSizeBp", () => {
+    /** Returns size for a valid range region. */
+    it("returns size for contig:start-end", () => {
+        expect(regionSizeBp("chr1:100-600")).toBe(500);
+    });
+
+    /** Returns null for bare contig name (no range). */
+    it("returns null for bare contig name", () => {
+        expect(regionSizeBp("chr1")).toBeNull();
+    });
+
+    /** Returns null for undefined. */
+    it("returns null for undefined", () => {
+        expect(regionSizeBp(undefined)).toBeNull();
+    });
+
+    /** Returns size of 1 for a 1-bp region. */
+    it("returns 1 for chr1:100-101", () => {
+        expect(regionSizeBp("chr1:100-101")).toBe(1);
     });
 });
