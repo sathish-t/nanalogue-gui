@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version button and dialog on landing page with link to nanalogue.com, external URL opens in OS browser ([`0b0dee6`](https://github.com/sathish-t/nanalogue-gui/commit/0b0dee655f35d7ab2fdb195de7264dbf22c8e8eb))
 - Auto-fit landing page height to rendered content with mode-change guard ([`dd3d790`](https://github.com/sathish-t/nanalogue-gui/commit/dd3d790dfa61863cf9a64330aee22890a36d2f22))
 - Increases IPC validation test coverage with tests for `validateListModels`, `validateSendMessage` field checks, and `validateIpcPayload` channel routing ([`1766072`](https://github.com/sathish-t/nanalogue-gui/commit/1766072f4962201bf5c2ca2d3bfe27ee487fb548), [`4e598b0`](https://github.com/sathish-t/nanalogue-gui/commit/4e598b03f86afcf132e0b72d45be24e403a91cfd), [`87eb133`](https://github.com/sathish-t/nanalogue-gui/commit/87eb133148376bd7b5ec3167e2f014e17c053fc3), [`abadd9e`](https://github.com/sathish-t/nanalogue-gui/commit/abadd9ebe4f5df846da58e426117cd7b1140a6be))
+- Increases test coverage for ai-chat-constants, qc-data-loader, and swipe-data-loader with edge case and structural tests ([`0df8a18`](https://github.com/sathish-t/nanalogue-gui/commit/0df8a18dde7f6c6a52aa3965c73001fd354b607d), [`e1a5212`](https://github.com/sathish-t/nanalogue-gui/commit/e1a5212df676b0c201e9edcade1631f13986e633), [`eaafcfd`](https://github.com/sathish-t/nanalogue-gui/commit/eaafcfdda13eca0b16222c5268a710c11292aad6))
 
 ### Changed
 
