@@ -254,10 +254,10 @@ probabilities:
 - This command produces a lot of data per read. so if you are querying lots of reads,
   this can quickly become unmanageable. Use your discretion on when to use this.
 
-### window_reads(bam_path: str, **kwargs) -> str
+### window_reads(bam_path: str, **kwargs) -> list[dict]
 
-Returns a TSV string with windowed modification densities across a
-BAM file. Each row represents one genomic window.
+Returns a list of per-read dicts with windowed modification densities
+from a BAM file.
 
 Additional keyword arguments (beyond the shared ones below):
 | Parameter | Type | Default | Description |
@@ -266,15 +266,35 @@ Additional keyword arguments (beyond the shared ones below):
 | step | int | required | Step size in bp |
 | win_op | str | "density" | "density" or "grad_density" |
 
-Sample output is shown below (only the first two rows, with tabs replaced by spaces):
-(basecall_qual is 255 as base quality scores are unavailable in this example file)
-#contig ref_win_start ref_win_end read_id win_val strand base mod_strand mod_type win_start win_end basecall_qual
-dummyI 9 13 5d10eb9a-aae1-4db8-8ec6-7ebb34d32575 0 + T + T 0 4 255
-dummyI 12 14 5d10eb9a-aae1-4db8-8ec6-7ebb34d32575 0 + T + T 3 5 255
+Each entry in the JSON array contains alignment info and a mod_table
+with windowed data tuples [win_start, win_end, win_val, mean_base_qual, ref_win_start, ref_win_end].
+If the alignment_type is "unmapped", the alignment field is not present.
+(mean_base_qual is 255 below as base quality scores are unavailable in this example file,
+the mean_base_qual is a number below 255 (usually 0-93) if qualities are present).
+
+Sample output (first entry only, formatted for readability):
+{
+  "alignment_type": "primary_forward",
+  "alignment": {
+    "start": 9, "end": 17, "contig": "dummyI", "contig_id": 0
+  },
+  "mod_table": [
+    {
+      "base": "T", "is_strand_plus": true, "mod_code": "T",
+      "data": [
+        [0, 4, 0.0, 255, 9, 13],
+        [3, 5, 0.0, 255, 12, 14],
+        [4, 8, 0.0, 255, 13, 17]
+      ]
+    }
+  ],
+  "read_id": "5d10eb9a-aae1-4db8-8ec6-7ebb34d32575",
+  "seq_len": 8
+}
 
 If you use "grad_density" instead of "density" in the win_op parameter above, win_val
-will be the gradient of the modification density per window instead of just the
-mean modification density per window.
+(the third element in each data tuple) will be the gradient of the modification
+density per window instead of just the mean modification density per window.
 
 ### seq_table(bam_path: str, **kwargs) -> str
 

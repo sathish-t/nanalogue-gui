@@ -73,10 +73,10 @@ len(mods)
     expect(typeof result.value).toBe("number");
 });
 
-it("window_reads returns TSV string via sandbox", async () => {
+it("window_reads returns parsed JSON array via sandbox", async () => {
     const code = `
-tsv = window_reads("${bamName}", win=100, step=50)
-len(tsv)
+records = window_reads("${bamName}", win=100, step=50)
+len(records)
 `;
     const result = await runSandboxCode(code, allowedDir);
     expect(result.success).toBe(true);

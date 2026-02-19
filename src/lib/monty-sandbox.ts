@@ -650,11 +650,11 @@ export async function runSandboxCode(
                 },
 
                 /**
-                 * Computes windowed read statistics as TSV from a BAM file.
+                 * Computes windowed read statistics from a BAM file.
                  *
                  * @param bamPath - Path to the BAM file.
                  * @param opts - Optional snake_case options from sandbox code.
-                 * @returns The windowed statistics as a TSV string.
+                 * @returns The windowed statistics as a parsed JSON array.
                  */
                 window_reads: async (
                     bamPath: string,
@@ -662,14 +662,23 @@ export async function runSandboxCode(
                 ) => {
                     rejectTreatAsUrl(opts);
                     const resolved = await resolvePath(allowedDir, bamPath);
-                    const tsv = await windowReads(
+                    const json = await windowReads(
                         toWindowOptions(resolved, opts, maxRecordsWindowReads),
                     );
-                    return enforceDataSizeLimit(
-                        tsv,
+                    const parsed: unknown = JSON.parse(json);
+                    if (!Array.isArray(parsed)) {
+                        throw new SandboxError(
+                            "RuntimeError",
+                            "window_reads returned non-array JSON",
+                        );
+                    }
+                    const records = parsed as unknown[];
+                    enforceRecordLimit(
+                        records,
                         "window_reads",
-                        maxOutputBytes,
+                        maxRecordsWindowReads,
                     );
+                    return records;
                 },
 
                 /**
