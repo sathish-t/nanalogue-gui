@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Reusable `<window-size-input>` custom element with inline validation, range enforcement (2–10,000), and `window-size-changed` event ([`3023a1c`](https://github.com/sathish-t/nanalogue-gui/commit/3023a1c8df5566d46034ed6bef509c73e779c635))
+- Configurable window size in Swipe mode, replacing the hardcoded 300-base default ([`f66d051`](https://github.com/sathish-t/nanalogue-gui/commit/f66d0517fcb8e97e4ba474b7cbb51fa2965e7435))
 - Read type counts (primary/secondary/supplementary/unmapped by strand) in QC results expandable stats panel ([`553b1da`](https://github.com/sathish-t/nanalogue-gui/commit/553b1da5dab409c137f6cb66a51ab40c624a35d2))
 - CRAM file support in all file picker dialogs across QC, Swipe, and Locate modes ([`4ef5c70`](https://github.com/sathish-t/nanalogue-gui/commit/4ef5c70c8bf53373442ca584c48a98cdfea85a14))
 - AI Chat types, IPC validation, and shared config field specs ([`595c9a3`](https://github.com/sathish-t/nanalogue-gui/commit/595c9a391fd721ab0c42614c0946d6cdf9edd033))
@@ -35,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- QC config window size input replaced with `<window-size-input>` custom element ([`8058ddc`](https://github.com/sathish-t/nanalogue-gui/commit/8058ddc1a161f1efa8f47a5e4775312e4337bca6))
 - Bumps `@nanalogue/node` to ^0.1.4 and migrates swipe-data-loader and qc-data-loader from TSV to JSON parsing for `windowReads` output ([`e1aecd3`](https://github.com/sathish-t/nanalogue-gui/commit/e1aecd35544a845b8df6145f4e44d15c93dbe00b), [`7ec8f9a`](https://github.com/sathish-t/nanalogue-gui/commit/7ec8f9aea3eeaada48ed52c9846d399368ec30f7), [`0fdc20e`](https://github.com/sathish-t/nanalogue-gui/commit/0fdc20e802cfcb05a61ed4e5435445f1776f796a))
 - Merges `paginateReadInfo` into `paginateWindowReads` — read lengths and alignment type counts now come from `windowReads` JSON, eliminating one concurrent API call ([`0fdc20e`](https://github.com/sathish-t/nanalogue-gui/commit/0fdc20e802cfcb05a61ed4e5435445f1776f796a))
 - Bumps `@nanalogue/node` to ^0.1.3 ([`2f49f16`](https://github.com/sathish-t/nanalogue-gui/commit/2f49f16c5fd5b99033fcee24b43a4ff12a68cc77))
