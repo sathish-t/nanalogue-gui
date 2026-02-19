@@ -1,0 +1,3 @@
+how many bam files are in this directory and what are their names?
+how many reads are in swipe.bam?
+using windows with size 300, I want you to explore the swipe.bam reads and report those reads where at least one window has a modification density above 70%
