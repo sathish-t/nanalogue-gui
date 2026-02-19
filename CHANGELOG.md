@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Sandbox `window_reads` parses JSON and returns a validated array with `enforceRecordLimit` instead of byte-based string truncation ([`7c70a19`](https://github.com/sathish-t/nanalogue-gui/commit/7c70a191fc24564b1bcd8c0f3e85f54eccaa82ea))
 - QC config window size input replaced with `<window-size-input>` custom element ([`8058ddc`](https://github.com/sathish-t/nanalogue-gui/commit/8058ddc1a161f1efa8f47a5e4775312e4337bca6))
 - Bumps `@nanalogue/node` to ^0.1.4 and migrates swipe-data-loader and qc-data-loader from TSV to JSON parsing for `windowReads` output ([`e1aecd3`](https://github.com/sathish-t/nanalogue-gui/commit/e1aecd35544a845b8df6145f4e44d15c93dbe00b), [`7ec8f9a`](https://github.com/sathish-t/nanalogue-gui/commit/7ec8f9aea3eeaada48ed52c9846d399368ec30f7), [`0fdc20e`](https://github.com/sathish-t/nanalogue-gui/commit/0fdc20e802cfcb05a61ed4e5435445f1776f796a))
 - Merges `paginateReadInfo` into `paginateWindowReads` — read lengths and alignment type counts now come from `windowReads` JSON, eliminating one concurrent API call ([`0fdc20e`](https://github.com/sathish-t/nanalogue-gui/commit/0fdc20e802cfcb05a61ed4e5435445f1776f796a))
