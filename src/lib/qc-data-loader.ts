@@ -89,7 +89,7 @@ async function paginateBamMods(
     let loggedMissingModTable = false;
     let readsWithMods = 0;
 
-    // Fetch pages of modification records until the API returns an empty page
+    // Fetch pages of modification records until a partial page signals the end
     for (;;) {
         const page = await bamMods({
             ...baseOptions,
@@ -97,8 +97,6 @@ async function paginateBamMods(
             limit: MODS_PAGE_SIZE,
             offset,
         });
-
-        if (page.length === 0) break;
 
         for (const record of page) {
             if (record.alignment_type === "unmapped") continue;
@@ -140,6 +138,9 @@ async function paginateBamMods(
         totalRecords += page.length;
         offset += MODS_PAGE_SIZE;
         onProgress?.("modifications", totalRecords);
+
+        // A partial page means we've reached the end of the data
+        if (page.length < MODS_PAGE_SIZE) break;
     }
 
     console.log(`  Got ${readsWithMods} reads with modifications`);
@@ -204,7 +205,7 @@ async function paginateWindowReads(
         unmapped: "unmapped",
     };
 
-    // Fetch pages of windowed JSON until the API returns an empty page
+    // Fetch pages of windowed JSON until a partial page signals the end
     for (;;) {
         const json = await windowReads({
             ...windowOptions,
@@ -214,7 +215,6 @@ async function paginateWindowReads(
         });
 
         const records = parseWindowReadsJson(json);
-        if (records.length === 0) break;
 
         for (const record of records) {
             // Accumulate alignment type counts
@@ -247,6 +247,9 @@ async function paginateWindowReads(
         totalReads += records.length;
         offset += PAGE_SIZE;
         onProgress?.("windows", totalReads);
+
+        // A partial page means we've reached the end of the data
+        if (records.length < PAGE_SIZE) break;
     }
 
     console.log(`  Got ${readLengthHist.count} reads`);
