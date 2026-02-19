@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2026-02-18
+## [0.2.0] - 2026-02-19
 
 ### Added
 
@@ -63,11 +63,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumps `@pydantic/monty` to ^0.0.6 ([`2a3a7e2`](https://github.com/sathish-t/nanalogue-gui/commit/2a3a7e2919f60c7b7174ff8ac5232e5eebeb0640))
 - Added: `@electron/windows-sign` ^1.2.2 dev dependency for electron-builder ([`231bbe6`](https://github.com/sathish-t/nanalogue-gui/commit/231bbe663a837b5ce8d2d508c4e5a548153454ed))
 - Added: `@vitest/coverage-v8` dev dependency for code coverage ([`47985fd`](https://github.com/sathish-t/nanalogue-gui/commit/47985fd759000e1e473aba1a56f77b4d24305199))
+- Added: `@playwright/test` ^1.58.2, `playwright` ^1.58.2, `seedrandom` ^3.0.5 dev dependencies for demo automation ([`3e9f102`](https://github.com/sathish-t/nanalogue-gui/commit/3e9f102a0692b37fc30b07233a0caa4412a844cc), [`9d6d6b8`](https://github.com/sathish-t/nanalogue-gui/commit/9d6d6b82fd0d9412f837acf7ef9dfc06f977ff1f))
+- Bumps `@pydantic/monty` to ^0.0.7 ([`37601a2`](https://github.com/sathish-t/nanalogue-gui/commit/37601a23de8b4dd973749037a31ee89f97d465b5))
 
 ### Infrastructure
 
 - Bumps GitHub Actions `upload-artifact` to v6 and `download-artifact` to v7 ([`b7f795d`](https://github.com/sathish-t/nanalogue-gui/commit/b7f795d92ff3537cb3785101aa3fe65041b068b9))
 - Adds Codecov coverage workflow for test coverage reporting ([`2118d4f`](https://github.com/sathish-t/nanalogue-gui/commit/2118d4f7036ad1aa8cd8f58718b3aa76c79f0d9b), [`e333ddb`](https://github.com/sathish-t/nanalogue-gui/commit/e333ddbd19f8f2f254344f1861e06e742122ecb8))
+- Adds Codecov config to exclude demo/ from coverage ([`259b6a6`](https://github.com/sathish-t/nanalogue-gui/commit/259b6a673c4c21b91b51e52c4f275efe6b3c2554))
+- Demo BAM generation script and Playwright screenshot automation for QC and Swipe modes ([`3e9f102`](https://github.com/sathish-t/nanalogue-gui/commit/3e9f102a0692b37fc30b07233a0caa4412a844cc), [`9d6d6b8`](https://github.com/sathish-t/nanalogue-gui/commit/9d6d6b82fd0d9412f837acf7ef9dfc06f977ff1f))
+- CI workflow for demo data generation and screenshot capture ([`7139a1c`](https://github.com/sathish-t/nanalogue-gui/commit/7139a1c717742f88644a062ee6396ab51d5f6e30))
+- Pre-commit hook for package-lock.json sync ([`37601a2`](https://github.com/sathish-t/nanalogue-gui/commit/37601a23de8b4dd973749037a31ee89f97d465b5))
 
 ### Removed
 
