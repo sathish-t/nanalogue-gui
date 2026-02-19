@@ -745,10 +745,11 @@ input[type="number"]:focus {
     position: relative;
 }
 
-/* Full-width sequence table with fixed layout. */
+/* Full-width sequence table ensuring the sequence column clears frozen columns. */
 .seq-table {
     border-collapse: collapse;
     font-size: 13px;
+    min-width: 100%;
     white-space: nowrap;
 }
 
@@ -832,7 +833,18 @@ input[type="number"]:focus {
     font-weight: 600;
 }
 
-/* Selected row highlight. */
+/* Subtle background tint for rows belonging to multi-alignment reads. */
+.seq-table tr.seq-multi-align {
+    background: #f5f5f5;
+}
+
+/* Multi-alignment tint on frozen cells must also show the tint. */
+.seq-table tr.seq-multi-align td:nth-child(1),
+.seq-table tr.seq-multi-align td:nth-child(2) {
+    background: #f5f5f5;
+}
+
+/* Selected row highlight (after multi-align so selection always wins). */
 .seq-table tr.seq-selected {
     background: #e3f2fd;
 }
@@ -868,4 +880,10 @@ input[type="number"]:focus {
     transform: translateY(-100%);
     white-space: nowrap;
     z-index: 10;
+}
+
+/* Warning text appended to the disclaimer for ambiguous reads. */
+.seq-ambiguous-warning {
+    color: #e65100;
+    font-weight: 600;
 }

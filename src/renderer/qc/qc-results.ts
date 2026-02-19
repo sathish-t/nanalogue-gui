@@ -160,6 +160,8 @@ interface QCData {
     seqTableRows?: SeqTableRow[];
     /** Human-readable reason why sequence data was skipped. */
     seqTableSkipReason?: string;
+    /** Read IDs excluded because multiple alignments had the same sequence length. */
+    seqTableAmbiguousReadIds?: string[];
 }
 
 /**
@@ -713,11 +715,13 @@ let lastClickedSeqRow = -1;
  * @param containerId - The DOM element ID of the container.
  * @param rows - The sequence table rows, or undefined if skipped.
  * @param skipReason - The reason sequences were skipped, if applicable.
+ * @param ambiguousReadIds - Read IDs excluded due to same-length alignments.
  */
 function renderSeqTable(
     containerId: string,
     rows: SeqTableRow[] | undefined,
     skipReason: string | undefined,
+    ambiguousReadIds: string[] | undefined,
 ): void {
     lastClickedSeqRow = -1;
 
@@ -732,12 +736,36 @@ function renderSeqTable(
         return;
     }
 
+    // Append ambiguous read warning to the disclaimer paragraph
+    if (ambiguousReadIds && ambiguousReadIds.length > 0) {
+        const disclaimer = document.querySelector(".seq-disclaimer");
+        if (disclaimer) {
+            const warning = document.createElement("span");
+            warning.className = "seq-ambiguous-warning";
+            warning.textContent = ` ${ambiguousReadIds.length} read(s) excluded because multiple alignments had the same sequence length: ${ambiguousReadIds.join(", ")}.`;
+            disclaimer.appendChild(warning);
+        }
+    }
+
     if (rows.length === 0) {
         const msg = document.createElement("div");
         msg.className = "no-data-message";
         msg.textContent = "No reads found in the specified region.";
         container.appendChild(msg);
         return;
+    }
+
+    // Identify read IDs with multiple alignments for visual grouping
+    const multiAlignIds = new Set<string>();
+    {
+        const seen = new Set<string>();
+        for (const row of rows) {
+            if (seen.has(row.readId)) {
+                multiAlignIds.add(row.readId);
+            } else {
+                seen.add(row.readId);
+            }
+        }
     }
 
     // Toolbar with copy button
@@ -761,7 +789,8 @@ function renderSeqTable(
     const countLabel = document.createElement("span");
     countLabel.style.color = "#888";
     countLabel.style.fontSize = "12px";
-    countLabel.textContent = `${rows.length} read${rows.length !== 1 ? "s" : ""}`;
+    const uniqueReadCount = new Set(rows.map((r) => r.readId)).size;
+    countLabel.textContent = `${uniqueReadCount} read${uniqueReadCount !== 1 ? "s" : ""}`;
     toolbar.appendChild(countLabel);
 
     container.appendChild(toolbar);
@@ -793,14 +822,21 @@ function renderSeqTable(
         const hasSelection = selectedSet.size > 0;
         copyBtn.disabled = !hasSelection;
         clearBtn.disabled = !hasSelection;
+        // Show deduplicated count since multi-alignment rows share a readId
+        const uniqueCount = new Set(
+            Array.from(selectedSet).map((idx) => rows?.[idx].readId),
+        ).size;
         copyBtn.textContent = hasSelection
-            ? `Copy ${selectedSet.size} selected read ID${selectedSet.size !== 1 ? "s" : ""}`
+            ? `Copy ${uniqueCount} selected read ID${uniqueCount !== 1 ? "s" : ""}`
             : "Copy selected read IDs";
     }
 
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const tr = document.createElement("tr");
+        if (multiAlignIds.has(row.readId)) {
+            tr.classList.add("seq-multi-align");
+        }
 
         // Read ID cell (clickable to copy)
         const readIdTd = document.createElement("td");
@@ -897,10 +933,13 @@ function renderSeqTable(
 
     // Copy button handler
     copyBtn.addEventListener("click", () => {
-        const ids = Array.from(selectedSet)
-            .sort((a, b) => a - b)
-            .map((idx) => rows[idx].readId)
-            .join("\n");
+        const ids = [
+            ...new Set(
+                Array.from(selectedSet)
+                    .sort((a, b) => a - b)
+                    .map((idx) => rows[idx].readId),
+            ),
+        ].join("\n");
         navigator.clipboard.writeText(ids).catch((err) => {
             console.error("Failed to copy read IDs:", err);
         });
@@ -1085,6 +1124,7 @@ async function initialize(): Promise<void> {
             "seq-table-container",
             data.seqTableRows,
             data.seqTableSkipReason,
+            data.seqTableAmbiguousReadIds,
         );
 
         setupTabs();
