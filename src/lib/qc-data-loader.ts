@@ -357,6 +357,42 @@ export function computeAvgQuality(qualities: number[]): number | null {
 }
 
 /**
+ * Matches tagged sequences to base sequences by length.
+ *
+ * For each tagged sequence, finds the base sequence with the same length.
+ * Returns null if any tagged length is ambiguous (duplicated) or unmatched.
+ *
+ * @param tagged - Array of tagged sequences for one readId.
+ * @param base - Array of base sequences for the same readId.
+ * @returns Array of base sequences in tagged order, or null if matching fails.
+ */
+export function matchBaseByLength(
+    tagged: string[],
+    base: string[],
+): string[] | null {
+    // Check tagged sequences have unique lengths
+    const taggedLengths = tagged.map((s) => s.length);
+    if (new Set(taggedLengths).size !== taggedLengths.length) return null;
+
+    // Build base lookup by length, rejecting duplicate lengths
+    const baseByLen = new Map<number, string>();
+    for (const s of base) {
+        if (baseByLen.has(s.length)) return null;
+        baseByLen.set(s.length, s);
+    }
+
+    // Match each tagged sequence to its base counterpart
+    const result: string[] = [];
+    for (const s of tagged) {
+        const match = baseByLen.get(s.length);
+        if (match === undefined) return null;
+        result.push(match);
+    }
+
+    return result;
+}
+
+/**
  * A partial sequence table row containing only the fields parsed directly from TSV.
  */
 interface PartialSeqRow {

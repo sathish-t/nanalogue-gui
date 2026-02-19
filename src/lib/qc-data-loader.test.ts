@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { RunningHistogram } from "./histogram";
 import {
     computeAvgQuality,
+    matchBaseByLength,
     maxReadLengthForBinWidth,
     parseSeqTableTsv,
     parseWindowedDensities,
@@ -182,6 +183,37 @@ describe("parseSeqTableTsv", () => {
             "read_id\tsequence\tqualities\nread1\tACGT\t10.20.30.40\n\n";
         const rows = parseSeqTableTsv(tsv);
         expect(rows).toHaveLength(1);
+    });
+});
+
+describe("matchBaseByLength", () => {
+    /** Matches sequences by unique lengths. */
+    it("matches by unique lengths", () => {
+        const tagged = ["ACGT", "TG"];
+        const base = ["XX", "YYYY"];
+        const result = matchBaseByLength(tagged, base);
+        expect(result).toEqual(["YYYY", "XX"]);
+    });
+
+    /** Returns null when two tagged sequences have the same length. */
+    it("returns null for ambiguous lengths", () => {
+        const tagged = ["ACGT", "TGCA"];
+        const base = ["XXXX", "YYYY"];
+        expect(matchBaseByLength(tagged, base)).toBeNull();
+    });
+
+    /** Handles single-element arrays (trivial match). */
+    it("matches single-element arrays", () => {
+        const tagged = ["ACGT"];
+        const base = ["YYYY"];
+        expect(matchBaseByLength(tagged, base)).toEqual(["YYYY"]);
+    });
+
+    /** Returns null when a tagged length has no base match. */
+    it("returns null when no base matches a tagged length", () => {
+        const tagged = ["ACGT", "TG"];
+        const base = ["XXX", "YYYYY"];
+        expect(matchBaseByLength(tagged, base)).toBeNull();
     });
 });
 
