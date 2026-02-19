@@ -1,0 +1,46 @@
+# Validates that demo data generation and Playwright screenshots run successfully.
+# Does not commit generated files — avoids churn from randomised output.
+
+name: Demo screenshots
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  demo:
+    name: Generate demo data & screenshots
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install display dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb openbox
+
+      - name: Install Playwright Electron deps
+        run: npx playwright install --with-deps
+
+      - name: Build
+        run: npm run build
+
+      - name: Generate demo data
+        run: node demo/generate-demo-bam.mjs
+
+      - name: Take screenshots
+        run: >-
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24"
+          npx playwright test --config demo/playwright.config.mjs
+        env:
+          ELECTRON_EXTRA_LAUNCH_ARGS: "--no-sandbox --disable-gpu"
