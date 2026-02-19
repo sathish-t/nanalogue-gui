@@ -71,12 +71,10 @@ describe("qc-config.html", () => {
             expect(input?.value).toBe("5");
         });
 
-        it("has a window-size number input defaulting to 300", () => {
+        it("has a window-size-input custom element", () => {
             const doc = loadTemplate();
-            const input = doc.querySelector<HTMLInputElement>("#window-size");
-            expect(input).not.toBeNull();
-            expect(input?.type).toBe("number");
-            expect(input?.value).toBe("300");
+            const el = doc.querySelector("window-size-input#window-size");
+            expect(el).not.toBeNull();
         });
     });
 

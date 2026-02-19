@@ -83,13 +83,8 @@
 
       <!-- Window size for the windowed analogue density calculation. -->
       <section class="config-section">
-        <h2>Window size <span class="optional">(for windowed density)</span></h2>
-        <div class="input-with-unit">
-          <label for="window-size" class="visually-hidden">Window size</label>
-          <input type="number" id="window-size" value="300" min="10" max="10000" step="10">
-          <span class="unit">bases of interest</span>
-        </div>
-        <p class="hint">Windows are counted in bases of interest (e.g., thymidines), not total genomic bases.</p>
+        <!-- Reusable window size input with inline validation. -->
+        <window-size-input id="window-size"></window-size-input>
       </section>
 
       <!-- Collapsible advanced filtering options. -->

@@ -6,6 +6,8 @@ import type { BamSelectedDetail } from "../shared/bam-resource-input";
 import "../shared/bam-resource-input";
 import type { ModFilterInput } from "../shared/mod-filter-input";
 import "../shared/mod-filter-input";
+import type { WindowSizeInput } from "../shared/window-size-input";
+import "../shared/window-size-input";
 
 /**
  * Result returned from peeking into a BAM file header and first records.
@@ -103,8 +105,8 @@ const elements = {
         "sample-fraction",
     ) as HTMLInputElement,
 
-    /** Input field for the analysis window size. */
-    windowSize: document.getElementById("window-size") as HTMLInputElement,
+    /** Window size input custom element. */
+    windowSize: document.getElementById("window-size") as WindowSizeInput,
 
     /** Dropdown for read length histogram granularity. */
     readLengthGranularity: document.getElementById(
@@ -417,7 +419,7 @@ async function generateQC() {
     }
 
     const sampleFraction = parseFloat(elements.sampleFraction.value);
-    const windowSize = parseInt(elements.windowSize.value, 10);
+    const windowSize = elements.windowSize.value;
 
     if (
         Number.isNaN(sampleFraction) ||
@@ -436,8 +438,8 @@ async function generateQC() {
         return;
     }
 
-    if (Number.isNaN(windowSize) || windowSize < 1) {
-        alert("Window size must be a number of at least 1.");
+    if (!elements.windowSize.isValid) {
+        alert("Window size must be an integer between 2 and 10,000.");
         elements.btnGenerate.disabled = false;
         return;
     }
