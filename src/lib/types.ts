@@ -64,6 +64,45 @@ export interface PlotData {
 }
 
 /**
+ * Represents a single modification table entry within a windowReads JSON record.
+ */
+export interface WindowReadsModEntry {
+    /** The base at the modification site. */
+    base: string;
+    /** Whether the modification is on the plus strand. */
+    is_strand_plus: boolean;
+    /** The modification type code. */
+    mod_code: string;
+    /** Per-window data: [win_start, win_end, win_val, basecall_qual, ref_win_start, ref_win_end]. */
+    data: number[][];
+}
+
+/**
+ * Represents a single per-read record in the windowReads JSON output.
+ */
+export interface WindowReadsRecord {
+    /** The alignment type string (e.g. "primary_forward", "unmapped"). */
+    alignment_type: string;
+    /** Alignment coordinates, absent for unmapped reads. */
+    alignment?: {
+        /** The start position of the alignment. */
+        start: number;
+        /** The end position of the alignment. */
+        end: number;
+        /** The contig or chromosome name. */
+        contig: string;
+        /** The numeric contig identifier. */
+        contig_id: number;
+    };
+    /** The modification table entries for this read. */
+    mod_table: WindowReadsModEntry[];
+    /** The unique identifier of the read. */
+    read_id: string;
+    /** The sequence length of the read. */
+    seq_len: number;
+}
+
+/**
  * Represents a single row of windowed read data from the analysis pipeline.
  */
 export interface WindowReadRow {
