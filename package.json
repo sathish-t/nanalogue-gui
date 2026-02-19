@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.30",
-    "@nanalogue/node": "^0.1.3",
+    "@nanalogue/node": "^0.1.4",
     "@pydantic/monty": "^0.0.6",
     "ai": "^6.0.86",
     "chart.js": "^4.4.0",

@@ -7,6 +7,7 @@ import type {
     PlotDataPoint,
     WindowedPoint,
     WindowReadRow,
+    WindowReadsRecord,
 } from "./types";
 
 const REGION_EXPANSION = 10000;
@@ -35,61 +36,70 @@ export async function loadContigSizes(
 }
 
 /**
- * Parses a TSV string of windowed read data into structured row objects.
+ * Derives the alignment strand from an alignment_type string.
  *
- * @param tsv - The raw TSV string output from the windowReads command.
- * @returns An array of parsed window read rows, skipping the header and incomplete lines.
+ * @param alignmentType - The alignment type (e.g. "primary_forward", "primary_reverse").
+ * @returns "+" for forward alignments, "-" for reverse alignments.
  */
-export function parseWindowReadsTsv(tsv: string): WindowReadRow[] {
-    const lines = tsv.trim().split("\n");
-    if (lines.length < 2) {
-        return [];
-    }
+function strandFromAlignmentType(alignmentType: string): string {
+    return alignmentType.endsWith("_reverse") ? "-" : "+";
+}
 
+/**
+ * Parses a JSON string of windowed read data into structured row objects.
+ *
+ * @param json - The raw JSON string output from the windowReads command.
+ * @returns An array of parsed window read rows, skipping unmapped reads and invalid bounds.
+ */
+export function parseWindowReadsJson(json: string): WindowReadRow[] {
+    const trimmed = json.trim();
+    if (trimmed.length === 0) return [];
+
+    const records = JSON.parse(trimmed) as WindowReadsRecord[];
     const rows: WindowReadRow[] = [];
 
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (!line.trim()) continue;
+    for (const record of records) {
+        if (record.alignment_type === "unmapped") continue;
+        if (!record.alignment) continue;
 
-        const fields = line.split("\t");
-        if (fields.length < 12) continue;
+        const contig = record.alignment.contig;
+        const strand = strandFromAlignmentType(record.alignment_type);
 
-        const ref_win_start = parseInt(fields[1], 10);
-        const ref_win_end = parseInt(fields[2], 10);
-        const win_val = parseFloat(fields[4]);
+        for (const entry of record.mod_table) {
+            for (const data of entry.data) {
+                const ref_win_start = data[4];
+                const ref_win_end = data[5];
+                const win_val = data[2];
 
-        if (ref_win_start === -1 || ref_win_end === -1) {
-            continue;
+                if (
+                    !Number.isFinite(ref_win_start) ||
+                    !Number.isFinite(ref_win_end) ||
+                    !Number.isFinite(win_val)
+                ) {
+                    continue;
+                }
+
+                // Drop rows with invalid window bounds (zero-width, negative-width, or negative start)
+                if (ref_win_start < 0 || ref_win_start >= ref_win_end) {
+                    continue;
+                }
+
+                rows.push({
+                    contig,
+                    ref_win_start,
+                    ref_win_end,
+                    read_id: record.read_id,
+                    win_val,
+                    strand,
+                    base: entry.base,
+                    mod_strand: entry.is_strand_plus ? "+" : "-",
+                    mod_type: entry.mod_code,
+                    win_start: data[0],
+                    win_end: data[1],
+                    basecall_qual: data[3],
+                });
+            }
         }
-
-        if (
-            !Number.isFinite(ref_win_start) ||
-            !Number.isFinite(ref_win_end) ||
-            !Number.isFinite(win_val)
-        ) {
-            continue;
-        }
-
-        // Drop rows with invalid window bounds (zero-width, negative-width, or negative start)
-        if (ref_win_start < 0 || ref_win_start >= ref_win_end) {
-            continue;
-        }
-
-        rows.push({
-            contig: fields[0],
-            ref_win_start,
-            ref_win_end,
-            read_id: fields[3],
-            win_val,
-            strand: fields[5],
-            base: fields[6],
-            mod_strand: fields[7],
-            mod_type: fields[8],
-            win_start: parseInt(fields[9], 10),
-            win_end: parseInt(fields[10], 10),
-            basecall_qual: parseInt(fields[11], 10),
-        });
     }
 
     return rows;
@@ -159,7 +169,7 @@ export async function loadPlotData(
     const region = `${annotation.contig}:${annotation.start}-${Math.min(annotation.end, contigSize)}`;
     const modRegion = `${annotation.contig}:${expandedStart}-${expandedEnd}`;
 
-    const [tsv, modRecords] = await Promise.all([
+    const [json, modRecords] = await Promise.all([
         windowReads({
             bamPath,
             treatAsUrl,
@@ -186,7 +196,7 @@ export async function loadPlotData(
         }),
     ]);
 
-    const rows = parseWindowReadsTsv(tsv);
+    const rows = parseWindowReadsJson(json);
 
     const windowedPoints: WindowedPoint[] = rows.map((row) => ({
         refWinStart: row.ref_win_start,
