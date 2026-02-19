@@ -239,27 +239,28 @@ function enforceRecordLimit(
 }
 
 /**
- * Enforces data size limit for TSV string outputs. Truncates at a newline boundary.
+ * Enforces data size limit for line-oriented string outputs (e.g. TSV).
+ * Truncates at a newline boundary so each kept line remains complete.
  *
- * @param tsvData - The TSV string to check.
+ * @param data - The line-oriented string to check.
  * @param fnName - The function name for the truncation notice.
  * @param maxBytes - The maximum allowed byte size.
- * @returns The original or truncated TSV string.
+ * @returns The original or truncated string.
  */
 function enforceDataSizeLimit(
-    tsvData: string,
+    data: string,
     fnName: string,
     maxBytes: number,
 ): string {
-    if (Buffer.byteLength(tsvData, "utf-8") <= maxBytes) {
-        return tsvData;
+    if (Buffer.byteLength(data, "utf-8") <= maxBytes) {
+        return data;
     }
-    const lastNewline = tsvData.lastIndexOf("\n", maxBytes);
+    const lastNewline = data.lastIndexOf("\n", maxBytes);
     const cutPoint = lastNewline > 0 ? lastNewline : maxBytes;
-    const totalLines = tsvData.split("\n").length;
-    const keptLines = tsvData.slice(0, cutPoint).split("\n").length;
+    const totalLines = data.split("\n").length;
+    const keptLines = data.slice(0, cutPoint).split("\n").length;
     return (
-        tsvData.slice(0, cutPoint) +
+        data.slice(0, cutPoint) +
         `\n[TRUNCATED by ${fnName}: showing ${keptLines} of ${totalLines} lines. ` +
         "Use region, sample_fraction, win/step, or stricter filters to reduce result size. " +
         "Or write to file and read back the first few lines. ]"
