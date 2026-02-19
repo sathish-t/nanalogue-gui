@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bumps `@nanalogue/node` to ^0.1.4 and migrates swipe-data-loader and qc-data-loader from TSV to JSON parsing for `windowReads` output ([`e1aecd3`](https://github.com/sathish-t/nanalogue-gui/commit/e1aecd35544a845b8df6145f4e44d15c93dbe00b), [`7ec8f9a`](https://github.com/sathish-t/nanalogue-gui/commit/7ec8f9aea3eeaada48ed52c9846d399368ec30f7), [`0fdc20e`](https://github.com/sathish-t/nanalogue-gui/commit/0fdc20e802cfcb05a61ed4e5435445f1776f796a))
+- Merges `paginateReadInfo` into `paginateWindowReads` — read lengths and alignment type counts now come from `windowReads` JSON, eliminating one concurrent API call ([`0fdc20e`](https://github.com/sathish-t/nanalogue-gui/commit/0fdc20e802cfcb05a61ed4e5435445f1776f796a))
 - Bumps `@nanalogue/node` to ^0.1.3 ([`2f49f16`](https://github.com/sathish-t/nanalogue-gui/commit/2f49f16c5fd5b99033fcee24b43a4ff12a68cc77))
 - Caps BED file parsing at 10k entries ([`ef12920`](https://github.com/sathish-t/nanalogue-gui/commit/ef1292084f853723546a7f04a0f5b46381e3a6d7))
 - Caps read ID parsing at 200k IDs ([`3d117f0`](https://github.com/sathish-t/nanalogue-gui/commit/3d117f0a5893943ef05d21853d47cf5ea63afde6))
@@ -52,10 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added: `ai` ^6.0.86, `@ai-sdk/openai-compatible` ^2.0.30, `@pydantic/monty` ^0.0.5, `picomatch` ^4.0.3 ([`8d7edab`](https://github.com/sathish-t/nanalogue-gui/commit/8d7edabfcd133168eb066144488ca9e0e1a34765))
 - Bumps `@pydantic/monty` to ^0.0.6 ([`2a3a7e2`](https://github.com/sathish-t/nanalogue-gui/commit/2a3a7e2919f60c7b7174ff8ac5232e5eebeb0640))
 - Added: `@electron/windows-sign` ^1.2.2 dev dependency for electron-builder ([`231bbe6`](https://github.com/sathish-t/nanalogue-gui/commit/231bbe663a837b5ce8d2d508c4e5a548153454ed))
+- Added: `@vitest/coverage-v8` dev dependency for code coverage ([`47985fd`](https://github.com/sathish-t/nanalogue-gui/commit/47985fd759000e1e473aba1a56f77b4d24305199))
 
 ### Infrastructure
 
 - Bumps GitHub Actions `upload-artifact` to v6 and `download-artifact` to v7 ([`b7f795d`](https://github.com/sathish-t/nanalogue-gui/commit/b7f795d92ff3537cb3785101aa3fe65041b068b9))
+- Adds Codecov coverage workflow for test coverage reporting ([`2118d4f`](https://github.com/sathish-t/nanalogue-gui/commit/2118d4f7036ad1aa8cd8f58718b3aa76c79f0d9b), [`e333ddb`](https://github.com/sathish-t/nanalogue-gui/commit/e333ddbd19f8f2f254344f1861e06e742122ecb8))
 
 ### Removed
 
