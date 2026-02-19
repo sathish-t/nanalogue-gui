@@ -1,0 +1,5 @@
+# Codecov configuration for nanalogue-gui
+# Excludes non-package directories from coverage reporting
+
+ignore:
+  - "demo/"
