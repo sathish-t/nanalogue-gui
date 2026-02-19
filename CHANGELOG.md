@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pagination break condition now uses empty-page detection instead of comparing returned count to page size, which caused early termination when reads were filtered; bamMods page size reduced to 1,000 to limit peak memory ([`9aca006`](https://github.com/sathish-t/nanalogue-gui/commit/9aca006a047a4479ddffccb27a48940b23c90a21))
 - Tool calls matched by ID instead of array index in chat orchestrator ([`79a72ff`](https://github.com/sathish-t/nanalogue-gui/commit/79a72ff5d68394ba1b6e852cb6f97c49d069d4f3))
 - AI Chat spinner and processing state reset on new chat ([`0036fa3`](https://github.com/sathish-t/nanalogue-gui/commit/0036fa30901a1926227f0e50bd65cb1214e3ea26))
+- Ambiguous read detection failed for multi-alignment reads because comma-space separator in seqTable output left leading whitespace, making same-length sequences appear different ([`7ca7f49`](https://github.com/sathish-t/nanalogue-gui/commit/7ca7f4920e327e4ad1bf0418133fb6dee2227201))
 
 ### Dependencies
 
