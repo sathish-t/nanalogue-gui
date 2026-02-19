@@ -3,6 +3,7 @@
 Electron GUI for Nanalogue: interactive nanopore data analysis and curation.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![codecov](https://codecov.io/gh/sathish-t/nanalogue-gui/graph/badge.svg?token=A9AQCSCMHD)](https://codecov.io/gh/sathish-t/nanalogue-gui)
 
 Nanalogue-gui provides a desktop application for working with BAM/Mod-BAM files,
 with a focus on single-molecule DNA/RNA modifications. It builds on
