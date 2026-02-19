@@ -10,6 +10,8 @@ import type { ModFilterInput } from "../shared/mod-filter-input";
 import "../shared/mod-filter-input";
 import type { OutputFileInput } from "../shared/output-file-input";
 import "../shared/output-file-input";
+import type { WindowSizeInput } from "../shared/window-size-input";
+import "../shared/window-size-input";
 
 /**
  * Result returned by the peek-bam IPC handler.
@@ -56,6 +58,7 @@ interface SwipeConfigApi {
         bamPath: string,
         bedPath: string,
         outputPath: string,
+        windowSize: number,
         modTag?: string,
         modStrand?: "bc" | "bc_comp",
         flankingRegion?: number,
@@ -85,6 +88,13 @@ const bamSource = document.getElementById("bam-source") as BamResourceInput;
  * Modification filter custom element reference.
  */
 const modFilter = document.getElementById("mod-filter") as ModFilterInput;
+
+/**
+ * Window size custom element reference.
+ */
+const windowSizeInput = document.getElementById(
+    "window-size",
+) as WindowSizeInput;
 
 /**
  * Output file selection custom element reference.
@@ -441,6 +451,12 @@ elements.btnStart.addEventListener("click", async () => {
 
     if (!bamPath || !bedPath || !outputPath) return;
 
+    const windowSize = windowSizeInput.value;
+    if (!windowSizeInput.isValid) {
+        alert("Window size must be an integer between 2 and 10,000.");
+        return;
+    }
+
     const { tag: modTag, modStrand } = modFilter;
     const rawFlanking = Number(elements.flankingRegion.value);
     if (!Number.isInteger(rawFlanking) || rawFlanking < 0) {
@@ -461,6 +477,7 @@ elements.btnStart.addEventListener("click", async () => {
             bamPath,
             bedPath,
             outputPath,
+            windowSize,
             modTag,
             modStrand,
             flankingRegion,

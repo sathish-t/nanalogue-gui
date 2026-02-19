@@ -86,6 +86,7 @@ contextBridge.exposeInMainWorld("api", {
      * @param bamPath - The path to the BAM file.
      * @param bedPath - The path to the BED annotations file.
      * @param outputPath - The path for the output BED file.
+     * @param windowSize - The number of bases of interest per analysis window.
      * @param modTag - The modification tag code to filter by.
      * @param modStrand - The strand convention for modification calls.
      * @param flankingRegion - The number of base pairs to expand the region by on each side.
@@ -97,6 +98,7 @@ contextBridge.exposeInMainWorld("api", {
         bamPath: string,
         bedPath: string,
         outputPath: string,
+        windowSize: number,
         modTag?: string,
         modStrand?: "bc" | "bc_comp",
         flankingRegion?: number,
@@ -108,6 +110,7 @@ contextBridge.exposeInMainWorld("api", {
             bamPath,
             bedPath,
             outputPath,
+            windowSize,
             modTag,
             modStrand,
             flankingRegion,
