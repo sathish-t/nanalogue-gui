@@ -440,14 +440,19 @@ export function parseSeqTableTsv(tsv: string): PartialSeqRow[] {
         if (fields.length < 3) continue;
 
         const readId = fields[0];
-        const sequence = fields[1];
-        const rawQual = fields[2];
-        const qualities =
-            rawQual === ""
-                ? []
-                : rawQual.split(".").map(Number).filter(Number.isFinite);
+        // Split on comma handles both single and multi-alignment rows:
+        // "ACGT".split(",") → ["ACGT"], "ACGT,TG".split(",") → ["ACGT", "TG"]
+        const seqs = fields[1].split(",");
+        const quals = fields[2].split(",");
 
-        rows.push({ readId, sequence, qualities });
+        for (let k = 0; k < seqs.length; k++) {
+            const qualStr = k < quals.length ? quals[k] : "";
+            const qualities =
+                qualStr === ""
+                    ? []
+                    : qualStr.split(".").map(Number).filter(Number.isFinite);
+            rows.push({ readId, sequence: seqs[k], qualities });
+        }
     }
 
     return rows;

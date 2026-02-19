@@ -184,6 +184,50 @@ describe("parseSeqTableTsv", () => {
         const rows = parseSeqTableTsv(tsv);
         expect(rows).toHaveLength(1);
     });
+
+    /** Splits comma-separated sequences into multiple rows sharing the same readId. */
+    it("splits comma-separated multi-alignment rows", () => {
+        const tsv = [
+            "read_id\tsequence\tqualities",
+            "read1\tACGT,TG\t10.20.30.40,5.15",
+        ].join("\n");
+
+        const rows = parseSeqTableTsv(tsv);
+        expect(rows).toHaveLength(2);
+        expect(rows[0]).toEqual({
+            readId: "read1",
+            sequence: "ACGT",
+            qualities: [10, 20, 30, 40],
+        });
+        expect(rows[1]).toEqual({
+            readId: "read1",
+            sequence: "TG",
+            qualities: [5, 15],
+        });
+    });
+
+    /** Handles a mix of single and multi-alignment rows. */
+    it("handles mix of single and multi-alignment rows", () => {
+        const tsv = [
+            "read_id\tsequence\tqualities",
+            "read1\tACGT\t10.20.30.40",
+            "read2\tAA,GGG\t1.2,3.4.5",
+        ].join("\n");
+
+        const rows = parseSeqTableTsv(tsv);
+        expect(rows).toHaveLength(3);
+        expect(rows[0].readId).toBe("read1");
+        expect(rows[1]).toEqual({
+            readId: "read2",
+            sequence: "AA",
+            qualities: [1, 2],
+        });
+        expect(rows[2]).toEqual({
+            readId: "read2",
+            sequence: "GGG",
+            qualities: [3, 4, 5],
+        });
+    });
 });
 
 describe("matchBaseByLength", () => {
