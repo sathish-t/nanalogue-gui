@@ -189,4 +189,175 @@ describe("parseWindowReadsJson", () => {
         const rows = parseWindowReadsJson("");
         expect(rows).toEqual([]);
     });
+
+    it("skips non-unmapped records without alignment field", () => {
+        const json = makeJson([
+            {
+                alignment_type: "primary_forward",
+                mod_table: [
+                    {
+                        base: "C",
+                        is_strand_plus: true,
+                        mod_code: "m",
+                        data: [[10, 20, 0.5, 30, 100, 200]],
+                    },
+                ],
+                read_id: "read1",
+                seq_len: 8,
+            },
+        ]);
+        const rows = parseWindowReadsJson(json);
+        expect(rows).toEqual([]);
+    });
+
+    it("drops rows with non-finite win_val (NaN)", () => {
+        const json = makeJson([
+            {
+                alignment_type: "primary_forward",
+                alignment: { start: 0, end: 10, contig: "chr1", contig_id: 0 },
+                mod_table: [
+                    {
+                        base: "C",
+                        is_strand_plus: true,
+                        mod_code: "m",
+                        data: [
+                            [10, 20, Number.NaN, 30, 100, 200],
+                            [10, 20, 0.75, 30, 100, 200],
+                        ],
+                    },
+                ],
+                read_id: "read1",
+                seq_len: 10,
+            },
+        ]);
+        const rows = parseWindowReadsJson(json);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].win_val).toBe(0.75);
+    });
+
+    it("drops rows with non-finite ref_win_start (Infinity)", () => {
+        const json = makeJson([
+            {
+                alignment_type: "primary_forward",
+                alignment: { start: 0, end: 10, contig: "chr1", contig_id: 0 },
+                mod_table: [
+                    {
+                        base: "C",
+                        is_strand_plus: true,
+                        mod_code: "m",
+                        data: [
+                            [10, 20, 0.5, 30, Number.POSITIVE_INFINITY, 200],
+                            [10, 20, 0.75, 30, 100, 200],
+                        ],
+                    },
+                ],
+                read_id: "read1",
+                seq_len: 10,
+            },
+        ]);
+        const rows = parseWindowReadsJson(json);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].ref_win_start).toBe(100);
+    });
+
+    it("drops rows with non-finite ref_win_end (NaN)", () => {
+        const json = makeJson([
+            {
+                alignment_type: "primary_forward",
+                alignment: { start: 0, end: 10, contig: "chr1", contig_id: 0 },
+                mod_table: [
+                    {
+                        base: "C",
+                        is_strand_plus: true,
+                        mod_code: "m",
+                        data: [
+                            [10, 20, 0.5, 30, 100, Number.NaN],
+                            [10, 20, 0.75, 30, 100, 200],
+                        ],
+                    },
+                ],
+                read_id: "read1",
+                seq_len: 10,
+            },
+        ]);
+        const rows = parseWindowReadsJson(json);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].ref_win_end).toBe(200);
+    });
+
+    it("handles multiple mod_table entries per record", () => {
+        const json = makeJson([
+            {
+                alignment_type: "primary_forward",
+                alignment: { start: 0, end: 10, contig: "chr1", contig_id: 0 },
+                mod_table: [
+                    {
+                        base: "C",
+                        is_strand_plus: true,
+                        mod_code: "m",
+                        data: [[10, 20, 0.5, 30, 100, 200]],
+                    },
+                    {
+                        base: "A",
+                        is_strand_plus: false,
+                        mod_code: "a",
+                        data: [[30, 40, 0.8, 50, 300, 400]],
+                    },
+                ],
+                read_id: "read1",
+                seq_len: 10,
+            },
+        ]);
+        const rows = parseWindowReadsJson(json);
+        expect(rows).toHaveLength(2);
+        expect(rows[0].base).toBe("C");
+        expect(rows[0].mod_type).toBe("m");
+        expect(rows[1].base).toBe("A");
+        expect(rows[1].mod_type).toBe("a");
+        expect(rows[1].mod_strand).toBe("-");
+    });
+
+    it("handles supplementary_forward alignment type", () => {
+        const json = makeJson([
+            {
+                alignment_type: "supplementary_forward",
+                alignment: { start: 0, end: 10, contig: "chr1", contig_id: 0 },
+                mod_table: [
+                    {
+                        base: "C",
+                        is_strand_plus: true,
+                        mod_code: "m",
+                        data: [[10, 20, 0.5, 30, 100, 200]],
+                    },
+                ],
+                read_id: "read1",
+                seq_len: 10,
+            },
+        ]);
+        const rows = parseWindowReadsJson(json);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].strand).toBe("+");
+    });
+
+    it("handles secondary_reverse alignment type", () => {
+        const json = makeJson([
+            {
+                alignment_type: "secondary_reverse",
+                alignment: { start: 0, end: 10, contig: "chr1", contig_id: 0 },
+                mod_table: [
+                    {
+                        base: "C",
+                        is_strand_plus: true,
+                        mod_code: "m",
+                        data: [[10, 20, 0.5, 30, 100, 200]],
+                    },
+                ],
+                read_id: "read1",
+                seq_len: 10,
+            },
+        ]);
+        const rows = parseWindowReadsJson(json);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].strand).toBe("-");
+    });
 });
