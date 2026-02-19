@@ -563,7 +563,6 @@ async function generateQC() {
     };
 
     const progressLabels: Record<string, string> = {
-        reads: "Loading reads for length data",
         modifications: "Loading reads for modification data",
         windows: "Loading reads for window data",
         sequences: "Loading reads for sequences",

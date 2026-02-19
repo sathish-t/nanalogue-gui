@@ -7,67 +7,70 @@ import {
     matchBaseByLength,
     maxReadLengthForBinWidth,
     parseSeqTableTsv,
-    parseWindowedDensities,
+    parseWindowReadsJson,
     regionSizeBp,
 } from "./qc-data-loader";
 
-describe("parseWindowedDensities", () => {
+describe("parseWindowReadsJson", () => {
     it("returns empty array for empty input", () => {
-        expect(parseWindowedDensities("")).toEqual([]);
+        expect(parseWindowReadsJson("")).toEqual([]);
     });
 
-    it("returns empty array for header-only input", () => {
-        expect(parseWindowedDensities("col1\tcol2\tcol3\tcol4\tcol5")).toEqual(
-            [],
-        );
+    it("returns empty array for whitespace-only input", () => {
+        expect(parseWindowReadsJson("   ")).toEqual([]);
     });
 
-    it("parses valid density values from TSV", () => {
-        const tsv = [
-            "contig\tstart\tend\tread_id\twin_val",
-            "chr1\t100\t200\tread1\t0.5",
-            "chr1\t200\t300\tread1\t0.75",
-        ].join("\n");
+    it("parses valid JSON records", () => {
+        const json = JSON.stringify([
+            {
+                alignment_type: "primary_forward",
+                alignment: { start: 9, end: 17, contig: "chr1", contig_id: 0 },
+                mod_table: [
+                    {
+                        base: "C",
+                        is_strand_plus: true,
+                        mod_code: "m",
+                        data: [[10, 20, 0.5, 30, 100, 200]],
+                    },
+                ],
+                read_id: "read1",
+                seq_len: 8,
+            },
+        ]);
 
-        const result = parseWindowedDensities(tsv);
-        expect(result).toEqual([0.5, 0.75]);
+        const result = parseWindowReadsJson(json);
+        expect(result).toHaveLength(1);
+        expect(result[0].alignment_type).toBe("primary_forward");
+        expect(result[0].read_id).toBe("read1");
+        expect(result[0].mod_table[0].data[0][2]).toBe(0.5);
     });
 
-    it("filters out NaN values", () => {
-        const tsv = [
-            "contig\tstart\tend\tread_id\twin_val",
-            "chr1\t100\t200\tread1\t0.5",
-            "chr1\t200\t300\tread1\tNaN",
-            "chr1\t300\t400\tread1\t0.75",
-        ].join("\n");
+    it("parses multiple records", () => {
+        const json = JSON.stringify([
+            {
+                alignment_type: "primary_forward",
+                alignment: { start: 0, end: 10, contig: "chr1", contig_id: 0 },
+                mod_table: [],
+                read_id: "read1",
+                seq_len: 10,
+            },
+            {
+                alignment_type: "unmapped",
+                mod_table: [],
+                read_id: "read2",
+                seq_len: 5,
+            },
+        ]);
 
-        const result = parseWindowedDensities(tsv);
-        expect(result).toEqual([0.5, 0.75]);
+        const result = parseWindowReadsJson(json);
+        expect(result).toHaveLength(2);
+        expect(result[0].alignment_type).toBe("primary_forward");
+        expect(result[1].alignment_type).toBe("unmapped");
+        expect(result[1].alignment).toBeUndefined();
     });
 
-    it("filters out Infinity values", () => {
-        const tsv = [
-            "contig\tstart\tend\tread_id\twin_val",
-            "chr1\t100\t200\tread1\t0.5",
-            "chr1\t200\t300\tread1\tInfinity",
-            "chr1\t300\t400\tread1\t-Infinity",
-            "chr1\t400\t500\tread1\t0.75",
-        ].join("\n");
-
-        const result = parseWindowedDensities(tsv);
-        expect(result).toEqual([0.5, 0.75]);
-    });
-
-    it("skips rows with fewer than 5 fields", () => {
-        const tsv = [
-            "contig\tstart\tend\tread_id\twin_val",
-            "chr1\t100\t200\tread1\t0.5",
-            "chr1\t200\t300",
-            "chr1\t300\t400\tread1\t0.75",
-        ].join("\n");
-
-        const result = parseWindowedDensities(tsv);
-        expect(result).toEqual([0.5, 0.75]);
+    it("parses empty JSON array", () => {
+        expect(parseWindowReadsJson("[]")).toEqual([]);
     });
 });
 
