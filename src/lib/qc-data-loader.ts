@@ -387,9 +387,10 @@ export function parseSeqTableTsv(tsv: string): PartialSeqRow[] {
 
         const readId = fields[0];
         // Split on comma handles both single and multi-alignment rows:
-        // "ACGT".split(",") → ["ACGT"], "ACGT,TG".split(",") → ["ACGT", "TG"]
-        const seqs = fields[1].split(",");
-        const quals = fields[2].split(",");
+        // "ACGT".split(",") → ["ACGT"], "ACGT, TG".split(",") → ["ACGT", "TG"]
+        // Trim each entry because nanalogue-node uses ", " (comma-space) as separator.
+        const seqs = fields[1].split(",").map((s) => s.trim());
+        const quals = fields[2].split(",").map((s) => s.trim());
 
         for (let k = 0; k < seqs.length; k++) {
             const qualStr = k < quals.length ? quals[k] : "";

@@ -247,6 +247,21 @@ describe("parseSeqTableTsv", () => {
         expect(rows[1].qualities).toEqual([]);
     });
 
+    /** Trims whitespace from comma-space separated sequences (nanalogue-node format). */
+    it("trims whitespace from comma-space separated entries", () => {
+        const tsv = [
+            "read_id\tsequence\tqualities",
+            "read1\tGGATAT, GGATAT\t4.8.9.24.32.37, 8.15.12.12.11.8",
+        ].join("\n");
+
+        const rows = parseSeqTableTsv(tsv);
+        expect(rows).toHaveLength(2);
+        expect(rows[0].sequence).toBe("GGATAT");
+        expect(rows[1].sequence).toBe("GGATAT");
+        expect(rows[0].sequence.length).toBe(rows[1].sequence.length);
+        expect(rows[1].qualities).toEqual([8, 15, 12, 12, 11, 8]);
+    });
+
     /** Handles a mix of single and multi-alignment rows. */
     it("handles mix of single and multi-alignment rows", () => {
         const tsv = [
