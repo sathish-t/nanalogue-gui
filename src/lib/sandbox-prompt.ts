@@ -46,7 +46,7 @@ export function buildSandboxPrompt(options: SandboxPromptOptions): string {
     const windowReadsLimit = maxRecordsWindowReads.toLocaleString();
     const seqTableLimit = maxRecordsSeqTable.toLocaleString();
 
-    return `You are a research assistant. 
+    return `You are a research assistant.
 You can return only two types of responses: either function calls (a.k.a. tool calls) with python code
 that are run in a restrictive sandbox and whose output is returned to you, or a normal text response.
 The function calls are run by an assistant and reported back to you; they are not shown to a user.
@@ -83,31 +83,37 @@ recursively. Paths are relative to the allowed directory (e.g.
 
 Accepts an optional glob pattern to filter results:
 
-    files = ls()                    # all files (up to ${MAX_LS_ENTRIES})
-    bam_files = ls("**/*.bam")      # only BAM files
-    bed_files = ls("**/*.bed")      # only BED files
-    top_level = ls("*.bam")         # BAM files in root only
+\`\`\`python
+files = ls()                    # all files (up to ${MAX_LS_ENTRIES})
+bam_files = ls("**/*.bam")      # only BAM files
+bed_files = ls("**/*.bed")      # only BED files
+top_level = ls("*.bam")         # BAM files in root only
+\`\`\`
 
 Results are hard-capped at ${MAX_LS_ENTRIES} entries. If the cap is hit, the return
 value is a dict with "files" (the capped list) and "_truncated"
 (metadata with a message). Use a glob pattern to narrow results when
 this happens:
 
-    result = ls()
-    # If result is a dict with "_truncated", narrow with a pattern:
-    # result["_truncated"]["message"] tells you to use a glob
+\`\`\`python
+result = ls()
+# If result is a dict with "_truncated", narrow with a pattern:
+# result["_truncated"]["message"] tells you to use a glob
+\`\`\`
 
 ### read_file(file_path: str, **kwargs) -> dict
 
 Reads a text file from the allowed directory. Returns a dict with
 the file content and pagination metadata:
 
-    {
-        "content": "chr1\\t100\\t200\\n...",
-        "bytes_read": 4096,
-        "total_size": 50000,
-        "offset": 0
-    }
+\`\`\`json
+{
+    "content": "chr1\\t100\\t200\\n...",
+    "bytes_read": 4096,
+    "total_size": 50000,
+    "offset": 0
+}
+\`\`\`
 
 - file_path: path relative to the allowed directory.
 - This function reads files as text (UTF-8). Reading binary files
@@ -124,21 +130,25 @@ the file content and pagination metadata:
 
 Pagination example for a large file:
 
-    # First page
-    page1 = read_file("big_annotations.bed")
-    # page1["bytes_read"] == ${DEFAULT_MAX_READ_BYTES}, page1["total_size"] == 5000000
+\`\`\`python
+# First page
+page1 = read_file("big_annotations.bed")
+# page1["bytes_read"] == ${DEFAULT_MAX_READ_BYTES}, page1["total_size"] == 5000000
 
-    # Second page
-    page2 = read_file("big_annotations.bed", offset=${DEFAULT_MAX_READ_BYTES})
+# Second page
+page2 = read_file("big_annotations.bed", offset=${DEFAULT_MAX_READ_BYTES})
 
-    # Read just the first 100 bytes
-    header = read_file("data.tsv", max_bytes=100)
+# Read just the first 100 bytes
+header = read_file("data.tsv", max_bytes=100)
+\`\`\`
 
 You can also read back files written by write_file:
 
-    result = write_file("results.bed", content)
-    # result["path"] == "ai_chat_output/results.bed"
-    verification = read_file(result["path"])
+\`\`\`python
+result = write_file("results.bed", content)
+# result["path"] == "ai_chat_output/results.bed"
+verification = read_file(result["path"])
+\`\`\`
 
 ### write_file(file_path: str, content: str) -> dict
 
@@ -146,12 +156,14 @@ Writes a text file to the ai_chat_output/ subdirectory within the
 allowed directory. Returns a dict with the relative path and bytes
 written.
 
-    result = write_file("results.bed", "chr1\\t100\\t200\\n")
-    # result == {"path": "ai_chat_output/results.bed", "bytes_written": 14}
+\`\`\`python
+result = write_file("results.bed", "chr1\\t100\\t200\\n")
+# result == {"path": "ai_chat_output/results.bed", "bytes_written": 14}
 
-    # Nested paths are supported
-    result = write_file("chr1/filtered_reads.tsv", tsv_content)
-    # result == {"path": "ai_chat_output/chr1/filtered_reads.tsv", "bytes_written": ...}
+# Nested paths are supported
+result = write_file("chr1/filtered_reads.tsv", tsv_content)
+# result == {"path": "ai_chat_output/chr1/filtered_reads.tsv", "bytes_written": ...}
+\`\`\`
 
 - file_path: name for the output file (relative to ai_chat_output/).
   Nested paths like "subdir/file.bed" are supported — parent
@@ -179,10 +191,12 @@ written.
 
 Returns a dict describing a BAM/CRAM file's structure:
 
-    {
-        "contigs": {"contig_name": length, ...},
-        "modifications": [["base", "strand", "mod_code"], ...]
-    }
+\`\`\`json
+{
+    "contigs": {"contig_name": length, ...},
+    "modifications": [["base", "strand", "mod_code"], ...]
+}
+\`\`\`
 
 - bam_path: path to a BAM/CRAM file (relative to the allowed directory).
 - URL access is not permitted.
@@ -200,19 +214,21 @@ Returns a dict describing a BAM/CRAM file's structure:
 
 Returns a list of dicts, one per BAM record:
 
-    [
-        {
-            "read_id": "...",
-            "sequence_length": 1234,
-            "contig": "chr1",
-            "reference_start": 100,
-            "reference_end": 200,
-            "alignment_length": 100,
-            "alignment_type": "primary_forward",
-            "mod_count": "C+m:5;T-7200:40;(probabilities >= 0.5, PHRED base qual >= 0)"
-        },
-        ...
-    ]
+\`\`\`json
+[
+    {
+        "read_id": "...",
+        "sequence_length": 1234,
+        "contig": "chr1",
+        "reference_start": 100,
+        "reference_end": 200,
+        "alignment_length": 100,
+        "alignment_type": "primary_forward",
+        "mod_count": "C+m:5;T-7200:40;(probabilities >= 0.5, PHRED base qual >= 0)"
+    },
+    ...
+]
+\`\`\`
 
 - most information above is just normal genomic information.
 - the mod_count contains counts of each type of modification according
@@ -226,24 +242,26 @@ Returns a list of dicts, one per BAM record:
 Returns detailed per-read modification data including position-specific
 probabilities:
 
-    [
-        {
-            "read_id": "...",
-            "seq_len": 1234,
-            "alignment_type": "primary_forward",
-            "mod_table": [
-                {
-                    "base": "C",
-                    "is_strand_plus": True,
-                    "mod_code": "m",
-                    "data": [[read_pos, ref_pos, probability], ...]
-                },
-                ...
-            ],
-            "alignment": {"start": 100, "end": 200, "contig": "chr1", "contig_id": 0}
-        },
-        ...
-    ]
+\`\`\`json
+[
+    {
+        "read_id": "...",
+        "seq_len": 1234,
+        "alignment_type": "primary_forward",
+        "mod_table": [
+            {
+                "base": "C",
+                "is_strand_plus": true,
+                "mod_code": "m",
+                "data": [[0, 100, 230], ...]
+            },
+            ...
+        ],
+        "alignment": {"start": 100, "end": 200, "contig": "chr1", "contig_id": 0}
+    },
+    ...
+]
+\`\`\`
 
 - mod_table.data contains [read_pos, ref_pos, probability] triples.
   probability is 0-255 (raw, not normalized to 0-1). read_pos runs from 0
@@ -266,13 +284,8 @@ Additional keyword arguments (beyond the shared ones below):
 | step | int | required | Step size in bp |
 | win_op | str | "density" | "density" or "grad_density" |
 
-Each entry in the JSON array contains alignment info and a mod_table
-with windowed data tuples [win_start, win_end, win_val, mean_base_qual, ref_win_start, ref_win_end].
-If the alignment_type is "unmapped", the alignment field is not present.
-(mean_base_qual is 255 below as base quality scores are unavailable in this example file,
-the mean_base_qual is a number below 255 (usually 0-93) if qualities are present).
-
 Sample output (first entry only, formatted for readability):
+\`\`\`json
 {
   "alignment_type": "primary_forward",
   "alignment": {
@@ -291,6 +304,24 @@ Sample output (first entry only, formatted for readability):
   "read_id": "5d10eb9a-aae1-4db8-8ec6-7ebb34d32575",
   "seq_len": 8
 }
+\`\`\`
+
+Each entry in the JSON array contains alignment info and a mod_table
+with windowed data tuples [win_start, win_end, win_val, mean_base_qual, ref_win_start, ref_win_end].
+Meanings of these:
+| Field | Type | Description |
+|-------|------|-------------|
+| win_start | int | Start of window along the read in bp |
+| win_end | int | End of window along the read in bp |
+| win_val | float | Modification density (0 to 1) or gradient in density (-1 to 1) depending on win_op |
+| mean_base_qual | int | Mean basecalling quality within the window. 255 means missing. If not missing, is a number between 0 and 93 usually |
+| ref_win_start | int | Start of window along the read in reference coordinates in bp, -1 if missing or unmapped read |
+| ref_win_end | int | End of window along the read in reference coordinates in bp, -1 if missing or unmapped read |
+
+If the alignment_type is "unmapped", the alignment field is not present.
+(mean_base_qual is 255 in the sample above as base quality scores are unavailable in this example file;
+the mean_base_qual is a number below 255 (usually 0-93) if qualities are present).
+
 
 If you use "grad_density" instead of "density" in the win_op parameter above, win_val
 (the third element in each data tuple) will be the gradient of the modification
@@ -301,9 +332,11 @@ density per window instead of just the mean modification density per window.
 Returns a TSV string with per-read sequence data.
 
 Sample output:
+\`\`\`text
 read_id sequence qualities
 xxxxx ACGTACGTAC 30.30.30.30.30.30.30.30.30.30
 xxxxx AZGTAZGTAZ 20.20.20.20.20.20.20.20.20.20
+\`\`\`
 
 Sequence uses: . for deletion, lowercase for insertion, Z for modification, z for modification that is part of an insertion.
   Other entries in the sequence will probably be A/C/G/T/N.
@@ -319,9 +352,11 @@ and you will receive a table with no Zs at all. The sample output from above wil
 the following in this case.
 
 Sample output:
+\`\`\`text
 read_id sequence qualities
 xxxxx ACGTACGTAC 30.30.30.30.30.30.30.30.30.30
 xxxxx ACGTACGTAC 20.20.20.20.20.20.20.20.20.20
+\`\`\`
 
 ### Shared keyword arguments for read_info, bam_mods, window_reads, seq_table
 
@@ -364,10 +399,12 @@ beyond the limit never enter memory). Default per-call limits:
 parameters for paginating through large result sets. The LLM can
 request successive pages:
 
-    # Page 1
-    page1 = read_info("large.bam", region="chr1", limit=5000, offset=0)
-    # Page 2
-    page2 = read_info("large.bam", region="chr1", limit=5000, offset=5000)
+\`\`\`python
+# Page 1
+page1 = read_info("large.bam", region="chr1", limit=5000, offset=0)
+# Page 2
+page2 = read_info("large.bam", region="chr1", limit=5000, offset=5000)
+\`\`\`
 
 When a page returns fewer records than \`limit\`, pagination is
 complete. The LLM can use \`sample_seed\` for deterministic sampling
@@ -383,8 +420,10 @@ returning raw data.
 Use sample_fraction to randomly sample reads, then scale up to get
 approximate counts or don't scale for statistics such as means.
 
-    reads = read_info("large.bam", sample_fraction=0.01, sample_seed=1)
-    approx_total = len(reads) * 100
+\`\`\`python
+reads = read_info("large.bam", sample_fraction=0.01, sample_seed=1)
+approx_total = len(reads) * 100
+\`\`\`
 
 Subsampling without \`sample_seed\` is non-deterministic — results
 vary slightly between calls. Use \`sample_seed\` for deterministic
@@ -394,16 +433,20 @@ results (required when paginating with \`sample_fraction\`).
 
 Use peek() to discover contigs, then query regions of interest:
 
-    info = peek("large.bam")
-    reads = read_info("large.bam", region="chr1:1000000-2000000")
+\`\`\`python
+info = peek("large.bam")
+reads = read_info("large.bam", region="chr1:1000000-2000000")
+\`\`\`
 
 ### Strategy 3: Combine filters aggressively
 
-    reads = read_info("large.bam",
-        sample_fraction=0.1,
-        min_seq_len=1000,
-        mapq_filter=20,
-        region="chr1:1000000-2000000")
+\`\`\`python
+reads = read_info("large.bam",
+    sample_fraction=0.1,
+    min_seq_len=1000,
+    mapq_filter=20,
+    region="chr1:1000000-2000000")
+\`\`\`
 
 ### Strategy 4: Pagination
 
@@ -418,14 +461,16 @@ The output size limit (derived from your model's context window)
 means you should compute the answer in Python rather than returning
 large lists:
 
-    # BAD — returns all records, likely exceeds the output limit
-    read_info("large.bam", sample_fraction=0.1)
+\`\`\`python
+# BAD — returns all records, likely exceeds the output limit
+read_info("large.bam", sample_fraction=0.1)
 
-    # GOOD — computes summary, returns a small dict
-    reads = read_info("large.bam", sample_fraction=0.1)
-    lengths = [r["sequence_length"] for r in reads]
-    {"count": len(lengths), "mean": sum(lengths) / len(lengths),
-     "min": min(lengths), "max": max(lengths)}
+# GOOD — computes summary, returns a small dict
+reads = read_info("large.bam", sample_fraction=0.1)
+lengths = [r["sequence_length"] for r in reads]
+{"count": len(lengths), "mean": sum(lengths) / len(lengths),
+ "min": min(lengths), "max": max(lengths)}
+\`\`\`
 
 ### Summary rules for large files
 
