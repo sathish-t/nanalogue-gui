@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Exit watchdog child process for force-killing the app on window close, even when the main event loop is blocked by native addon calls ([`ecfa1f5`](https://github.com/sathish-t/nanalogue-gui/commit/ecfa1f5837ae5d51a10dcb8a731c1a8b40150149))
 - Version button and dialog on landing page with link to nanalogue.com, external URL opens in OS browser ([`0b0dee6`](https://github.com/sathish-t/nanalogue-gui/commit/0b0dee655f35d7ab2fdb195de7264dbf22c8e8eb))
 - Auto-fit landing page height to rendered content with mode-change guard ([`dd3d790`](https://github.com/sathish-t/nanalogue-gui/commit/dd3d790dfa61863cf9a64330aee22890a36d2f22))
+- Increases IPC validation test coverage with tests for `validateListModels`, `validateSendMessage` field checks, and `validateIpcPayload` channel routing ([`1766072`](https://github.com/sathish-t/nanalogue-gui/commit/1766072f4962201bf5c2ca2d3bfe27ee487fb548), [`4e598b0`](https://github.com/sathish-t/nanalogue-gui/commit/4e598b03f86afcf132e0b72d45be24e403a91cfd), [`87eb133`](https://github.com/sathish-t/nanalogue-gui/commit/87eb133148376bd7b5ec3167e2f014e17c053fc3), [`abadd9e`](https://github.com/sathish-t/nanalogue-gui/commit/abadd9ebe4f5df846da58e426117cd7b1140a6be))
 
 ### Changed
 
