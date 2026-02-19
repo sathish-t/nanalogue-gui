@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Caps BED file parsing at 10k entries ([`ef12920`](https://github.com/sathish-t/nanalogue-gui/commit/ef1292084f853723546a7f04a0f5b46381e3a6d7))
 - Caps read ID parsing at 200k IDs ([`3d117f0`](https://github.com/sathish-t/nanalogue-gui/commit/3d117f0a5893943ef05d21853d47cf5ea63afde6))
 - QC data loading now paginates in 10k-record pages with streaming histograms to reduce peak memory ([`d385b9e`](https://github.com/sathish-t/nanalogue-gui/commit/d385b9ecf0774135d390f8723858fd03fc4f882c))
+- QC pagination stops on partial page instead of requiring an extra empty-page fetch ([`1f2e833`](https://github.com/sathish-t/nanalogue-gui/commit/1f2e8336bbb87b0d16fa2b8f7df4534705e1b7bf))
 - QC generation forwards per-source pagination progress to the renderer via `qc-progress` IPC ([`02b8185`](https://github.com/sathish-t/nanalogue-gui/commit/02b8185ae1a3c696c3bc168c6dee84eca14ddd5c))
 
 ### Fixed
