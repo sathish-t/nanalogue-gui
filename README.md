@@ -7,7 +7,7 @@ Electron GUI for Nanalogue: interactive nanopore data analysis and curation.
 
 Nanalogue-gui provides a desktop application for working with BAM/Mod-BAM files,
 with a focus on single-molecule DNA/RNA modifications. It builds on
-[@nanalogue/node](https://github.com/DNAReplicationLab/nanalogue-node) to provide
+[@nanalogue/node](https://github.com/sathish-t/nanalogue-node) to provide
 interactive visualisation and curation workflows.
 
 ## Table of Contents
