@@ -72,6 +72,20 @@ describe("parseWindowReadsJson", () => {
     it("parses empty JSON array", () => {
         expect(parseWindowReadsJson("[]")).toEqual([]);
     });
+
+    it("preserves unmapped records without alignment field", () => {
+        const json = JSON.stringify([
+            {
+                alignment_type: "unmapped",
+                mod_table: [],
+                read_id: "read1",
+                seq_len: 5,
+            },
+        ]);
+        const result = parseWindowReadsJson(json);
+        expect(result).toHaveLength(1);
+        expect(result[0].alignment).toBeUndefined();
+    });
 });
 
 describe("maxReadLengthForBinWidth", () => {
@@ -209,6 +223,30 @@ describe("parseSeqTableTsv", () => {
         });
     });
 
+    /** Skips lines with fewer than 3 tab-separated fields. */
+    it("skips lines with fewer than 3 fields", () => {
+        const tsv = [
+            "read_id\tsequence\tqualities",
+            "read1\tACGT",
+            "read2\tTGCA\t5.10.15.20",
+        ].join("\n");
+        const rows = parseSeqTableTsv(tsv);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].readId).toBe("read2");
+    });
+
+    /** Handles multi-alignment row where second alignment has no quality data. */
+    it("defaults missing quality segment to empty array", () => {
+        const tsv = [
+            "read_id\tsequence\tqualities",
+            "read1\tACGT,TG\t10.20.30.40",
+        ].join("\n");
+        const rows = parseSeqTableTsv(tsv);
+        expect(rows).toHaveLength(2);
+        expect(rows[0].qualities).toEqual([10, 20, 30, 40]);
+        expect(rows[1].qualities).toEqual([]);
+    });
+
     /** Handles a mix of single and multi-alignment rows. */
     it("handles mix of single and multi-alignment rows", () => {
         const tsv = [
@@ -262,6 +300,20 @@ describe("matchBaseByLength", () => {
         const base = ["XXX", "YYYYY"];
         expect(matchBaseByLength(tagged, base)).toBeNull();
     });
+
+    /** Returns null when base sequences have duplicate lengths. */
+    it("returns null for duplicate base lengths", () => {
+        const tagged = ["ACGT", "TG"];
+        const base = ["XXXX", "YYYY"];
+        expect(matchBaseByLength(tagged, base)).toBeNull();
+    });
+
+    /** Handles three sequences matched in non-trivial order. */
+    it("matches three sequences by length", () => {
+        const tagged = ["A", "BCDE", "FG"];
+        const base = ["xx", "yyyy", "z"];
+        expect(matchBaseByLength(tagged, base)).toEqual(["z", "yyyy", "xx"]);
+    });
 });
 
 describe("computeAvgQuality", () => {
@@ -290,6 +342,16 @@ describe("computeAvgQuality", () => {
     it("returns same value when all qualities are equal", () => {
         expect(computeAvgQuality([15, 15, 15])).toBe(15);
     });
+
+    /** Verifies quality 0 returns 0. */
+    it("handles quality 0", () => {
+        expect(computeAvgQuality([0])).toBe(0);
+    });
+
+    /** Verifies mixed 255 and non-255 values skip only 255. */
+    it("skips 255 values interspersed with valid values", () => {
+        expect(computeAvgQuality([255, 20, 255])).toBe(20);
+    });
 });
 
 describe("regionSizeBp", () => {
@@ -311,5 +373,15 @@ describe("regionSizeBp", () => {
     /** Returns size of 1 for a 1-bp region. */
     it("returns 1 for chr1:100-101", () => {
         expect(regionSizeBp("chr1:100-101")).toBe(1);
+    });
+
+    /** Returns null for empty string. */
+    it("returns null for empty string", () => {
+        expect(regionSizeBp("")).toBeNull();
+    });
+
+    /** Returns null for contig with colon but no dash range. */
+    it("returns null for contig:start without end", () => {
+        expect(regionSizeBp("chr1:100")).toBeNull();
     });
 });
