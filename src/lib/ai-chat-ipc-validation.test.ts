@@ -1,9 +1,10 @@
-// Tests for validateSendMessage config validation.
-// Ensures IPC payloads are validated correctly.
+// Tests for IPC payload validation functions.
+// Covers validateListModels, validateSendMessage, and validateIpcPayload.
 
 import { describe, expect, it } from "vitest";
 import { CONFIG_FIELD_SPECS, MAX_MESSAGE_BYTES } from "./ai-chat-constants";
 import {
+    validateIpcPayload,
     validateListModels,
     validateSendMessage,
 } from "./ai-chat-ipc-validation";
@@ -462,6 +463,80 @@ describe("validateSendMessage config validation", () => {
         if (!result.valid) {
             expect(result.error).toContain("timeout seconds");
             expect(result.error).toContain("max retries");
+        }
+    });
+});
+
+describe("validateIpcPayload", () => {
+    it("routes ai-chat-list-models to validateListModels", () => {
+        const result = validateIpcPayload(
+            "ai-chat-list-models",
+            validListModelsPayload(),
+        );
+        expect(result.valid).toBe(true);
+        if (result.valid) {
+            expect(result.data).toHaveProperty("endpointUrl");
+            expect(result.data).toHaveProperty("apiKey");
+        }
+    });
+
+    it("routes ai-chat-send-message to validateSendMessage", () => {
+        const result = validateIpcPayload(
+            "ai-chat-send-message",
+            validSendPayload(),
+        );
+        expect(result.valid).toBe(true);
+        if (result.valid) {
+            expect(result.data).toHaveProperty("model");
+            expect(result.data).toHaveProperty("message");
+        }
+    });
+
+    it("accepts ai-chat-cancel with null data", () => {
+        const result = validateIpcPayload("ai-chat-cancel", undefined);
+        expect(result.valid).toBe(true);
+        if (result.valid) {
+            expect(result.data).toBeNull();
+        }
+    });
+
+    it("accepts ai-chat-new-chat with null data", () => {
+        const result = validateIpcPayload("ai-chat-new-chat", undefined);
+        expect(result.valid).toBe(true);
+        if (result.valid) {
+            expect(result.data).toBeNull();
+        }
+    });
+
+    it("accepts ai-chat-pick-directory with null data", () => {
+        const result = validateIpcPayload("ai-chat-pick-directory", undefined);
+        expect(result.valid).toBe(true);
+        if (result.valid) {
+            expect(result.data).toBeNull();
+        }
+    });
+
+    it("accepts ai-chat-go-back with null data", () => {
+        const result = validateIpcPayload("ai-chat-go-back", undefined);
+        expect(result.valid).toBe(true);
+        if (result.valid) {
+            expect(result.data).toBeNull();
+        }
+    });
+
+    it("rejects unknown channel", () => {
+        const result = validateIpcPayload("ai-chat-unknown", {});
+        expect(result.valid).toBe(false);
+        if (!result.valid) {
+            expect(result.error).toBe("Unknown channel: ai-chat-unknown");
+        }
+    });
+
+    it("propagates validation errors from sub-validators", () => {
+        const result = validateIpcPayload("ai-chat-list-models", null);
+        expect(result.valid).toBe(false);
+        if (!result.valid) {
+            expect(result.error).toBe("Payload must be an object");
         }
     });
 });
