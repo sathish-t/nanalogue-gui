@@ -262,4 +262,6 @@ export interface QCData {
     seqTableRows?: SeqTableRow[];
     /** Human-readable reason why sequence data was skipped. */
     seqTableSkipReason?: string;
+    /** Read IDs excluded from seq table because multiple alignments had the same sequence length. */
+    seqTableAmbiguousReadIds?: string[];
 }

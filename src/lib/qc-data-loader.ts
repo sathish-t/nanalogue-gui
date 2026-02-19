@@ -412,6 +412,8 @@ interface SeqTableResult {
     rows?: SeqTableRow[];
     /** Human-readable reason why sequence data was skipped. */
     skipReason?: string;
+    /** Read IDs excluded because multiple alignments had the same sequence length. */
+    ambiguousReadIds?: string[];
 }
 
 /**
@@ -509,27 +511,82 @@ async function fetchSeqTable(
     const taggedRows = parseSeqTableTsv(taggedTsv);
     const baseRows = parseSeqTableTsv(baseTsv);
 
-    // Build a lookup from the base (no-mod) results by readId
-    const baseByReadId = new Map<string, string>();
+    // Build a lookup from the base (no-mod) results by readId → array of sequences
+    const baseByReadId = new Map<string, string[]>();
     for (const row of baseRows) {
-        baseByReadId.set(row.readId, row.sequence);
+        const arr = baseByReadId.get(row.readId);
+        if (arr) {
+            arr.push(row.sequence);
+        } else {
+            baseByReadId.set(row.readId, [row.sequence]);
+        }
+    }
+
+    // Group tagged rows by readId for length-based matching
+    const taggedByReadId = new Map<string, PartialSeqRow[]>();
+    for (const row of taggedRows) {
+        const arr = taggedByReadId.get(row.readId);
+        if (arr) {
+            arr.push(row);
+        } else {
+            taggedByReadId.set(row.readId, [row]);
+        }
     }
 
     const result: SeqTableRow[] = [];
-    for (const row of taggedRows) {
-        const baseSequence = baseByReadId.get(row.readId) ?? row.sequence;
-        result.push({
-            readId: row.readId,
-            sequence: row.sequence,
-            baseSequence,
-            qualities: row.qualities,
-            avgQuality: computeAvgQuality(row.qualities),
-        });
+    const ambiguousReadIds: string[] = [];
+
+    for (const [readId, rows] of taggedByReadId) {
+        const baseSeqs = baseByReadId.get(readId);
+
+        if (!baseSeqs) {
+            console.error(
+                `readId ${readId} found in tagged seqTable but missing from base seqTable`,
+            );
+            continue;
+        }
+
+        if (rows.length === 1) {
+            // Single alignment — use first base sequence
+            result.push({
+                readId,
+                sequence: rows[0].sequence,
+                baseSequence: baseSeqs[0],
+                qualities: rows[0].qualities,
+                avgQuality: computeAvgQuality(rows[0].qualities),
+            });
+            continue;
+        }
+
+        // Multiple alignments — match by length
+        const matched = matchBaseByLength(
+            rows.map((r) => r.sequence),
+            baseSeqs,
+        );
+
+        if (!matched) {
+            ambiguousReadIds.push(readId);
+            continue;
+        }
+
+        for (let i = 0; i < rows.length; i++) {
+            result.push({
+                readId,
+                sequence: rows[i].sequence,
+                baseSequence: matched[i],
+                qualities: rows[i].qualities,
+                avgQuality: computeAvgQuality(rows[i].qualities),
+            });
+        }
     }
 
     onProgress?.("sequences", result.length);
 
-    return { rows: result };
+    return {
+        rows: result,
+        ambiguousReadIds:
+            ambiguousReadIds.length > 0 ? ambiguousReadIds : undefined,
+    };
 }
 
 /**
@@ -654,6 +711,7 @@ export async function generateQCData(
         readTypeCounts,
         seqTableRows: seqResult.rows,
         seqTableSkipReason: seqResult.skipReason,
+        seqTableAmbiguousReadIds: seqResult.ambiguousReadIds,
     };
 }
 
