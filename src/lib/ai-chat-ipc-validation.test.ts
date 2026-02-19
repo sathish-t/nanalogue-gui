@@ -11,7 +11,7 @@ import { validateSendMessage } from "./ai-chat-ipc-validation";
  * @param overrides - Optional fields to override in the payload.
  * @returns A record matching the expected shape of a send-message payload.
  */
-function validPayload(
+function validSendPayload(
     overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
     return {
@@ -27,7 +27,7 @@ function validPayload(
 
 describe("validateSendMessage config validation", () => {
     it("uses fallback for missing config", () => {
-        const result = validateSendMessage(validPayload());
+        const result = validateSendMessage(validSendPayload());
         expect(result.valid).toBe(true);
         if (result.valid) {
             expect(result.data.config.contextWindowTokens).toBe(
@@ -38,7 +38,7 @@ describe("validateSendMessage config validation", () => {
 
     it("uses fallback for non-numeric values", () => {
         const result = validateSendMessage(
-            validPayload({ config: { maxRetries: "abc" } }),
+            validSendPayload({ config: { maxRetries: "abc" } }),
         );
         expect(result.valid).toBe(true);
         if (result.valid) {
@@ -50,7 +50,7 @@ describe("validateSendMessage config validation", () => {
 
     it("rejects below-minimum values", () => {
         const result = validateSendMessage(
-            validPayload({ config: { timeoutSeconds: 1 } }),
+            validSendPayload({ config: { timeoutSeconds: 1 } }),
         );
         expect(result.valid).toBe(false);
         if (!result.valid) {
@@ -61,7 +61,7 @@ describe("validateSendMessage config validation", () => {
 
     it("rejects above-maximum values", () => {
         const result = validateSendMessage(
-            validPayload({ config: { maxRetries: 100 } }),
+            validSendPayload({ config: { maxRetries: 100 } }),
         );
         expect(result.valid).toBe(false);
         if (!result.valid) {
@@ -72,7 +72,7 @@ describe("validateSendMessage config validation", () => {
 
     it("accepts and rounds valid numbers", () => {
         const result = validateSendMessage(
-            validPayload({ config: { timeoutSeconds: 60.7 } }),
+            validSendPayload({ config: { timeoutSeconds: 60.7 } }),
         );
         expect(result.valid).toBe(true);
         if (result.valid) {
@@ -82,7 +82,7 @@ describe("validateSendMessage config validation", () => {
 
     it("accepts boundary values", () => {
         const result = validateSendMessage(
-            validPayload({ config: { maxRetries: 1 } }),
+            validSendPayload({ config: { maxRetries: 1 } }),
         );
         expect(result.valid).toBe(true);
         if (result.valid) {
@@ -92,7 +92,7 @@ describe("validateSendMessage config validation", () => {
 
     it("collects multiple field errors", () => {
         const result = validateSendMessage(
-            validPayload({
+            validSendPayload({
                 config: { timeoutSeconds: 1, maxRetries: 100 },
             }),
         );
