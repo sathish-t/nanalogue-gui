@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Keeps package-lock.json in sync with package.json so that
+# npm ci in CI does not fail on optional-dependency mismatches.
+
+if git diff --cached --name-only | grep -q '^package\.json$'; then
+  # Use the staged version of package.json for lock file generation
+  cp package.json package.json.bak
+  trap '[ -f package.json.bak ] && mv package.json.bak package.json' EXIT INT TERM
+
+  staged_pkg=$(mktemp)
+  git show :package.json > "$staged_pkg"
+  cp "$staged_pkg" package.json
+  rm "$staged_pkg"
+
+  if ! npm install --package-lock-only --ignore-scripts; then
+    echo "pre-commit: npm install --package-lock-only failed, aborting commit" >&2
+    exit 1
+  fi
+
+  mv package.json.bak package.json
+  trap - EXIT INT TERM
+  git add package-lock.json
+fi
