@@ -6,5 +6,5 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
     testDir: ".",
     testMatch: "take-screenshots.mjs",
-    timeout: 60_000,
+    timeout: 300_000,
 });

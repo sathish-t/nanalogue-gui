@@ -44,3 +44,4 @@ jobs:
           npx playwright test --config demo/playwright.config.mjs
         env:
           ELECTRON_EXTRA_LAUNCH_ARGS: "--no-sandbox --disable-gpu"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
