@@ -107,6 +107,11 @@ jobs:
 
               # Install npm dependencies, build, and test
               npm ci
+
+              # @pydantic/monty has no native linux-arm64 package;
+              # install the WASM fallback so tests pass on aarch64
+              npm install --force @pydantic/monty-wasm32-wasi
+
               npm run build
               npm test
             '
