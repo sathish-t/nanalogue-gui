@@ -2,6 +2,11 @@
 # Keeps package-lock.json in sync with package.json so that
 # npm ci in CI does not fail on optional-dependency mismatches.
 
+# Load nvm (shell function, not on PATH in non-interactive shells)
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+# shellcheck source=/dev/null
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
 if git diff --cached --name-only | grep -q '^package\.json$'; then
   # Use the staged version of package.json for lock file generation
   cp package.json package.json.bak
@@ -12,7 +17,9 @@ if git diff --cached --name-only | grep -q '^package\.json$'; then
   cp "$staged_pkg" package.json
   rm "$staged_pkg"
 
-  if ! npm install --package-lock-only --ignore-scripts; then
+  # Use Node 22 (minimum supported version) so the lock file is
+  # compatible with npm ci on both Node 22 and Node 24 in CI.
+  if ! nvm exec 22 npm install --package-lock-only --ignore-scripts; then
     echo "pre-commit: npm install --package-lock-only failed, aborting commit" >&2
     exit 1
   fi
