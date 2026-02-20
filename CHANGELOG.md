@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2026-02-19
+## [0.2.0] - 2026-02-20
 
 ### Added
 
@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-alignment UI: row tinting, deduplicated counts, ambiguous-read warning ([`cf4e170`](https://github.com/sathish-t/nanalogue-gui/commit/cf4e17080f434b25ff56fc36f9cfc6d200370435))
 - Exit watchdog child process for force-killing the app on window close, even when the main event loop is blocked by native addon calls ([`ecfa1f5`](https://github.com/sathish-t/nanalogue-gui/commit/ecfa1f5837ae5d51a10dcb8a731c1a8b40150149))
 - Version button and dialog on landing page with link to nanalogue.com, external URL opens in OS browser ([`0b0dee6`](https://github.com/sathish-t/nanalogue-gui/commit/0b0dee655f35d7ab2fdb195de7264dbf22c8e8eb))
-- Auto-fit landing page height to rendered content with mode-change guard ([`dd3d790`](https://github.com/sathish-t/nanalogue-gui/commit/dd3d790dfa61863cf9a64330aee22890a36d2f22))
+
 - Increases IPC validation test coverage with tests for `validateListModels`, `validateSendMessage` field checks, and `validateIpcPayload` channel routing ([`1766072`](https://github.com/sathish-t/nanalogue-gui/commit/1766072f4962201bf5c2ca2d3bfe27ee487fb548), [`4e598b0`](https://github.com/sathish-t/nanalogue-gui/commit/4e598b03f86afcf132e0b72d45be24e403a91cfd), [`87eb133`](https://github.com/sathish-t/nanalogue-gui/commit/87eb133148376bd7b5ec3167e2f014e17c053fc3), [`abadd9e`](https://github.com/sathish-t/nanalogue-gui/commit/abadd9ebe4f5df846da58e426117cd7b1140a6be))
 - Increases test coverage for ai-chat-constants, qc-data-loader, and swipe-data-loader with edge case and structural tests ([`0df8a18`](https://github.com/sathish-t/nanalogue-gui/commit/0df8a18dde7f6c6a52aa3965c73001fd354b607d), [`e1a5212`](https://github.com/sathish-t/nanalogue-gui/commit/e1a5212df676b0c201e9edcade1631f13986e633), [`eaafcfd`](https://github.com/sathish-t/nanalogue-gui/commit/eaafcfdda13eca0b16222c5268a710c11292aad6))
 
@@ -52,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Pagination break condition now uses empty-page detection instead of comparing returned count to page size, which caused early termination when reads were filtered; bamMods page size reduced to 1,000 to limit peak memory ([`9aca006`](https://github.com/sathish-t/nanalogue-gui/commit/9aca006a047a4479ddffccb27a48940b23c90a21))
+
 - Tool calls matched by ID instead of array index in chat orchestrator ([`79a72ff`](https://github.com/sathish-t/nanalogue-gui/commit/79a72ff5d68394ba1b6e852cb6f97c49d069d4f3))
 - AI Chat spinner and processing state reset on new chat ([`0036fa3`](https://github.com/sathish-t/nanalogue-gui/commit/0036fa30901a1926227f0e50bd65cb1214e3ea26))
 - Ambiguous read detection failed for multi-alignment reads because comma-space separator in seqTable output left leading whitespace, making same-length sequences appear different ([`7ca7f49`](https://github.com/sathish-t/nanalogue-gui/commit/7ca7f4920e327e4ad1bf0418133fb6dee2227201))
@@ -60,11 +60,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Dependencies
 
 - Added: `ai` ^6.0.86, `@ai-sdk/openai-compatible` ^2.0.30, `@pydantic/monty` ^0.0.5, `picomatch` ^4.0.3 ([`8d7edab`](https://github.com/sathish-t/nanalogue-gui/commit/8d7edabfcd133168eb066144488ca9e0e1a34765))
-- Bumps `@pydantic/monty` to ^0.0.6 ([`2a3a7e2`](https://github.com/sathish-t/nanalogue-gui/commit/2a3a7e2919f60c7b7174ff8ac5232e5eebeb0640))
+- Bumps `@pydantic/monty` to ^0.0.7 ([`37601a2`](https://github.com/sathish-t/nanalogue-gui/commit/37601a23de8b4dd973749037a31ee89f97d465b5))
 - Added: `@electron/windows-sign` ^1.2.2 dev dependency for electron-builder ([`231bbe6`](https://github.com/sathish-t/nanalogue-gui/commit/231bbe663a837b5ce8d2d508c4e5a548153454ed))
 - Added: `@vitest/coverage-v8` dev dependency for code coverage ([`47985fd`](https://github.com/sathish-t/nanalogue-gui/commit/47985fd759000e1e473aba1a56f77b4d24305199))
 - Added: `@playwright/test` ^1.58.2, `playwright` ^1.58.2, `seedrandom` ^3.0.5 dev dependencies for demo automation ([`3e9f102`](https://github.com/sathish-t/nanalogue-gui/commit/3e9f102a0692b37fc30b07233a0caa4412a844cc), [`9d6d6b8`](https://github.com/sathish-t/nanalogue-gui/commit/9d6d6b82fd0d9412f837acf7ef9dfc06f977ff1f))
-- Bumps `@pydantic/monty` to ^0.0.7 ([`37601a2`](https://github.com/sathish-t/nanalogue-gui/commit/37601a23de8b4dd973749037a31ee89f97d465b5))
+- Bumps `ai` to ^6.0.94 ([`fe4bbac`](https://github.com/sathish-t/nanalogue-gui/commit/fe4bbac))
+- Bumps `@electron/windows-sign` to ^2.0.2 ([`bf229ac`](https://github.com/sathish-t/nanalogue-gui/commit/bf229ac))
+- Bumps `typescript-eslint` to ^8.56.0 ([`105c0f1`](https://github.com/sathish-t/nanalogue-gui/commit/105c0f1))
+- Bumps `eslint-plugin-jsdoc` to ^62.6.1 ([`a2b95b9`](https://github.com/sathish-t/nanalogue-gui/commit/a2b95b9))
 
 ### Infrastructure
 
@@ -74,6 +77,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Demo BAM generation script and Playwright screenshot automation for QC and Swipe modes ([`3e9f102`](https://github.com/sathish-t/nanalogue-gui/commit/3e9f102a0692b37fc30b07233a0caa4412a844cc), [`9d6d6b8`](https://github.com/sathish-t/nanalogue-gui/commit/9d6d6b82fd0d9412f837acf7ef9dfc06f977ff1f))
 - CI workflow for demo data generation and screenshot capture ([`7139a1c`](https://github.com/sathish-t/nanalogue-gui/commit/7139a1c717742f88644a062ee6396ab51d5f6e30))
 - Pre-commit hook for package-lock.json sync ([`37601a2`](https://github.com/sathish-t/nanalogue-gui/commit/37601a23de8b4dd973749037a31ee89f97d465b5))
+- Bumps GitHub Actions `actions/setup-node` to v6 and `actions/checkout` to v6 ([`320da88`](https://github.com/sathish-t/nanalogue-gui/commit/320da88), [`a22ca61`](https://github.com/sathish-t/nanalogue-gui/commit/a22ca61))
+- Fixes Electron launch in CI screenshot workflow ([`b046876`](https://github.com/sathish-t/nanalogue-gui/commit/b046876))
+- Adds AI Chat screenshot test to demo automation ([`421d5a5`](https://github.com/sathish-t/nanalogue-gui/commit/421d5a5))
+- Refreshes README with screenshots, AI Chat docs, CRAM support, and binary install instructions ([`c7362cc`](https://github.com/sathish-t/nanalogue-gui/commit/c7362cc))
 
 ### Removed
 
