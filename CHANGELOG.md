@@ -81,6 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixes Electron launch in CI screenshot workflow ([`b046876`](https://github.com/sathish-t/nanalogue-gui/commit/b046876))
 - Adds AI Chat screenshot test to demo automation ([`421d5a5`](https://github.com/sathish-t/nanalogue-gui/commit/421d5a5))
 - Refreshes README with screenshots, AI Chat docs, CRAM support, and binary install instructions ([`c7362cc`](https://github.com/sathish-t/nanalogue-gui/commit/c7362cc))
+- Installs `@pydantic/monty-wasm32-wasi` fallback in release Docker build for aarch64 Linux, where no native monty binding exists ([`8d323c5`](https://github.com/sathish-t/nanalogue-gui/commit/8d323c5))
 
 ### Removed
 
