@@ -7,7 +7,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc && npm run build:renderer && npm run copy-assets",
+    "build": "npm run build:main && npm run build:renderer && npm run copy-assets",
+    "build:main": "esbuild src/main.ts src/preload.ts src/exit-watchdog.ts --bundle --platform=node --format=cjs --outdir=dist --external:electron --external:@nanalogue/node --external:@pydantic/monty",
     "build:renderer": "npm run build:landing && npm run build:swipe && npm run build:qc && npm run build:locate && npm run build:ai-chat",
     "build:landing": "esbuild src/renderer/landing/landing.ts --bundle --outfile=dist/renderer/landing/landing.js --format=iife --platform=browser",
     "build:swipe": "esbuild src/renderer/swipe/swipe.ts src/renderer/swipe/swipe-config.ts --bundle --outdir=dist/renderer/swipe --format=iife --platform=browser",
