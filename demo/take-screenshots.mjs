@@ -14,11 +14,20 @@ const swipeBed = resolve(dir, "swipe.bed");
 const swipeOutput = resolve(dir, "swipe-output.bed");
 
 /**
+ * Parses ELECTRON_EXTRA_LAUNCH_ARGS env var into an array of CLI flags.
+ * @returns {string[]} Array of extra Electron flags, empty if env var is unset.
+ */
+function extraElectronArgs() {
+    const raw = process.env.ELECTRON_EXTRA_LAUNCH_ARGS || "";
+    return raw.split(/\s+/).filter(Boolean);
+}
+
+/**
  * Launches the Electron app and returns the app and first window.
  */
 async function launchApp() {
     const app = await electron.launch({
-        args: [resolve(projectRoot, "dist", "main.js")],
+        args: [...extraElectronArgs(), resolve(projectRoot, "dist", "main.js")],
         cwd: projectRoot,
     });
     const page = await app.firstWindow();
