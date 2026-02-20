@@ -87,7 +87,7 @@ export function registerIpcHandlers() {
 
         // Navigate to results page
         mainWindow?.loadFile(
-            resolve(__dirname, "..", "renderer", "qc", "qc-results.html"),
+            resolve(__dirname, "renderer", "qc", "qc-results.html"),
         );
     });
 
