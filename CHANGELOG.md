@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Extracted reusable `ChatSession` class from AI Chat IPC handlers for shared GUI/CLI use ([`9c02a77`](https://github.com/sathish-t/nanalogue-gui/commit/9c02a77339bf7c79f7ff627567c33cf1b2137bb7))
+
+### Added
+
+- Unit tests for `ChatSession` covering send, cancel, reset, and stale response detection ([`650e0dc`](https://github.com/sathish-t/nanalogue-gui/commit/650e0dc25eb30761056c716935076fc1c3a8efd1))
+- Standalone `nanalogue-chat` CLI for LLM-powered BAM analysis without Electron ([`ec3f7aa`](https://github.com/sathish-t/nanalogue-gui/commit/ec3f7aabebed6ea2246bd42041bebddc4cbc14ec))
+
 ## [0.2.0] - 2026-02-20
 
 ### Added
