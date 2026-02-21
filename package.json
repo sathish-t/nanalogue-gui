@@ -3,11 +3,15 @@
   "version": "0.2.0",
   "description": "GUI tools for nanopore data analysis",
   "main": "dist/main.js",
+  "bin": {
+    "nanalogue-chat": "./dist/cli.mjs"
+  },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "npm run build:main && npm run build:renderer && npm run copy-assets",
+    "build": "npm run build:main && npm run build:renderer && npm run build:cli && npm run copy-assets",
+    "build:cli": "esbuild src/cli.ts --bundle --outfile=dist/cli.mjs --format=esm --platform=node --external:@nanalogue/node --external:@pydantic/monty --banner:js='#!/usr/bin/env node'",
     "build:main": "esbuild src/main.ts src/preload.ts src/exit-watchdog.ts --bundle --platform=node --format=cjs --outdir=dist --external:electron --external:@nanalogue/node --external:@pydantic/monty",
     "build:renderer": "npm run build:landing && npm run build:swipe && npm run build:qc && npm run build:locate && npm run build:ai-chat",
     "build:landing": "esbuild src/renderer/landing/landing.ts --bundle --outfile=dist/renderer/landing/landing.js --format=iife --platform=browser",
