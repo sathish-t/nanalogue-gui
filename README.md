@@ -22,6 +22,7 @@ interactive visualisation and curation workflows.
   - [Swipe](#swipe)
   - [Locate Reads](#locate-reads)
   - [AI Chat](#ai-chat)
+    - [CLI (nanalogue-chat)](#cli-nanalogue-chat)
 - [Development](#development)
 - [Versioning](#versioning)
 - [Changelog](#changelog)
@@ -283,10 +284,51 @@ This ensures our sandbox is secure, and allows us to inspect what the LLM is doi
 
 ![AI Chat multi-turn conversation with sandbox](demo/screenshot-ai-chat-q3-sandbox.png)
 
+#### CLI (nanalogue-chat)
+
+The same AI Chat analysis engine is available as a standalone terminal REPL,
+with no Electron or GUI needed. After building, run:
+
+```bash
+npm run build
+node dist/cli.mjs --endpoint <url> --model <name> --dir <path>
+```
+
+For example, to chat about BAM files in `./data` using a local Ollama model:
+
+```bash
+node dist/cli.mjs --endpoint http://localhost:11434/v1 --model llama3 --dir ./data
+```
+
+**Authentication:** pass your API key with `--api-key <key>`, or set the
+`$API_KEY` environment variable. Local runners like Ollama do not require a key.
+
+**Model discovery:** use `--list-models` with an endpoint to see which models
+are available:
+
+```bash
+node dist/cli.mjs --endpoint https://api.openai.com/v1 --api-key $API_KEY --list-models
+```
+
+**REPL commands:**
+
+| Command | Action |
+|---|---|
+| `/new` | Start a new conversation |
+| `/quit` | Exit the CLI |
+| Ctrl+C during a request | Cancel the current request |
+| Ctrl+C at the prompt | Exit |
+
+For the full list of providers and endpoint URLs, see the
+[Setting up a provider](#setting-up-a-provider) table above.
+
+Advanced options (context window size, timeouts, record limits) are available
+via flags — run `node dist/cli.mjs --help` for details.
+
 ## Development
 
 ```bash
-# Build the project
+# Build the project (produces dist/main.js, dist/renderer.js, and dist/cli.mjs)
 npm run build
 
 # Run in development mode
