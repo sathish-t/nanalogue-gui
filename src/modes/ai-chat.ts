@@ -6,22 +6,15 @@ import {
     validateListModels,
     validateSendMessage,
 } from "../lib/ai-chat-ipc-validation";
-import { handleUserMessage } from "../lib/chat-orchestrator";
-import type { AiChatEvent, Fact, HistoryEntry } from "../lib/chat-types";
+import { ChatSession } from "../lib/chat-session";
+import type { AiChatEvent } from "../lib/chat-types";
 import { fetchModels } from "../lib/model-listing";
 
 let mainWindow: BrowserWindow | null = null;
 
-/** Conversation history for the current session. */
-let history: HistoryEntry[] = [];
-/** Accumulated facts from successful tool results. */
-let facts: Fact[] = [];
-/** Monotonic request counter for stale response detection. */
-let requestId = 0;
-/** Abort controller for the current in-flight request. */
-let currentAbortController: AbortController | null = null;
-/** Per-turn dedup cache for tool call results. */
-let dedupCache = new Map<string, string>();
+/** Shared session state for the current chat. */
+const session = new ChatSession();
+
 /** Set of acknowledged non-localhost endpoint origins (memory-only). */
 const endpointConsent = new Set<string>();
 
@@ -142,76 +135,15 @@ export function registerIpcHandlers(): void {
                 }
             }
 
-            // Increment requestId and create new abort controller
-            requestId += 1;
-            const thisRequestId = requestId;
-            currentAbortController?.abort();
-            currentAbortController = new AbortController();
-            const localSignal = currentAbortController.signal;
-            dedupCache = new Map();
-
-            try {
-                const result = await handleUserMessage({
-                    message,
-                    endpointUrl,
-                    apiKey,
-                    model,
-                    allowedDir,
-                    config,
-                    emitEvent,
-                    history,
-                    facts,
-                    signal: localSignal,
-                    dedupCache,
-                });
-
-                // Check for cancellation or stale response. Cancel increments
-                // requestId, so check the abort signal first to return the
-                // correct "Cancelled" status instead of "Request superseded".
-                if (localSignal.aborted) {
-                    emitEvent({ type: "turn_cancelled" });
-                    return { success: false, error: "Cancelled" };
-                }
-                if (thisRequestId !== requestId) {
-                    return { success: false, error: "Request superseded" };
-                }
-
-                return {
-                    success: true,
-                    text: result.text,
-                    steps: result.steps,
-                };
-            } catch (error) {
-                if (localSignal.aborted) {
-                    const isTimeout =
-                        error instanceof Error &&
-                        (error.name === "TimeoutError" ||
-                            error.message.includes("timed out"));
-                    if (!isTimeout) {
-                        emitEvent({ type: "turn_cancelled" });
-                        return { success: false, error: "Cancelled" };
-                    }
-                }
-                if (thisRequestId !== requestId) {
-                    return { success: false, error: "Request superseded" };
-                }
-                const isTimeout =
-                    error instanceof Error &&
-                    (error.name === "TimeoutError" ||
-                        error.message.includes("timed out"));
-                const errorMsg =
-                    error instanceof Error ? error.message : String(error);
-                emitEvent({
-                    type: "turn_error",
-                    error: errorMsg,
-                    isTimeout,
-                });
-                return {
-                    success: false,
-                    error: errorMsg,
-                    isTimeout,
-                };
-            }
+            return session.sendMessage({
+                endpointUrl,
+                apiKey,
+                model,
+                message,
+                allowedDir,
+                config,
+                emitEvent,
+            });
         },
     );
 
@@ -221,9 +153,7 @@ export function registerIpcHandlers(): void {
          * Cancels the current in-flight LLM/sandbox request.
          */
         () => {
-            requestId += 1;
-            currentAbortController?.abort();
-            currentAbortController = null;
+            session.cancel();
         },
     );
 
@@ -233,12 +163,7 @@ export function registerIpcHandlers(): void {
          * Resets conversation state without losing connection settings.
          */
         () => {
-            history = [];
-            facts = [];
-            requestId += 1;
-            currentAbortController?.abort();
-            currentAbortController = null;
-            dedupCache = new Map();
+            session.reset();
         },
     );
 
@@ -266,13 +191,7 @@ export function registerIpcHandlers(): void {
          * Navigates back to the landing page from the AI Chat screen.
          */
         () => {
-            // Reset state when leaving
-            history = [];
-            facts = [];
-            requestId += 1;
-            currentAbortController?.abort();
-            currentAbortController = null;
-            dedupCache = new Map();
+            session.reset();
         },
     );
 
