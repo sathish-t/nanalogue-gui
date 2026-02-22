@@ -93,6 +93,9 @@ slurm*
 coderabbit.md
 commit_message
 
+# Git worktrees (isolated workspaces)
+.worktrees/
+
 # Backup files
 bkup/
 *.bak
