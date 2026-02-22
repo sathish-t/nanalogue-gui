@@ -314,6 +314,10 @@ execute_sandbox_code tool with Python code.
 Start by calling ls() to discover available files in the analysis
 directory. Use ls("**/*.bam") to find BAM files specifically.
 
+Respond in plain text only. Do not use markdown formatting
+(no asterisks, backticks, hashes, or HTML tags). Use simple
+indentation and line breaks for structure.
+
 ${sandboxPrompt}
 
 ${factsBlock}`;
