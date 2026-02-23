@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ai`, `@ai-sdk/openai-compatible`, and `zod` dependencies replaced by native fetch ([`e57aa9d`](https://github.com/sathish-t/nanalogue-gui/commit/e57aa9d1a8778d4944cdab37589ec1ca938df5b6))
 
+### Dependencies
+
+- Bumps `@biomejs/biome` to ^2.4.3, `electron-builder` to ^26.8.1, `electron` to ^40.6.0
+
 ## [0.2.0] - 2026-02-20
 
 ### Added

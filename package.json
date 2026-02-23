@@ -47,7 +47,7 @@
     "picomatch": "^4.0.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.0",
+    "@biomejs/biome": "^2.4.3",
     "@electron/windows-sign": "^2.0.2",
     "@eslint/js": "^9.39.2",
     "@playwright/test": "^1.58.2",
@@ -55,8 +55,8 @@
     "@types/node": "^22.0.0",
     "@types/picomatch": "^4.0.2",
     "@vitest/coverage-v8": "^4.0.18",
-    "electron": "^40.4.1",
-    "electron-builder": "^26.7.0",
+    "electron": "^40.6.0",
+    "electron-builder": "^26.8.1",
     "esbuild": "^0.27.3",
     "eslint": "^9.39.2",
     "eslint-plugin-jsdoc": "^62.6.1",
