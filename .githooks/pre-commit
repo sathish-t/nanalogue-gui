@@ -7,7 +7,7 @@ export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 # shellcheck source=/dev/null
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-if git diff --cached --name-only | grep -q '^package\.json$'; then
+if git diff --cached --name-only | grep -q '^package\(-lock\)\?\.json$'; then
   # Use the staged version of package.json for lock file generation
   cp package.json package.json.bak
   trap '[ -f package.json.bak ] && mv package.json.bak package.json' EXIT INT TERM
