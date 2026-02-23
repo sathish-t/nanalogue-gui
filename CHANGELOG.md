@@ -10,11 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Extracted reusable `ChatSession` class from AI Chat IPC handlers for shared GUI/CLI use ([`9c02a77`](https://github.com/sathish-t/nanalogue-gui/commit/9c02a77339bf7c79f7ff627567c33cf1b2137bb7))
+- Rewrites chat orchestrator from Vercel AI SDK tool-call architecture to a native fetch loop where the LLM responds with Python code executed in the Monty sandbox ([`e57aa9d`](https://github.com/sathish-t/nanalogue-gui/commit/e57aa9d1a8778d4944cdab37589ec1ca938df5b6))
 
 ### Added
 
 - Unit tests for `ChatSession` covering send, cancel, reset, and stale response detection ([`650e0dc`](https://github.com/sathish-t/nanalogue-gui/commit/650e0dc25eb30761056c716935076fc1c3a8efd1))
 - Standalone `nanalogue-chat` CLI for LLM-powered BAM analysis without Electron ([`ec3f7aa`](https://github.com/sathish-t/nanalogue-gui/commit/ec3f7aabebed6ea2246bd42041bebddc4cbc14ec))
+- Print capture and `continue_thinking()` external function in Monty sandbox ([`3c3c82d`](https://github.com/sathish-t/nanalogue-gui/commit/3c3c82ded04ed2bff86a6234606b7af2b0eb9239))
+- `maxCodeRounds` and `temperature` configuration fields for AI Chat ([`ee664df`](https://github.com/sathish-t/nanalogue-gui/commit/ee664df2964bb1cf21106e9b81108ea1d3fea6d5))
+
+### Removed
+
+- `ai`, `@ai-sdk/openai-compatible`, and `zod` dependencies replaced by native fetch ([`e57aa9d`](https://github.com/sathish-t/nanalogue-gui/commit/e57aa9d1a8778d4944cdab37589ec1ca938df5b6))
 
 ## [0.2.0] - 2026-02-20
 
