@@ -40,6 +40,10 @@ export const /** Default fallback max output bytes (used when no explicit value 
 export const /** Minimum output bytes floor. */ MIN_OUTPUT_BYTES = 4 * 1024;
 export const /** Maximum output bytes ceiling. */ MAX_OUTPUT_BYTES = 80 * 1024;
 
+// --- Print capture limits ---
+
+export const /** Maximum bytes of print output to capture per sandbox execution (1 MB). */ MAX_PRINT_CAPTURE_BYTES = 1_048_576;
+
 // --- Message size limits ---
 
 export const /** Maximum bytes for a single user message (100 KB). */ MAX_MESSAGE_BYTES =
@@ -71,4 +75,5 @@ export const /** All external function names registered with Monty. */ EXTERNAL_
             "ls",
             "read_file",
             "write_file",
+            "continue_thinking",
         ] as const;

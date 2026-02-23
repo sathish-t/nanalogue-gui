@@ -17,6 +17,10 @@ export interface SandboxResult {
     message?: string;
     /** Whether the error was caused by a timeout. */
     isTimeout?: boolean;
+    /** Whether continue_thinking() was called in the sandbox code. */
+    continueThinkingCalled?: boolean;
+    /** Captured print() output segments from sandbox code. */
+    prints?: string[];
 }
 
 /** Configuration options for the Monty sandbox. */

@@ -12,7 +12,9 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { simulateModBam } from "@nanalogue/node";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { runMontyAsync } from "@pydantic/monty";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { MAX_PRINT_CAPTURE_BYTES } from "./ai-chat-constants";
 import { resolvePath, runSandboxCode } from "./monty-sandbox";
 
 let allowedDir: string;
@@ -451,6 +453,81 @@ files = ls()
     expect(files).not.toContain("link_subdir/data.txt");
 });
 
+// --- continue_thinking external function ---
+
+it("continue_thinking sets continueThinkingCalled flag", async () => {
+    const result = await runSandboxCode(
+        'continue_thinking()\nprint("hello")',
+        allowedDir,
+    );
+    expect(result.success).toBe(true);
+    expect(result.continueThinkingCalled).toBe(true);
+});
+
+it("continue_thinking works with print and expression value", async () => {
+    const result = await runSandboxCode(
+        'print("hello ")\ncontinue_thinking()\n1 + 1',
+        allowedDir,
+    );
+    expect(result.success).toBe(true);
+    expect(result.continueThinkingCalled).toBe(true);
+    // Always use join("") for print assertions — printCallback fires
+    // per-segment, not per-line, so joining reconstructs original output.
+    expect(result.prints?.join("")).toContain("hello ");
+    expect(result.value).toBe(2);
+});
+
+it("continue_thinking discards continueThinkingCalled on runtime error", async () => {
+    // Use undefined_var (NameError) instead of 1/0 — Monty may not
+    // raise ZeroDivisionError the same way CPython does.
+    const result = await runSandboxCode(
+        "continue_thinking()\nundefined_var",
+        allowedDir,
+    );
+    expect(result.success).toBe(false);
+    expect(result.continueThinkingCalled).toBeUndefined();
+});
+
+it("continue_thinking returns false when not called", async () => {
+    const result = await runSandboxCode("1 + 1", allowedDir);
+    expect(result.success).toBe(true);
+    expect(result.continueThinkingCalled).toBe(false);
+});
+
+// --- print() capture ---
+
+it("captures print output in SandboxResult", async () => {
+    const result = await runSandboxCode('print("hello")\n42', allowedDir);
+    expect(result.success).toBe(true);
+    expect(result.prints?.join("")).toContain("hello");
+    expect(result.value).toBe(42);
+});
+
+it("captures multiple print calls", async () => {
+    const result = await runSandboxCode(
+        'print("a")\nprint("b")\n1',
+        allowedDir,
+    );
+    expect(result.success).toBe(true);
+    expect(result.prints?.join("")).toContain("a");
+    expect(result.prints?.join("")).toContain("b");
+});
+
+it("returns empty prints array when print not called", async () => {
+    const result = await runSandboxCode("1 + 1", allowedDir);
+    expect(result.success).toBe(true);
+    expect(result.prints).toEqual([]);
+});
+
+it("preserves prints on runtime error", async () => {
+    const result = await runSandboxCode(
+        'print("before")\nundefined_var',
+        allowedDir,
+    );
+    expect(result.success).toBe(false);
+    expect(result.prints?.join("")).toContain("before");
+});
+
 it("ls returns resolved path for symlink-to-file", async () => {
     await writeFile(join(allowedDir, "real_file.txt"), "hello");
     await symlink(
@@ -468,4 +545,100 @@ files = ls()
     // Should contain the real path, not the symlink path
     expect(files).toContain("real_file.txt");
     expect(files).not.toContain("link_file.txt");
+});
+
+// --- Print capture cap ---
+
+it("caps print capture at MAX_PRINT_CAPTURE_BYTES", async () => {
+    // Each iteration prints 10000 chars + newline; 200 iterations = ~2 MB
+    const code = `
+for i in range(200):
+    print("x" * 10000)
+`;
+    const result = await runSandboxCode(code, allowedDir, {
+        maxDurationSecs: 30,
+    });
+    expect(result.success).toBe(true);
+    const totalBytes = Buffer.byteLength(
+        result.prints?.join("") ?? "",
+        "utf-8",
+    );
+    expect(totalBytes).toBeLessThanOrEqual(MAX_PRINT_CAPTURE_BYTES);
+});
+
+// --- Parity tests: runMontyAsyncWithPrint vs runMontyAsync ---
+
+describe("runMontyAsyncWithPrint parity with runMontyAsync", () => {
+    /**
+     * Runs code through upstream runMontyAsync for parity comparison.
+     *
+     * @param code - The Python code to execute.
+     * @returns The output value from upstream runMontyAsync.
+     */
+    async function runUpstream(code: string): Promise<unknown> {
+        const { Monty } = await import("@pydantic/monty");
+        const m = new Monty(code, {});
+        return runMontyAsync(m, {});
+    }
+
+    it("simple expression: both return same value", async () => {
+        const code = "1 + 1";
+        const upstream = await runUpstream(code);
+        const wrapped = await runSandboxCode(code, allowedDir);
+        expect(wrapped.success).toBe(true);
+        expect(wrapped.value).toBe(upstream);
+    });
+
+    it("external function call: both return same value", async () => {
+        const code = `info = peek("${bamName}")\nlen(info["contigs"])`;
+        // Upstream with external functions
+        const { Monty } = await import("@pydantic/monty");
+        const { peek } = await import("@nanalogue/node");
+        const resolvedBam = join(allowedDir, bamName);
+        const m = new Monty(code, { externalFunctions: ["peek"] });
+        const upstream = await runMontyAsync(m, {
+            /**
+             * External functions for upstream parity test.
+             */
+            externalFunctions: {
+                /**
+                 * Peek implementation for parity test.
+                 *
+                 * @returns Peek result.
+                 */
+                peek: async () => peek({ bamPath: resolvedBam }),
+            },
+        });
+        const wrapped = await runSandboxCode(code, allowedDir);
+        expect(wrapped.success).toBe(true);
+        expect(wrapped.value).toBe(upstream);
+    });
+
+    it("runtime error: both produce the same error", async () => {
+        const code = "undefined_var";
+        const { Monty, MontyRuntimeError } = await import("@pydantic/monty");
+        const m = new Monty(code, {});
+        let upstreamError: Error | undefined;
+        try {
+            await runMontyAsync(m, {});
+        } catch (e) {
+            upstreamError = e as Error;
+        }
+        expect(upstreamError).toBeInstanceOf(MontyRuntimeError);
+
+        const wrapped = await runSandboxCode(code, allowedDir);
+        expect(wrapped.success).toBe(false);
+        expect(wrapped.errorType).toBe("RuntimeError");
+    });
+
+    it("additionally captures print output", async () => {
+        const code = 'print("parity test")\n42';
+        const upstream = await runUpstream(code);
+        const wrapped = await runSandboxCode(code, allowedDir);
+        expect(wrapped.success).toBe(true);
+        // Same expression value
+        expect(wrapped.value).toBe(upstream);
+        // But also captures print output (upstream does not)
+        expect(wrapped.prints?.join("")).toContain("parity test");
+    });
 });

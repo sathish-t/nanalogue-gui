@@ -22,8 +22,8 @@ import {
 import {
     Monty,
     MontyRuntimeError,
+    MontySnapshot,
     MontySyntaxError,
-    runMontyAsync,
 } from "@pydantic/monty";
 import picomatch from "picomatch";
 import {
@@ -42,6 +42,7 @@ import {
     MAX_FILENAME_LENGTH,
     MAX_LS_ENTRIES,
     MAX_OUTPUT_BYTES,
+    MAX_PRINT_CAPTURE_BYTES,
     MIN_OUTPUT_BYTES,
 } from "./ai-chat-constants";
 import type { SandboxOptions, SandboxResult } from "./chat-types";
@@ -524,6 +525,89 @@ function convertMaps(value: unknown): unknown {
     return value;
 }
 
+// --- runMontyAsyncWithPrint ---
+// Vendored reimplementation of runMontyAsync from @pydantic/monty that
+// forwards printCallback to Monty.start(). The upstream runMontyAsync omits
+// printCallback from RunMontyAsyncOptions. If Monty ships native support,
+// remove this function and use the upstream version.
+// TODO: track upstream Monty support for printCallback in runMontyAsync.
+
+/**
+ * Runs a Monty instance asynchronously with printCallback support.
+ * Reimplements the runMontyAsync loop (~45 lines) to pass printCallback to start().
+ *
+ * @param montyRunner - The Monty instance to execute.
+ * @param options - Execution options including limits, external functions, and printCallback.
+ * @param options.inputs - Input values to inject into the Python namespace.
+ * @param options.externalFunctions - External functions callable from Python.
+ * @param options.limits - Resource limits for the Monty VM.
+ * @param options.limits.maxDurationSecs - Maximum execution duration in seconds.
+ * @param options.limits.maxMemory - Maximum memory usage in bytes.
+ * @param options.limits.maxAllocations - Maximum number of allocations.
+ * @param options.printCallback - Callback invoked when Python calls print().
+ * @returns The final output value from the Monty execution.
+ */
+async function runMontyAsyncWithPrint(
+    montyRunner: Monty,
+    options: {
+        /** Input values to inject into the Python namespace. */
+        inputs?: Record<string, unknown>;
+        /** External functions callable from Python. */
+        externalFunctions?: Record<string, (...args: unknown[]) => unknown>;
+        /** Resource limits for the Monty VM. */
+        limits?: {
+            /** Maximum wall-clock time in seconds before the VM is terminated. */
+            maxDurationSecs?: number;
+            /** Maximum memory in bytes the VM is allowed to allocate. */
+            maxMemory?: number;
+            /** Maximum number of heap allocations before the VM is terminated. */
+            maxAllocations?: number;
+        };
+        /** Callback for captured print() output. */
+        printCallback?: (stream: string, text: string) => void;
+    },
+): Promise<unknown> {
+    const { inputs, externalFunctions = {}, limits, printCallback } = options;
+    let progress = montyRunner.start({
+        inputs,
+        limits,
+        printCallback,
+    });
+    while (progress instanceof MontySnapshot) {
+        const snapshot = progress;
+        const funcName = snapshot.functionName;
+        const extFunction = externalFunctions[funcName];
+        if (!extFunction) {
+            progress = snapshot.resume({
+                exception: {
+                    type: "KeyError",
+                    message: `"External function '${funcName}' not found"`,
+                },
+            });
+            continue;
+        }
+        try {
+            let result = extFunction(...snapshot.args, snapshot.kwargs);
+            if (
+                result &&
+                typeof (result as Promise<unknown>).then === "function"
+            ) {
+                result = await (result as Promise<unknown>);
+            }
+            progress = snapshot.resume({ returnValue: result });
+        } catch (error) {
+            const err = error as Error;
+            progress = snapshot.resume({
+                exception: {
+                    type: err.name || "RuntimeError",
+                    message: err.message || String(error),
+                },
+            });
+        }
+    }
+    return progress.output;
+}
+
 /**
  * Runs Python code in the Monty sandbox with all external functions bound.
  *
@@ -546,6 +630,10 @@ export async function runSandboxCode(
         maxRecordsSeqTable = DEFAULT_MAX_RECORDS_SEQ_TABLE,
         maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
     } = options;
+
+    let continueThinkingCalled = false;
+    const prints: string[] = [];
+    let printBytes = 0;
 
     try {
         const m = new Monty(code, {
@@ -586,13 +674,39 @@ export async function runSandboxCode(
             }
             return wrapped;
         }
-        const value = await runMontyAsync(m, {
+        const value = await runMontyAsyncWithPrint(m, {
             limits: {
                 maxDurationSecs,
                 maxMemory,
                 maxAllocations: DEFAULT_MAX_ALLOCATIONS,
             },
+            /**
+             * Captures print output from the sandbox into the prints array.
+             * Silently drops prints beyond MAX_PRINT_CAPTURE_BYTES — the Monty
+             * runtime continues executing but we stop accumulating output.
+             *
+             * @param _stream - The output stream name (unused).
+             * @param text - The printed text content.
+             */
+            printCallback: (_stream, text) => {
+                const textBytes = Buffer.byteLength(text, "utf-8");
+                if (printBytes + textBytes <= MAX_PRINT_CAPTURE_BYTES) {
+                    prints.push(text);
+                    printBytes += textBytes;
+                }
+            },
             externalFunctions: wrapForMonty({
+                /**
+                 * Signals that the LLM needs another execution round.
+                 * Sets the continueThinkingCalled flag and returns null to Python.
+                 *
+                 * @returns Null.
+                 */
+                continue_thinking: () => {
+                    continueThinkingCalled = true;
+                    return null;
+                },
+
                 /**
                  * Peeks at BAM file headers and summary info.
                  *
@@ -876,14 +990,19 @@ export async function runSandboxCode(
             value: gated,
             truncated,
             endedWithExpression: converted != null,
+            continueThinkingCalled,
+            prints,
         };
     } catch (error) {
+        // On error, continueThinkingCalled is discarded (not included) but
+        // prints are preserved — they show how far execution got before the error.
         if (error instanceof MontyRuntimeError) {
             return {
                 success: false,
                 errorType: "RuntimeError",
                 message: error.message,
                 isTimeout: error.message.includes("time limit"),
+                prints,
             };
         }
         if (error instanceof MontySyntaxError) {
@@ -892,6 +1011,7 @@ export async function runSandboxCode(
                 errorType: "SyntaxError",
                 message: error.message,
                 isTimeout: false,
+                prints,
             };
         }
         return {
@@ -899,6 +1019,7 @@ export async function runSandboxCode(
             errorType: "GenericError",
             message: String(error),
             isTimeout: false,
+            prints,
         };
     }
 }
