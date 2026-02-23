@@ -1,15 +1,21 @@
 // Config field specs shared between main process and renderer.
 // This module must remain free of Node-specific imports so esbuild can bundle it for the browser.
 
-import type { AiChatConfig, ConfigFieldSpec } from "./chat-types";
+import type {
+    AiChatConfig,
+    ConfigFieldSpec,
+    OptionalFloatFieldSpec,
+} from "./chat-types";
 
-export const /** Validation specs for each AiChatConfig field. */ CONFIG_FIELD_SPECS: Record<
-        keyof AiChatConfig,
+export const /** Upper bound for maxCodeRounds to prevent runaway loops. */ MAX_CODE_ROUNDS_LIMIT = 50;
+
+export const /** Validation specs for each integer AiChatConfig field (temperature excluded). */ CONFIG_FIELD_SPECS: Record<
+        Exclude<keyof AiChatConfig, "temperature">,
         ConfigFieldSpec
     > = {
-        /** Smallest useful context window vs. Largest models available today. */
+        /** System prompt alone reaches 3000-5000 tokens; 8k allows small local models. */
         contextWindowTokens: {
-            min: 1_000,
+            min: 8_000,
             max: 2_000_000,
             fallback: 32_000,
             label: "context window tokens",
@@ -51,7 +57,21 @@ export const /** Validation specs for each AiChatConfig field. */ CONFIG_FIELD_S
             fallback: 5_000,
             label: "max seq_table records",
         },
+        /** At least one round; cap to prevent runaway loops. */
+        maxCodeRounds: {
+            min: 1,
+            max: MAX_CODE_ROUNDS_LIMIT,
+            fallback: 10,
+            label: "max code rounds",
+        },
     };
+
+export const /** Validation spec for optional temperature (float, no fallback). */ TEMPERATURE_SPEC: OptionalFloatFieldSpec =
+        {
+            min: 0,
+            max: 2,
+            label: "temperature",
+        };
 
 /**
  * Asserts that every field spec has min <= fallback <= max.

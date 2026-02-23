@@ -124,13 +124,25 @@
     <!-- Context window size in tokens. Min/max values from CONFIG_FIELD_SPECS in src/lib/ai-chat-constants.ts. -->
     <div class="dialog-row">
       <label for="opt-context-window">Context window (tokens):</label>
-      <input type="number" id="opt-context-window" value="32000" min="1000" max="2000000">
+      <input type="number" id="opt-context-window" value="32000" min="8000" max="2000000">
     </div>
 
     <!-- Maximum retries per turn. -->
     <div class="dialog-row">
       <label for="opt-max-retries">Max retries:</label>
       <input type="number" id="opt-max-retries" value="5" min="1" max="20">
+    </div>
+
+    <!-- Maximum code execution rounds per user message. -->
+    <div class="dialog-row">
+      <label for="opt-max-code-rounds">Max code rounds:</label>
+      <input type="number" id="opt-max-code-rounds" value="10" min="1" max="50">
+    </div>
+
+    <!-- LLM sampling temperature. Empty means provider default. -->
+    <div class="dialog-row">
+      <label for="opt-temperature">Temperature:</label>
+      <input type="number" id="opt-temperature" value="" min="0" max="2" step="0.1" placeholder="(provider default)">
     </div>
 
     <!-- Warning for sandbox limit fields. -->

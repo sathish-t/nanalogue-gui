@@ -57,6 +57,8 @@ const argConfig = {
         "max-records-bam-mods": { type: "string" as const },
         "max-records-window-reads": { type: "string" as const },
         "max-records-seq-table": { type: "string" as const },
+        "max-code-rounds": { type: "string" as const },
+        temperature: { type: "string" as const },
         "no-code": { type: "boolean" as const, default: false },
         "list-models": { type: "boolean" as const, default: false },
         help: { type: "boolean" as const, short: "h", default: false },
@@ -89,6 +91,8 @@ ${BOLD}Advanced options:${RESET}
   --max-records-bam-mods <n>     Max bam_mods records (default: ${CONFIG_FIELD_SPECS.maxRecordsBamMods.fallback})
   --max-records-window-reads <n> Max window_reads records (default: ${CONFIG_FIELD_SPECS.maxRecordsWindowReads.fallback})
   --max-records-seq-table <n>    Max seq_table records (default: ${CONFIG_FIELD_SPECS.maxRecordsSeqTable.fallback})
+  --max-code-rounds <n>    Max code execution rounds (default: ${CONFIG_FIELD_SPECS.maxCodeRounds.fallback})
+  --temperature <n>        LLM sampling temperature 0-2 (default: provider default)
 
 ${BOLD}Display:${RESET}
   --no-code                Suppress sandbox code display
@@ -125,7 +129,7 @@ function parseNumericArg(
     if (value === undefined) return spec.fallback;
     const n = Number(value);
     if (!Number.isFinite(n)) return spec.fallback;
-    return Math.max(spec.min, Math.min(spec.max, n));
+    return Math.round(Math.max(spec.min, Math.min(spec.max, n)));
 }
 
 /**
@@ -238,6 +242,23 @@ async function main(): Promise<void> {
             values["max-records-seq-table"],
             CONFIG_FIELD_SPECS.maxRecordsSeqTable,
         ),
+        maxCodeRounds: parseNumericArg(
+            values["max-code-rounds"],
+            CONFIG_FIELD_SPECS.maxCodeRounds,
+        ),
+        // Temperature is optional — undefined means omit from request body.
+        // Reject non-finite or out-of-range values to avoid sending NaN/null to the API.
+        temperature: (() => {
+            if (values.temperature === undefined) return undefined;
+            const t = Number.parseFloat(values.temperature);
+            if (!Number.isFinite(t) || t < 0 || t > 2) {
+                console.warn(
+                    `Warning: ignoring invalid --temperature "${values.temperature}" (must be a number between 0 and 2)`,
+                );
+                return undefined;
+            }
+            return t;
+        })(),
     };
 
     const session = new ChatSession();

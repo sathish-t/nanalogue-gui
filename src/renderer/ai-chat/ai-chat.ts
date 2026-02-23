@@ -189,6 +189,12 @@ const optMaxWindowReads = document.getElementById(
 const optMaxSeqTable = document.getElementById(
     "opt-max-seq-table",
 ) as HTMLInputElement;
+const optMaxCodeRounds = document.getElementById(
+    "opt-max-code-rounds",
+) as HTMLInputElement;
+const optTemperature = document.getElementById(
+    "opt-temperature",
+) as HTMLInputElement;
 
 /** Stored code steps for the code panel pagination. */
 let codeSteps: Array<{
@@ -407,6 +413,14 @@ function getConfig(): Record<string, unknown> {
             optMaxSeqTable.value,
             CONFIG_FIELD_SPECS.maxRecordsSeqTable.fallback,
         ),
+        maxCodeRounds: parse(
+            optMaxCodeRounds.value,
+            CONFIG_FIELD_SPECS.maxCodeRounds.fallback,
+        ),
+        // Temperature is optional — empty string means undefined (omit from request)
+        temperature: optTemperature.value.trim()
+            ? Number.parseFloat(optTemperature.value)
+            : undefined,
     };
 }
 
@@ -422,6 +436,8 @@ function lockAdvancedOptions(): void {
     optMaxBamMods.disabled = true;
     optMaxWindowReads.disabled = true;
     optMaxSeqTable.disabled = true;
+    optMaxCodeRounds.disabled = true;
+    optTemperature.disabled = true;
 }
 
 /**
@@ -436,6 +452,8 @@ function unlockAdvancedOptions(): void {
     optMaxBamMods.disabled = false;
     optMaxWindowReads.disabled = false;
     optMaxSeqTable.disabled = false;
+    optMaxCodeRounds.disabled = false;
+    optTemperature.disabled = false;
 }
 
 /**
@@ -457,6 +475,8 @@ function resetDefaults(): void {
     optMaxSeqTable.value = String(
         CONFIG_FIELD_SPECS.maxRecordsSeqTable.fallback,
     );
+    optMaxCodeRounds.value = String(CONFIG_FIELD_SPECS.maxCodeRounds.fallback);
+    optTemperature.value = "";
 }
 
 /**

@@ -49,7 +49,7 @@ describe("ai-chat-constants", () => {
     });
 
     it("exports expected number of config fields", () => {
-        expect(Object.keys(CONFIG_FIELD_SPECS)).toHaveLength(7);
+        expect(Object.keys(CONFIG_FIELD_SPECS)).toHaveLength(8);
     });
 });
 

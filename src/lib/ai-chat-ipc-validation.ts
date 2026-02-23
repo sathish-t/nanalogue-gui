@@ -2,7 +2,11 @@
 // Renderer input is treated as untrusted at the main-process boundary.
 
 import { isAbsolute } from "node:path";
-import { CONFIG_FIELD_SPECS, MAX_MESSAGE_BYTES } from "./ai-chat-constants";
+import {
+    CONFIG_FIELD_SPECS,
+    MAX_MESSAGE_BYTES,
+    TEMPERATURE_SPEC,
+} from "./ai-chat-constants";
 import type { AiChatConfig, ConfigFieldSpec } from "./chat-types";
 
 /** Successful validation result with typed data. */
@@ -203,10 +207,34 @@ export function validateSendMessage(
             configValues[key] = result;
         }
     }
+    // Temperature is optional and float-valued — handled separately from
+    // the integer CONFIG_FIELD_SPECS loop (no Math.round, no fallback).
+    let temperature: number | undefined;
+    if (rawConfig.temperature !== undefined && rawConfig.temperature !== null) {
+        if (
+            typeof rawConfig.temperature !== "number" ||
+            !Number.isFinite(rawConfig.temperature)
+        ) {
+            temperature = undefined;
+        } else if (
+            rawConfig.temperature < TEMPERATURE_SPEC.min ||
+            rawConfig.temperature > TEMPERATURE_SPEC.max
+        ) {
+            configErrors.push(
+                `${TEMPERATURE_SPEC.label} must be between ${TEMPERATURE_SPEC.min} and ${TEMPERATURE_SPEC.max} (got ${rawConfig.temperature})`,
+            );
+        } else {
+            temperature = rawConfig.temperature;
+        }
+    }
+
     if (configErrors.length > 0) {
         return { valid: false, error: configErrors.join("; ") };
     }
-    const config = configValues as unknown as AiChatConfig;
+    const config = {
+        ...configValues,
+        temperature,
+    } as unknown as AiChatConfig;
 
     return {
         valid: true,

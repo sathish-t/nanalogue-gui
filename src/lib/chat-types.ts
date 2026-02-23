@@ -215,6 +215,10 @@ export interface AiChatConfig {
     maxRetries: number;
     /** LLM request timeout in seconds. */
     timeoutSeconds: number;
+    /** Maximum code execution rounds per user message. */
+    maxCodeRounds: number;
+    /** LLM sampling temperature. When undefined, omitted from request body. */
+    temperature?: number;
     /** Maximum records from read_info. */
     maxRecordsReadInfo: number;
     /** Maximum records from bam_mods. */
@@ -234,5 +238,15 @@ export interface ConfigFieldSpec {
     /** Default value when the field is omitted or non-numeric. */
     fallback: number;
     /** Human-readable label for error messages (e.g. "context window tokens"). */
+    label: string;
+}
+
+/** Validation spec for an optional float config field (no fallback, no rounding). */
+export interface OptionalFloatFieldSpec {
+    /** Minimum allowed value (inclusive). */
+    min: number;
+    /** Maximum allowed value (inclusive). */
+    max: number;
+    /** Human-readable label for error messages. */
     label: string;
 }

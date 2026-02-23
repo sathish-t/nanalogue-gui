@@ -1,7 +1,10 @@
 // Main-process constants for the AI Chat feature.
 // Centralizes numeric limits, defaults, and configuration values used across sandbox, orchestrator, and prompt modules.
 
-export { CONFIG_FIELD_SPECS } from "./ai-chat-shared-constants";
+export {
+    CONFIG_FIELD_SPECS,
+    TEMPERATURE_SPEC,
+} from "./ai-chat-shared-constants";
 
 // --- Token estimation ---
 

@@ -286,6 +286,7 @@ const minimalConfig: AiChatConfig = {
     contextWindowTokens: 4096,
     maxRetries: 2,
     timeoutSeconds: 30,
+    maxCodeRounds: 10,
     maxRecordsReadInfo: 100,
     maxRecordsBamMods: 100,
     maxRecordsWindowReads: 100,
