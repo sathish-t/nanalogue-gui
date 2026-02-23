@@ -20,7 +20,7 @@ export const /** Timeout in milliseconds for the model-list fetch request. */ MO
 export const /** Maximum cumulative sandbox runtime per turn in milliseconds (30 minutes). */ MAX_CUMULATIVE_SANDBOX_MS =
         30 * 60 * 1000;
 export const /** Maximum serialized size for the facts array in bytes. */ MAX_FACTS_BYTES = 2048;
-export const /** Maximum LLM tool-call round-trips per user message. */ MAX_TOOL_STEPS = 10;
+export const /** Default maximum code execution rounds per user message. */ DEFAULT_MAX_CODE_ROUNDS = 10;
 
 // --- Sandbox execution defaults ---
 
@@ -43,14 +43,19 @@ export const /** Default fallback max output bytes (used when no explicit value 
 export const /** Minimum output bytes floor. */ MIN_OUTPUT_BYTES = 4 * 1024;
 export const /** Maximum output bytes ceiling. */ MAX_OUTPUT_BYTES = 80 * 1024;
 
-// --- Print capture limits ---
+// --- Orchestrator output limits ---
 
-export const /** Maximum bytes of print output to capture per sandbox execution (1 MB). */ MAX_PRINT_CAPTURE_BYTES = 1_048_576;
+export const /** Maximum terminal output before writing to a file instead of showing inline. */ TERMINAL_OUTPUT_OVERFLOW_BYTES = 10_240;
+export const /** Maximum bytes for execution feedback sent back to the LLM. */ FEEDBACK_OUTPUT_MAX_BYTES = 4096;
 
 // --- Message size limits ---
 
 export const /** Maximum bytes for a single user message (100 KB). */ MAX_MESSAGE_BYTES =
         100 * 1024;
+
+// --- Print capture limits ---
+
+export const /** Maximum bytes of print output to capture per sandbox execution (1 MB). */ MAX_PRINT_CAPTURE_BYTES = 1_048_576;
 
 // --- File operation limits ---
 

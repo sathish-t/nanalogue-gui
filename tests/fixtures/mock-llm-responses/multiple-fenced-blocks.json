@@ -1,0 +1,15 @@
+{
+    "mockResponses": [
+        {
+            "choices": [{
+                "message": {"role": "assistant", "content": "First step:\n\n```python\nx = 1\n```\n\nSecond step:\n\n```python\nprint(x + 1)\n```"},
+                "finish_reason": "stop"
+            }]
+        }
+    ],
+    "expected": {
+        "text": "2\n",
+        "stepCount": 1,
+        "steps": [{"success": true}]
+    }
+}

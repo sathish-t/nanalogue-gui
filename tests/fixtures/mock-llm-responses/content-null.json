@@ -1,0 +1,15 @@
+{
+    "mockResponses": [
+        {
+            "choices": [{
+                "message": {"role": "assistant", "content": null},
+                "finish_reason": "stop"
+            }]
+        }
+    ],
+    "expected": {
+        "text": "(The model did not produce a usable response. Its output may have been truncated or contained errors.)",
+        "stepCount": 0,
+        "steps": []
+    }
+}

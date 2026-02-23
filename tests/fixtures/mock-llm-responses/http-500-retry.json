@@ -1,43 +1,17 @@
 {
-  "mockResponses": [
-    {
-      "_comment": "First request: server error (retryable)",
-      "_statusCode": 500,
-      "choices": [
+    "mockResponses": [
+        {"_statusCode": 500, "choices": []},
         {
-          "message": { "role": "assistant", "content": "error" },
-          "finish_reason": "stop"
+            "choices": [{
+                "message": {"role": "assistant", "content": "print('ok')"},
+                "finish_reason": "stop"
+            }]
         }
-      ]
-    },
-    {
-      "_comment": "Second request (retry): valid tool call",
-      "choices": [
-        {
-          "message": {
-            "role": "assistant",
-            "content": null,
-            "tool_calls": [
-              {
-                "id": "call_1",
-                "type": "function",
-                "function": {
-                  "name": "execute_sandbox_code",
-                  "arguments": "{\"code\":\"1 + 1\"}"
-                }
-              }
-            ]
-          },
-          "finish_reason": "tool_calls"
-        }
-      ]
-    },
-    null
-  ],
-  "expected": {
-    "text": "sandbox returned: 2",
-    "stepCount": 1,
-    "steps": [{ "success": true, "value": 2 }],
-    "minRequestCount": 2
-  }
+    ],
+    "expected": {
+        "text": "ok\n",
+        "stepCount": 1,
+        "steps": [{"success": true}],
+        "minRequestCount": 2
+    }
 }

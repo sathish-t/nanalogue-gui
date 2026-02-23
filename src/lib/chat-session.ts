@@ -35,8 +35,6 @@ interface SendSuccess {
     text: string;
     /** The sandbox execution steps. */
     steps: Array<{
-        /** The tool call ID. */
-        toolCallId: string;
         /** The Python code that was executed. */
         code: string;
         /** The sandbox execution result. */
@@ -73,14 +71,12 @@ export type SendMessageResult = SendSuccess | SendFailure;
 export class ChatSession {
     /** Conversation history for the current session. */
     history: HistoryEntry[] = [];
-    /** Accumulated facts from successful tool results. */
+    /** Accumulated facts from successful code execution results. */
     facts: Fact[] = [];
     /** Monotonic request counter for stale response detection. */
     requestId = 0;
     /** Abort controller for the current in-flight request. */
     currentAbortController: AbortController | null = null;
-    /** Per-turn dedup cache for tool call results. */
-    dedupCache = new Map<string, string>();
 
     /**
      * Sends a user message through the orchestrator and returns the response.
@@ -104,7 +100,6 @@ export class ChatSession {
         this.currentAbortController?.abort();
         this.currentAbortController = new AbortController();
         const localSignal = this.currentAbortController.signal;
-        this.dedupCache = new Map();
 
         try {
             const result = await handleUserMessage({
@@ -118,7 +113,6 @@ export class ChatSession {
                 history: this.history,
                 facts: this.facts,
                 signal: localSignal,
-                dedupCache: this.dedupCache,
             });
 
             // Check for cancellation or stale response. Cancel increments
@@ -188,6 +182,5 @@ export class ChatSession {
         this.requestId += 1;
         this.currentAbortController?.abort();
         this.currentAbortController = null;
-        this.dedupCache = new Map();
     }
 }

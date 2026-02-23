@@ -67,7 +67,6 @@ describe("ChatSession", () => {
             expect(args.signal).toBeInstanceOf(AbortSignal);
             expect(args.history).toEqual(expect.any(Array));
             expect(args.facts).toEqual(expect.any(Array));
-            expect(args.dedupCache).toBeInstanceOf(Map);
         });
 
         it("returns the orchestrator result on success", async () => {
@@ -75,7 +74,6 @@ describe("ChatSession", () => {
                 text: "42 reads",
                 steps: [
                     {
-                        toolCallId: "t1",
                         code: "read_info('test.bam')",
                         result: { success: true, value: 42 },
                     },
@@ -97,7 +95,6 @@ describe("ChatSession", () => {
                 text: "42 reads",
                 steps: [
                     {
-                        toolCallId: "t1",
                         code: "read_info('test.bam')",
                         result: { success: true, value: 42 },
                     },
@@ -128,36 +125,8 @@ describe("ChatSession", () => {
             expect(session.requestId).toBe(3);
         });
 
-        it("clears dedupCache before each turn", async () => {
-            vi.mocked(handleUserMessage).mockImplementation(async (opts) => {
-                // Simulate populating the dedup cache during a turn
-                opts.dedupCache.set("key", "value");
-                return { text: "", steps: [] };
-            });
-
-            const opts = {
-                endpointUrl: "http://localhost:11434/v1",
-                apiKey: "",
-                model: "llama3",
-                message: "test",
-                allowedDir: "/tmp",
-                config: defaultConfig,
-                emitEvent: vi.fn(),
-            };
-
-            await session.sendMessage(opts);
-            // After the first call the cache has entries from the mock
-            // The next call should start with a fresh cache
-            await session.sendMessage(opts);
-
-            const lastArgs = vi.mocked(handleUserMessage).mock.calls[1][0];
-            // The cache passed to handleUserMessage should be empty at call time
-            // (it gets populated during execution, but starts fresh)
-            expect(lastArgs.dedupCache.size).toBe(1); // populated by mock during call
-        });
-
         it("aborts previous request when sending a new one", async () => {
-            let capturedSignal: AbortSignal | null = null;
+            let capturedSignal = null as AbortSignal | null;
             vi.mocked(handleUserMessage).mockImplementation(async (opts) => {
                 capturedSignal = opts.signal;
                 return { text: "", steps: [] };
@@ -185,7 +154,7 @@ describe("ChatSession", () => {
 
     describe("cancel", () => {
         it("aborts the current abort controller", async () => {
-            let capturedSignal: AbortSignal | null = null;
+            let capturedSignal = null as AbortSignal | null;
             vi.mocked(handleUserMessage).mockImplementation(async (opts) => {
                 capturedSignal = opts.signal;
                 return { text: "", steps: [] };
@@ -235,17 +204,16 @@ describe("ChatSession", () => {
     });
 
     describe("reset", () => {
-        it("clears history, facts, and dedupCache", async () => {
+        it("clears history and facts", async () => {
             vi.mocked(handleUserMessage).mockImplementation(async (opts) => {
                 // Simulate adding to history/facts inside orchestrator
                 opts.history.push({ role: "user", content: "test" });
                 opts.facts.push({
                     type: "file",
                     filename: "x.bam",
-                    toolCallId: "c1",
+                    roundId: "round-1",
                     timestamp: 1,
                 });
-                opts.dedupCache.set("k", "v");
                 return { text: "", steps: [] };
             });
 
@@ -267,11 +235,10 @@ describe("ChatSession", () => {
 
             expect(session.history).toHaveLength(0);
             expect(session.facts).toHaveLength(0);
-            expect(session.dedupCache.size).toBe(0);
         });
 
         it("aborts current request and increments requestId", async () => {
-            let capturedSignal: AbortSignal | null = null;
+            let capturedSignal = null as AbortSignal | null;
             vi.mocked(handleUserMessage).mockImplementation(async (opts) => {
                 capturedSignal = opts.signal;
                 return { text: "", steps: [] };

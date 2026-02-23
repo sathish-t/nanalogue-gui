@@ -1,0 +1,22 @@
+{
+    "mockResponses": [
+        {
+            "choices": [{
+                "message": {"role": "assistant", "content": "x = 42"},
+                "finish_reason": "stop"
+            }]
+        },
+        {
+            "choices": [{
+                "message": {"role": "assistant", "content": "print(42)"},
+                "finish_reason": "stop"
+            }]
+        }
+    ],
+    "expected": {
+        "text": "42\n",
+        "stepCount": 2,
+        "steps": [{"success": true}, {"success": true}],
+        "minRequestCount": 2
+    }
+}

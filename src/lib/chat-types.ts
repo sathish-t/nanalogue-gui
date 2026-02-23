@@ -41,41 +41,12 @@ export interface SandboxOptions {
     maxOutputBytes?: number;
 }
 
-/** A tool call object within an assistant message. */
-export interface ToolCall {
-    /** Unique identifier for this tool call. */
-    id: string;
-    /** The type of tool call (always "function"). */
-    type: string;
-    /** The function name and serialized arguments. */
-    function: {
-        /** The name of the function to call. */
-        name: string;
-        /** The JSON-serialized arguments. */
-        arguments: string;
-    };
-}
-
-/** A tool result message in the conversation history. */
-export interface ToolMessage {
-    /** The message role. */
-    role: "tool";
-    /** The tool call ID this result corresponds to. */
-    tool_call_id: string;
-    /** The stringified result content. */
-    content: string;
-    /** Whether the tool execution succeeded. */
-    success: boolean;
-}
-
 /** An assistant message in the conversation history. */
 export interface AssistantMessage {
     /** The message role. */
     role: "assistant";
     /** The text content of the message. */
     content: string;
-    /** Tool calls emitted by the assistant (if any). */
-    tool_calls?: ToolCall[];
 }
 
 /** A user message in the conversation history. */
@@ -84,13 +55,17 @@ export interface UserMessage {
     role: "user";
     /** The text content of the message. */
     content: string;
+    /** Whether this message is a code execution result (not real user input). */
+    isExecutionResult?: boolean;
+    /** Typed execution status for pruning (replaces string-prefix detection). */
+    executionStatus?: "ok" | "error";
 }
 
 /** A single entry in the conversation history. */
-export type HistoryEntry = UserMessage | AssistantMessage | ToolMessage;
+export type HistoryEntry = UserMessage | AssistantMessage;
 
 /**
- * A typed fact recording key information from successful tool results.
+ * A typed fact recording key information from successful code execution results.
  * Facts are extracted by pattern matching, not LLM summarization.
  */
 export type Fact =
@@ -99,36 +74,18 @@ export type Fact =
           type: "file";
           /** The file that was referenced. */
           filename: string;
-          /** The tool call that produced this fact. */
-          toolCallId: string;
+          /** The execution round that produced this fact. */
+          roundId: string;
           /** When this fact was extracted (epoch ms). */
           timestamp: number;
-      }
-    | {
-          /** The fact kind discriminator. */
-          type: "result";
-          /** The file the result came from. */
-          filename: string;
-          /** The metric name that was computed. */
-          metric: string;
-          /** The computed metric value as a string. */
-          value: string;
-          /** Any filters that were active when computing the result. */
-          filters: string;
-          /** The tool call that produced this fact. */
-          toolCallId: string;
-          /** When this fact was extracted (epoch ms). */
-          timestamp: number;
-          /** Whether the source data was truncated by the output gate. */
-          fromTruncated: boolean;
       }
     | {
           /** The fact kind discriminator. */
           type: "filter";
           /** Human-readable description of the filter. */
           description: string;
-          /** The tool call that produced this fact. */
-          toolCallId: string;
+          /** The execution round that produced this fact. */
+          roundId: string;
           /** When this fact was extracted (epoch ms). */
           timestamp: number;
       }
@@ -137,8 +94,8 @@ export type Fact =
           type: "output";
           /** The filesystem path of the output file. */
           path: string;
-          /** The tool call that produced this fact. */
-          toolCallId: string;
+          /** The execution round that produced this fact. */
+          roundId: string;
           /** When this fact was extracted (epoch ms). */
           timestamp: number;
       };
@@ -158,13 +115,13 @@ export type AiChatEvent =
       }
     | {
           /** The event kind discriminator. */
-          type: "tool_execution_start";
+          type: "code_execution_start";
           /** The Python code about to be executed. */
           code: string;
       }
     | {
           /** The event kind discriminator. */
-          type: "tool_execution_end";
+          type: "code_execution_end";
           /** The sandbox execution result. */
           result: SandboxResult;
       }

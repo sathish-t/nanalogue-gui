@@ -1,0 +1,15 @@
+{
+    "mockResponses": [
+        {
+            "choices": [{
+                "message": {"role": "assistant", "content": "Here's the result:\n\n```python\nprint('extracted')\n```"},
+                "finish_reason": "stop"
+            }]
+        }
+    ],
+    "expected": {
+        "text": "extracted\n",
+        "stepCount": 1,
+        "steps": [{"success": true}]
+    }
+}

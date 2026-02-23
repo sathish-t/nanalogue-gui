@@ -59,7 +59,6 @@ const argConfig = {
         "max-records-seq-table": { type: "string" as const },
         "max-code-rounds": { type: "string" as const },
         temperature: { type: "string" as const },
-        "no-code": { type: "boolean" as const, default: false },
         "list-models": { type: "boolean" as const, default: false },
         help: { type: "boolean" as const, short: "h", default: false },
     },
@@ -94,8 +93,7 @@ ${BOLD}Advanced options:${RESET}
   --max-code-rounds <n>    Max code execution rounds (default: ${CONFIG_FIELD_SPECS.maxCodeRounds.fallback})
   --temperature <n>        LLM sampling temperature 0-2 (default: provider default)
 
-${BOLD}Display:${RESET}
-  --no-code                Suppress sandbox code display
+${BOLD}Other:${RESET}
   --list-models            List available models and exit
 
 ${BOLD}REPL commands:${RESET}
@@ -140,12 +138,20 @@ function parseNumericArg(
  */
 function formatSandboxResult(result: SandboxResult): string {
     if (result.success) {
-        const value =
-            typeof result.value === "string"
-                ? result.value
-                : JSON.stringify(result.value, null, 2);
+        const parts: string[] = [];
+        if (result.prints?.length) {
+            parts.push(result.prints.join(""));
+        }
+        if (result.endedWithExpression && result.value != null) {
+            const value =
+                typeof result.value === "string"
+                    ? result.value
+                    : JSON.stringify(result.value, null, 2);
+            parts.push(value);
+        }
+        const text = parts.join("") || "(no output)";
         const truncNote = result.truncated ? " [truncated]" : "";
-        return `${value}${truncNote}`;
+        return `${text}${truncNote}`;
     }
     return `${result.errorType}: ${result.message}`;
 }
@@ -180,8 +186,6 @@ async function main(): Promise<void> {
     const apiKey = values["api-key"] ?? process.env.API_KEY ?? "";
     const model = values.model;
     const allowedDir = values.dir;
-    const showCode = !values["no-code"];
-
     // --list-models mode
     if (values["list-models"]) {
         if (!endpointUrl) {
@@ -273,20 +277,15 @@ async function main(): Promise<void> {
             case "turn_start":
                 process.stdout.write(color(YELLOW, "[thinking...]"));
                 break;
-            case "tool_execution_start":
+            case "code_execution_start":
                 // Clear the thinking indicator and show code
                 process.stdout.write("\r\x1b[K");
-                if (showCode) {
-                    console.log(
-                        color(
-                            LIGHT_BLUE,
-                            `\`\`\`python\n${event.code}\n\`\`\``,
-                        ),
-                    );
-                }
+                console.log(
+                    color(LIGHT_BLUE, `\`\`\`python\n${event.code}\n\`\`\``),
+                );
                 process.stdout.write(color(YELLOW, "[running code...]"));
                 break;
-            case "tool_execution_end":
+            case "code_execution_end":
                 process.stdout.write("\r\x1b[K");
                 console.log(color(DIM, formatSandboxResult(event.result)));
                 break;

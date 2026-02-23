@@ -48,9 +48,9 @@ interface ListModelsResult {
 interface AiChatEvent {
     /** The event type discriminator. */
     type: string;
-    /** Python code for tool_execution_start events. */
+    /** Python code for code_execution_start events. */
     code?: string;
-    /** Sandbox result for tool_execution_end events. */
+    /** Sandbox result for code_execution_end events. */
     result?: unknown;
     /** Assistant text for turn_end events. */
     text?: string;
@@ -806,10 +806,10 @@ api.onAiChatEvent((event: AiChatEvent) => {
         case "llm_request_start":
             setSpinner(true, "Waiting for LLM...");
             break;
-        case "tool_execution_start":
+        case "code_execution_start":
             setSpinner(true, "Running sandbox code...");
             break;
-        case "tool_execution_end":
+        case "code_execution_end":
             setSpinner(true, "Processing...");
             break;
         case "llm_request_end":

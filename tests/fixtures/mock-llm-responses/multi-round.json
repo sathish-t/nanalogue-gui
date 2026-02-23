@@ -1,0 +1,21 @@
+{
+    "mockResponses": [
+        {
+            "choices": [{
+                "message": {"role": "assistant", "content": "1 + 1\ncontinue_thinking()"},
+                "finish_reason": "stop"
+            }]
+        },
+        {
+            "choices": [{
+                "message": {"role": "assistant", "content": "print('The answer is 2')"},
+                "finish_reason": "stop"
+            }]
+        }
+    ],
+    "expected": {
+        "text": "The answer is 2\n",
+        "stepCount": 2,
+        "steps": [{"success": true}, {"success": true}]
+    }
+}

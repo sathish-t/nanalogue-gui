@@ -46,27 +46,22 @@ export function buildSandboxPrompt(options: SandboxPromptOptions): string {
     const windowReadsLimit = maxRecordsWindowReads.toLocaleString();
     const seqTableLimit = maxRecordsSeqTable.toLocaleString();
 
-    return `You are a research assistant.
-You can return only two types of responses: either function calls (a.k.a. tool calls) with python code
-that are run in a restrictive sandbox and whose output is returned to you, or a normal text response.
-The function calls are run by an assistant and reported back to you; they are not shown to a user.
-Under no circumstances must you output a function call i.e. python code directly to the user.
-All function calls must use the appropriate function-calling infrastructure to tell the orchestrator
-that these are function calls so that the orchestrator can run them in a restrictive sandbox.
+    return `## Sandbox environment
 
-## Properties of the restrictive sandbox
-
+Your code runs in a restricted Python sandbox.
 You have access to Python builtins (len, range, sorted, sum, min, max etc.) and the
 external functions listed below. No classes, limited stdlib, no third-party libraries.
 External functions (peek, read_info,
-bam_mods, window_reads, seq_table, ls, read_file, write_file) call
+bam_mods, window_reads, seq_table, ls, read_file, write_file, continue_thinking) call
 into the host application. You do not have Python classes.
 You do not have network access, and have read/write file access only to a specified folder
-and its subfolders, and file system access is implemented through the Python code.
-Your code must end with a bare expression (not an assignment) to
-produce a return value.
+and its subfolders.
+When using continue_thinking(), end your code with a bare expression
+(not an assignment) so the return value is captured for feedback.
+For final answers, use print() instead — do not end with a bare
+expression that duplicates a printed value.
 
-IMPORTANT: Your code output (the return value) must be concise.
+IMPORTANT: Keep output concise.
 The maximum output size is ${maxOutputKB} KB. If your result exceeds
 this, it will be truncated. Prefer computing summary statistics
 (counts, means, distributions) over returning raw record lists,
@@ -74,6 +69,15 @@ unless the prompt message you receive shows the user is specifically
 interested in per-record information such as read ids, sequences etc.
 
 ## Available external functions
+
+### continue_thinking() -> None
+
+Signals that you need another round of execution. When called, your
+print() output and expression value are fed back to you instead of
+being shown to the user. Use this for multi-step analysis where you
+need to inspect intermediate results before producing a final answer.
+
+Without continue_thinking(), your output goes directly to the user.
 
 ### ls(pattern: str = None) -> list[str] | dict
 
@@ -396,8 +400,7 @@ beyond the limit never enter memory). Default per-call limits:
 - seq_table: max ${seqTableLimit} records
 
 **Pagination:** All read functions support \`offset\` and \`limit\`
-parameters for paginating through large result sets. The LLM can
-request successive pages:
+parameters for paginating through large result sets:
 
 \`\`\`python
 # Page 1
@@ -407,7 +410,7 @@ page2 = read_info("large.bam", region="chr1", limit=5000, offset=5000)
 \`\`\`
 
 When a page returns fewer records than \`limit\`, pagination is
-complete. The LLM can use \`sample_seed\` for deterministic sampling
+complete. Use \`sample_seed\` for deterministic sampling
 across pages (required when combining \`sample_fraction\` with
 pagination).
 
@@ -502,8 +505,13 @@ lengths = [r["sequence_length"] for r in reads]
 - write_file() writes to an ai_chat_output/ subdirectory and never
   overwrites existing files.
 - You cannot access the network.
-- Your code must end with a bare expression to return a value.
-  Example: write len(reads) on the last line, not result = len(reads).
+- When using continue_thinking(), end with a bare expression to return
+  a value. For final answers, use print() and avoid duplicating the
+  printed value as a bare expression.
+- If you want a value to be returned, do not end the block with an
+  if/else statement — that is not a bare expression and the value
+  will not be captured. Assign the result to a variable first, then
+  put the variable as the last line.
 - All file paths are relative to a pre-configured allowed directory.
 - You may use try/except to handle errors from external functions.
 - Output is capped at ${maxOutputKB} KB. Compute summaries, don't return raw data.`;
