@@ -49,7 +49,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.3",
     "@electron/windows-sign": "^2.0.2",
-    "@eslint/js": "^9.39.2",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
     "@stylistic/stylelint-plugin": "^5.0.1",
     "@types/node": "^22.0.0",
