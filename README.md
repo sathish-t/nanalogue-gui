@@ -265,15 +265,15 @@ relevant for you depends on how you use the chat feature here.
 
 **AI Chat with a connected endpoint:**
 
-![AI Chat with connected endpoint](demo/screenshot-ai-chat-configured.png)
+![AI Chat with connected endpoint](demo/screenshot-ai-chat-configured-openai.png)
 
 **Asking a question about BAM data:**
 
-![AI Chat question and response](demo/screenshot-ai-chat-q1.png)
+![AI Chat question and response](demo/screenshot-ai-chat-q1-openai.png)
 
 **Multi-turn conversation:**
 
-![AI Chat multi-turn conversation](demo/screenshot-ai-chat-q3.png)
+![AI Chat multi-turn conversation](demo/screenshot-ai-chat-q3-openai.png)
 
 **Display sandboxed code:**
 
@@ -282,7 +282,7 @@ Our sandbox uses the [Monty](https://github.com/pydantic/monty) package from pyd
 code in a secure way so that it has access only to our files and to specific functions.
 This ensures our sandbox is secure, and allows us to inspect what the LLM is doing.
 
-![AI Chat multi-turn conversation with sandbox](demo/screenshot-ai-chat-q3-sandbox.png)
+![AI Chat multi-turn conversation with sandbox](demo/screenshot-ai-chat-sandbox-openai.png)
 
 #### CLI (nanalogue-chat)
 
