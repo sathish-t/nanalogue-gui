@@ -389,6 +389,39 @@ describe("AI Chat generation guard", () => {
         await flushMicrotasks();
     });
 
+    it("discards late send-message response after cancel", async () => {
+        mockApi.aiChatSendMessage.mockReturnValueOnce(
+            new Promise<SendMessageResult>(() => {}),
+        );
+
+        // Fill required fields and send
+        const endpoint = document.getElementById(
+            "input-endpoint",
+        ) as HTMLInputElement;
+        endpoint.value = "http://localhost:11434/v1";
+        (document.getElementById("input-dir") as HTMLInputElement).value =
+            "/tmp/bam";
+        (document.getElementById("input-model") as HTMLInputElement).value =
+            "model-a";
+        (document.getElementById("input-message") as HTMLInputElement).value =
+            "hello";
+        (document.getElementById("btn-send") as HTMLButtonElement).click();
+        await flushMicrotasks();
+
+        // Cancel while send is in flight — cancel handler calls setProcessing(false)
+        (document.getElementById("btn-cancel") as HTMLButtonElement).click();
+        await flushMicrotasks();
+
+        // Config fields should be re-enabled after cancel
+        expect(
+            (document.getElementById("input-dir") as HTMLInputElement).disabled,
+        ).toBe(false);
+        expect(
+            (document.getElementById("btn-browse") as HTMLButtonElement)
+                .disabled,
+        ).toBe(false);
+    });
+
     it("accepts fetch response when no New Chat intervened", async () => {
         await new Promise<void>((resolve) => {
             setTimeout(resolve, 0);
