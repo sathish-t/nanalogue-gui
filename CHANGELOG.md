@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Print capture and `continue_thinking()` external function in Monty sandbox ([`3c3c82d`](https://github.com/sathish-t/nanalogue-gui/commit/3c3c82ded04ed2bff86a6234606b7af2b0eb9239))
 - `maxCodeRounds` and `temperature` configuration fields for AI Chat ([`ee664df`](https://github.com/sathish-t/nanalogue-gui/commit/ee664df2964bb1cf21106e9b81108ea1d3fea6d5))
 
+### Fixed
+
+- Pre-commit hook now also triggers when only `package-lock.json` is staged, e.g. after `npm audit fix` ([`e97fb89`](https://github.com/sathish-t/nanalogue-gui/commit/e97fb89214a6b9bac47772cf3c05941d06976fbe))
+
 ### Removed
 
 - `ai`, `@ai-sdk/openai-compatible`, and `zod` dependencies replaced by native fetch ([`e57aa9d`](https://github.com/sathish-t/nanalogue-gui/commit/e57aa9d1a8778d4944cdab37589ec1ca938df5b6))
