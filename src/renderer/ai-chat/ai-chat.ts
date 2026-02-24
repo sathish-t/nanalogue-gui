@@ -790,6 +790,9 @@ btnNewChat.addEventListener("click", async () => {
     setSpinner(false);
     setProcessing(false);
     unlockAdvancedOptions();
+    // Re-enable config fields after unlockAdvancedOptions resets chatStarted,
+    // in case a fetch-models request disabled them before chatStarted was set.
+    setConfigFieldsDisabled(false);
 
     // Reset model/connection state so stale provider data doesn't leak
     fetchedModels = [];

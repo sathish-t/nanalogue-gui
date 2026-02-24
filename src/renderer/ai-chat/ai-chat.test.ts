@@ -580,4 +580,56 @@ describe("AI Chat config field locking during processing", () => {
         resolveSend({ success: true, text: "done" });
         await flushMicrotasks();
     });
+
+    it("re-enables config fields via New Chat after fetch/send race", async () => {
+        let resolveModels!: (value: ListModelsResult) => void;
+        mockApi.aiChatListModels.mockReturnValueOnce(
+            new Promise<ListModelsResult>((resolve) => {
+                resolveModels = resolve;
+            }),
+        );
+
+        // Start fetch-models (disables config fields)
+        (document.getElementById("input-endpoint") as HTMLInputElement).value =
+            "http://localhost:11434/v1";
+        (
+            document.getElementById("btn-fetch-models") as HTMLButtonElement
+        ).click();
+        await flushMicrotasks();
+
+        // Send first message while fetch is in flight — sets chatStarted=true
+        (document.getElementById("input-dir") as HTMLInputElement).disabled =
+            false;
+        (document.getElementById("input-dir") as HTMLInputElement).value =
+            "/tmp/bam";
+        (document.getElementById("input-model") as HTMLInputElement).disabled =
+            false;
+        (document.getElementById("input-model") as HTMLInputElement).value =
+            "model-a";
+        (document.getElementById("input-message") as HTMLInputElement).value =
+            "hello";
+        (document.getElementById("btn-send") as HTMLButtonElement).click();
+        await flushMicrotasks();
+
+        // Fetch completes — setConfigFieldsDisabled(false) skipped (chatStarted=true)
+        resolveModels({ success: true, models: ["model-a"] });
+        await flushMicrotasks();
+
+        // New Chat should re-enable everything
+        (document.getElementById("btn-new-chat") as HTMLButtonElement).click();
+        await flushMicrotasks();
+
+        for (const id of configFieldIds) {
+            expect(
+                (document.getElementById(id) as HTMLInputElement).disabled,
+                `${id} should be re-enabled after New Chat`,
+            ).toBe(false);
+        }
+        for (const id of configButtonIds) {
+            expect(
+                (document.getElementById(id) as HTMLButtonElement).disabled,
+                `${id} should be re-enabled after New Chat`,
+            ).toBe(false);
+        }
+    });
 });
