@@ -216,7 +216,9 @@ You have to install llama.cpp, configure its parameters, choose a model etc.
 The command shown below is for illustrative purposes only--the flags etc. may have
 changed since the time of writing.
 A bigger model on a computer with better hardware specs will generally give
-better results.
+better results. For a step-by-step guide covering installation, model
+selection, and recommended flags, see
+[documentation/local-llm-setup.md](documentation/local-llm-setup.md).
 
 ```bash
 ./build/bin/llama-server \
