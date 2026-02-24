@@ -315,6 +315,7 @@ function showModelDropdown(filter: string): void {
         option.textContent = modelId;
         option.addEventListener("mousedown", (e) => {
             e.preventDefault();
+            if (chatStarted) return;
             inputModel.value = modelId;
             modelDropdown.classList.add("hidden");
         });
@@ -488,10 +489,22 @@ function getConfig(): Record<string, unknown> {
 }
 
 /**
- * Locks the advanced options fields after the first message.
+ * Permanently locks all session config fields after the first successful send.
+ * Sets chatStarted first so setConfigFieldsDisabled becomes a no-op, then
+ * disables main config controls directly and locks advanced options.
  */
-function lockAdvancedOptions(): void {
+function lockSessionConfig(): void {
     chatStarted = true;
+    // Disable main config controls directly (not via setConfigFieldsDisabled,
+    // which is now a no-op because chatStarted is true).
+    inputDir.disabled = true;
+    btnBrowse.disabled = true;
+    inputEndpoint.disabled = true;
+    inputApiKey.disabled = true;
+    inputModel.disabled = true;
+    btnFetchModels.disabled = true;
+    hideModelDropdown();
+    // Disable advanced options
     optContextWindow.disabled = true;
     optMaxRetries.disabled = true;
     optTimeout.disabled = true;
@@ -507,10 +520,20 @@ function lockAdvancedOptions(): void {
 }
 
 /**
- * Unlocks the advanced options fields (for New Chat).
+ * Unlocks all session config fields (for New Chat). Sets chatStarted false
+ * first so setConfigFieldsDisabled is re-enabled for future temporary locking,
+ * then re-enables main config controls directly and unlocks advanced options.
  */
-function unlockAdvancedOptions(): void {
+function unlockSessionConfig(): void {
     chatStarted = false;
+    // Re-enable main config controls directly (symmetric with lockSessionConfig)
+    inputDir.disabled = false;
+    btnBrowse.disabled = false;
+    inputEndpoint.disabled = false;
+    inputApiKey.disabled = false;
+    inputModel.disabled = false;
+    btnFetchModels.disabled = false;
+    // Re-enable advanced options
     optContextWindow.disabled = false;
     optMaxRetries.disabled = false;
     optTimeout.disabled = false;
@@ -729,6 +752,7 @@ async function sendUserMessage(
         inputEndpoint.value.trim() === requestedEndpoint;
 
     if (result.success) {
+        if (!chatStarted) lockSessionConfig();
         if (result.text) {
             appendMessage("assistant", result.text);
         }
@@ -786,9 +810,6 @@ btnSend.addEventListener("click", async () => {
         return;
     }
 
-    // Lock advanced options on first message
-    if (!chatStarted) lockAdvancedOptions();
-
     inputMessage.value = "";
     await sendUserMessage(message, true);
 });
@@ -821,10 +842,7 @@ btnNewChat.addEventListener("click", async () => {
     showCodePage(0);
     setSpinner(false);
     setProcessing(false);
-    unlockAdvancedOptions();
-    // Re-enable config fields after unlockAdvancedOptions resets chatStarted,
-    // in case a fetch-models request disabled them before chatStarted was set.
-    setConfigFieldsDisabled(false);
+    unlockSessionConfig();
 
     // Reset model/connection state so stale provider data doesn't leak
     fetchedModels = [];
