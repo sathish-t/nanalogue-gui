@@ -37,6 +37,8 @@ export interface SandboxOptions {
     maxRecordsWindowReads?: number;
     /** Maximum records from seq_table. */
     maxRecordsSeqTable?: number;
+    /** Maximum number of Monty VM heap allocations. */
+    maxAllocations?: number;
     /** Maximum output size in bytes (derived from context budget). */
     maxOutputBytes?: number;
 }
@@ -184,6 +186,12 @@ export interface AiChatConfig {
     maxRecordsWindowReads: number;
     /** Maximum records from seq_table. */
     maxRecordsSeqTable: number;
+    /** Maximum sandbox execution duration in seconds. */
+    maxDurationSecs: number;
+    /** Maximum sandbox heap memory in megabytes (converted to bytes before use). */
+    maxMemoryMB: number;
+    /** Maximum Monty VM heap allocations. */
+    maxAllocations: number;
 }
 
 /** Validation spec for a single AiChatConfig field. */

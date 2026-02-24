@@ -23,6 +23,9 @@ const defaultConfig: AiChatConfig = {
     maxRecordsBamMods: 5_000,
     maxRecordsWindowReads: 5_000,
     maxRecordsSeqTable: 5_000,
+    maxDurationSecs: 600,
+    maxMemoryMB: 512,
+    maxAllocations: 100_000,
 };
 
 describe("ChatSession", () => {

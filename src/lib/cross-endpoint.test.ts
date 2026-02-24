@@ -222,6 +222,9 @@ const minimalConfig: AiChatConfig = {
     maxRecordsBamMods: 100,
     maxRecordsWindowReads: 100,
     maxRecordsSeqTable: 100,
+    maxDurationSecs: 600,
+    maxMemoryMB: 512,
+    maxAllocations: 100_000,
 };
 
 /** Orchestrator call result for test assertions. */

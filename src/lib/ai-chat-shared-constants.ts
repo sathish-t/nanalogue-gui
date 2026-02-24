@@ -64,6 +64,27 @@ export const /** Validation specs for each integer AiChatConfig field (temperatu
             fallback: 10,
             label: "max code rounds",
         },
+        /** Minimum meaningful timeout vs. 1-hour hard ceiling. */
+        maxDurationSecs: {
+            min: 10,
+            max: 3600,
+            fallback: 600,
+            label: "max sandbox duration (seconds)",
+        },
+        /** Floor prevents undersized heaps; ceiling prevents host OOM. */
+        maxMemoryMB: {
+            min: 64,
+            max: 4096,
+            fallback: 512,
+            label: "max sandbox memory (MB)",
+        },
+        /** Floor prevents trivial limits; ceiling prevents host blowup. */
+        maxAllocations: {
+            min: 10_000,
+            max: 10_000_000,
+            fallback: 100_000,
+            label: "max sandbox allocations",
+        },
     };
 
 export const /** Validation spec for optional temperature (float, no fallback). */ TEMPERATURE_SPEC: OptionalFloatFieldSpec =

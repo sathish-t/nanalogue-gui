@@ -58,6 +58,9 @@ const argConfig = {
         "max-records-window-reads": { type: "string" as const },
         "max-records-seq-table": { type: "string" as const },
         "max-code-rounds": { type: "string" as const },
+        "max-duration-secs": { type: "string" as const },
+        "max-memory-mb": { type: "string" as const },
+        "max-allocations": { type: "string" as const },
         temperature: { type: "string" as const },
         "list-models": { type: "boolean" as const, default: false },
         help: { type: "boolean" as const, short: "h", default: false },
@@ -91,6 +94,9 @@ ${BOLD}Advanced options:${RESET}
   --max-records-window-reads <n> Max window_reads records (default: ${CONFIG_FIELD_SPECS.maxRecordsWindowReads.fallback})
   --max-records-seq-table <n>    Max seq_table records (default: ${CONFIG_FIELD_SPECS.maxRecordsSeqTable.fallback})
   --max-code-rounds <n>    Max code execution rounds (default: ${CONFIG_FIELD_SPECS.maxCodeRounds.fallback})
+  --max-duration-secs <n>  Max sandbox duration in seconds (default: ${CONFIG_FIELD_SPECS.maxDurationSecs.fallback})
+  --max-memory-mb <n>      Max sandbox memory in MB (default: ${CONFIG_FIELD_SPECS.maxMemoryMB.fallback})
+  --max-allocations <n>    Max sandbox VM allocations (default: ${CONFIG_FIELD_SPECS.maxAllocations.fallback})
   --temperature <n>        LLM sampling temperature 0-2 (default: provider default)
 
 ${BOLD}Other:${RESET}
@@ -249,6 +255,18 @@ async function main(): Promise<void> {
         maxCodeRounds: parseNumericArg(
             values["max-code-rounds"],
             CONFIG_FIELD_SPECS.maxCodeRounds,
+        ),
+        maxDurationSecs: parseNumericArg(
+            values["max-duration-secs"],
+            CONFIG_FIELD_SPECS.maxDurationSecs,
+        ),
+        maxMemoryMB: parseNumericArg(
+            values["max-memory-mb"],
+            CONFIG_FIELD_SPECS.maxMemoryMB,
+        ),
+        maxAllocations: parseNumericArg(
+            values["max-allocations"],
+            CONFIG_FIELD_SPECS.maxAllocations,
         ),
         // Temperature is optional — undefined means omit from request body.
         // Reject non-finite or out-of-range values to avoid sending NaN/null to the API.

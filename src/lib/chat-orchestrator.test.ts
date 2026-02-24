@@ -609,6 +609,9 @@ const minimalConfig: AiChatConfig = {
     maxRecordsBamMods: 100,
     maxRecordsWindowReads: 100,
     maxRecordsSeqTable: 100,
+    maxDurationSecs: 600,
+    maxMemoryMB: 512,
+    maxAllocations: 100_000,
 };
 
 describe("adversarial/edge-case tests", () => {
@@ -1019,6 +1022,9 @@ describe("/exec slash command", () => {
                 maxRecordsWindowReads: 100,
                 maxRecordsSeqTable: 100,
                 maxCodeRounds: 1,
+                maxDurationSecs: 600,
+                maxMemoryMB: 512,
+                maxAllocations: 100_000,
             },
             history: [],
             facts: [],
