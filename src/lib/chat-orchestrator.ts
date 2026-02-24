@@ -2,7 +2,7 @@
 // Manages conversation history, context transformation, facts, and the code-only LLM loop.
 
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import {
     BYTES_PER_TOKEN,
@@ -788,6 +788,45 @@ export async function handleUserMessage(
 
     // Add user message to history
     history.push({ role: "user", content: message });
+
+    // Handle /exec slash command — run a user file directly, skip the LLM.
+    const execMatch = message.match(/^\/exec\s+(.+)$/);
+    if (execMatch) {
+        history.pop();
+        const maxOutputBytes = deriveMaxOutputBytes(config.contextWindowTokens);
+        emitEvent({ type: "turn_start" });
+        const filePath = execMatch[1].trim();
+        if (!filePath.endsWith(".py")) {
+            throw new Error("/exec only supports .py files");
+        }
+        const resolved = await resolvePath(allowedDir, filePath);
+        const code = await readFile(resolved, "utf-8");
+
+        emitEvent({ type: "code_execution_start", code });
+        const sandboxResult = await runSandboxGuarded(
+            code,
+            allowedDir,
+            {
+                maxRecordsReadInfo: config.maxRecordsReadInfo,
+                maxRecordsBamMods: config.maxRecordsBamMods,
+                maxRecordsWindowReads: config.maxRecordsWindowReads,
+                maxRecordsSeqTable: config.maxRecordsSeqTable,
+                maxOutputBytes,
+            },
+            signal,
+        );
+        emitEvent({ type: "code_execution_end", result: sandboxResult });
+
+        const text =
+            "# Direct user execution\n" +
+            "# These results do not go to the LLM, so do not reference any of these results in your LLM conversation.\n" +
+            "# Any text overflow etc. are the user's responsibility.\n" +
+            "# Timeouts may not apply to you (check the package's code if you want to know more).\n\n" +
+            collectTerminalOutput(sandboxResult);
+        const steps = [{ code, result: sandboxResult }];
+        emitEvent({ type: "turn_end", text, steps });
+        return { text, steps };
+    }
 
     // Build system prompt
     const maxOutputBytes = deriveMaxOutputBytes(config.contextWindowTokens);
