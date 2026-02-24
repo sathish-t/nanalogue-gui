@@ -210,6 +210,15 @@ const optMaxSeqTable = document.getElementById(
 const optMaxCodeRounds = document.getElementById(
     "opt-max-code-rounds",
 ) as HTMLInputElement;
+const optMaxDuration = document.getElementById(
+    "opt-max-duration",
+) as HTMLInputElement;
+const optMaxMemory = document.getElementById(
+    "opt-max-memory",
+) as HTMLInputElement;
+const optMaxAllocations = document.getElementById(
+    "opt-max-allocations",
+) as HTMLInputElement;
 const optTemperature = document.getElementById(
     "opt-temperature",
 ) as HTMLInputElement;
@@ -459,6 +468,18 @@ function getConfig(): Record<string, unknown> {
             optMaxCodeRounds.value,
             CONFIG_FIELD_SPECS.maxCodeRounds.fallback,
         ),
+        maxDurationSecs: parse(
+            optMaxDuration.value,
+            CONFIG_FIELD_SPECS.maxDurationSecs.fallback,
+        ),
+        maxMemoryMB: parse(
+            optMaxMemory.value,
+            CONFIG_FIELD_SPECS.maxMemoryMB.fallback,
+        ),
+        maxAllocations: parse(
+            optMaxAllocations.value,
+            CONFIG_FIELD_SPECS.maxAllocations.fallback,
+        ),
         // Temperature is optional — empty string means undefined (omit from request)
         temperature: optTemperature.value.trim()
             ? Number.parseFloat(optTemperature.value)
@@ -479,6 +500,9 @@ function lockAdvancedOptions(): void {
     optMaxWindowReads.disabled = true;
     optMaxSeqTable.disabled = true;
     optMaxCodeRounds.disabled = true;
+    optMaxDuration.disabled = true;
+    optMaxMemory.disabled = true;
+    optMaxAllocations.disabled = true;
     optTemperature.disabled = true;
 }
 
@@ -495,6 +519,9 @@ function unlockAdvancedOptions(): void {
     optMaxWindowReads.disabled = false;
     optMaxSeqTable.disabled = false;
     optMaxCodeRounds.disabled = false;
+    optMaxDuration.disabled = false;
+    optMaxMemory.disabled = false;
+    optMaxAllocations.disabled = false;
     optTemperature.disabled = false;
 }
 
@@ -518,6 +545,11 @@ function resetDefaults(): void {
         CONFIG_FIELD_SPECS.maxRecordsSeqTable.fallback,
     );
     optMaxCodeRounds.value = String(CONFIG_FIELD_SPECS.maxCodeRounds.fallback);
+    optMaxDuration.value = String(CONFIG_FIELD_SPECS.maxDurationSecs.fallback);
+    optMaxMemory.value = String(CONFIG_FIELD_SPECS.maxMemoryMB.fallback);
+    optMaxAllocations.value = String(
+        CONFIG_FIELD_SPECS.maxAllocations.fallback,
+    );
     optTemperature.value = "";
 }
 
