@@ -184,8 +184,8 @@ not found in the BAM, and unmapped reads excluded from the output.
 ### AI Chat
 
 Experimental mode for asking natural-language questions about BAM files.
-Connects to any OpenAI-compatible API endpoint (local or remote) and uses
-tool calls to query BAM data in a sandboxed environment.
+Connects to any OpenAI-compatible API endpoint (local or remote) and 
+queries BAM data in a sandboxed environment.
 
 **AI Chat works with any provider that exposes an OpenAI-compatible v1 API
 endpoint.** This includes cloud providers like OpenAI, Anthropic,
@@ -245,8 +245,8 @@ These are other suggestions for LLM providers/setups that we haven't tested ours
 
 Use the **Fetch Models** button after entering your endpoint URL and API key
 to see which models are available from your provider. For best results, choose
-a model that supports **tool calling** (also called function calling), since
-AI Chat relies on tool calls to query your BAM data. Larger models generally
+a model that supports returning Python code, since
+AI Chat relies on Python code run in a sandbox to query your BAM data. Larger models generally
 give better answers but respond more slowly; smaller models are faster but may
 struggle with complex questions.
 
@@ -279,8 +279,8 @@ relevant for you depends on how you use the chat feature here.
 
 **Display sandboxed code:**
 
-We use a python sandbox to receive code from the LLM and execute it.
-Our sandbox uses the [Monty](https://github.com/pydantic/monty) package from pydantic to run python
+We use a Python sandbox to receive code from the LLM and execute it.
+Our sandbox uses the [Monty](https://github.com/pydantic/monty) package from pydantic to run Python
 code in a secure way so that it has access only to our files and to specific functions.
 This ensures our sandbox is secure, and allows us to inspect what the LLM is doing.
 
