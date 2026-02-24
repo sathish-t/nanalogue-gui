@@ -286,6 +286,15 @@ This ensures our sandbox is secure, and allows us to inspect what the LLM is doi
 
 ![AI Chat multi-turn conversation with sandbox](demo/screenshot-ai-chat-sandbox-openai.png)
 
+**Run your own Python scripts:**
+
+You can bypass the LLM entirely and run a Python file directly in the sandbox
+using the `/exec` command (available in both the GUI chat input and the CLI
+REPL). The file must be a `.py` file inside your BAM directory. The script
+runs with the same sandbox permissions as LLM-generated code (access to your
+BAM files and the built-in helper functions), but the results are not sent to
+the LLM conversation.
+
 #### CLI (nanalogue-chat)
 
 The same AI Chat analysis engine is available as a standalone terminal REPL,
@@ -317,6 +326,7 @@ node dist/cli.mjs --endpoint https://api.openai.com/v1 --api-key $API_KEY --list
 | Command | Action |
 |---|---|
 | `/new` | Start a new conversation |
+| `/exec <file.py>` | Run a Python file directly in the sandbox without sending it to the LLM |
 | `/quit` | Exit the CLI |
 | Ctrl+C during a request | Cancel the current request |
 | Ctrl+C at the prompt | Exit |
