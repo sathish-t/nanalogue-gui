@@ -11,10 +11,10 @@ interface LaunchResult {
     reason?: string;
 }
 
-/** Response from the send-message IPC handler. */
-interface SendMessageResult {
-    /** Whether the request succeeded. */
-    success: boolean;
+/** Successful send-message response with assistant text and optional code steps. */
+interface SendMessageSuccess {
+    /** Discriminant — the request succeeded. */
+    success: true;
     /** The assistant's text response. */
     text?: string;
     /** Tool execution steps for the code panel. */
@@ -24,25 +24,43 @@ interface SendMessageResult {
         /** The sandbox execution result. */
         result: unknown;
     }>;
-    /** Error message when success is false. */
-    error?: string;
+}
+
+/** Failed send-message response with an error description. */
+interface SendMessageFailure {
+    /** Discriminant — the request failed. */
+    success: false;
+    /** Error message describing the failure. */
+    error: string;
     /** Whether the error was a timeout. */
     isTimeout?: boolean;
-    /** Endpoint origin requiring consent. */
+    /** Endpoint origin requiring consent (set when error is CONSENT_REQUIRED). */
     origin?: string;
 }
 
-/** Response from the list-models IPC handler. */
-interface ListModelsResult {
-    /** Whether the request succeeded. */
-    success: boolean;
+/** Discriminated union for the send-message IPC response. */
+type SendMessageResult = SendMessageSuccess | SendMessageFailure;
+
+/** Successful list-models response with the available model IDs. */
+interface ListModelsSuccess {
+    /** Discriminant — the request succeeded. */
+    success: true;
     /** Available model IDs. */
-    models?: string[];
-    /** Error message when success is false. */
-    error?: string;
+    models: string[];
+}
+
+/** Failed list-models response with an error description. */
+interface ListModelsFailure {
+    /** Discriminant — the request failed. */
+    success: false;
+    /** Error message describing the failure. */
+    error: string;
     /** Endpoint origin when consent is required. */
     origin?: string;
 }
+
+/** Discriminated union for the list-models IPC response. */
+type ListModelsResult = ListModelsSuccess | ListModelsFailure;
 
 /** Event sent from main process during AI Chat turns. */
 interface AiChatEvent {
@@ -561,7 +579,7 @@ btnFetchModels.addEventListener("click", async () => {
     const endpointStillMatches =
         inputEndpoint.value.trim() === requestedEndpoint;
 
-    if (result.success && result.models) {
+    if (result.success) {
         fetchedModels = result.models;
         showModelDropdown(inputModel.value);
         fetchStatus.textContent = `Found ${result.models.length} model(s).`;
