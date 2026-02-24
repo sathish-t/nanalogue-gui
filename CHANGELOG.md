@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Updates README AI Chat section to reflect Python code sandbox approach instead of tool calling ([`b24f008`](https://github.com/sathish-t/nanalogue-gui/commit/b24f00848fcb7ee0b3bf42e08303cf4b9581de6a))
 - Parameterizes AI Chat demo screenshots for multiple providers (OpenAI, Google Gemini, Anthropic) with per-provider filenames and artifact upload ([`33c1af1`](https://github.com/sathish-t/nanalogue-gui/commit/33c1af118d39bd33dd98ae1f414f0845f780c472), [`d96388b`](https://github.com/sathish-t/nanalogue-gui/commit/d96388b94dc3b5ffa1dfe58f55cfa635c90392ef), [`a6296f4`](https://github.com/sathish-t/nanalogue-gui/commit/a6296f4ef87ac7a3b391dcf01ec258c0b5ea28b0))
 - Extracted reusable `ChatSession` class from AI Chat IPC handlers for shared GUI/CLI use ([`9c02a77`](https://github.com/sathish-t/nanalogue-gui/commit/9c02a77339bf7c79f7ff627567c33cf1b2137bb7))
 - Rewrites chat orchestrator from Vercel AI SDK tool-call architecture to a native fetch loop where the LLM responds with Python code executed in the Monty sandbox ([`e57aa9d`](https://github.com/sathish-t/nanalogue-gui/commit/e57aa9d1a8778d4944cdab37589ec1ca938df5b6))
