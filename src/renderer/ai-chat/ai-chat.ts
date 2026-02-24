@@ -623,74 +623,87 @@ btnFetchModels.addEventListener("click", async () => {
 
     const requestedEndpoint = inputEndpoint.value.trim();
     const generation = chatGeneration;
-    let result = await api.aiChatListModels({
-        endpointUrl: inputEndpoint.value,
-        apiKey: inputApiKey.value,
-    });
-
-    // Handle consent-required for non-localhost endpoints
-    if (
-        !result.success &&
-        result.error === "CONSENT_REQUIRED" &&
-        result.origin
-    ) {
-        const consentOrigin = document.getElementById(
-            "consent-origin",
-        ) as HTMLElement;
-        consentOrigin.textContent = result.origin;
-        const accepted = await new Promise<boolean>((resolve) => {
-            pendingConsentResolve = resolve;
-            consentDialog.showModal();
+    try {
+        let result = await api.aiChatListModels({
+            endpointUrl: inputEndpoint.value,
+            apiKey: inputApiKey.value,
         });
-        if (accepted) {
-            await api.aiChatConsent(result.origin);
-            result = await api.aiChatListModels({
-                endpointUrl: inputEndpoint.value,
-                apiKey: inputApiKey.value,
+
+        // Handle consent-required for non-localhost endpoints
+        if (
+            !result.success &&
+            result.error === "CONSENT_REQUIRED" &&
+            result.origin
+        ) {
+            const consentOrigin = document.getElementById(
+                "consent-origin",
+            ) as HTMLElement;
+            consentOrigin.textContent = result.origin;
+            const accepted = await new Promise<boolean>((resolve) => {
+                pendingConsentResolve = resolve;
+                consentDialog.showModal();
             });
+            if (accepted) {
+                if (generation !== chatGeneration) return;
+                await api.aiChatConsent(result.origin);
+                result = await api.aiChatListModels({
+                    endpointUrl: inputEndpoint.value,
+                    apiKey: inputApiKey.value,
+                });
+            } else {
+                if (generation === chatGeneration) {
+                    fetchStatus.textContent = "Endpoint consent denied.";
+                    setTimeout(() => {
+                        fetchStatus.textContent = "";
+                    }, 8000);
+                }
+                return;
+            }
+        }
+
+        // Discard stale response if New Chat was clicked during the request.
+        // Do not re-enable fields here — New Chat already handled that.
+        if (generation !== chatGeneration) return;
+
+        // Only update connection status if endpoint hasn't changed during request
+        const endpointStillMatches =
+            inputEndpoint.value.trim() === requestedEndpoint;
+
+        if (result.success) {
+            fetchedModels = result.models;
+            showModelDropdown(inputModel.value);
+            fetchStatus.textContent = `Found ${result.models.length} model(s).`;
+            if (endpointStillMatches) {
+                try {
+                    connectedOrigin = new URL(requestedEndpoint).origin;
+                } catch {
+                    connectedOrigin = null;
+                }
+                updateConnectionStatus(true);
+            }
         } else {
+            fetchStatus.textContent = result.error ?? "Unknown error";
+            if (endpointStillMatches) {
+                connectedOrigin = null;
+                updateConnectionStatus(false);
+            }
+        }
+
+        // Auto-dismiss after 8 seconds
+        setTimeout(() => {
+            fetchStatus.textContent = "";
+        }, 8000);
+    } catch (err) {
+        if (generation === chatGeneration) {
+            const msg = err instanceof Error ? err.message : String(err);
+            fetchStatus.textContent = `Unexpected error: ${msg}`;
+        }
+    } finally {
+        if (generation === chatGeneration && !chatStarted) {
             btnFetchModels.disabled = false;
             setConfigFieldsDisabled(false);
-            fetchStatus.textContent = "Endpoint consent denied.";
-            return;
         }
     }
-
-    // Discard stale response if New Chat was clicked during the request.
-    // Do not re-enable fields here — New Chat already handled that.
-    if (generation !== chatGeneration) return;
-
-    btnFetchModels.disabled = false;
-    setConfigFieldsDisabled(false);
-
-    // Only update connection status if endpoint hasn't changed during request
-    const endpointStillMatches =
-        inputEndpoint.value.trim() === requestedEndpoint;
-
-    if (result.success) {
-        fetchedModels = result.models;
-        showModelDropdown(inputModel.value);
-        fetchStatus.textContent = `Found ${result.models.length} model(s).`;
-        if (endpointStillMatches) {
-            try {
-                connectedOrigin = new URL(requestedEndpoint).origin;
-            } catch {
-                connectedOrigin = null;
-            }
-            updateConnectionStatus(true);
-        }
-    } else {
-        fetchStatus.textContent = result.error ?? "Unknown error";
-        if (endpointStillMatches) {
-            connectedOrigin = null;
-            updateConnectionStatus(false);
-        }
-    }
-
-    // Auto-dismiss after 8 seconds
-    setTimeout(() => {
-        fetchStatus.textContent = "";
-    }, 8000);
 });
 
 // Model input — filter and show/hide the custom dropdown
@@ -732,69 +745,79 @@ async function sendUserMessage(
 
     const requestedEndpoint = inputEndpoint.value.trim();
     const generation = chatGeneration;
-    const result = await api.aiChatSendMessage({
-        endpointUrl: inputEndpoint.value,
-        apiKey: inputApiKey.value,
-        model: inputModel.value,
-        message,
-        allowedDir: inputDir.value,
-        config: getConfig(),
-    });
-
-    setProcessing(false);
-    setSpinner(false);
-
-    // Discard stale response if New Chat was clicked during the request
-    if (generation !== chatGeneration) return;
-
-    // Only update connection status if endpoint hasn't changed during request
-    const endpointStillMatches =
-        inputEndpoint.value.trim() === requestedEndpoint;
-
-    if (result.success) {
-        if (!chatStarted) lockSessionConfig();
-        if (result.text) {
-            appendMessage("assistant", result.text);
-        }
-        if (result.steps) {
-            codeSteps.push(...result.steps);
-            showCodePage(codeSteps.length - 1);
-        }
-        if (endpointStillMatches) {
-            try {
-                connectedOrigin = new URL(requestedEndpoint).origin;
-            } catch {
-                connectedOrigin = null;
-            }
-            updateConnectionStatus(true);
-        }
-    } else if (result.error === "CONSENT_REQUIRED" && result.origin) {
-        // Show consent dialog
-        const consentOrigin = document.getElementById(
-            "consent-origin",
-        ) as HTMLElement;
-        consentOrigin.textContent = result.origin;
-        const accepted = await new Promise<boolean>((resolve) => {
-            pendingConsentResolve = resolve;
-            consentDialog.showModal();
+    try {
+        const result = await api.aiChatSendMessage({
+            endpointUrl: inputEndpoint.value,
+            apiKey: inputApiKey.value,
+            model: inputModel.value,
+            message,
+            allowedDir: inputDir.value,
+            config: getConfig(),
         });
-        if (accepted) {
-            await api.aiChatConsent(result.origin);
-            // Retry without re-appending the user bubble
-            await sendUserMessage(message, false);
+
+        // Discard stale response if New Chat was clicked during the request
+        if (generation !== chatGeneration) return;
+
+        // Only update connection status if endpoint hasn't changed during request
+        const endpointStillMatches =
+            inputEndpoint.value.trim() === requestedEndpoint;
+
+        if (result.success) {
+            if (!chatStarted) lockSessionConfig();
+            if (result.text) {
+                appendMessage("assistant", result.text);
+            }
+            if (result.steps) {
+                codeSteps.push(...result.steps);
+                showCodePage(codeSteps.length - 1);
+            }
+            if (endpointStillMatches) {
+                try {
+                    connectedOrigin = new URL(requestedEndpoint).origin;
+                } catch {
+                    connectedOrigin = null;
+                }
+                updateConnectionStatus(true);
+            }
+        } else if (result.error === "CONSENT_REQUIRED" && result.origin) {
+            // Show consent dialog
+            const consentOrigin = document.getElementById(
+                "consent-origin",
+            ) as HTMLElement;
+            consentOrigin.textContent = result.origin;
+            const accepted = await new Promise<boolean>((resolve) => {
+                pendingConsentResolve = resolve;
+                consentDialog.showModal();
+            });
+            if (accepted) {
+                if (generation !== chatGeneration) return;
+                await api.aiChatConsent(result.origin);
+                // Retry without re-appending the user bubble
+                await sendUserMessage(message, false);
+            } else if (generation === chatGeneration) {
+                appendMessage(
+                    "error",
+                    "Connection cancelled — endpoint consent denied.",
+                );
+            }
+        } else if (result.error === "Cancelled") {
+            appendMessage("error", "Request cancelled.");
         } else {
-            appendMessage(
-                "error",
-                "Connection cancelled — endpoint consent denied.",
-            );
+            appendMessage("error", result.error ?? "Unknown error occurred.");
+            if (endpointStillMatches) {
+                connectedOrigin = null;
+                updateConnectionStatus(false);
+            }
         }
-    } else if (result.error === "Cancelled") {
-        appendMessage("error", "Request cancelled.");
-    } else {
-        appendMessage("error", result.error ?? "Unknown error occurred.");
-        if (endpointStillMatches) {
-            connectedOrigin = null;
-            updateConnectionStatus(false);
+    } catch (err) {
+        if (generation === chatGeneration) {
+            const msg = err instanceof Error ? err.message : String(err);
+            appendMessage("error", `Unexpected error: ${msg}`);
+        }
+    } finally {
+        if (generation === chatGeneration) {
+            setProcessing(false);
+            setSpinner(false);
         }
     }
 }
