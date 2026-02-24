@@ -812,6 +812,9 @@ export async function handleUserMessage(
                 maxRecordsWindowReads: config.maxRecordsWindowReads,
                 maxRecordsSeqTable: config.maxRecordsSeqTable,
                 maxOutputBytes,
+                maxDurationSecs: config.maxDurationSecs,
+                maxMemory: config.maxMemoryMB * 1024 * 1024,
+                maxAllocations: config.maxAllocations,
             },
             signal,
         );
@@ -848,6 +851,9 @@ export async function handleUserMessage(
         maxRecordsWindowReads: config.maxRecordsWindowReads,
         maxRecordsSeqTable: config.maxRecordsSeqTable,
         maxOutputBytes,
+        maxDurationSecs: config.maxDurationSecs,
+        maxMemory: config.maxMemoryMB * 1024 * 1024,
+        maxAllocations: config.maxAllocations,
     };
 
     const steps: Array<{

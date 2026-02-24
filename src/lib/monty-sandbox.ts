@@ -624,6 +624,7 @@ export async function runSandboxCode(
     const {
         maxDurationSecs = DEFAULT_MAX_DURATION_SECS,
         maxMemory = DEFAULT_MAX_MEMORY,
+        maxAllocations = DEFAULT_MAX_ALLOCATIONS,
         maxRecordsReadInfo = DEFAULT_MAX_RECORDS_READ_INFO,
         maxRecordsBamMods = DEFAULT_MAX_RECORDS_BAM_MODS,
         maxRecordsWindowReads = DEFAULT_MAX_RECORDS_WINDOW_READS,
@@ -678,7 +679,7 @@ export async function runSandboxCode(
             limits: {
                 maxDurationSecs,
                 maxMemory,
-                maxAllocations: DEFAULT_MAX_ALLOCATIONS,
+                maxAllocations,
             },
             /**
              * Captures print output from the sandbox into the prints array.
