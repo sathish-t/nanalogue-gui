@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `/exec` slash command for running Python files directly without an LLM round-trip ([`fbf9b98`](https://github.com/sathish-t/nanalogue-gui/commit/fbf9b98a6a89210fb9dba2f6642a961c02c46268))
 - Unit tests for `ChatSession` covering send, cancel, reset, and stale response detection ([`650e0dc`](https://github.com/sathish-t/nanalogue-gui/commit/650e0dc25eb30761056c716935076fc1c3a8efd1))
 - Standalone `nanalogue-chat` CLI for LLM-powered BAM analysis without Electron ([`ec3f7aa`](https://github.com/sathish-t/nanalogue-gui/commit/ec3f7aabebed6ea2246bd42041bebddc4cbc14ec))
 - Print capture and `continue_thinking()` external function in Monty sandbox ([`3c3c82d`](https://github.com/sathish-t/nanalogue-gui/commit/3c3c82ded04ed2bff86a6234606b7af2b0eb9239))
