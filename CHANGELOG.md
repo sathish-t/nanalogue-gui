@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Configurable sandbox resource limits: `maxDurationSecs`, `maxMemoryMB`, `maxAllocations` with CLI flags, validation specs, and UI controls ([`2d1218c`](https://github.com/sathish-t/nanalogue-gui/commit/2d1218c3cf89f3a12dd87812571dd9c433c1c6c8), [`49db849`](https://github.com/sathish-t/nanalogue-gui/commit/49db8499029ae36b7d3a756350d0475aadebc628), [`b1fdc4b`](https://github.com/sathish-t/nanalogue-gui/commit/b1fdc4b324f170444755c58ea9d8276d37973c5e))
 - `/exec` slash command for running Python files directly without an LLM round-trip ([`fbf9b98`](https://github.com/sathish-t/nanalogue-gui/commit/fbf9b98a6a89210fb9dba2f6642a961c02c46268))
 - Unit tests for `ChatSession` covering send, cancel, reset, and stale response detection ([`650e0dc`](https://github.com/sathish-t/nanalogue-gui/commit/650e0dc25eb30761056c716935076fc1c3a8efd1))
 - Standalone `nanalogue-chat` CLI for LLM-powered BAM analysis without Electron ([`ec3f7aa`](https://github.com/sathish-t/nanalogue-gui/commit/ec3f7aabebed6ea2246bd42041bebddc4cbc14ec))
