@@ -358,6 +358,24 @@ function setSpinner(show: boolean, text?: string): void {
 }
 
 /**
+ * Temporarily disables or re-enables the config fields (directory, endpoint,
+ * API key, model, and their buttons) during in-flight requests. Skipped when
+ * chatStarted is true because those fields will be permanently locked once a
+ * session-level lock is in place.
+ *
+ * @param disabled - Whether to disable the fields.
+ */
+function setConfigFieldsDisabled(disabled: boolean): void {
+    if (chatStarted) return;
+    inputDir.disabled = disabled;
+    btnBrowse.disabled = disabled;
+    inputEndpoint.disabled = disabled;
+    inputApiKey.disabled = disabled;
+    inputModel.disabled = disabled;
+    btnFetchModels.disabled = disabled;
+}
+
+/**
  * Enables or disables the send/cancel buttons during processing.
  *
  * @param processing - Whether a request is in flight.
@@ -367,6 +385,10 @@ function setProcessing(processing: boolean): void {
     btnCancel.classList.toggle("hidden", !processing);
     inputMessage.disabled = processing;
     btnSend.disabled = processing;
+    setConfigFieldsDisabled(processing);
+    if (processing) {
+        hideModelDropdown();
+    }
 }
 
 /**
@@ -541,6 +563,8 @@ btnFetchModels.addEventListener("click", async () => {
     }
     fetchStatus.textContent = "Fetching models...";
     btnFetchModels.disabled = true;
+    setConfigFieldsDisabled(true);
+    hideModelDropdown();
 
     const requestedEndpoint = inputEndpoint.value.trim();
     const generation = chatGeneration;
@@ -571,15 +595,18 @@ btnFetchModels.addEventListener("click", async () => {
             });
         } else {
             btnFetchModels.disabled = false;
+            setConfigFieldsDisabled(false);
             fetchStatus.textContent = "Endpoint consent denied.";
             return;
         }
     }
 
-    btnFetchModels.disabled = false;
-
-    // Discard stale response if New Chat was clicked during the request
+    // Discard stale response if New Chat was clicked during the request.
+    // Do not re-enable fields here — New Chat already handled that.
     if (generation !== chatGeneration) return;
+
+    btnFetchModels.disabled = false;
+    setConfigFieldsDisabled(false);
 
     // Only update connection status if endpoint hasn't changed during request
     const endpointStillMatches =

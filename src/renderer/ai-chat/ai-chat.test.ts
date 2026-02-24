@@ -414,3 +414,170 @@ describe("AI Chat generation guard", () => {
         ).toContain("Connected");
     });
 });
+
+describe("AI Chat config field locking during processing", () => {
+    /** Mock API injected into window before the module loads. */
+    let mockApi: MockApi;
+
+    /** Config field IDs that should be disabled during processing. */
+    const configFieldIds = [
+        "input-dir",
+        "input-endpoint",
+        "input-api-key",
+        "input-model",
+    ];
+
+    /** Config button IDs that should be disabled during processing. */
+    const configButtonIds = ["btn-browse", "btn-fetch-models"];
+
+    beforeEach(async () => {
+        vi.resetModules();
+        loadHtml();
+        mockApi = createMockApi();
+        (window as unknown as { /** The preload API. */ api: MockApi }).api =
+            mockApi;
+        await import("./ai-chat");
+    });
+
+    afterEach(() => {
+        document.documentElement.innerHTML = "";
+    });
+
+    it("disables config fields when fetch-models is in flight", async () => {
+        let resolveModels!: (value: ListModelsResult) => void;
+        mockApi.aiChatListModels.mockReturnValueOnce(
+            new Promise<ListModelsResult>((resolve) => {
+                resolveModels = resolve;
+            }),
+        );
+
+        (document.getElementById("input-endpoint") as HTMLInputElement).value =
+            "http://localhost:11434/v1";
+        (
+            document.getElementById("btn-fetch-models") as HTMLButtonElement
+        ).click();
+        await flushMicrotasks();
+
+        // Config fields should be disabled while fetch is in flight
+        for (const id of configFieldIds) {
+            expect(
+                (document.getElementById(id) as HTMLInputElement).disabled,
+                `${id} should be disabled`,
+            ).toBe(true);
+        }
+        for (const id of configButtonIds) {
+            expect(
+                (document.getElementById(id) as HTMLButtonElement).disabled,
+                `${id} should be disabled`,
+            ).toBe(true);
+        }
+
+        // Clean up deferred promise
+        resolveModels({ success: true, models: ["model-a"] });
+        await flushMicrotasks();
+    });
+
+    it("re-enables config fields after fetch-models completes", async () => {
+        let resolveModels!: (value: ListModelsResult) => void;
+        mockApi.aiChatListModels.mockReturnValueOnce(
+            new Promise<ListModelsResult>((resolve) => {
+                resolveModels = resolve;
+            }),
+        );
+
+        (document.getElementById("input-endpoint") as HTMLInputElement).value =
+            "http://localhost:11434/v1";
+        (
+            document.getElementById("btn-fetch-models") as HTMLButtonElement
+        ).click();
+        await flushMicrotasks();
+
+        // Resolve — fields should re-enable
+        resolveModels({ success: true, models: ["model-a"] });
+        await flushMicrotasks();
+
+        for (const id of configFieldIds) {
+            expect(
+                (document.getElementById(id) as HTMLInputElement).disabled,
+                `${id} should be re-enabled`,
+            ).toBe(false);
+        }
+        for (const id of configButtonIds) {
+            expect(
+                (document.getElementById(id) as HTMLButtonElement).disabled,
+                `${id} should be re-enabled`,
+            ).toBe(false);
+        }
+    });
+
+    it("re-enables config fields after fetch-models fails", async () => {
+        let resolveModels!: (value: ListModelsResult) => void;
+        mockApi.aiChatListModels.mockReturnValueOnce(
+            new Promise<ListModelsResult>((resolve) => {
+                resolveModels = resolve;
+            }),
+        );
+
+        (document.getElementById("input-endpoint") as HTMLInputElement).value =
+            "http://localhost:11434/v1";
+        (
+            document.getElementById("btn-fetch-models") as HTMLButtonElement
+        ).click();
+        await flushMicrotasks();
+
+        // Resolve with failure — fields should still re-enable
+        resolveModels({ success: false, error: "connection refused" });
+        await flushMicrotasks();
+
+        for (const id of configFieldIds) {
+            expect(
+                (document.getElementById(id) as HTMLInputElement).disabled,
+                `${id} should be re-enabled after failure`,
+            ).toBe(false);
+        }
+        for (const id of configButtonIds) {
+            expect(
+                (document.getElementById(id) as HTMLButtonElement).disabled,
+                `${id} should be re-enabled after failure`,
+            ).toBe(false);
+        }
+    });
+
+    it("hides model dropdown during send", async () => {
+        let resolveSend!: (value: SendMessageResult) => void;
+        mockApi.aiChatSendMessage.mockReturnValueOnce(
+            new Promise<SendMessageResult>((resolve) => {
+                resolveSend = resolve;
+            }),
+        );
+
+        // Fetch models first to populate the dropdown
+        (document.getElementById("input-endpoint") as HTMLInputElement).value =
+            "http://localhost:11434/v1";
+        (
+            document.getElementById("btn-fetch-models") as HTMLButtonElement
+        ).click();
+        await flushMicrotasks();
+
+        const dropdown = document.getElementById(
+            "model-dropdown",
+        ) as HTMLDivElement;
+        expect(dropdown.children.length).toBeGreaterThan(0);
+
+        // Fill remaining fields and send — dropdown should be hidden
+        (document.getElementById("input-dir") as HTMLInputElement).value =
+            "/tmp/bam";
+        (document.getElementById("input-model") as HTMLInputElement).value =
+            "model-a";
+        (document.getElementById("input-message") as HTMLInputElement).value =
+            "hello";
+        (document.getElementById("btn-send") as HTMLButtonElement).click();
+        await flushMicrotasks();
+
+        expect(dropdown.classList.contains("hidden")).toBe(true);
+
+        // Clean up
+        resolveSend({ success: true, text: "done" });
+        await flushMicrotasks();
+    });
+});
