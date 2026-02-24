@@ -231,6 +231,8 @@ let pendingConsentResolve: ((accepted: boolean) => void) | null = null;
 let fetchedModels: string[] = [];
 /** Origin of the last successfully connected endpoint, or null. */
 let connectedOrigin: string | null = null;
+/** Generation counter incremented on New Chat to discard stale async responses. */
+let chatGeneration = 0;
 
 /** Hostnames that count as localhost. */
 const LOCALHOST_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
@@ -541,6 +543,7 @@ btnFetchModels.addEventListener("click", async () => {
     btnFetchModels.disabled = true;
 
     const requestedEndpoint = inputEndpoint.value.trim();
+    const generation = chatGeneration;
     let result = await api.aiChatListModels({
         endpointUrl: inputEndpoint.value,
         apiKey: inputApiKey.value,
@@ -574,6 +577,9 @@ btnFetchModels.addEventListener("click", async () => {
     }
 
     btnFetchModels.disabled = false;
+
+    // Discard stale response if New Chat was clicked during the request
+    if (generation !== chatGeneration) return;
 
     // Only update connection status if endpoint hasn't changed during request
     const endpointStillMatches =
@@ -643,6 +649,7 @@ async function sendUserMessage(
     setSpinner(true, "Waiting for LLM...");
 
     const requestedEndpoint = inputEndpoint.value.trim();
+    const generation = chatGeneration;
     const result = await api.aiChatSendMessage({
         endpointUrl: inputEndpoint.value,
         apiKey: inputApiKey.value,
@@ -654,6 +661,9 @@ async function sendUserMessage(
 
     setProcessing(false);
     setSpinner(false);
+
+    // Discard stale response if New Chat was clicked during the request
+    if (generation !== chatGeneration) return;
 
     // Only update connection status if endpoint hasn't changed during request
     const endpointStillMatches =
@@ -739,8 +749,12 @@ btnCancel.addEventListener("click", async () => {
     setSpinner(false);
 });
 
-// New Chat button — reset conversation
+// New Chat button — full reset of conversation and connection state
 btnNewChat.addEventListener("click", async () => {
+    // Bump generation first so any in-flight response that resolves during
+    // the aiChatNewChat await is discarded by the generation guard.
+    chatGeneration++;
+
     await api.aiChatNewChat();
     chatMessages.innerHTML = "";
     codeSteps = [];
@@ -749,6 +763,14 @@ btnNewChat.addEventListener("click", async () => {
     setSpinner(false);
     setProcessing(false);
     unlockAdvancedOptions();
+
+    // Reset model/connection state so stale provider data doesn't leak
+    fetchedModels = [];
+    connectedOrigin = null;
+    fetchStatus.textContent = "";
+    modelDropdown.innerHTML = "";
+    hideModelDropdown();
+    updateConnectionStatus(false);
 });
 
 // Back button — return to landing page
