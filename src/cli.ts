@@ -3,6 +3,7 @@
 
 import { createInterface } from "node:readline";
 import { parseArgs } from "node:util";
+import { version } from "../package.json";
 import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
 import { ChatSession } from "./lib/chat-session";
 import type {
@@ -63,6 +64,7 @@ const argConfig = {
         "max-allocations": { type: "string" as const },
         temperature: { type: "string" as const },
         "list-models": { type: "boolean" as const, default: false },
+        version: { type: "boolean" as const, short: "v", default: false },
         help: { type: "boolean" as const, short: "h", default: false },
     },
     strict: true,
@@ -101,6 +103,7 @@ ${BOLD}Advanced options:${RESET}
 
 ${BOLD}Other:${RESET}
   --list-models            List available models and exit
+  -v, --version            Print version and exit
 
 ${BOLD}REPL commands:${RESET}
   /new                     Start a new conversation
@@ -182,6 +185,11 @@ async function main(): Promise<void> {
     }
 
     const { values } = parsed;
+
+    if (values.version) {
+        console.log(version);
+        process.exit(0);
+    }
 
     if (values.help) {
         printUsage();
