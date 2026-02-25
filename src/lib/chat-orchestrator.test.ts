@@ -16,6 +16,7 @@ import {
     evictFacts,
     extractCodeFromFences,
     extractFacts,
+    getLastSentMessages,
     handleUserMessage,
     pruneFailedRounds,
     renderFactsBlock,
@@ -814,6 +815,77 @@ describe("adversarial/edge-case tests", () => {
 
         // Should execute directly without fence extraction interfering
         expect(result.text).toContain("```python");
+    });
+
+    it("stores request and response in lastSentMessages after LLM call", async () => {
+        resetLastSentMessages();
+        const responses: MockCompletion[] = [
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('ok')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ];
+        mockServer = await startMockServer(responses);
+
+        await callOrchestrator(mockServer.url);
+
+        const stored = getLastSentMessages();
+        expect(stored).not.toBeNull();
+        // First message is the system prompt
+        expect(stored![0].role).toBe("system");
+        // Last message is the assistant's response
+        expect(stored![stored!.length - 1].role).toBe("assistant");
+        expect(stored![stored!.length - 1].content).toBe("print('ok')");
+    });
+
+    it("lastSentMessages includes assistant response from forced-final path", async () => {
+        resetLastSentMessages();
+        const responses: MockCompletion[] = [
+            // Round 1: continue_thinking (exhausts maxRounds=1)
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "continue_thinking()\n42",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            // Forced-final response
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('final answer')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ];
+        mockServer = await startMockServer(responses);
+
+        await callOrchestrator(mockServer.url, {
+            config: { maxCodeRounds: 1 },
+        });
+
+        const stored = getLastSentMessages();
+        expect(stored).not.toBeNull();
+        // Last message should be the forced-final assistant response
+        expect(stored![stored!.length - 1].role).toBe("assistant");
+        expect(stored![stored!.length - 1].content).toBe(
+            "print('final answer')",
+        );
     });
 
     it("429 with Retry-After header respects the delay", async () => {

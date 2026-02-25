@@ -955,7 +955,8 @@ export async function handleUserMessage(
         });
         const llmMessages = convertToLlmMessages(prepared);
 
-        // Store the attempted request payload for /dump_llm_instructions
+        // Store the request payload before the call so it's available
+        // even if the LLM call fails (network error, 4xx, etc.)
         lastSentMessages = [
             { role: "system", content: systemPrompt },
             ...llmMessages,
@@ -976,6 +977,12 @@ export async function handleUserMessage(
         emitEvent({ type: "llm_request_end" });
 
         const rawCode = completion.choices?.[0]?.message?.content ?? "";
+
+        // Append the assistant response now that we have it
+        lastSentMessages = [
+            ...lastSentMessages,
+            { role: "assistant", content: rawCode },
+        ];
         if (!rawCode.trim()) break;
 
         // Check finish_reason — "length" means response was truncated by token limit
@@ -1131,7 +1138,8 @@ export async function handleUserMessage(
         });
         const llmMessages = convertToLlmMessages(prepared);
 
-        // Store the attempted request payload for /dump_llm_instructions
+        // Store the request payload before the call so it's available
+        // even if the LLM call fails (network error, 4xx, etc.)
         lastSentMessages = [
             { role: "system", content: systemPrompt },
             ...llmMessages,
@@ -1151,6 +1159,12 @@ export async function handleUserMessage(
         emitEvent({ type: "llm_request_end" });
 
         const rawFinal = completion.choices?.[0]?.message?.content ?? "";
+
+        // Append the assistant response now that we have it
+        lastSentMessages = [
+            ...lastSentMessages,
+            { role: "assistant", content: rawFinal },
+        ];
         const finalFinishReason = completion.choices?.[0]?.finish_reason;
         if (finalFinishReason === "length") {
             // Truncated forced-final response — do not execute partial code.
