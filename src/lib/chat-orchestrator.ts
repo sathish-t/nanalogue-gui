@@ -888,7 +888,12 @@ export async function handleUserMessage(
         const filename = `nanalogue-chat-${date}-${uuid}.log`;
         const outputFile = join(safeDir, filename);
 
-        const content = JSON.stringify(lastSentMessages, null, 2);
+        const content = lastSentMessages
+            .map(
+                (msg, i) =>
+                    `=== Message ${i + 1}: ${msg.role} ===\n\n${msg.content}`,
+            )
+            .join("\n\n");
         await writeFile(outputFile, content, "utf-8");
 
         const relPath = relative(allowedDir, outputFile);

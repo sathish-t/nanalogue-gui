@@ -1,7 +1,14 @@
 // Unit tests for chat orchestrator functions.
 // Tests pruneFailedRounds, facts extraction, context pipeline, /exec slash command, and adversarial edge cases.
 
-import { mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import {
+    mkdtemp,
+    readdir,
+    readFile,
+    rm,
+    symlink,
+    writeFile,
+} from "node:fs/promises";
 import {
     createServer,
     type IncomingMessage,
@@ -1375,6 +1382,43 @@ describe("/dump_llm_instructions slash command", () => {
         });
 
         expect(history).toHaveLength(0);
+    });
+
+    it("writes plain-text sections with message headers", async () => {
+        setLastSentMessages([
+            { role: "system", content: "You are a helpful assistant." },
+            { role: "user", content: "Hello there." },
+        ]);
+        const { config, history, facts, events, signal } = dumpTestHarness();
+
+        await handleUserMessage({
+            message: "/dump_llm_instructions",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            facts,
+            signal,
+        });
+
+        const outputDir = join(tmpDir, "ai_chat_output");
+        const files = await readdir(outputDir);
+        const content = await readFile(join(outputDir, files[0]), "utf-8");
+
+        expect(content).toContain("=== Message 1: system ===");
+        expect(content).toContain("You are a helpful assistant.");
+        expect(content).toContain("=== Message 2: user ===");
+        expect(content).toContain("Hello there.");
     });
 
     it("filename matches nanalogue-chat-{date}-{uuid}.log pattern", async () => {

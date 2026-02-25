@@ -290,7 +290,7 @@ This ensures our sandbox is secure, and allows us to inspect what the LLM is doi
 
 You can dump the full request payload sent to the LLM (system prompt and
 conversation history) by typing `/dump_llm_instructions` in the chat input
-or CLI REPL. The output is written as human-readable JSON to
+or CLI REPL. The output is written as plain text to
 `ai_chat_output/` inside your BAM directory. At least one message must have
 been sent to the LLM before the dump command will produce output.
 
