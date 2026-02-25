@@ -286,6 +286,14 @@ This ensures our sandbox is secure, and allows us to inspect what the LLM is doi
 
 ![AI Chat multi-turn conversation with sandbox](demo/screenshot-ai-chat-sandbox-openai.png)
 
+**Inspect LLM instructions:**
+
+You can dump the full request payload sent to the LLM (system prompt and
+conversation history) by typing `/dump_llm_instructions` in the chat input
+or CLI REPL. The output is written as human-readable JSON to
+`ai_chat_output/` inside your BAM directory. At least one message must have
+been sent to the LLM before the dump command will produce output.
+
 **Run your own Python scripts:**
 
 You can bypass the LLM entirely and run a Python file directly in the sandbox
@@ -327,6 +335,7 @@ node dist/cli.mjs --endpoint https://api.openai.com/v1 --api-key $API_KEY --list
 |---|---|
 | `/new` | Start a new conversation |
 | `/exec <file.py>` | Run a Python file directly in the sandbox without sending it to the LLM |
+| `/dump_llm_instructions` | Dump the full LLM request payload from the last round to a log file in `ai_chat_output/` |
 | `/quit` | Exit the CLI |
 | Ctrl+C during a request | Cancel the current request |
 | Ctrl+C at the prompt | Exit |

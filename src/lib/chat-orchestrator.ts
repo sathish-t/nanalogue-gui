@@ -867,6 +867,36 @@ export async function handleUserMessage(
         return { text, steps };
     }
 
+    // Handle /dump_llm_instructions — dump last LLM request payload to file.
+    const dumpMatch = message.match(/^\/dump_llm_instructions\s*$/);
+    if (dumpMatch) {
+        history.pop();
+        emitEvent({ type: "turn_start" });
+
+        if (!lastSentMessages) {
+            const text = "No LLM call has been made yet, nothing to dump.";
+            emitEvent({ type: "turn_end", text, steps: [] });
+            return { text, steps: [] };
+        }
+
+        const outputDir = join(allowedDir, "ai_chat_output");
+        await mkdir(outputDir, { recursive: true });
+        const safeDir = await resolvePath(allowedDir, "ai_chat_output");
+
+        const date = new Date().toISOString().slice(0, 10);
+        const uuid = randomUUID();
+        const filename = `nanalogue-chat-${date}-${uuid}.log`;
+        const outputFile = join(safeDir, filename);
+
+        const content = JSON.stringify(lastSentMessages, null, 2);
+        await writeFile(outputFile, content, "utf-8");
+
+        const relPath = relative(allowedDir, outputFile);
+        const text = `LLM instructions dumped to ${relPath}`;
+        emitEvent({ type: "turn_end", text, steps: [] });
+        return { text, steps: [] };
+    }
+
     // Build system prompt
     const maxOutputBytes = deriveMaxOutputBytes(config.contextWindowTokens);
     const maxOutputKB = Math.round(maxOutputBytes / 1024);

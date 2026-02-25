@@ -1,7 +1,7 @@
 // Unit tests for chat orchestrator functions.
 // Tests pruneFailedRounds, facts extraction, context pipeline, /exec slash command, and adversarial edge cases.
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import {
     createServer,
     type IncomingMessage,
@@ -19,7 +19,9 @@ import {
     handleUserMessage,
     pruneFailedRounds,
     renderFactsBlock,
+    resetLastSentMessages,
     runSandboxGuarded,
+    setLastSentMessages,
     transformContext,
 } from "./chat-orchestrator";
 import type {
@@ -1190,5 +1192,245 @@ describe("/exec slash command", () => {
         expect(result.text).toContain("Direct user execution");
         expect(result.steps).toHaveLength(1);
         expect(result.steps[0].result.success).toBe(false);
+    });
+});
+
+describe("/dump_llm_instructions slash command", () => {
+    let tmpDir: string;
+
+    beforeEach(async () => {
+        tmpDir = await mkdtemp(join(tmpdir(), "dump-test-"));
+        resetLastSentMessages();
+    });
+
+    afterEach(async () => {
+        await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    /**
+     * Builds a minimal config and shared state for dump tests.
+     *
+     * @returns Config, empty history, empty facts, events collector, and abort signal.
+     */
+    function dumpTestHarness(): {
+        /** Orchestrator config. */
+        config: AiChatConfig;
+        /** Conversation history. */
+        history: HistoryEntry[];
+        /** Facts array. */
+        facts: Fact[];
+        /** Collected events. */
+        events: AiChatEvent[];
+        /** Abort signal. */
+        signal: AbortSignal;
+    } {
+        return {
+            config: {
+                contextWindowTokens: 8192,
+                maxRetries: 1,
+                timeoutSeconds: 30,
+                maxRecordsReadInfo: 100,
+                maxRecordsBamMods: 100,
+                maxRecordsWindowReads: 100,
+                maxRecordsSeqTable: 100,
+                maxCodeRounds: 1,
+                maxDurationSecs: 600,
+                maxMemoryMB: 512,
+                maxAllocations: 100_000,
+            },
+            history: [],
+            facts: [],
+            events: [] as AiChatEvent[],
+            signal: AbortSignal.timeout(10_000),
+        };
+    }
+
+    it("returns nothing-to-dump when no LLM call has been attempted", async () => {
+        const { config, history, facts, events, signal } = dumpTestHarness();
+
+        const result = await handleUserMessage({
+            message: "/dump_llm_instructions",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            facts,
+            signal,
+        });
+
+        expect(result.text).toBe(
+            "No LLM call has been made yet, nothing to dump.",
+        );
+        expect(result.steps).toHaveLength(0);
+
+        // Verify no file was written
+        const outputDir = join(tmpDir, "ai_chat_output");
+        await expect(readdir(outputDir)).rejects.toThrow();
+    });
+
+    it("does not add command to conversation history", async () => {
+        setLastSentMessages([{ role: "system", content: "test prompt" }]);
+        const { config, history, facts, events, signal } = dumpTestHarness();
+
+        await handleUserMessage({
+            message: "/dump_llm_instructions",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            facts,
+            signal,
+        });
+
+        expect(history).toHaveLength(0);
+    });
+
+    it("filename matches nanalogue-chat-{date}-{uuid}.log pattern", async () => {
+        setLastSentMessages([{ role: "system", content: "test prompt" }]);
+        const { config, history, facts, events, signal } = dumpTestHarness();
+
+        await handleUserMessage({
+            message: "/dump_llm_instructions",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            facts,
+            signal,
+        });
+
+        const files = await readdir(join(tmpDir, "ai_chat_output"));
+        expect(files[0]).toMatch(
+            /^nanalogue-chat-\d{4}-\d{2}-\d{2}-[\da-f-]+\.log$/,
+        );
+    });
+
+    it("produces unique files on repeated invocations", async () => {
+        setLastSentMessages([{ role: "system", content: "test prompt" }]);
+        const { config, history, facts, events, signal } = dumpTestHarness();
+        const opts = {
+            message: "/dump_llm_instructions",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            facts,
+            signal,
+        };
+
+        await handleUserMessage(opts);
+        await handleUserMessage(opts);
+
+        const files = await readdir(join(tmpDir, "ai_chat_output"));
+        expect(files).toHaveLength(2);
+        expect(files[0]).not.toBe(files[1]);
+    });
+
+    it("handles trailing whitespace in command", async () => {
+        setLastSentMessages([{ role: "system", content: "test prompt" }]);
+        const { config, history, facts, events, signal } = dumpTestHarness();
+
+        const result = await handleUserMessage({
+            message: "/dump_llm_instructions   ",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            facts,
+            signal,
+        });
+
+        expect(result.text).toContain("LLM instructions dumped to");
+        const files = await readdir(join(tmpDir, "ai_chat_output"));
+        expect(files).toHaveLength(1);
+    });
+
+    it("rejects when ai_chat_output is a symlink outside allowed dir", async () => {
+        setLastSentMessages([{ role: "system", content: "test prompt" }]);
+        const outsideDir = await mkdtemp(join(tmpdir(), "dump-escape-"));
+        try {
+            await symlink(outsideDir, join(tmpDir, "ai_chat_output"));
+
+            const { config, history, facts, events, signal } =
+                dumpTestHarness();
+
+            await expect(
+                handleUserMessage({
+                    message: "/dump_llm_instructions",
+                    endpointUrl: "http://localhost:1234/v1",
+                    apiKey: "",
+                    model: "test",
+                    allowedDir: tmpDir,
+                    config,
+                    /**
+                     * Collects emitted events.
+                     *
+                     * @param e - The event to collect.
+                     */
+                    emitEvent: (e: AiChatEvent) => {
+                        events.push(e);
+                    },
+                    history,
+                    facts,
+                    signal,
+                }),
+            ).rejects.toThrow();
+
+            // Verify nothing was written to the outside directory
+            const outsideFiles = await readdir(outsideDir);
+            expect(outsideFiles).toHaveLength(0);
+        } finally {
+            await rm(outsideDir, { recursive: true, force: true });
+        }
     });
 });
