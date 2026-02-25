@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-02-25
+
 ### Changed
 
 - Updates README AI Chat section to reflect Python code sandbox approach instead of tool calling ([`b24f008`](https://github.com/sathish-t/nanalogue-gui/commit/b24f00848fcb7ee0b3bf42e08303cf4b9581de6a))
@@ -25,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standalone `nanalogue-chat` CLI for LLM-powered BAM analysis without Electron ([`ec3f7aa`](https://github.com/sathish-t/nanalogue-gui/commit/ec3f7aabebed6ea2246bd42041bebddc4cbc14ec))
 - Print capture and `continue_thinking()` external function in Monty sandbox ([`3c3c82d`](https://github.com/sathish-t/nanalogue-gui/commit/3c3c82ded04ed2bff86a6234606b7af2b0eb9239))
 - `maxCodeRounds` and `temperature` configuration fields for AI Chat ([`ee664df`](https://github.com/sathish-t/nanalogue-gui/commit/ee664df2964bb1cf21106e9b81108ea1d3fea6d5))
+- `--version` / `-v` flag for the CLI that prints the package version and exits ([`ae3e614`](https://github.com/sathish-t/nanalogue-gui/commit/ae3e6146a50053a928f01c80b6f5e0401c54ba62))
 
 ### Fixed
 

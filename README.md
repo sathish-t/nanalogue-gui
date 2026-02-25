@@ -10,6 +10,13 @@ files, with a focus on single-molecule DNA/RNA modifications. It builds on
 [@nanalogue/node](https://github.com/sathish-t/nanalogue-node) to provide
 interactive visualisation and curation workflows.
 
+Nanalogue-gui is part of the [Nanalogue](https://www.nanalogue.com) family of
+tools for nanopore data analysis. Sister packages include
+[nanalogue](https://github.com/DNAReplicationLab/nanalogue) (Rust CLI and
+library), [pynanalogue](https://github.com/DNAReplicationLab/pynanalogue) (Python
+wrapper), and [@nanalogue/node](https://github.com/sathish-t/nanalogue-node)
+(Node.js bindings).
+
 ![Landing page](demo/screenshot-landing.png)
 
 ## Table of Contents
