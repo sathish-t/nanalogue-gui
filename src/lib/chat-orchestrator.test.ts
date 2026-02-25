@@ -846,10 +846,10 @@ describe("adversarial/edge-case tests", () => {
         const stored = getLastSentMessages();
         expect(stored).not.toBeNull();
         // First message is the system prompt
-        expect(stored![0].role).toBe("system");
+        expect(stored?.[0].role).toBe("system");
         // Last message is the assistant's response
-        expect(stored![stored!.length - 1].role).toBe("assistant");
-        expect(stored![stored!.length - 1].content).toBe("print('ok')");
+        expect(stored?.[stored.length - 1].role).toBe("assistant");
+        expect(stored?.[stored.length - 1].content).toBe("print('ok')");
     });
 
     it("lastSentMessages includes assistant response from forced-final path", async () => {
@@ -889,8 +889,8 @@ describe("adversarial/edge-case tests", () => {
         const stored = getLastSentMessages();
         expect(stored).not.toBeNull();
         // Last message should be the forced-final assistant response
-        expect(stored![stored!.length - 1].role).toBe("assistant");
-        expect(stored![stored!.length - 1].content).toBe(
+        expect(stored?.[stored.length - 1].role).toBe("assistant");
+        expect(stored?.[stored.length - 1].content).toBe(
             "print('final answer')",
         );
     });
