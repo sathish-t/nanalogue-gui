@@ -7,10 +7,13 @@ import type { AiChatConfig } from "./chat-types";
 // Mock the orchestrator so tests don't need a real LLM or sandbox
 vi.mock("./chat-orchestrator", () => ({
     handleUserMessage: vi.fn(),
+    resetLastSentMessages: vi.fn(),
 }));
 
 // Import after mock setup so the mock takes effect
-const { handleUserMessage } = await import("./chat-orchestrator");
+const { handleUserMessage, resetLastSentMessages } = await import(
+    "./chat-orchestrator"
+);
 const { ChatSession } = await import("./chat-session");
 
 /** Default config matching GUI fallbacks for test convenience. */
@@ -238,6 +241,11 @@ describe("ChatSession", () => {
 
             expect(session.history).toHaveLength(0);
             expect(session.facts).toHaveLength(0);
+        });
+
+        it("calls resetLastSentMessages to clear dump state", () => {
+            session.reset();
+            expect(resetLastSentMessages).toHaveBeenCalled();
         });
 
         it("aborts current request and increments requestId", async () => {

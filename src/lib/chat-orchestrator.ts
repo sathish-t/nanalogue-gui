@@ -30,6 +30,42 @@ import {
 } from "./monty-sandbox";
 import { buildSandboxPrompt } from "./sandbox-prompt";
 
+/** A single message in the LLM request payload (system, user, or assistant). */
+export interface LlmMessage {
+    /** The message role. */
+    role: string;
+    /** The message content. */
+    content: string;
+}
+
+/** Most recent messages array sent (or attempted) to the LLM API. */
+let lastSentMessages: LlmMessage[] | null = null;
+
+/**
+ * Clears the stored last-sent messages. Called by ChatSession.reset().
+ */
+export function resetLastSentMessages(): void {
+    lastSentMessages = null;
+}
+
+/**
+ * Returns the stored last-sent messages for the /dump_llm_instructions command.
+ *
+ * @returns The last-sent messages array, or null if no LLM call has been attempted.
+ */
+export function getLastSentMessages(): LlmMessage[] | null {
+    return lastSentMessages;
+}
+
+/**
+ * Replaces the stored last-sent messages. Used by tests to seed dump state.
+ *
+ * @param messages - The messages to store, or null to clear.
+ */
+export function setLastSentMessages(messages: LlmMessage[] | null): void {
+    lastSentMessages = messages;
+}
+
 /**
  * Removes failed code-execute-feedback round pairs from history,
  * keeping the most recent failed pair so the model can see its last error.
@@ -889,6 +925,12 @@ export async function handleUserMessage(
         });
         const llmMessages = convertToLlmMessages(prepared);
 
+        // Store the attempted request payload for /dump_llm_instructions
+        lastSentMessages = [
+            { role: "system", content: systemPrompt },
+            ...llmMessages,
+        ];
+
         // Call LLM
         emitEvent({ type: "llm_request_start" });
         const completion = await fetchChatCompletion(
@@ -1058,6 +1100,12 @@ export async function handleUserMessage(
             contextBudgetTokens: config.contextWindowTokens,
         });
         const llmMessages = convertToLlmMessages(prepared);
+
+        // Store the attempted request payload for /dump_llm_instructions
+        lastSentMessages = [
+            { role: "system", content: systemPrompt },
+            ...llmMessages,
+        ];
 
         emitEvent({ type: "llm_request_start" });
         const completion = await fetchChatCompletion(

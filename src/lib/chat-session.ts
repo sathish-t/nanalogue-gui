@@ -1,7 +1,7 @@
 // Reusable chat session state for the AI Chat feature.
 // Wraps conversation history, facts, and abort handling so both the GUI and CLI share the same logic.
 
-import { handleUserMessage } from "./chat-orchestrator";
+import { handleUserMessage, resetLastSentMessages } from "./chat-orchestrator";
 import type {
     AiChatConfig,
     AiChatEvent,
@@ -182,5 +182,6 @@ export class ChatSession {
         this.requestId += 1;
         this.currentAbortController?.abort();
         this.currentAbortController = null;
+        resetLastSentMessages();
     }
 }
