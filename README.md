@@ -1,6 +1,7 @@
 # `nanalogue-gui`
 
-Electron GUI for Nanalogue: interactive nanopore data analysis and curation.
+Electron GUI for Nanalogue: interactive sequence data analysis and curation with a focus
+on single molecules and DNA/RNA modifications.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![codecov](https://codecov.io/gh/sathish-t/nanalogue-gui/graph/badge.svg?token=A9AQCSCMHD)](https://codecov.io/gh/sathish-t/nanalogue-gui)

@@ -267,10 +267,11 @@ probabilities:
 ]
 \`\`\`
 
-- mod_table.data contains [read_pos, ref_pos, probability] triples.
-  probability is 0-255 (raw, not normalized to 0-1). read_pos runs from 0
-  to the sequence length of the read. ref_pos runs from start to end, and
-  can be -1 if there are bases on the sequence that do not map to the reference.
+- mod_table.data contains [read_pos, ref_pos, probability] triples. probability is 0-255 (raw, not normalized to 0-1).
+  read_pos is a 0-based index into the BAM-stored SEQ field. For forward-strand reads this matches basecalling order.
+  For reverse-strand reads, position 0 is the leftmost genomic base (the BAM SEQ is stored reverse-complemented
+  from basecalling order). ref_pos runs from start to end, and can be -1 if there are bases on the sequence
+  that do not map to the reference.
 - Use this when you need per-base modification probabilities. Use
   read_info when you only need summary mod counts.
 - This command produces a lot of data per read. so if you are querying lots of reads,
