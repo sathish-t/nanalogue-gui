@@ -62,6 +62,8 @@ const argConfig = {
         "max-duration-secs": { type: "string" as const },
         "max-memory-mb": { type: "string" as const },
         "max-allocations": { type: "string" as const },
+        "max-read-mb": { type: "string" as const },
+        "max-write-mb": { type: "string" as const },
         temperature: { type: "string" as const },
         "list-models": { type: "boolean" as const, default: false },
         version: { type: "boolean" as const, short: "v", default: false },
@@ -99,6 +101,8 @@ ${BOLD}Advanced options:${RESET}
   --max-duration-secs <n>  Max sandbox duration in seconds (default: ${CONFIG_FIELD_SPECS.maxDurationSecs.fallback})
   --max-memory-mb <n>      Max sandbox memory in MB (default: ${CONFIG_FIELD_SPECS.maxMemoryMB.fallback})
   --max-allocations <n>    Max sandbox VM allocations (default: ${CONFIG_FIELD_SPECS.maxAllocations.fallback})
+  --max-read-mb <n>        Max read_file size in MB (default: ${CONFIG_FIELD_SPECS.maxReadMB.fallback})
+  --max-write-mb <n>       Max write_file size in MB (default: ${CONFIG_FIELD_SPECS.maxWriteMB.fallback})
   --temperature <n>        LLM sampling temperature 0-2 (default: provider default)
 
 ${BOLD}Other:${RESET}
@@ -278,8 +282,14 @@ async function main(): Promise<void> {
             values["max-allocations"],
             CONFIG_FIELD_SPECS.maxAllocations,
         ),
-        maxReadMB: CONFIG_FIELD_SPECS.maxReadMB.fallback,
-        maxWriteMB: CONFIG_FIELD_SPECS.maxWriteMB.fallback,
+        maxReadMB: parseNumericArg(
+            values["max-read-mb"],
+            CONFIG_FIELD_SPECS.maxReadMB,
+        ),
+        maxWriteMB: parseNumericArg(
+            values["max-write-mb"],
+            CONFIG_FIELD_SPECS.maxWriteMB,
+        ),
         // Temperature is optional — undefined means omit from request body.
         // Reject non-finite or out-of-range values to avoid sending NaN/null to the API.
         temperature: (() => {
