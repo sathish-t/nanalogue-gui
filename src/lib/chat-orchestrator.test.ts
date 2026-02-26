@@ -1513,6 +1513,7 @@ describe("/dump_llm_instructions slash command", () => {
         });
 
         expect(result.text).toContain("LLM instructions dumped to");
+        expect(result.text).toContain("not fed back to the LLM");
         const files = await readdir(join(tmpDir, "ai_chat_output"));
         expect(files).toHaveLength(1);
     });

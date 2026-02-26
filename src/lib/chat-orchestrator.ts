@@ -899,7 +899,9 @@ export async function handleUserMessage(
         await writeFile(outputFile, content, "utf-8");
 
         const relPath = relative(allowedDir, outputFile);
-        const text = `LLM instructions dumped to ${relPath}`;
+        const text =
+            `LLM instructions dumped to ${relPath}\n` +
+            "This message is not fed back to the LLM. Do not reference this file in conversations.";
         emitEvent({ type: "turn_end", text, steps: [] });
         return { text, steps: [] };
     }
