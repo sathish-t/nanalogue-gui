@@ -107,6 +107,8 @@ ${BOLD}Other:${RESET}
 
 ${BOLD}REPL commands:${RESET}
   /new                     Start a new conversation
+  /exec <file.py>          Run a Python file directly in the sandbox
+  /dump_llm_instructions   Dump the last LLM request payload to a log file
   /quit                    Exit the CLI
   Ctrl+C during request    Cancel current request
   Ctrl+C at prompt         Exit`);
