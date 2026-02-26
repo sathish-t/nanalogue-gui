@@ -278,6 +278,8 @@ async function main(): Promise<void> {
             values["max-allocations"],
             CONFIG_FIELD_SPECS.maxAllocations,
         ),
+        maxReadMB: CONFIG_FIELD_SPECS.maxReadMB.fallback,
+        maxWriteMB: CONFIG_FIELD_SPECS.maxWriteMB.fallback,
         // Temperature is optional — undefined means omit from request body.
         // Reject non-finite or out-of-range values to avoid sending NaN/null to the API.
         temperature: (() => {

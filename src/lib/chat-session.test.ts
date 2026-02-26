@@ -29,6 +29,8 @@ const defaultConfig: AiChatConfig = {
     maxDurationSecs: 600,
     maxMemoryMB: 512,
     maxAllocations: 100_000,
+    maxReadMB: 1,
+    maxWriteMB: 50,
 };
 
 describe("ChatSession", () => {

@@ -622,6 +622,8 @@ const minimalConfig: AiChatConfig = {
     maxDurationSecs: 600,
     maxMemoryMB: 512,
     maxAllocations: 100_000,
+    maxReadMB: 1,
+    maxWriteMB: 50,
 };
 
 describe("adversarial/edge-case tests", () => {
@@ -1106,6 +1108,8 @@ describe("/exec slash command", () => {
                 maxDurationSecs: 600,
                 maxMemoryMB: 512,
                 maxAllocations: 100_000,
+                maxReadMB: 1,
+                maxWriteMB: 50,
             },
             history: [],
             facts: [],
@@ -1316,6 +1320,8 @@ describe("/dump_llm_instructions slash command", () => {
                 maxDurationSecs: 600,
                 maxMemoryMB: 512,
                 maxAllocations: 100_000,
+                maxReadMB: 1,
+                maxWriteMB: 50,
             },
             history: [],
             facts: [],

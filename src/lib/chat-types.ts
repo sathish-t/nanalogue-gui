@@ -41,6 +41,10 @@ export interface SandboxOptions {
     maxAllocations?: number;
     /** Maximum output size in bytes (derived from context budget). */
     maxOutputBytes?: number;
+    /** Maximum bytes per read_file call. */
+    maxReadBytes?: number;
+    /** Maximum bytes per write_file call. */
+    maxWriteBytes?: number;
 }
 
 /** An assistant message in the conversation history. */
@@ -192,6 +196,10 @@ export interface AiChatConfig {
     maxMemoryMB: number;
     /** Maximum Monty VM heap allocations. */
     maxAllocations: number;
+    /** Maximum read_file size in megabytes (converted to bytes before use). */
+    maxReadMB: number;
+    /** Maximum write_file size in megabytes (converted to bytes before use). */
+    maxWriteMB: number;
 }
 
 /** Validation spec for a single AiChatConfig field. */

@@ -225,6 +225,8 @@ const minimalConfig: AiChatConfig = {
     maxDurationSecs: 600,
     maxMemoryMB: 512,
     maxAllocations: 100_000,
+    maxReadMB: 1,
+    maxWriteMB: 50,
 };
 
 /** Orchestrator call result for test assertions. */

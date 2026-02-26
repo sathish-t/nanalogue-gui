@@ -85,6 +85,20 @@ export const /** Validation specs for each integer AiChatConfig field (temperatu
             fallback: 100_000,
             label: "max sandbox allocations",
         },
+        /** Floor of 1 MB; ceiling of 10 MB per read_file call. */
+        maxReadMB: {
+            min: 1,
+            max: 10,
+            fallback: 1,
+            label: "max read_file size (MB)",
+        },
+        /** Floor of 1 MB; ceiling of 100 MB per write_file call. */
+        maxWriteMB: {
+            min: 1,
+            max: 100,
+            fallback: 50,
+            label: "max write_file size (MB)",
+        },
     };
 
 export const /** Validation spec for optional temperature (float, no fallback). */ TEMPERATURE_SPEC: OptionalFloatFieldSpec =
