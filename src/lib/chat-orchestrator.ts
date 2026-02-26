@@ -851,6 +851,8 @@ export async function handleUserMessage(
                 maxDurationSecs: config.maxDurationSecs,
                 maxMemory: config.maxMemoryMB * 1024 * 1024,
                 maxAllocations: config.maxAllocations,
+                maxReadBytes: config.maxReadMB * 1024 * 1024,
+                maxWriteBytes: config.maxWriteMB * 1024 * 1024,
             },
             signal,
         );
@@ -911,6 +913,9 @@ export async function handleUserMessage(
         maxRecordsBamMods: config.maxRecordsBamMods,
         maxRecordsWindowReads: config.maxRecordsWindowReads,
         maxRecordsSeqTable: config.maxRecordsSeqTable,
+        maxReadMB: config.maxReadMB,
+        maxWriteMB: config.maxWriteMB,
+        maxDurationSecs: config.maxDurationSecs,
     });
     const factsBlock = renderFactsBlock(facts);
     const systemPrompt = buildSystemPrompt(sandboxPrompt, factsBlock);
@@ -925,6 +930,8 @@ export async function handleUserMessage(
         maxDurationSecs: config.maxDurationSecs,
         maxMemory: config.maxMemoryMB * 1024 * 1024,
         maxAllocations: config.maxAllocations,
+        maxReadBytes: config.maxReadMB * 1024 * 1024,
+        maxWriteBytes: config.maxWriteMB * 1024 * 1024,
     };
 
     const steps: Array<{

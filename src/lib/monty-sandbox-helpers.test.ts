@@ -188,6 +188,9 @@ describe("buildSandboxPrompt", () => {
             maxRecordsBamMods: 5_000,
             maxRecordsWindowReads: 5_000,
             maxRecordsSeqTable: 5_000,
+            maxReadMB: 1,
+            maxWriteMB: 50,
+            maxDurationSecs: 600,
         });
         expect(prompt).not.toMatch(/Files available:/i);
         expect(prompt).toContain("ls()");
@@ -200,6 +203,9 @@ describe("buildSandboxPrompt", () => {
             maxRecordsBamMods: 5_000,
             maxRecordsWindowReads: 5_000,
             maxRecordsSeqTable: 5_000,
+            maxReadMB: 1,
+            maxWriteMB: 50,
+            maxDurationSecs: 600,
         });
         expect(prompt).toContain("42 KB");
     });

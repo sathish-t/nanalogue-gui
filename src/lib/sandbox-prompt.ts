@@ -1,13 +1,7 @@
 // Builds the LLM system prompt describing sandbox capabilities.
 // All numeric limits are derived from code constants, not hardcoded in prose.
 
-import {
-    DEFAULT_MAX_DURATION_SECS,
-    DEFAULT_MAX_READ_BYTES,
-    DEFAULT_MAX_WRITE_BYTES,
-    MAX_FILENAME_LENGTH,
-    MAX_LS_ENTRIES,
-} from "./ai-chat-constants";
+import { MAX_FILENAME_LENGTH, MAX_LS_ENTRIES } from "./ai-chat-constants";
 
 /** Options for building the sandbox prompt. */
 export interface SandboxPromptOptions {
@@ -21,6 +15,12 @@ export interface SandboxPromptOptions {
     maxRecordsWindowReads: number;
     /** Maximum records from seq_table per call. */
     maxRecordsSeqTable: number;
+    /** Maximum read_file size in megabytes. */
+    maxReadMB: number;
+    /** Maximum write_file size in megabytes. */
+    maxWriteMB: number;
+    /** Maximum sandbox execution duration in seconds. */
+    maxDurationSecs: number;
 }
 
 /**
@@ -36,11 +36,13 @@ export function buildSandboxPrompt(options: SandboxPromptOptions): string {
         maxRecordsBamMods,
         maxRecordsWindowReads,
         maxRecordsSeqTable,
+        maxReadMB,
+        maxWriteMB,
+        maxDurationSecs,
     } = options;
 
-    const maxReadMB = Math.round(DEFAULT_MAX_READ_BYTES / (1024 * 1024));
-    const maxWriteMB = Math.round(DEFAULT_MAX_WRITE_BYTES / (1024 * 1024));
-    const maxDurationMinutes = Math.round(DEFAULT_MAX_DURATION_SECS / 60);
+    const maxReadBytes = maxReadMB * 1024 * 1024;
+    const maxDurationMinutes = Math.round(maxDurationSecs / 60);
     const readInfoLimit = maxRecordsReadInfo.toLocaleString();
     const bamModsLimit = maxRecordsBamMods.toLocaleString();
     const windowReadsLimit = maxRecordsWindowReads.toLocaleString();
@@ -130,17 +132,17 @@ the file content and pagination metadata:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | offset | int | 0 | Byte offset to start reading from |
-| max_bytes | int | ${DEFAULT_MAX_READ_BYTES} | Max bytes to read (capped at ${maxReadMB} MB) |
+| max_bytes | int | ${maxReadBytes} | Max bytes to read (capped at ${maxReadMB} MB) |
 
 Pagination example for a large file:
 
 \`\`\`python
 # First page
 page1 = read_file("big_annotations.bed")
-# page1["bytes_read"] == ${DEFAULT_MAX_READ_BYTES}, page1["total_size"] == 5000000
+# page1["bytes_read"] == ${maxReadBytes}, page1["total_size"] == 5000000
 
 # Second page
-page2 = read_file("big_annotations.bed", offset=${DEFAULT_MAX_READ_BYTES})
+page2 = read_file("big_annotations.bed", offset=${maxReadBytes})
 
 # Read just the first 100 bytes
 header = read_file("data.tsv", max_bytes=100)
