@@ -303,13 +303,12 @@ function renderChart(plotData: PlotData) {
 
     const { rawPoints, windowedPoints, annotation, expandedRegion } = plotData;
 
-    const stepLineData: PlotDataPoint[] = windowedPoints.map((wp) => ({
-        x: wp.refWinStart,
-        y: wp.winVal,
-    }));
-    if (windowedPoints.length > 0) {
-        const last = windowedPoints[windowedPoints.length - 1];
-        stepLineData.push({ x: last.refWinEnd, y: last.winVal });
+    // Build explicit horizontal segments for each window with vertical
+    // connectors between them, avoiding Chart.js stepped interpolation.
+    const stepLineData: PlotDataPoint[] = [];
+    for (const wp of windowedPoints) {
+        stepLineData.push({ x: wp.refWinStart, y: wp.winVal });
+        stepLineData.push({ x: wp.refWinEnd, y: wp.winVal });
     }
 
     chart = new Chart(ctx, {
@@ -333,7 +332,6 @@ function renderChart(plotData: PlotData) {
                     borderColor: "black",
                     borderWidth: 2.5,
                     pointRadius: 0,
-                    stepped: "after",
                     order: 1,
                 },
             ],
