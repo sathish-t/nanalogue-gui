@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-02-26
+
 ### Added
 
 - Configurable `maxReadMB` and `maxWriteMB` sandbox file size limits with CLI flags, validation specs, and settings UI ([`78c6e37`](https://github.com/sathish-t/nanalogue-gui/commit/78c6e376e6189bb807d091955bc25664d73a5db3), [`bc774ad`](https://github.com/sathish-t/nanalogue-gui/commit/bc774ad9c7153cb3e5e8506dcaefc2410b62d690), [`6a0b9e1`](https://github.com/sathish-t/nanalogue-gui/commit/6a0b9e190c8817b15f5d1b9e6bdeec877f8d9124), [`f6d2d43`](https://github.com/sathish-t/nanalogue-gui/commit/f6d2d4368b7ad57c8b4cb9bf7e41ac0a7bfbfa1d), [`e724662`](https://github.com/sathish-t/nanalogue-gui/commit/e724662e5d9bcf1a1dd4c9374c48044f4a9d7e9d))
