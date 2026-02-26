@@ -196,6 +196,18 @@
       <input type="number" id="opt-max-allocations" value="100000" min="10000" max="10000000">
     </div>
 
+    <!-- Maximum read_file size in megabytes. -->
+    <div class="dialog-row">
+      <label for="opt-max-read-mb">Max read_file size (MB):</label>
+      <input type="number" id="opt-max-read-mb" value="1" min="1" max="10">
+    </div>
+
+    <!-- Maximum write_file size in megabytes. -->
+    <div class="dialog-row">
+      <label for="opt-max-write-mb">Max write_file size (MB):</label>
+      <input type="number" id="opt-max-write-mb" value="50" min="1" max="100">
+    </div>
+
     <!-- Dialog action buttons. -->
     <div class="dialog-actions">
       <!-- Resets all fields to default values. -->

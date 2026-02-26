@@ -222,6 +222,12 @@ const optMaxAllocations = document.getElementById(
 const optTemperature = document.getElementById(
     "opt-temperature",
 ) as HTMLInputElement;
+const optMaxReadMB = document.getElementById(
+    "opt-max-read-mb",
+) as HTMLInputElement;
+const optMaxWriteMB = document.getElementById(
+    "opt-max-write-mb",
+) as HTMLInputElement;
 
 /** Stored code steps for the code panel pagination. */
 let codeSteps: Array<{
@@ -481,6 +487,14 @@ function getConfig(): Record<string, unknown> {
             optMaxAllocations.value,
             CONFIG_FIELD_SPECS.maxAllocations.fallback,
         ),
+        maxReadMB: parse(
+            optMaxReadMB.value,
+            CONFIG_FIELD_SPECS.maxReadMB.fallback,
+        ),
+        maxWriteMB: parse(
+            optMaxWriteMB.value,
+            CONFIG_FIELD_SPECS.maxWriteMB.fallback,
+        ),
         // Temperature is optional — empty string means undefined (omit from request)
         temperature: optTemperature.value.trim()
             ? Number.parseFloat(optTemperature.value)
@@ -516,6 +530,8 @@ function lockSessionConfig(): void {
     optMaxDuration.disabled = true;
     optMaxMemory.disabled = true;
     optMaxAllocations.disabled = true;
+    optMaxReadMB.disabled = true;
+    optMaxWriteMB.disabled = true;
     optTemperature.disabled = true;
 }
 
@@ -545,6 +561,8 @@ function unlockSessionConfig(): void {
     optMaxDuration.disabled = false;
     optMaxMemory.disabled = false;
     optMaxAllocations.disabled = false;
+    optMaxReadMB.disabled = false;
+    optMaxWriteMB.disabled = false;
     optTemperature.disabled = false;
 }
 
@@ -573,6 +591,8 @@ function resetDefaults(): void {
     optMaxAllocations.value = String(
         CONFIG_FIELD_SPECS.maxAllocations.fallback,
     );
+    optMaxReadMB.value = String(CONFIG_FIELD_SPECS.maxReadMB.fallback);
+    optMaxWriteMB.value = String(CONFIG_FIELD_SPECS.maxWriteMB.fallback);
     optTemperature.value = "";
 }
 
