@@ -630,6 +630,8 @@ export async function runSandboxCode(
         maxRecordsWindowReads = DEFAULT_MAX_RECORDS_WINDOW_READS,
         maxRecordsSeqTable = DEFAULT_MAX_RECORDS_SEQ_TABLE,
         maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
+        maxReadBytes = DEFAULT_MAX_READ_BYTES,
+        maxWriteBytes = DEFAULT_MAX_WRITE_BYTES,
     } = options;
 
     let continueThinkingCalled = false;
@@ -875,8 +877,7 @@ export async function runSandboxCode(
                             `read_file: offset must be a non-negative integer, got ${String(rawOffset)}`,
                         );
                     }
-                    const rawMaxBytes =
-                        opts?.max_bytes ?? DEFAULT_MAX_READ_BYTES;
+                    const rawMaxBytes = opts?.max_bytes ?? maxReadBytes;
                     if (
                         typeof rawMaxBytes !== "number" ||
                         !Number.isFinite(rawMaxBytes) ||
@@ -889,10 +890,7 @@ export async function runSandboxCode(
                         );
                     }
                     const offset = rawOffset;
-                    const requestedBytes = Math.min(
-                        rawMaxBytes,
-                        DEFAULT_MAX_READ_BYTES,
-                    );
+                    const requestedBytes = Math.min(rawMaxBytes, maxReadBytes);
                     const fd = await open(resolved, "r");
                     try {
                         const stat = await fd.stat();
@@ -939,11 +937,11 @@ export async function runSandboxCode(
                         }
                     }
                     const contentBytes = Buffer.byteLength(content, "utf-8");
-                    if (contentBytes > DEFAULT_MAX_WRITE_BYTES) {
+                    if (contentBytes > maxWriteBytes) {
                         throw new SandboxError(
                             "ValueError",
                             `Content size ${contentBytes} bytes exceeds write limit of ` +
-                                `${DEFAULT_MAX_WRITE_BYTES} bytes (${DEFAULT_MAX_WRITE_BYTES / 1024 / 1024} MB)`,
+                                `${maxWriteBytes} bytes (${maxWriteBytes / 1024 / 1024} MB)`,
                         );
                     }
                     const outputDir = join(allowedDir, AI_CHAT_OUTPUT_DIR);
