@@ -59,7 +59,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: binary-${{ matrix.arch }}-${{ runner.os }}
           path: |
@@ -193,7 +193,7 @@ jobs:
           ' "$APPIMAGE"
 
       - name: Upload screenshot
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: screenshot-${{ matrix.platform }}
           path: screenshot.png
