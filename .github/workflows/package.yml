@@ -75,7 +75,7 @@ jobs:
       contents: write
     steps:
       - name: Download all binary artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: binary-*
           merge-multiple: true
@@ -130,7 +130,7 @@ jobs:
 
     steps:
       - name: Download binary artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: binary-${{ matrix.arch }}-${{ matrix.os }}
           path: binaries
