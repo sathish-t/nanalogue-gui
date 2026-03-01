@@ -375,6 +375,13 @@ nanalogue-chat --endpoint https://api.openai.com/v1 --api-key $API_KEY --list-mo
 For the full list of providers and endpoint URLs, see the
 [Setting up a provider](#setting-up-a-provider) table above.
 
+**Disabling colour output:** set `NO_COLOR=1` to suppress ANSI colour codes —
+useful when piping output to a file or script:
+
+```bash
+NO_COLOR=1 nanalogue-chat --endpoint <url> --model <name> --dir <path>
+```
+
 Advanced options (context window size, timeouts, record limits) are available
 via flags — run `nanalogue-chat --help` for details.
 

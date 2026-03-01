@@ -39,6 +39,7 @@ const LIGHT_BLUE = `${ESC}94m`;
  * @returns The colorized string.
  */
 function color(code: string, text: string): string {
+    if ("NO_COLOR" in process.env) return text;
     return `${code}${text}${RESET}`;
 }
 
