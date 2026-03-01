@@ -64,6 +64,20 @@ cd nanalogue-gui
 npm install
 ```
 
+Alternatively, if you only want the **`nanalogue-chat` CLI** (no Electron GUI),
+clone the repo, build, and link it globally:
+
+```bash
+git clone https://github.com/sathish-t/nanalogue-gui.git
+cd nanalogue-gui
+npm install
+npm run build
+npm link
+```
+
+This puts the `nanalogue-chat` command on your PATH from any directory. See the
+[CLI section](#cli-nanalogue-chat) for usage.
+
 ## Usage
 
 If you have installed the app from a binary, just launch the binary like you normally would.
@@ -314,17 +328,27 @@ the LLM conversation.
 #### CLI (nanalogue-chat)
 
 The same AI Chat analysis engine is available as a standalone terminal REPL,
-with no Electron or GUI needed. After building, run:
+with no Electron or GUI needed.
+
+**End-users** (installed via `npm install -g nanalogue-gui`):
 
 ```bash
-npm run build
+nanalogue-chat --endpoint <url> --model <name> --dir <path>
+```
+
+**Developers** (built from source):
+
+```bash
 node dist/cli.mjs --endpoint <url> --model <name> --dir <path>
 ```
+
+The remaining examples below use `nanalogue-chat`; developers substitute
+`node dist/cli.mjs`.
 
 For example, to chat about BAM files in `./data` using a local Ollama model:
 
 ```bash
-node dist/cli.mjs --endpoint http://localhost:11434/v1 --model llama3 --dir ./data
+nanalogue-chat --endpoint http://localhost:11434/v1 --model llama3 --dir ./data
 ```
 
 **Authentication:** pass your API key with `--api-key <key>`, or set the
@@ -334,7 +358,7 @@ node dist/cli.mjs --endpoint http://localhost:11434/v1 --model llama3 --dir ./da
 are available:
 
 ```bash
-node dist/cli.mjs --endpoint https://api.openai.com/v1 --api-key $API_KEY --list-models
+nanalogue-chat --endpoint https://api.openai.com/v1 --api-key $API_KEY --list-models
 ```
 
 **REPL commands:**
@@ -352,7 +376,7 @@ For the full list of providers and endpoint URLs, see the
 [Setting up a provider](#setting-up-a-provider) table above.
 
 Advanced options (context window size, timeouts, record limits) are available
-via flags — run `node dist/cli.mjs --help` for details.
+via flags — run `nanalogue-chat --help` for details.
 
 ## Development
 
