@@ -257,7 +257,7 @@ it("read_file rejects path traversal", async () => {
     expect(result.message).toMatch(/outside the allowed directory/);
 });
 
-it("write_file creates file in ai_chat_output subdirectory", async () => {
+it("write_file creates file at given path within allowed dir", async () => {
     const code = `
 result = write_file("results.bed", "chr1\\t100\\t200\\n")
 result
@@ -265,14 +265,11 @@ result
     const result = await runSandboxCode(code, allowedDir);
     expect(result.success).toBe(true);
     const value = result.value as Record<string, unknown>;
-    expect(value.path).toBe("ai_chat_output/results.bed");
+    expect(value.path).toBe("results.bed");
     expect(value.bytes_written).toBeGreaterThan(0);
 
     const fs = await import("node:fs/promises");
-    const written = await fs.readFile(
-        join(allowedDir, "ai_chat_output", "results.bed"),
-        "utf-8",
-    );
+    const written = await fs.readFile(join(allowedDir, "results.bed"), "utf-8");
     expect(written).toBe("chr1\t100\t200\n");
 });
 
@@ -287,11 +284,30 @@ it("write_file refuses to overwrite existing file", async () => {
     expect(result2.message).toMatch(/already exists/);
 });
 
-it("write_file rejects path traversal outside ai_chat_output", async () => {
+it("write_file rejects path traversal outside allowed dir", async () => {
     const code = 'write_file("../tumor.bam", "malicious content")';
     const result = await runSandboxCode(code, allowedDir);
     expect(result.success).toBe(false);
     expect(result.message).toMatch(/outside the allowed directory/);
+});
+
+it("write_file rejects path through symlinked directory pointing outside allowed dir", async () => {
+    const outsideDir = await import("node:fs/promises").then((fs) =>
+        fs.mkdtemp(join(tmpdir(), "outside-write-")),
+    );
+    await symlink(outsideDir, join(allowedDir, "link_outside_dir"));
+    try {
+        const code = 'write_file("link_outside_dir/evil.txt", "content")';
+        const result = await runSandboxCode(code, allowedDir);
+        expect(result.success).toBe(false);
+        expect(result.message).toMatch(/outside the allowed directory/);
+        // Verify no directory was created outside allowedDir
+        const fs = await import("node:fs/promises");
+        const outsideContents = await fs.readdir(outsideDir);
+        expect(outsideContents).toHaveLength(0);
+    } finally {
+        await rm(outsideDir, { recursive: true });
+    }
 });
 
 it("write_file supports nested paths with auto-created directories", async () => {
@@ -302,14 +318,14 @@ result
     const result = await runSandboxCode(code, allowedDir);
     expect(result.success).toBe(true);
     const value = result.value as Record<string, unknown>;
-    expect(value.path).toBe("ai_chat_output/chr1/region_a/filtered.bed");
+    expect(value.path).toBe("chr1/region_a/filtered.bed");
     expect(value.bytes_written).toBeGreaterThan(0);
 });
 
 it("read_file can read back write_file output", async () => {
     const code = `
 write_file("roundtrip.tsv", "read_id\\tlen\\nread1\\t1000\\n")
-result = read_file("ai_chat_output/roundtrip.tsv")
+result = read_file("roundtrip.tsv")
 result["content"]
 `;
     const result = await runSandboxCode(code, allowedDir);
@@ -326,7 +342,7 @@ files = ls()
 `;
     const result = await runSandboxCode(code, allowedDir);
     expect(result.success).toBe(true);
-    expect(result.value).toContain("ai_chat_output/visible.txt");
+    expect(result.value).toContain("visible.txt");
 });
 
 it("read_info respects native limit parameter", async () => {

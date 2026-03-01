@@ -27,7 +27,6 @@ import {
 } from "@pydantic/monty";
 import picomatch from "picomatch";
 import {
-    AI_CHAT_OUTPUT_DIR,
     DEFAULT_MAX_ALLOCATIONS,
     DEFAULT_MAX_DURATION_SECS,
     DEFAULT_MAX_MEMORY,
@@ -91,6 +90,39 @@ export function deriveMaxOutputBytes(contextBudgetTokens: number): number {
     const contextBudgetBytes = contextBudgetTokens * 4;
     const derived = Math.round(contextBudgetBytes * 0.15);
     return Math.max(MIN_OUTPUT_BYTES, Math.min(MAX_OUTPUT_BYTES, derived));
+}
+
+/**
+ * Walks up from targetPath and verifies the deepest existing ancestor
+ * has a realpath inside allowedDir. Prevents mkdir from following
+ * pre-existing symlinks outside the sandbox before resolvePath can catch them.
+ *
+ * @param allowedDir - The base directory all paths must stay within.
+ * @param targetPath - The absolute path whose existing ancestors to check.
+ * @param errorMessage - The error message to throw if validation fails.
+ */
+async function assertExistingAncestorInside(
+    allowedDir: string,
+    targetPath: string,
+    errorMessage: string,
+): Promise<void> {
+    const allowedDirReal = await realpath(allowedDir);
+    let current = resolve(targetPath, "..");
+    while (true) {
+        try {
+            const real = await realpath(current);
+            assertInside(allowedDirReal, real, errorMessage);
+            return;
+        } catch (e) {
+            if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+                const parent = resolve(current, "..");
+                if (parent === current) return; // reached filesystem root
+                current = parent;
+                continue;
+            }
+            throw e;
+        }
+    }
 }
 
 /**
@@ -914,9 +946,9 @@ export async function runSandboxCode(
                 },
 
                 /**
-                 * Writes a text file to the ai_chat_output subdirectory (no overwrites).
+                 * Writes a text file to the allowed directory (no overwrites).
                  *
-                 * @param filePath - Path for the new file (relative to output dir).
+                 * @param filePath - Path for the new file (relative to the allowed directory).
                  * @param content - The text content to write.
                  * @returns An object with the written path and bytes_written.
                  */
@@ -944,29 +976,30 @@ export async function runSandboxCode(
                                 `${maxWriteBytes} bytes (${maxWriteBytes / 1024 / 1024} MB)`,
                         );
                     }
-                    const outputDir = join(allowedDir, AI_CHAT_OUTPUT_DIR);
-                    await mkdir(outputDir, { recursive: true });
-                    // Validate the path stays inside outputDir before creating directories
-                    const tentative = resolve(outputDir, filePath);
+                    // Pre-symlink traversal guard: reject escaping paths before
+                    // any filesystem mutations.
+                    const tentative = resolve(allowedDir, filePath);
                     assertInside(
-                        outputDir,
+                        allowedDir,
+                        tentative,
+                        `Path "${filePath}" is outside the allowed directory`,
+                    );
+                    // Check existing ancestors before mkdir to prevent following
+                    // pre-existing symlinks outside allowedDir.
+                    await assertExistingAncestorInside(
+                        allowedDir,
                         tentative,
                         `Path "${filePath}" is outside the allowed directory`,
                     );
                     const parentDir = join(tentative, "..");
                     await mkdir(parentDir, { recursive: true });
-                    // Resolve against allowedDir (not outputDir) so a symlinked
-                    // ai_chat_output directory cannot escape the sandbox root.
-                    const resolved = await resolvePath(
-                        allowedDir,
-                        join(AI_CHAT_OUTPUT_DIR, filePath),
-                    );
+                    // Symlink-safe resolution: verify canonical path stays within allowedDir.
+                    const resolved = await resolvePath(allowedDir, filePath);
                     try {
                         await access(resolved);
                         throw new SandboxError(
                             "FileExistsError",
-                            `File "${filePath}" already exists in ${AI_CHAT_OUTPUT_DIR}/. ` +
-                                "Choose a different name.",
+                            `File "${filePath}" already exists. Choose a different name.`,
                         );
                     } catch (e) {
                         if ((e as NodeJS.ErrnoException).code !== "ENOENT")
@@ -974,7 +1007,7 @@ export async function runSandboxCode(
                     }
                     await writeFile(resolved, content, "utf-8");
                     return {
-                        path: `${AI_CHAT_OUTPUT_DIR}/${filePath}`,
+                        path: filePath,
                         bytes_written: contentBytes,
                     };
                 },
