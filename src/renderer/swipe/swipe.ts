@@ -95,7 +95,7 @@ interface PlotData {
     /** The array of windowed aggregation points for the step-line overlay. */
     windowedPoints: WindowedPoint[];
 
-    /** The annotation region metadata including contig, coordinates, and read identifier. */
+    /** The annotation region metadata including contig, coordinates, read identifier, and raw BED line. */
     annotation: {
         /** The contig or chromosome name for the annotation. */
         contig: string;
@@ -108,6 +108,9 @@ interface PlotData {
 
         /** The nanopore read identifier associated with this annotation. */
         readId: string;
+
+        /** The original unparsed line from the BED file, used to extract extra columns. */
+        rawLine: string;
     };
 
     /** The expanded genomic region used for the plot viewport. */
@@ -189,6 +192,9 @@ const elements = {
     /** The warning banner shown when annotation coordinates are clamped. */
     clampWarning: document.getElementById("clamp-warning") as HTMLElement,
 
+    /** The info strip showing extra BED columns beyond the four mandatory fields. */
+    bedExtraInfo: document.getElementById("bed-extra-info") as HTMLElement,
+
     /** The element displaying the output file path after completion. */
     outputInfo: document.getElementById("output-info") as HTMLElement,
 };
@@ -259,6 +265,31 @@ function updateTitle(plotData: PlotData | null) {
     } else {
         elements.title.textContent = "No data";
     }
+}
+
+/**
+ * Shows or hides the extra BED fields info strip based on the plot data.
+ * Columns beyond the four mandatory BED fields (contig, start, end, readId)
+ * are extracted from the raw line and displayed as dot-separated values.
+ *
+ * @param plotData - The plot data whose annotation may have extra BED columns, or null to hide.
+ */
+function updateBedExtraInfo(plotData: PlotData | null) {
+    if (!plotData) {
+        elements.bedExtraInfo.classList.add("hidden");
+        return;
+    }
+
+    const fields = plotData.annotation.rawLine.split("\t");
+    const extraFields = fields.slice(4);
+
+    if (extraFields.length === 0) {
+        elements.bedExtraInfo.classList.add("hidden");
+        return;
+    }
+
+    elements.bedExtraInfo.textContent = `Additional BED fields (separated by ·): ${extraFields.join(" · ")}`;
+    elements.bedExtraInfo.classList.remove("hidden");
 }
 
 /**
@@ -451,6 +482,7 @@ async function handleAction(action: "accept" | "reject") {
 
         if (result.done) {
             updateClampWarning(null);
+            updateBedExtraInfo(null);
             showDone(result.state);
         } else if (
             result.plotData &&
@@ -460,10 +492,12 @@ async function handleAction(action: "accept" | "reject") {
             hideLoading();
             updateTitle(result.plotData);
             updateClampWarning(result.plotData);
+            updateBedExtraInfo(result.plotData);
             renderChart(result.plotData);
         } else {
             updateTitle(result.plotData ?? null);
             updateClampWarning(result.plotData ?? null);
+            updateBedExtraInfo(result.plotData ?? null);
             showNoData();
         }
     } catch (error) {
@@ -502,10 +536,12 @@ async function initialize() {
             hideLoading();
             updateTitle(plotData);
             updateClampWarning(plotData);
+            updateBedExtraInfo(plotData);
             renderChart(plotData);
         } else {
             updateTitle(plotData);
             updateClampWarning(plotData);
+            updateBedExtraInfo(plotData);
             showNoData();
         }
 

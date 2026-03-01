@@ -273,3 +273,20 @@ body {
 #clamp-warning.hidden {
     display: none;
 }
+
+/* Info strip displaying extra BED columns beyond the four mandatory fields. */
+#bed-extra-info {
+    background: #f0f4f8;
+    color: #546e7a;
+    font-family: Monaco, Menlo, monospace;
+    font-size: 12px;
+    overflow: hidden;
+    padding: 4px 24px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Hidden utility class for the extra BED fields strip. */
+#bed-extra-info.hidden {
+    display: none;
+}
