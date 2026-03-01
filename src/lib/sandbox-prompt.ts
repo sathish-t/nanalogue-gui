@@ -154,26 +154,25 @@ You can also read back files written by write_file:
 
 \`\`\`python
 result = write_file("results.bed", content)
-# result["path"] == "ai_chat_output/results.bed"
+# result["path"] == "results.bed"
 verification = read_file(result["path"])
 \`\`\`
 
 ### write_file(file_path: str, content: str) -> dict
 
-Writes a text file to the ai_chat_output/ subdirectory within the
-allowed directory. Returns a dict with the relative path and bytes
-written.
+Writes a text file to the allowed directory. Returns a dict with the
+relative path and bytes written.
 
 \`\`\`python
 result = write_file("results.bed", "chr1\\t100\\t200\\n")
-# result == {"path": "ai_chat_output/results.bed", "bytes_written": 14}
+# result == {"path": "results.bed", "bytes_written": 14}
 
 # Nested paths are supported
 result = write_file("chr1/filtered_reads.tsv", tsv_content)
-# result == {"path": "ai_chat_output/chr1/filtered_reads.tsv", "bytes_written": ...}
+# result == {"path": "chr1/filtered_reads.tsv", "bytes_written": ...}
 \`\`\`
 
-- file_path: name for the output file (relative to ai_chat_output/).
+- file_path: path for the output file, relative to the allowed directory.
   Nested paths like "subdir/file.bed" are supported — parent
   directories are created automatically.
 - content: text content to write (UTF-8). Max ${maxWriteMB} MB per call.
@@ -182,17 +181,16 @@ result = write_file("chr1/filtered_reads.tsv", tsv_content)
   different name (e.g., append a number: "results_2.bed").
 - Filenames must not contain control characters or exceed ${MAX_FILENAME_LENGTH}
   characters per path component.
-- Files are always written to ai_chat_output/ — you cannot write
-  to the parent directory or anywhere else.
+- Files can be written anywhere within the allowed directory.
 - Written files are visible to ls() and read_file() immediately.
 - Use this to save analysis results (BED regions, filtered read
   lists, summary CSVs) that the user can access outside the chat.
 - You can also save sandbox code snippets as .py files for reuse:
     write_file("helpers.py", "def get_mod_types(bam):\\n  ...")
-  Read them back later with read_file("ai_chat_output/helpers.py")
+  Read them back later with read_file("helpers.py")
   and inline the functions into subsequent sandbox calls. (Monty
   cannot import files, so you must copy the code into each call.)
-  The user can also find these files in ai_chat_output/ after the
+  The user can also find these files in the allowed directory after the
   session and adapt them for real Python.
 
 ### peek(bam_path: str) -> dict
@@ -507,7 +505,7 @@ lengths = [r["sequence_length"] for r in reads]
 - You cannot use Python's open() or os module. Use ls() to discover
   files, peek/read_info/bam_mods/window_reads/seq_table for BAM/CRAM
   data, read_file() for text files, and write_file() to save results.
-- write_file() writes to an ai_chat_output/ subdirectory and never
+- write_file() writes anywhere within the allowed directory and never
   overwrites existing files.
 - You cannot access the network.
 - When using continue_thinking(), end with a bare expression to return
