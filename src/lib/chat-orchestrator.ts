@@ -414,8 +414,16 @@ export function extractFacts(
         typeof toolResult.value === "object" &&
         "path" in (toolResult.value as Record<string, unknown>)
     ) {
-        const path = (toolResult.value as Record<string, string>).path;
-        if (path?.startsWith("ai_chat_output/")) {
+        const writeResult = toolResult.value as Record<string, unknown>;
+        const path = writeResult.path;
+        const bytesWritten = writeResult.bytes_written;
+        const hasWriteFileCall = /write_file\s*\(/.test(code);
+        if (
+            hasWriteFileCall &&
+            typeof path === "string" &&
+            path &&
+            typeof bytesWritten === "number"
+        ) {
             addFact(facts, {
                 type: "output",
                 path,
