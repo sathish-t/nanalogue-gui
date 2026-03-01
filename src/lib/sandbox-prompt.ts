@@ -90,10 +90,12 @@ recursively. Paths are relative to the allowed directory (e.g.
 Accepts an optional glob pattern to filter results:
 
 \`\`\`python
-files = ls()                    # all files (up to ${MAX_LS_ENTRIES})
-bam_files = ls("**/*.bam")      # only BAM files
-bed_files = ls("**/*.bed")      # only BED files
-top_level = ls("*.bam")         # BAM files in root only
+files = ls()                             # all files (up to ${MAX_LS_ENTRIES})
+bam_files = ls("**/*.bam")               # only BAM files
+bed_files = ls("**/*.bed")               # only BED files
+top_level = ls("*.bam")                  # BAM files in root only
+sub_bam = ls("sample_001/**/*.bam")      # BAM files under sample_001/ only
+nested = ls("run_A/alignments/*.bam")    # BAM files in a specific subfolder
 \`\`\`
 
 Results are hard-capped at ${MAX_LS_ENTRIES} entries. If the cap is hit, the return
