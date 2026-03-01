@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- End-user documentation for `nanalogue-chat` in README ([`96f2aaa`](https://github.com/sathish-t/nanalogue-gui/commit/96f2aaa96e66bf7a689f41a820387e8cc89b2c91))
+- Extra BED fields displayed in swipe info strip ([`8f7a9eb`](https://github.com/sathish-t/nanalogue-gui/commit/8f7a9eb9096261220bde3226c58e6d48c948e322))
+
+### Changed
+
+- CLI output now respects the `NO_COLOR` environment variable ([`7ecc829`](https://github.com/sathish-t/nanalogue-gui/commit/7ecc829b68d33d5e2e8ef4822e4e77210987162f))
+- `write_file` now writes directly to the allowed directory instead of a fixed `ai_chat_output/` subdirectory; adds symlink-traversal guard via `assertExistingAncestorInside` before `mkdir` ([`83f21df`](https://github.com/sathish-t/nanalogue-gui/commit/83f21df5255f0ff586223be178c561bfbb077daf))
+- Updates sandbox system-prompt documentation to reflect new `write_file` path semantics ([`2fb20c3`](https://github.com/sathish-t/nanalogue-gui/commit/2fb20c3e4afe5b4792bdd1c05ef84c07639c1b4b))
+- `extractFacts` now detects `write_file` output via `bytes_written` presence and a code-level scan instead of the removed `ai_chat_output/` path prefix ([`a663f6d`](https://github.com/sathish-t/nanalogue-gui/commit/a663f6d12d2b4d3309f4e3bc9679e368c5e38be4))
+
 ## [0.2.3] - 2026-02-26
 
 ### Added
