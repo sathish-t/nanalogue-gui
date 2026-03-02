@@ -1,6 +1,7 @@
 // Standalone CLI for the nanalogue AI Chat feature.
 // Provides an interactive REPL for LLM-powered BAM analysis without the Electron GUI.
 
+import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { parseArgs } from "node:util";
 import { version } from "../package.json";
@@ -171,7 +172,9 @@ async function main(): Promise<void> {
     const endpointUrl = values.endpoint;
     const apiKey = values["api-key"] ?? process.env.API_KEY ?? "";
     const model = values.model;
-    const allowedDir = values.dir;
+    const allowedDir = values.dir
+        ? resolve(process.cwd(), values.dir)
+        : values.dir;
     // --list-models mode
     if (values["list-models"]) {
         if (!endpointUrl) {
