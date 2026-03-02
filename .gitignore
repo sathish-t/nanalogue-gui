@@ -76,6 +76,9 @@ CLAUDE.md
 .claude/
 docs/
 
+# Pi coding agent files
+.pi/
+
 # Local brainstorming notes (not for GitHub)
 brainstorming*
 
