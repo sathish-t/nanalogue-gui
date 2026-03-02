@@ -12,6 +12,7 @@ import type {
     SandboxResult,
 } from "./lib/chat-types";
 import { fetchModels } from "./lib/model-listing";
+import { parseNumericArg, SANDBOX_ARG_DEFS } from "./lib/sandbox-cli-args";
 
 // --- ANSI color helpers ---
 
@@ -51,20 +52,11 @@ const argConfig = {
         endpoint: { type: "string" as const },
         "api-key": { type: "string" as const },
         model: { type: "string" as const },
-        dir: { type: "string" as const },
+        ...SANDBOX_ARG_DEFS,
         "context-window": { type: "string" as const },
         "max-retries": { type: "string" as const },
         timeout: { type: "string" as const },
-        "max-records-read-info": { type: "string" as const },
-        "max-records-bam-mods": { type: "string" as const },
-        "max-records-window-reads": { type: "string" as const },
-        "max-records-seq-table": { type: "string" as const },
         "max-code-rounds": { type: "string" as const },
-        "max-duration-secs": { type: "string" as const },
-        "max-memory-mb": { type: "string" as const },
-        "max-allocations": { type: "string" as const },
-        "max-read-mb": { type: "string" as const },
-        "max-write-mb": { type: "string" as const },
         temperature: { type: "string" as const },
         "list-models": { type: "boolean" as const, default: false },
         version: { type: "boolean" as const, short: "v", default: false },
@@ -117,33 +109,6 @@ ${BOLD}REPL commands:${RESET}
   /quit                    Exit the CLI
   Ctrl+C during request    Cancel current request
   Ctrl+C at prompt         Exit`);
-}
-
-/**
- * Parses a numeric CLI argument, clamping to the spec's min/max range.
- *
- * @param value - The raw string value from parseArgs.
- * @param spec - The config field spec with min, max, and fallback.
- * @param spec.min - Minimum allowed value (inclusive).
- * @param spec.max - Maximum allowed value (inclusive).
- * @param spec.fallback - Default value when absent or non-numeric.
- * @returns The parsed and clamped number, or the fallback.
- */
-function parseNumericArg(
-    value: string | undefined,
-    spec: {
-        /** Minimum allowed value (inclusive). */
-        min: number;
-        /** Maximum allowed value (inclusive). */
-        max: number;
-        /** Default value when absent or non-numeric. */
-        fallback: number;
-    },
-): number {
-    if (value === undefined) return spec.fallback;
-    const n = Number(value);
-    if (!Number.isFinite(n)) return spec.fallback;
-    return Math.round(Math.max(spec.min, Math.min(spec.max, n)));
 }
 
 /**
