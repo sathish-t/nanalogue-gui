@@ -632,7 +632,13 @@ function buildExecutionFeedback(
                 FEEDBACK_OUTPUT_MAX_BYTES,
             );
             feedback.prints = text;
-            if (truncated) feedback.truncated = true;
+            // Mark truncated if truncatePrints clipped the joined text, OR if
+            // runSandboxCode already clipped it via the maxPrintBytes ceiling
+            // (result.printsTruncated). Without this, a small-context-window
+            // run where maxPrintBytes == FEEDBACK_OUTPUT_MAX_BYTES would pass
+            // the already-clipped text through truncatePrints with no trim and
+            // silently drop the truncation signal.
+            if (truncated || result.printsTruncated) feedback.truncated = true;
         }
         if (result.endedWithExpression && result.value != null) {
             const valStr = safeStringify(result.value);
@@ -660,6 +666,10 @@ function buildExecutionFeedback(
                 feedback.value = valStr.ok
                     ? JSON.parse(valStr.json)
                     : valStr.fallback;
+                // gateOutputSize may have already truncated the value (e.g. a
+                // large array or string); surface that to the LLM even if the
+                // truncated representation fits within the feedback byte budget.
+                if (result.truncated) feedback.value_truncated = true;
             }
         }
         feedback.rounds_remaining = roundsRemaining;
@@ -679,7 +689,9 @@ function buildExecutionFeedback(
             FEEDBACK_OUTPUT_MAX_BYTES,
         );
         errorPayload.prints = text;
-        if (truncated) errorPayload.truncated = true;
+        // Mirror the success-path logic: also flag truncation when runSandboxCode
+        // clipped prints via the maxPrintBytes ceiling before truncatePrints ran.
+        if (truncated || result.printsTruncated) errorPayload.truncated = true;
     }
     // Include instructive hint inside the JSON on SyntaxError so the model
     // learns the expected format.
@@ -859,6 +871,11 @@ export async function handleUserMessage(
         maxAllocations: config.maxAllocations,
         maxReadBytes: config.maxReadMB * 1024 * 1024,
         maxWriteBytes: config.maxWriteMB * 1024 * 1024,
+        // maxPrintBytes is intentionally left at its default (MAX_PRINT_CAPTURE_BYTES,
+        // 1 MB) so that large print()-based final answers are fully captured and
+        // can be redirected to an overflow file by handleTerminalOverflow.
+        // The LLM-facing truncation at the context budget is already enforced
+        // downstream by truncatePrints() in buildExecutionFeedback.
     };
 
     const steps: Array<{
