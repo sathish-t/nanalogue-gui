@@ -471,6 +471,10 @@ Note that the development environment notes are only relevant if you intend to p
 or add features. They are not relevant if you want to just install and run the app. Just go to
 the [installation](#installation) section of this document.
 
+The `documentation/code-explainers/` folder contains short write-ups explaining
+how specific parts of the codebase work — useful if you want to understand a
+feature before diving into the source.
+
 ## Versioning
 
 We use [Semantic Versioning](https://semver.org/).
