@@ -17,6 +17,8 @@ export interface SandboxResult {
     message?: string;
     /** Whether the error was caused by a timeout. */
     isTimeout?: boolean;
+    /** Whether print() output was clipped by the maxPrintBytes limit. */
+    printsTruncated?: boolean;
     /** Whether continue_thinking() was called in the sandbox code. */
     continueThinkingCalled?: boolean;
     /** Captured print() output segments from sandbox code. */
@@ -45,6 +47,8 @@ export interface SandboxOptions {
     maxReadBytes?: number;
     /** Maximum bytes per write_file call. */
     maxWriteBytes?: number;
+    /** Maximum bytes of print() output to capture. Defaults to MAX_PRINT_CAPTURE_BYTES (1 MB). */
+    maxPrintBytes?: number;
 }
 
 /** An assistant message in the conversation history. */
