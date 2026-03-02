@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- "View System Prompt" button in the AI Chat config panel opens a dialog showing the static initial prompt sent to the LLM, built from the current Advanced Options config; includes a Copy button and a note indicating whether the preview reflects current or session-locked settings ([`2770e13`](https://github.com/sathish-t/nanalogue-gui/commit/2770e136950e66265f05af085e72c6cecdbe4974), [`a8c5d61`](https://github.com/sathish-t/nanalogue-gui/commit/a8c5d6185cfd8c29740de2d8fc0df3d965e59b80))
+- Sandbox `print()` output is now capped at 1 MB per execution (`maxPrintBytes`), truncated at a UTF-8 boundary; a `printsTruncated` flag on the result signals when clipping occurred. In `nanalogue-sandbox-exec` the cap is set to `min(maxOutputBytes, MAX_PRINT_BUFFER_BYTES)` and `printsTruncated` is reflected in exit-code reporting ([`4b9c25f`](https://github.com/sathish-t/nanalogue-gui/commit/4b9c25fa2815959cea9f6a7467747b726ae58236), [`1714241`](https://github.com/sathish-t/nanalogue-gui/commit/1714241d352ff8eb370fc3cf797d66f17d895db4))
 - Copy-to-clipboard button in the AI Chat sandbox code panel; button is inline with the ◀ ▶ pagination controls, disabled when no code is available, and shows brief "Copied!" / "Failed" feedback ([`e944f5b`](https://github.com/sathish-t/nanalogue-gui/commit/e944f5bc127764f12b2c5df97e5bbe72f36c5515))
 - `nanalogue-sandbox-exec` CLI for running Python scripts directly in the Monty sandbox without LLM involvement ([`90763d4`](https://github.com/sathish-t/nanalogue-gui/commit/90763d4ca045c558594098f8327c48c76ded1609))
 - End-user documentation for `nanalogue-chat` in README ([`96f2aaa`](https://github.com/sathish-t/nanalogue-gui/commit/96f2aaa96e66bf7a689f41a820387e8cc89b2c91))
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Sandbox system prompt restructured: `print()` / `continue_thinking()` guidance split into clearly labelled thinking-round vs final-round sections; corrects `seq_table` docs (`region` is required and must be a keyword argument), changes "limited stdlib" to "no stdlib, no imports of any kind", and unifies the hardcoded output-cap mention with the dynamic `maxOutputKB` value ([`6e079d6`](https://github.com/sathish-t/nanalogue-gui/commit/6e079d6abd4c38d1395e05e96118151de2213d5c))
 - CLI output now respects the `NO_COLOR` environment variable ([`7ecc829`](https://github.com/sathish-t/nanalogue-gui/commit/7ecc829b68d33d5e2e8ef4822e4e77210987162f))
 - `write_file` now writes directly to the allowed directory instead of a fixed `ai_chat_output/` subdirectory; adds symlink-traversal guard via `assertExistingAncestorInside` before `mkdir` ([`83f21df`](https://github.com/sathish-t/nanalogue-gui/commit/83f21df5255f0ff586223be178c561bfbb077daf))
 - Updates sandbox system-prompt documentation to reflect new `write_file` path semantics ([`2fb20c3`](https://github.com/sathish-t/nanalogue-gui/commit/2fb20c3e4afe5b4792bdd1c05ef84c07639c1b4b))

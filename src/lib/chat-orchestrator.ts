@@ -862,10 +862,9 @@ export async function handleUserMessage(
     };
 
     const steps: Array<{
-        /** The Python code. */ code: string /** The result. */;
-        /**
-         *
-         */
+        /** The Python code. */
+        code: string;
+        /** The result. */
         result: SandboxResult;
     }> = [];
     let cumulativeSandboxMs = 0;
