@@ -43,7 +43,33 @@ import {
     MAX_OUTPUT_BYTES,
     MAX_PRINT_CAPTURE_BYTES,
     MIN_OUTPUT_BYTES,
+    SENSITIVE_FILE_DENY_LIST,
 } from "./ai-chat-constants";
+
+// Precomputed deny-list matcher — evaluated once at module load so every
+// read_file / ls call avoids re-compiling the pattern set.
+// Spread into a plain string[] so picomatch receives the expected type without
+// an unsafe double cast through unknown.
+// dot: true  — match files inside hidden dirs (e.g. .ssh/id_rsa).
+// nocase: true — catch CERT.PEM / ID_RSA on case-insensitive file systems.
+const isDeniedPath = picomatch([...SENSITIVE_FILE_DENY_LIST], {
+    dot: true,
+    nocase: true,
+});
+
+/**
+ * Normalises a file path for deny-list matching by converting backslashes to
+ * forward slashes. Picomatch patterns always use forward slashes, so without
+ * this step nested paths on Windows (e.g. "sub\id_rsa") would escape the
+ * deny-list even though they match the glob "** /id_rsa".
+ *
+ * @param p - The relative path to normalise.
+ * @returns The path with all backslashes replaced by forward slashes.
+ */
+function toForwardSlashes(p: string): string {
+    return p.replace(/\\/g, "/");
+}
+
 import type { SandboxOptions, SandboxResult } from "./chat-types";
 
 /**
@@ -308,6 +334,7 @@ function enforceDataSizeLimit(
  * @param allowedDir - The root allowed directory.
  * @param options - Optional pattern matcher, max entries, and visited set.
  * @param options.pattern - Glob matcher function to filter files.
+ * @param options.deny - Glob matcher function to exclude files (deny-list).
  * @param options.maxEntries - Maximum number of entries to return.
  * @param options.visited - Set of visited inodes for symlink cycle detection.
  * @returns An object with the file list and whether the cap was hit.
@@ -318,6 +345,8 @@ async function listFilesRecursive(
     options: {
         /** Glob matcher function to filter files. */
         pattern?: picomatch.Matcher;
+        /** Glob matcher function to exclude files (deny-list). */
+        deny?: picomatch.Matcher;
         /** Maximum number of entries to return. */
         maxEntries?: number;
         /** Set of visited inodes for symlink cycle detection. */
@@ -354,7 +383,9 @@ async function listFilesRecursive(
         } catch {
             continue;
         }
-        const resolvedRel = relative(allowedDir, resolved);
+        // Normalise to forward slashes so the deny-list picomatch patterns
+        // match correctly on Windows where relative() uses backslashes.
+        const resolvedRel = toForwardSlashes(relative(allowedDir, resolved));
         if (entry.isDirectory() || entry.isSymbolicLink()) {
             try {
                 const stat = await lstat(resolved);
@@ -362,6 +393,7 @@ async function listFilesRecursive(
                     const remaining = maxEntries - results.length;
                     const sub = await listFilesRecursive(resolved, allowedDir, {
                         pattern: options.pattern,
+                        deny: options.deny,
                         maxEntries: remaining,
                         visited,
                     });
@@ -371,7 +403,10 @@ async function listFilesRecursive(
                         break;
                     }
                 } else if (stat.isFile()) {
-                    if (!options.pattern || options.pattern(resolvedRel)) {
+                    if (
+                        (!options.pattern || options.pattern(resolvedRel)) &&
+                        (!options.deny || !options.deny(resolvedRel))
+                    ) {
                         results.push(resolvedRel);
                     }
                 }
@@ -379,7 +414,10 @@ async function listFilesRecursive(
                 // Ignore unreadable entries (permission errors, broken symlinks)
             }
         } else if (entry.isFile()) {
-            if (!options.pattern || options.pattern(resolvedRel)) {
+            if (
+                (!options.pattern || options.pattern(resolvedRel)) &&
+                (!options.deny || !options.deny(resolvedRel))
+            ) {
                 results.push(resolvedRel);
             }
         }
@@ -899,10 +937,15 @@ export async function runSandboxCode(
                     const matcher = patternStr
                         ? picomatch(patternStr)
                         : undefined;
+                    // Resolve allowedDir to its real path so that
+                    // relative(allowedDir, resolved) inside listFilesRecursive
+                    // always yields a clean subpath even when allowedDir itself
+                    // contains symlinks (resolved is always a real path).
+                    const allowedDirReal = await realpath(allowedDir);
                     const { files, capped } = await listFilesRecursive(
-                        allowedDir,
-                        allowedDir,
-                        { pattern: matcher },
+                        allowedDirReal,
+                        allowedDirReal,
+                        { pattern: matcher, deny: isDeniedPath },
                     );
                     if (capped) {
                         return {
@@ -930,6 +973,24 @@ export async function runSandboxCode(
                     opts?: Record<string, unknown>,
                 ) => {
                     const resolved = await resolvePath(allowedDir, filePath);
+                    // Use the real path of allowedDir as the base so that
+                    // relative() produces a clean subpath even when allowedDir
+                    // itself contains symlinks (resolved is always a real path).
+                    // Normalise to forward slashes so the picomatch patterns
+                    // match correctly on Windows.
+                    const allowedDirReal = await realpath(allowedDir);
+                    const relResolved = toForwardSlashes(
+                        relative(allowedDirReal, resolved),
+                    );
+                    if (isDeniedPath(relResolved)) {
+                        // OSError maps to Python's OSError, which Monty accepts.
+                        // PermissionError is a subclass of OSError in CPython but
+                        // Monty does not recognise it by name, so we use OSError.
+                        throw new SandboxError(
+                            "OSError",
+                            `Reading "${filePath}" is not permitted`,
+                        );
+                    }
 
                     const rawOffset = opts?.offset ?? 0;
                     if (
