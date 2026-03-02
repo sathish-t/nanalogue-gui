@@ -9,8 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `nanalogue-sandbox-exec` CLI for running Python scripts directly in the Monty sandbox without LLM involvement ([`90763d4`](https://github.com/sathish-t/nanalogue-gui/commit/90763d4ca045c558594098f8327c48c76ded1609))
 - End-user documentation for `nanalogue-chat` in README ([`96f2aaa`](https://github.com/sathish-t/nanalogue-gui/commit/96f2aaa96e66bf7a689f41a820387e8cc89b2c91))
 - Extra BED fields displayed in swipe info strip ([`8f7a9eb`](https://github.com/sathish-t/nanalogue-gui/commit/8f7a9eb9096261220bde3226c58e6d48c948e322))
+
+### Fixed
+
+- Temporary files created during tests are now deleted after each test run ([`00f2794`](https://github.com/sathish-t/nanalogue-gui/commit/00f2794ea0b9c8aef8f3a0dfbff16ad3ba4f33e7))
 
 ### Changed
 
