@@ -175,6 +175,9 @@ const btnCodePrev = document.getElementById(
 const btnCodeNext = document.getElementById(
     "btn-code-next",
 ) as HTMLButtonElement;
+const btnCopyCode = document.getElementById(
+    "btn-copy-code",
+) as HTMLButtonElement;
 const inputMessage = document.getElementById(
     "input-message",
 ) as HTMLInputElement;
@@ -416,12 +419,14 @@ function showCodePage(page: number): void {
     if (codeSteps.length === 0) {
         codeDisplay.textContent = "No code executed yet.";
         codePageIndicator.textContent = "0 / 0";
+        btnCopyCode.disabled = true;
         return;
     }
     const clampedPage = Math.max(0, Math.min(page, codeSteps.length - 1));
     currentCodePage = clampedPage;
     codeDisplay.textContent = codeSteps[clampedPage].code;
     codePageIndicator.textContent = `${clampedPage + 1} / ${codeSteps.length}`;
+    btnCopyCode.disabled = false;
 }
 
 /**
@@ -916,6 +921,26 @@ btnCodePrev.addEventListener("click", () => {
 
 btnCodeNext.addEventListener("click", () => {
     showCodePage(currentCodePage + 1);
+});
+
+// Copy code button — copies the currently displayed code block to the clipboard
+btnCopyCode.addEventListener("click", () => {
+    const code = codeSteps[currentCodePage]?.code;
+    if (!code) return;
+    navigator.clipboard
+        .writeText(code)
+        .then(() => {
+            btnCopyCode.textContent = "Copied!";
+            setTimeout(() => {
+                btnCopyCode.textContent = "Copy";
+            }, 1500);
+        })
+        .catch(() => {
+            btnCopyCode.textContent = "Failed";
+            setTimeout(() => {
+                btnCopyCode.textContent = "Copy";
+            }, 1500);
+        });
 });
 
 // Advanced Options dialog

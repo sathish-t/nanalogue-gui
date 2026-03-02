@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Copy-to-clipboard button in the AI Chat sandbox code panel; button is inline with the ◀ ▶ pagination controls, disabled when no code is available, and shows brief "Copied!" / "Failed" feedback ([`e944f5b`](https://github.com/sathish-t/nanalogue-gui/commit/e944f5bc127764f12b2c5df97e5bbe72f36c5515))
 - `nanalogue-sandbox-exec` CLI for running Python scripts directly in the Monty sandbox without LLM involvement ([`90763d4`](https://github.com/sathish-t/nanalogue-gui/commit/90763d4ca045c558594098f8327c48c76ded1609))
 - End-user documentation for `nanalogue-chat` in README ([`96f2aaa`](https://github.com/sathish-t/nanalogue-gui/commit/96f2aaa96e66bf7a689f41a820387e8cc89b2c91))
 - Extra BED fields displayed in swipe info strip ([`8f7a9eb`](https://github.com/sathish-t/nanalogue-gui/commit/8f7a9eb9096261220bde3226c58e6d48c948e322))

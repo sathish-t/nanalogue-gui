@@ -94,11 +94,13 @@
       <div id="code-panel-content" class="hidden">
         <!-- Pre-formatted code block. -->
         <pre id="code-display"></pre>
-        <!-- Pagination controls for navigating tool call code. -->
+        <!-- Pagination controls for navigating tool call code, and copy button. -->
         <div id="code-pagination">
           <button type="button" id="btn-code-prev">◀</button>
           <span id="code-page-indicator">0 / 0</span>
           <button type="button" id="btn-code-next">▶</button>
+          <!-- Copies the currently displayed code block to the clipboard. -->
+          <button type="button" id="btn-copy-code" disabled>Copy</button>
         </div>
         <!-- Disclaimer notes about sandbox code. -->
         <p class="code-disclaimer">Sandbox code is non-deterministic — re-running may produce different results.</p>
