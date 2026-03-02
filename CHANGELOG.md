@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refreshes all demo screenshots to reflect recent UI changes ([`c258231`](https://github.com/sathish-t/nanalogue-gui/commit/c25823182c6a6df1e953e77e9c7c015b1f221895))
+- Demo swipe BED generation now includes score and strand columns; score is 0 or 1 based on read ID prefix, strand is + or - based on alignment direction ([`bdd4934`](https://github.com/sathish-t/nanalogue-gui/commit/bdd4934942f38ce1d166c1eb011a0b73a341084e))
 - Sandbox system prompt restructured: `print()` / `continue_thinking()` guidance split into clearly labelled thinking-round vs final-round sections; corrects `seq_table` docs (`region` is required and must be a keyword argument), changes "limited stdlib" to "no stdlib, no imports of any kind", and unifies the hardcoded output-cap mention with the dynamic `maxOutputKB` value ([`6e079d6`](https://github.com/sathish-t/nanalogue-gui/commit/6e079d6abd4c38d1395e05e96118151de2213d5c))
 - CLI output now respects the `NO_COLOR` environment variable ([`7ecc829`](https://github.com/sathish-t/nanalogue-gui/commit/7ecc829b68d33d5e2e8ef4822e4e77210987162f))
 - `write_file` now writes directly to the allowed directory instead of a fixed `ai_chat_output/` subdirectory; adds symlink-traversal guard via `assertExistingAncestorInside` before `mkdir` ([`83f21df`](https://github.com/sathish-t/nanalogue-gui/commit/83f21df5255f0ff586223be178c561bfbb077daf))
