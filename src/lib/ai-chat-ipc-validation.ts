@@ -55,6 +55,12 @@ export interface ListModelsPayload {
     apiKey: string;
 }
 
+/** Validated payload for ai-chat-get-system-prompt. */
+export interface GetSystemPromptPayload {
+    /** The orchestrator configuration used to build the prompt. */
+    config: AiChatConfig;
+}
+
 /** Validated payload for ai-chat-send-message. */
 export interface SendMessagePayload {
     /** The LLM endpoint URL. */
@@ -122,6 +128,73 @@ function validateNumber(
         return `${spec.label} must be between ${spec.min.toLocaleString()} and ${spec.max.toLocaleString()} (got ${rounded.toLocaleString()})`;
     }
     return rounded;
+}
+
+/**
+ * Validates the payload for the ai-chat-get-system-prompt IPC channel.
+ *
+ * The config field is optional — any missing or non-numeric field falls back
+ * to its spec default rather than causing a hard error. An absent config
+ * object is treated the same as an empty one.
+ *
+ * @param payload - The raw IPC payload.
+ * @returns A validation result with the typed payload.
+ */
+export function validateGetSystemPrompt(
+    payload: unknown,
+): ValidationResult<GetSystemPromptPayload> {
+    const p =
+        typeof payload === "object" && payload !== null
+            ? (payload as Record<string, unknown>)
+            : {};
+
+    const rawConfig =
+        typeof p.config === "object" && p.config !== null
+            ? (p.config as Record<string, unknown>)
+            : {};
+
+    const configErrors: string[] = [];
+    const configValues = {} as Record<string, number>;
+    for (const [key, spec] of Object.entries(CONFIG_FIELD_SPECS)) {
+        const result = validateNumber(rawConfig[key], spec);
+        if (typeof result === "string") {
+            configErrors.push(result);
+        } else {
+            configValues[key] = result;
+        }
+    }
+
+    // Temperature is optional and float-valued — handled separately from
+    // the integer CONFIG_FIELD_SPECS loop (no Math.round, no fallback).
+    let temperature: number | undefined;
+    if (rawConfig.temperature !== undefined && rawConfig.temperature !== null) {
+        if (
+            typeof rawConfig.temperature !== "number" ||
+            !Number.isFinite(rawConfig.temperature)
+        ) {
+            temperature = undefined;
+        } else if (
+            rawConfig.temperature < TEMPERATURE_SPEC.min ||
+            rawConfig.temperature > TEMPERATURE_SPEC.max
+        ) {
+            configErrors.push(
+                `${TEMPERATURE_SPEC.label} must be between ${TEMPERATURE_SPEC.min} and ${TEMPERATURE_SPEC.max} (got ${rawConfig.temperature})`,
+            );
+        } else {
+            temperature = rawConfig.temperature;
+        }
+    }
+
+    if (configErrors.length > 0) {
+        return { valid: false, error: configErrors.join("; ") };
+    }
+
+    const config = {
+        ...configValues,
+        temperature,
+    } as unknown as AiChatConfig;
+
+    return { valid: true, data: { config } };
 }
 
 /**
@@ -261,6 +334,8 @@ export function validateIpcPayload(
     payload: unknown,
 ): ValidationResult<unknown> {
     switch (channel) {
+        case "ai-chat-get-system-prompt":
+            return validateGetSystemPrompt(payload);
         case "ai-chat-list-models":
             return validateListModels(payload);
         case "ai-chat-send-message":

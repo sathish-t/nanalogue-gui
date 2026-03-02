@@ -3,12 +3,15 @@
 
 import { type BrowserWindow, dialog, ipcMain } from "electron";
 import {
+    validateGetSystemPrompt,
     validateListModels,
     validateSendMessage,
 } from "../lib/ai-chat-ipc-validation";
 import { ChatSession } from "../lib/chat-session";
 import type { AiChatEvent } from "../lib/chat-types";
 import { fetchModels } from "../lib/model-listing";
+import { deriveMaxOutputBytes } from "../lib/monty-sandbox";
+import { buildSandboxPrompt } from "../lib/sandbox-prompt";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -205,6 +208,42 @@ export function registerIpcHandlers(): void {
          */
         (_event, origin: string) => {
             endpointConsent.add(origin);
+        },
+    );
+
+    ipcMain.handle(
+        "ai-chat-get-system-prompt",
+        /**
+         * Builds and returns the static system prompt for the given config.
+         *
+         * The returned string is the output of buildSandboxPrompt() only —
+         * the dynamic facts block appended during a live session is not included.
+         *
+         * @param _event - The IPC event (unused).
+         * @param payload - The config payload from the renderer.
+         * @returns The static system prompt string, or an error result.
+         */
+        (_event, payload: unknown) => {
+            const validation = validateGetSystemPrompt(payload);
+            if (!validation.valid) {
+                return { success: false, error: validation.error };
+            }
+            const { config } = validation.data;
+            const maxOutputBytes = deriveMaxOutputBytes(
+                config.contextWindowTokens,
+            );
+            const maxOutputKB = Math.round(maxOutputBytes / 1024);
+            const prompt = buildSandboxPrompt({
+                maxOutputKB,
+                maxRecordsReadInfo: config.maxRecordsReadInfo,
+                maxRecordsBamMods: config.maxRecordsBamMods,
+                maxRecordsWindowReads: config.maxRecordsWindowReads,
+                maxRecordsSeqTable: config.maxRecordsSeqTable,
+                maxReadMB: config.maxReadMB,
+                maxWriteMB: config.maxWriteMB,
+                maxDurationSecs: config.maxDurationSecs,
+            });
+            return { success: true, prompt };
         },
     );
 }

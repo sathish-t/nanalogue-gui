@@ -405,6 +405,21 @@ contextBridge.exposeInMainWorld("api", {
         ipcRenderer.invoke("ai-chat-consent", origin),
 
     /**
+     * Retrieve the static system prompt for the given config.
+     *
+     * Returns the output of buildSandboxPrompt() only — the dynamic facts
+     * block appended during a live session is not included.
+     *
+     * @param payload - The config to build the prompt from.
+     * @param payload.config - The advanced configuration options.
+     * @returns A promise with the prompt string or an error.
+     */
+    aiChatGetSystemPrompt: (payload: {
+        /** The advanced configuration options. */
+        config: Record<string, unknown>;
+    }) => ipcRenderer.invoke("ai-chat-get-system-prompt", payload),
+
+    /**
      * Register a listener for AI Chat events from the main process.
      *
      * @param callback - The event handler function.
