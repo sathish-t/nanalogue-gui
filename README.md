@@ -207,8 +207,10 @@ not found in the BAM, and unmapped reads excluded from the output.
 ### AI Chat
 
 Experimental mode for asking natural-language questions about BAM files.
-Connects to any OpenAI-compatible API endpoint (local or remote) and 
-queries BAM data in a sandboxed environment.
+Connects to any OpenAI-compatible API endpoint (local or remote) and
+queries BAM data in a sandboxed environment. For a detailed explanation
+of how AI Chat works under the hood, see
+[documentation/ai-chat.md](documentation/ai-chat.md).
 
 **AI Chat works with any provider that exposes an OpenAI-compatible v1 API
 endpoint.** This includes cloud providers like OpenAI, Anthropic,
