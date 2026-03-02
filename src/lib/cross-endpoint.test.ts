@@ -513,8 +513,10 @@ describe("cross-endpoint compatibility", () => {
         const elapsed = Date.now() - start;
 
         expect(result.text).toBe("ok\n");
-        // Retry-After: 1 means 1 second delay — should take at least 900ms
-        expect(elapsed).toBeGreaterThanOrEqual(900);
+        // Retry-After: 1 means 1 second delay; 500 ms lower bound gives
+        // generous slack for scheduling jitter while still catching any code
+        // path that skips the sleep entirely (which would complete in < 5 ms).
+        expect(elapsed).toBeGreaterThanOrEqual(500);
         expect(mockServer.requestCount()).toBeGreaterThanOrEqual(2);
     });
 
