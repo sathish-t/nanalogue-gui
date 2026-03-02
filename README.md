@@ -280,7 +280,7 @@ The configuration screen allows setting:
 - API endpoint URL (defaults to `http://localhost:11434/v1` for Ollama)
 - API key (if your provider requires one)
 - Model name (with Fetch Models button for auto-discovery)
-- Advanced options including sandboxed code execution
+- Advanced options including sandboxed code execution (see [documentation/advanced-options.md](documentation/advanced-options.md) for a full reference)
 
 NOTE: Depending on the provider and model you choose, your context lengths etc. could be different.
 If possible, please look up your model's parameters such as context length and change them using the
@@ -386,7 +386,9 @@ NO_COLOR=1 nanalogue-chat --endpoint <url> --model <name> --dir <path>
 ```
 
 Advanced options (context window size, timeouts, record limits) are available
-via flags — run `nanalogue-chat --help` for details.
+via flags — run `nanalogue-chat --help` for a quick reference, or see
+[documentation/advanced-options.md](documentation/advanced-options.md) for the
+full reference including GUI equivalents.
 
 #### CLI (nanalogue-sandbox-exec)
 
@@ -424,22 +426,10 @@ Exit codes:
 nanalogue-sandbox-exec --dir ./data analyse.py > results.txt
 ```
 
-**Sandbox limits** can be tuned with flags (all optional):
-
-| Flag | Default | Description |
-|---|---|---|
-| `--max-output-bytes <n>` | 10 MB | Maximum output size written to stdout |
-| `--max-records-read-info <n>` | 200,000 | Max records from `read_info` |
-| `--max-records-bam-mods <n>` | 5,000 | Max records from `bam_mods` |
-| `--max-records-window-reads <n>` | 5,000 | Max records from `window_reads` |
-| `--max-records-seq-table <n>` | 5,000 | Max records from `seq_table` |
-| `--max-duration-secs <n>` | 600 | Maximum sandbox wall-clock time |
-| `--max-memory-mb <n>` | 512 | Maximum sandbox memory |
-| `--max-allocations <n>` | 100,000 | Maximum VM allocations |
-| `--max-read-mb <n>` | 1 | Maximum bytes per `read_file` call |
-| `--max-write-mb <n>` | 50 | Maximum bytes per `write_file` call |
-
-Run `nanalogue-sandbox-exec --help` for the full reference.
+Sandbox limits and output size can be tuned with flags — run
+`nanalogue-sandbox-exec --help` for a quick reference, or see
+[documentation/advanced-options.md](documentation/advanced-options.md) for the
+full reference.
 
 ## Development
 
