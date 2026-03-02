@@ -31,6 +31,7 @@ wrapper), and [@nanalogue/node](https://github.com/sathish-t/nanalogue-node)
   - [Locate Reads](#locate-reads)
   - [AI Chat](#ai-chat)
     - [CLI (nanalogue-chat)](#cli-nanalogue-chat)
+    - [CLI (nanalogue-sandbox-exec)](#cli-nanalogue-sandbox-exec)
 - [Development](#development)
 - [Versioning](#versioning)
 - [Changelog](#changelog)
@@ -385,10 +386,63 @@ NO_COLOR=1 nanalogue-chat --endpoint <url> --model <name> --dir <path>
 Advanced options (context window size, timeouts, record limits) are available
 via flags — run `nanalogue-chat --help` for details.
 
+#### CLI (nanalogue-sandbox-exec)
+
+`nanalogue-sandbox-exec` runs a Python script directly in the Monty sandbox
+without involving an LLM. It has access to the same BAM helper functions as
+AI Chat (e.g. `read_info`, `bam_mods`, `write_file`) and the same security
+model (access restricted to the `--dir` directory), but the script and its
+output are never sent to a language model. This makes it useful for batch
+processing, reproducible analyses, and CI pipelines where LLM involvement is
+not needed.
+
+**End-users** (installed via `npm install -g nanalogue-gui`):
+
+```bash
+nanalogue-sandbox-exec --dir <path> <script.py>
+```
+
+**Developers** (built from source):
+
+```bash
+node dist/execute-cli.mjs --dir <path> <script.py>
+```
+
+`--dir` is required and must be the directory containing your BAM files.
+The script path is resolved relative to the current working directory.
+
+Output is written to **stdout**; errors are written to **stderr**.
+Exit codes:
+- `0` — sandbox ran successfully (stdout may be empty for silent scripts)
+- `1` — bad arguments, file not found, or sandbox error
+
+**Example — run an analysis script and capture its output:**
+
+```bash
+nanalogue-sandbox-exec --dir ./data analyse.py > results.txt
+```
+
+**Sandbox limits** can be tuned with flags (all optional):
+
+| Flag | Default | Description |
+|---|---|---|
+| `--max-output-bytes <n>` | 10 MB | Maximum output size written to stdout |
+| `--max-records-read-info <n>` | 200,000 | Max records from `read_info` |
+| `--max-records-bam-mods <n>` | 5,000 | Max records from `bam_mods` |
+| `--max-records-window-reads <n>` | 5,000 | Max records from `window_reads` |
+| `--max-records-seq-table <n>` | 5,000 | Max records from `seq_table` |
+| `--max-duration-secs <n>` | 600 | Maximum sandbox wall-clock time |
+| `--max-memory-mb <n>` | 512 | Maximum sandbox memory |
+| `--max-allocations <n>` | 100,000 | Maximum VM allocations |
+| `--max-read-mb <n>` | 1 | Maximum bytes per `read_file` call |
+| `--max-write-mb <n>` | 50 | Maximum bytes per `write_file` call |
+
+Run `nanalogue-sandbox-exec --help` for the full reference.
+
 ## Development
 
 ```bash
-# Build the project (produces dist/main.js, dist/renderer.js, and dist/cli.mjs)
+# Build the project (produces dist/main.js, dist/renderer.js, dist/cli.mjs, and dist/execute-cli.mjs)
 npm run build
 
 # Run in development mode
