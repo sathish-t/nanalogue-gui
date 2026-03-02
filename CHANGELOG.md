@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updates sandbox system-prompt documentation to reflect new `write_file` path semantics ([`2fb20c3`](https://github.com/sathish-t/nanalogue-gui/commit/2fb20c3e4afe5b4792bdd1c05ef84c07639c1b4b))
 - `extractFacts` now detects `write_file` output via `bytes_written` presence and a code-level scan instead of the removed `ai_chat_output/` path prefix ([`a663f6d`](https://github.com/sathish-t/nanalogue-gui/commit/a663f6d12d2b4d3309f4e3bc9679e368c5e38be4))
 
+### Dependencies
+
+- Bumps `@biomejs/biome` to ^2.4.4, `electron` to ^40.6.1, `eslint` to ^10.0.2, `@eslint/js` to ^10.0.1, `eslint-plugin-jsdoc` to ^62.7.1, `html-validate` to ^10.9.0, `stylelint` to ^17.4.0, `typescript-eslint` to ^8.56.1; bumps `actions/upload-artifact` to v7, `actions/download-artifact` to v8
+
 ## [0.2.3] - 2026-02-26
 
 ### Added
