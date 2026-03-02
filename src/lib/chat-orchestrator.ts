@@ -465,9 +465,18 @@ async function fetchChatCompletion(
 ): Promise<ChatCompletionResponse> {
     const base = endpointUrl.endsWith("/") ? endpointUrl : `${endpointUrl}/`;
     const url = new URL("chat/completions", base).href;
+    // Mistral and chutes.ai use the older max_tokens field; all other
+    // OpenAI-compatible providers use max_completion_tokens. Sending both
+    // causes errors on providers that validate for unknown fields, so we
+    // pick one based on the endpoint URL — same approach as pi-mono's
+    // openai-completions provider.
+    const maxTokensField =
+        endpointUrl.includes("mistral.ai") || endpointUrl.includes("chutes.ai")
+            ? "max_tokens"
+            : "max_completion_tokens";
     const payload: Record<string, unknown> = {
         model,
-        max_completion_tokens: 4096,
+        [maxTokensField]: 4096,
         messages: [{ role: "system", content: systemPrompt }, ...messages],
     };
     // Only include temperature when explicitly set — omitting lets the
