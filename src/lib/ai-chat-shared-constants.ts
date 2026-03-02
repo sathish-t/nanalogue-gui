@@ -1,4 +1,4 @@
-// Config field specs shared between main process and renderer.
+// Config field specs and shared constants for the AI Chat feature.
 // This module must remain free of Node-specific imports so esbuild can bundle it for the browser.
 
 import type {

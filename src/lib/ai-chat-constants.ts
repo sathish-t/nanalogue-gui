@@ -71,6 +71,26 @@ export const /** Hard cap on ls() results to prevent host blowup. */ MAX_LS_ENTR
 export const /** Dedicated subdirectory for write_file output. */ AI_CHAT_OUTPUT_DIR =
         "ai_chat_output";
 
+// --- Sensitive file deny-list ---
+
+export const /** Best-effort glob patterns (relative to allowedDir) for files read_file must reject and ls must exclude. */ SENSITIVE_FILE_DENY_LIST =
+        [
+            "**/*.key", // private keys
+            "**/*.pem", // PEM certificates / keys
+            "**/*.crt", // X.509 certificates
+            "**/*.cer", // X.509 certificates (alternate extension)
+            "**/*.p12", // PKCS#12 key containers
+            "**/*.pfx", // PKCS#12 (Windows alias)
+            "**/.env", // dotenv files
+            "**/.env.*", // .env.local, .env.production, etc.
+            "**/id_rsa", // SSH RSA private key
+            "**/id_ed25519", // SSH Ed25519 private key
+            "**/id_dsa", // SSH DSA private key
+            "**/id_ecdsa", // SSH ECDSA private key
+            "**/*.credentials", // credential store files
+            "**/*.gpg", // GPG-encrypted data
+        ] as const;
+
 // --- External function registry ---
 
 export const /** All external function names registered with Monty. */ EXTERNAL_FUNCTIONS =
