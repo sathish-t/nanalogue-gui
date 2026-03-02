@@ -852,6 +852,45 @@ export async function handleUserMessage(
         return { text, steps: [] };
     }
 
+    // Handle /dump_system_prompt — dump the static system prompt to file.
+    const dumpSysPromptMatch = message.match(/^\/dump_system_prompt\s*$/);
+    if (dumpSysPromptMatch) {
+        history.pop();
+        emitEvent({ type: "turn_start" });
+
+        const outputDir = join(allowedDir, "ai_chat_output");
+        await mkdir(outputDir, { recursive: true });
+        const safeDir = await resolvePath(allowedDir, "ai_chat_output");
+
+        const date = new Date().toISOString().slice(0, 10);
+        const uuid = randomUUID();
+        const filename = `nanalogue-chat-${date}-${uuid}.log`;
+        const outputFile = join(safeDir, filename);
+
+        const maxOutputBytesForPrompt = deriveMaxOutputBytes(
+            config.contextWindowTokens,
+        );
+        const maxOutputKBForPrompt = Math.round(maxOutputBytesForPrompt / 1024);
+        const promptContent = buildSandboxPrompt({
+            maxOutputKB: maxOutputKBForPrompt,
+            maxRecordsReadInfo: config.maxRecordsReadInfo,
+            maxRecordsBamMods: config.maxRecordsBamMods,
+            maxRecordsWindowReads: config.maxRecordsWindowReads,
+            maxRecordsSeqTable: config.maxRecordsSeqTable,
+            maxReadMB: config.maxReadMB,
+            maxWriteMB: config.maxWriteMB,
+            maxDurationSecs: config.maxDurationSecs,
+        });
+        await writeFile(outputFile, promptContent, "utf-8");
+
+        const relPath = relative(allowedDir, outputFile);
+        const text =
+            `System prompt dumped to ${relPath}\n` +
+            "This message is not fed back to the LLM. Do not reference this file in conversations.";
+        emitEvent({ type: "turn_end", text, steps: [] });
+        return { text, steps: [] };
+    }
+
     // Build system prompt
     const maxOutputBytes = deriveMaxOutputBytes(config.contextWindowTokens);
     const maxOutputKB = Math.round(maxOutputBytes / 1024);

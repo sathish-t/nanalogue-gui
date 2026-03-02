@@ -1,5 +1,5 @@
 // Unit tests for chat orchestrator functions.
-// Tests pruneFailedRounds, facts extraction, context pipeline, /exec slash command, and adversarial edge cases.
+// Tests pruneFailedRounds, facts extraction, context pipeline, /exec slash command, adversarial edge cases, and dump slash commands.
 
 import {
     mkdtemp,
@@ -1532,6 +1532,277 @@ describe("/dump_llm_instructions slash command", () => {
             await expect(
                 handleUserMessage({
                     message: "/dump_llm_instructions",
+                    endpointUrl: "http://localhost:1234/v1",
+                    apiKey: "",
+                    model: "test",
+                    allowedDir: tmpDir,
+                    config,
+                    /**
+                     * Collects emitted events.
+                     *
+                     * @param e - The event to collect.
+                     */
+                    emitEvent: (e: AiChatEvent) => {
+                        events.push(e);
+                    },
+                    history,
+                    facts,
+                    signal,
+                }),
+            ).rejects.toThrow();
+
+            // Verify nothing was written to the outside directory
+            const outsideFiles = await readdir(outsideDir);
+            expect(outsideFiles).toHaveLength(0);
+        } finally {
+            await rm(outsideDir, { recursive: true, force: true });
+        }
+    });
+});
+
+describe("/dump_system_prompt slash command", () => {
+    let tmpDir: string;
+
+    beforeEach(async () => {
+        tmpDir = await mkdtemp(join(tmpdir(), "dump-sys-prompt-test-"));
+        resetLastSentMessages();
+    });
+
+    afterEach(async () => {
+        await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    /**
+     * Builds a minimal config and shared state for dump-system-prompt tests.
+     *
+     * @returns Config, empty history, empty facts, events collector, and abort signal.
+     */
+    function dumpSysPromptHarness(): {
+        /** Orchestrator config. */
+        config: AiChatConfig;
+        /** Conversation history. */
+        history: HistoryEntry[];
+        /** Facts array. */
+        facts: Fact[];
+        /** Collected events. */
+        events: AiChatEvent[];
+        /** Abort signal. */
+        signal: AbortSignal;
+    } {
+        return {
+            config: {
+                contextWindowTokens: 8192,
+                maxRetries: 1,
+                timeoutSeconds: 30,
+                maxRecordsReadInfo: 100,
+                maxRecordsBamMods: 100,
+                maxRecordsWindowReads: 100,
+                maxRecordsSeqTable: 100,
+                maxCodeRounds: 1,
+                maxDurationSecs: 600,
+                maxMemoryMB: 512,
+                maxAllocations: 100_000,
+                maxReadMB: 1,
+                maxWriteMB: 50,
+            },
+            history: [],
+            facts: [],
+            events: [] as AiChatEvent[],
+            signal: AbortSignal.timeout(10_000),
+        };
+    }
+
+    it("dumps system prompt even when no LLM call has been made yet", async () => {
+        const { config, history, facts, events, signal } =
+            dumpSysPromptHarness();
+
+        const result = await handleUserMessage({
+            message: "/dump_system_prompt",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            facts,
+            signal,
+        });
+
+        expect(result.text).toContain("System prompt dumped to");
+        expect(result.text).toContain("not fed back to the LLM");
+        expect(result.steps).toHaveLength(0);
+
+        const files = await readdir(join(tmpDir, "ai_chat_output"));
+        expect(files).toHaveLength(1);
+    });
+
+    it("does not add command to conversation history", async () => {
+        const { config, history, facts, events, signal } =
+            dumpSysPromptHarness();
+
+        await handleUserMessage({
+            message: "/dump_system_prompt",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            facts,
+            signal,
+        });
+
+        expect(history).toHaveLength(0);
+    });
+
+    it("writes non-empty content to the dump file", async () => {
+        const { config, history, facts, events, signal } =
+            dumpSysPromptHarness();
+
+        await handleUserMessage({
+            message: "/dump_system_prompt",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            facts,
+            signal,
+        });
+
+        const outputDir = join(tmpDir, "ai_chat_output");
+        const files = await readdir(outputDir);
+        const content = await readFile(join(outputDir, files[0]), "utf-8");
+        expect(content.length).toBeGreaterThan(0);
+    });
+
+    it("filename matches nanalogue-chat-{date}-{uuid}.log pattern", async () => {
+        const { config, history, facts, events, signal } =
+            dumpSysPromptHarness();
+
+        await handleUserMessage({
+            message: "/dump_system_prompt",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            facts,
+            signal,
+        });
+
+        const files = await readdir(join(tmpDir, "ai_chat_output"));
+        expect(files[0]).toMatch(
+            /^nanalogue-chat-\d{4}-\d{2}-\d{2}-[\da-f-]+\.log$/,
+        );
+    });
+
+    it("writes a new file each invocation rather than overwriting", async () => {
+        const { config, history, facts, events, signal } =
+            dumpSysPromptHarness();
+        const opts = {
+            message: "/dump_system_prompt",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            facts,
+            signal,
+        };
+
+        await handleUserMessage(opts);
+        await handleUserMessage(opts);
+
+        const files = await readdir(join(tmpDir, "ai_chat_output"));
+        expect(files).toHaveLength(2);
+        expect(files[0]).not.toBe(files[1]);
+    });
+
+    it("handles trailing whitespace in command", async () => {
+        const { config, history, facts, events, signal } =
+            dumpSysPromptHarness();
+
+        const result = await handleUserMessage({
+            message: "/dump_system_prompt   ",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            facts,
+            signal,
+        });
+
+        expect(result.text).toContain("System prompt dumped to");
+        expect(result.text).toContain("not fed back to the LLM");
+        const files = await readdir(join(tmpDir, "ai_chat_output"));
+        expect(files).toHaveLength(1);
+    });
+
+    it("rejects when ai_chat_output is a symlink outside allowed dir", async () => {
+        const outsideDir = await mkdtemp(join(tmpdir(), "dump-sys-escape-"));
+        try {
+            await symlink(outsideDir, join(tmpDir, "ai_chat_output"));
+
+            const { config, history, facts, events, signal } =
+                dumpSysPromptHarness();
+
+            await expect(
+                handleUserMessage({
+                    message: "/dump_system_prompt",
                     endpointUrl: "http://localhost:1234/v1",
                     apiKey: "",
                     model: "test",
