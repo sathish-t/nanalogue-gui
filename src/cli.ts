@@ -320,6 +320,16 @@ async function main(): Promise<void> {
     );
     console.log(`Analyzing files in: ${allowedDir}`);
     console.log(
+        color(
+            YELLOW,
+            "Note: The AI can read and list files in the above directory. " +
+                "A best-effort attempt is made to block common sensitive file types " +
+                "(keys, certificates, credentials), but complete protection cannot " +
+                "be guaranteed. Only use a directory whose contents you are " +
+                "comfortable sharing.",
+        ),
+    );
+    console.log(
         `Type ${BOLD}/new${RESET} for new chat, ${BOLD}/quit${RESET} to exit.\n`,
     );
 
