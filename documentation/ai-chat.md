@@ -82,6 +82,9 @@ the nine registered external functions.
 
 ### External functions
 
+The record limits and file size limits shown below are defaults — all of them
+are user-configurable. See [advanced-options.md](advanced-options.md).
+
 | Function | What it does |
 |---|---|
 | `peek(file)` | Summary info for a BAM/CRAM file (contigs, modifications) |
@@ -99,6 +102,10 @@ rejects anything that resolves outside `allowedDir` — including symlinks
 that point outside it.
 
 ### Resource limits
+
+> All limits listed here are defaults and are user-configurable via the
+> Advanced Options dialog (GUI) or CLI flags. See
+> [advanced-options.md](advanced-options.md).
 
 Two layers of limits protect the host process:
 
