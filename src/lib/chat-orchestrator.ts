@@ -23,6 +23,7 @@ import type {
     SandboxResult,
 } from "./chat-types";
 import {
+    collectTerminalOutput,
     deriveMaxOutputBytes,
     resolvePath,
     runSandboxCode,
@@ -614,22 +615,6 @@ export function extractCodeFromFences(response: string): string | null {
     const matches = [...response.matchAll(FENCE_PATTERN)];
     if (matches.length === 0) return null;
     return matches.map((m) => m[1].trimEnd()).join("\n\n");
-}
-
-/**
- * Collects terminal output (prints + expression value) from a successful sandbox result.
- * Expression values get a trailing newline for consistency with print() output.
- *
- * @param result - The sandbox execution result.
- * @returns The collected output string.
- */
-function collectTerminalOutput(result: SandboxResult): string {
-    const parts: string[] = [...(result.prints ?? [])];
-    if (result.endedWithExpression && result.value != null) {
-        const valStr = safeStringify(result.value);
-        parts.push(`${valStr.ok ? valStr.json : valStr.fallback}\n`);
-    }
-    return parts.join("") || "(No output produced.)";
 }
 
 /**

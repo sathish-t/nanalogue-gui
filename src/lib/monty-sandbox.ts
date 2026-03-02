@@ -641,6 +641,23 @@ async function runMontyAsyncWithPrint(
 }
 
 /**
+ * Collects all terminal output from a sandbox result into a single string.
+ * Joins any print statements and, if the final expression produced a value,
+ * appends its JSON representation. Returns "(No output produced.)" when empty.
+ *
+ * @param result - The sandbox execution result.
+ * @returns The combined terminal output string.
+ */
+export function collectTerminalOutput(result: SandboxResult): string {
+    const parts: string[] = [...(result.prints ?? [])];
+    if (result.endedWithExpression && result.value != null) {
+        const valStr = safeStringify(result.value);
+        parts.push(`${valStr.ok ? valStr.json : valStr.fallback}\n`);
+    }
+    return parts.join("") || "(No output produced.)";
+}
+
+/**
  * Runs Python code in the Monty sandbox with all external functions bound.
  *
  * @param code - The Python code to execute.
@@ -664,11 +681,13 @@ export async function runSandboxCode(
         maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
         maxReadBytes = DEFAULT_MAX_READ_BYTES,
         maxWriteBytes = DEFAULT_MAX_WRITE_BYTES,
+        maxPrintBytes = MAX_PRINT_CAPTURE_BYTES,
     } = options;
 
     let continueThinkingCalled = false;
     const prints: string[] = [];
     let printBytes = 0;
+    let printsTruncated = false;
 
     try {
         const m = new Monty(code, {
@@ -725,9 +744,24 @@ export async function runSandboxCode(
              */
             printCallback: (_stream, text) => {
                 const textBytes = Buffer.byteLength(text, "utf-8");
-                if (printBytes + textBytes <= MAX_PRINT_CAPTURE_BYTES) {
+                if (printBytes >= maxPrintBytes) {
+                    // Subsequent chunks after the limit is reached are also truncated.
+                    printsTruncated = true;
+                    return;
+                }
+                const remaining = maxPrintBytes - printBytes;
+                if (textBytes <= remaining) {
                     prints.push(text);
                     printBytes += textBytes;
+                } else {
+                    // Keep the leading bytes that still fit, backing off to a
+                    // UTF-8 boundary so no multi-byte character is split.
+                    const buf = Buffer.from(text);
+                    let end = remaining;
+                    while (end > 0 && (buf[end] & 0xc0) === 0x80) end--;
+                    prints.push(buf.subarray(0, end).toString("utf-8"));
+                    printBytes = maxPrintBytes;
+                    printsTruncated = true;
                 }
             },
             externalFunctions: wrapForMonty({
@@ -1024,6 +1058,7 @@ export async function runSandboxCode(
             endedWithExpression: converted != null,
             continueThinkingCalled,
             prints,
+            printsTruncated,
         };
     } catch (error) {
         // On error, continueThinkingCalled is discarded (not included) but
@@ -1035,6 +1070,7 @@ export async function runSandboxCode(
                 message: error.message,
                 isTimeout: error.message.includes("time limit"),
                 prints,
+                printsTruncated,
             };
         }
         if (error instanceof MontySyntaxError) {
@@ -1044,6 +1080,7 @@ export async function runSandboxCode(
                 message: error.message,
                 isTimeout: false,
                 prints,
+                printsTruncated,
             };
         }
         return {
@@ -1052,6 +1089,7 @@ export async function runSandboxCode(
             message: String(error),
             isTimeout: false,
             prints,
+            printsTruncated,
         };
     }
 }
