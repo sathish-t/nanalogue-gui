@@ -26,7 +26,6 @@ import {
     getLastSentMessages,
     handleUserMessage,
     pruneFailedRounds,
-    renderFactsBlock,
     resetLastSentMessages,
     runSandboxGuarded,
     setLastSentMessages,
@@ -38,6 +37,7 @@ import type {
     Fact,
     HistoryEntry,
 } from "./chat-types";
+import { renderFactsBlock } from "./sandbox-prompt";
 
 describe("pruneFailedRounds", () => {
     it("drops old failed rounds but keeps the most recent one", () => {
