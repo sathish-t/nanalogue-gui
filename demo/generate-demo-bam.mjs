@@ -38,8 +38,10 @@ for (let i = mapped.length - 1; i > 0; i--) {
     [mapped[i], mapped[j]] = [mapped[j], mapped[i]];
 }
 const selected = mapped.slice(0, 10);
-const bedLines = selected.map(
-    (r) => `${r.contig}\t${r.reference_start}\t${r.reference_end}\t${r.read_id}`
-);
+const bedLines = selected.map((r) => {
+    const score = r.read_id.startsWith('0') ? 0 : 1;
+    const strand = r.alignment_type.endsWith('_forward') ? '+' : '-';
+    return `${r.contig}\t${r.reference_start}\t${r.reference_end}\t${r.read_id}\t${score}\t${strand}`;
+});
 await writeFile(resolve(dir, 'swipe.bed'), bedLines.join('\n') + '\n');
 console.log('Generated swipe.bed (10 random reads)');
