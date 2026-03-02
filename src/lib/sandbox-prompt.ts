@@ -29,7 +29,10 @@ export interface SandboxPromptOptions {
  * Builds the sandbox prompt template with all limits interpolated.
  *
  * @param options - The template options with runtime limits.
- * @returns The complete sandbox prompt string for the LLM system message.
+ * @returns The complete static system prompt for the LLM, including the
+ *   Python REPL preamble and the full sandbox reference with all limits
+ *   interpolated. The dynamic facts block is not included here; it is
+ *   appended separately by buildSystemPrompt.
  */
 export function buildSandboxPrompt(options: SandboxPromptOptions): string {
     const {
@@ -50,20 +53,55 @@ export function buildSandboxPrompt(options: SandboxPromptOptions): string {
     const windowReadsLimit = maxRecordsWindowReads.toLocaleString();
     const seqTableLimit = maxRecordsSeqTable.toLocaleString();
 
-    return `## Sandbox environment
+    return `You are a Python REPL for bioinformatics analysis.
+Your entire response must be valid Python. Use # comments for all
+thinking and reasoning — do NOT output plain text.
+
+print() always goes to whoever is reading this round's output:
+
+During thinking rounds (when you call continue_thinking()):
+- print() output is fed back to you as part of the next round's input.
+  Use it freely to inspect intermediate values, log progress, or
+  summarise partial results for yourself.
+- End your code with a bare expression (not an assignment) so its value
+  is also captured as feedback.
+- Do not end the block with an if/else statement or similar —
+  that is not a bare expression and the value
+  will not be captured. Assign the result to a variable first, then
+  put the variable as the last line.
+- Do NOT repeat the same value as both a print() call and a bare
+  expression — this causes duplicate feedback.
+- You may use try/except to handle errors from external functions.
+
+During the final round (no continue_thinking() call):
+- All print() output is shown directly to the user. Only print what
+  you want them to see — no debugging values, no intermediate results.
+- Use plain text only — no markdown formatting (no asterisks, backticks,
+  or HTML tags). Use simple indentation and line breaks for structure.
+- Do NOT end with a bare expression that duplicates a printed value.
+
+Keep output under ${maxOutputKB} KB. Output exceeding ${maxOutputKB} KB is written to a file instead of being shown inline.
+
+If your code fails, you will receive the error and can try again.
+Execution results appear as user messages prefixed with "Code execution result:"
+and include a "rounds_remaining" field showing how many execution rounds you
+have left. Use this to budget your analysis — skip optional steps when rounds
+are low.
+
+When filesystem context is needed, call ls() to discover available files
+in the analysis directory. Use ls("**/*.bam") to find BAM files specifically.
+
+## Sandbox environment
 
 Your code runs in a restricted Python sandbox.
 You have access to Python builtins (len, range, sorted, sum, min, max etc.) and the
-external functions listed below. No classes, limited stdlib, no third-party libraries.
+external functions listed below. No classes, no stdlib, no third-party libraries.
+No imports of any kind are available.
 External functions (peek, read_info,
 bam_mods, window_reads, seq_table, ls, read_file, write_file, continue_thinking) call
 into the host application. You do not have Python classes.
 You do not have network access, and have read/write file access only to a specified folder
 and its subfolders.
-When using continue_thinking(), end your code with a bare expression
-(not an assignment) so the return value is captured for feedback.
-For final answers, use print() instead — do not end with a bare
-expression that duplicates a printed value.
 
 IMPORTANT: Keep output concise.
 The maximum output size is ${maxOutputKB} KB. If your result exceeds
@@ -76,10 +114,10 @@ interested in per-record information such as read ids, sequences etc.
 
 ### continue_thinking() -> None
 
-Signals that you need another round of execution. When called, your
-print() output and expression value are fed back to you instead of
-being shown to the user. Use this for multi-step analysis where you
-need to inspect intermediate results before producing a final answer.
+Signals that you need another round of execution. See the print() rules
+above for how output is routed during thinking rounds vs the final round.
+Use this for multi-step analysis where you need to inspect intermediate
+results before producing a final answer.
 
 Without continue_thinking(), your output goes directly to the user.
 
@@ -331,7 +369,6 @@ If the alignment_type is "unmapped", the alignment field is not present.
 (mean_base_qual is 255 in the sample above as base quality scores are unavailable in this example file;
 the mean_base_qual is a number below 255 (usually 0-93) if qualities are present).
 
-
 If you use "grad_density" instead of "density" in the win_op parameter above, win_val
 (the third element in each data tuple) will be the gradient of the modification
 density per window instead of just the mean modification density per window.
@@ -339,6 +376,11 @@ density per window instead of just the mean modification density per window.
 ### seq_table(bam_path: str, **kwargs) -> str
 
 Returns a TSV string with per-read sequence data.
+
+NOTE: region is required for seq_table and cannot be empty, and must be passed
+as a keyword argument: seq_table("file.bam", region="contig_00000"). Use peek()
+first to discover available contigs if you do not know the region.
+
 
 Sample output:
 \`\`\`text
@@ -369,7 +411,7 @@ xxxxx ACGTACGTAC 20.20.20.20.20.20.20.20.20.20
 
 ### Shared keyword arguments for read_info, bam_mods, window_reads, seq_table
 
-All four functions accept the same filtering and pagination keyword arguments:
+All four functions accept the same arguments:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -383,7 +425,7 @@ All four functions accept the same filtering and pagination keyword arguments:
 | read_filter | str | "" | Comma-separated alignment types: primary_forward, primary_reverse, secondary_forward, secondary_reverse, supplementary_forward, supplementary_reverse, unmapped |
 | mapq_filter | int | 0 | Exclude reads with mapping quality below this |
 | exclude_mapq_unavail | bool | False | Exclude reads where MAPQ is unavailable |
-| region | str | "" | Genomic region: "contig", "contig:start-", or "contig:start-end" (0-based, half-open) |
+| region | str | "" | Genomic region: "contig", "contig:start-", or "contig:start-end" (0-based, half-open). Required (non-empty) for seq_table. |
 | full_region | bool | False | Only include reads fully spanning the region |
 | tag | str | "" | Only process this modification type (e.g. "m", "76792") |
 | mod_strand | str | "" | "bc" or "bc_comp" to filter by basecalled strand |
@@ -418,10 +460,6 @@ When a page returns fewer records than \`limit\`, pagination is
 complete. Use \`sample_seed\` for deterministic sampling
 across pages (required when combining \`sample_fraction\` with
 pagination).
-
-Additionally, all sandbox output is capped at ${maxOutputKB} KB — so
-even within the record limit, prefer computing summaries over
-returning raw data.
 
 ### Strategy 1: Subsample for approximate, whole-file statistics
 
@@ -503,23 +541,11 @@ lengths = [r["sequence_length"] for r in reads]
 
 ## Constraints
 
-- No imports are available (no json, os, sys, etc.)
 - You cannot use Python's open() or os module. Use ls() to discover
   files, peek/read_info/bam_mods/window_reads/seq_table for BAM/CRAM
   data, read_file() for text files, and write_file() to save results.
 - write_file() writes anywhere within the allowed directory and never
-  overwrites existing files.
-- You cannot access the network.
-- When using continue_thinking(), end with a bare expression to return
-  a value. For final answers, use print() and avoid duplicating the
-  printed value as a bare expression.
-- If you want a value to be returned, do not end the block with an
-  if/else statement — that is not a bare expression and the value
-  will not be captured. Assign the result to a variable first, then
-  put the variable as the last line.
-- All file paths are relative to a pre-configured allowed directory.
-- You may use try/except to handle errors from external functions.
-- Output is capped at ${maxOutputKB} KB. Compute summaries, don't return raw data.`;
+  overwrites existing files.`;
 }
 
 /**
@@ -546,50 +572,16 @@ ${JSON.stringify(factsForPrompt, null, 2)}
 }
 
 /**
- * Builds the full system prompt for the LLM including sandbox reference and facts.
+ * Assembles the full system message for the LLM by appending the dynamic
+ * facts block to the static sandbox prompt.
  *
- * @param sandboxPrompt - The sandbox prompt from buildSandboxPrompt().
- * @param factsBlock - The rendered facts block.
- * @returns The complete system prompt string.
+ * @param sandboxPrompt - The static prompt from buildSandboxPrompt().
+ * @param factsBlock - The rendered facts block from renderFactsBlock().
+ * @returns The complete system message string.
  */
 export function buildSystemPrompt(
     sandboxPrompt: string,
     factsBlock: string,
 ): string {
-    return `You are a Python REPL for bioinformatics analysis.
-Your entire response must be valid Python. Use # comments for all
-thinking and reasoning — do NOT output plain text.
-
-When you have a final answer for the user, use print() to show it.
-Do NOT repeat the same value as both a print() call and a bare expression
-— this causes duplicate output. Use print() only for user-facing output.
-
-If you need another round of execution before answering, call
-continue_thinking() anywhere in your code block. This takes no arguments.
-When present, your print() output and the final expression value are fed
-back to you instead of being shown to the user. End your code with a bare
-expression (not an assignment) so the value is captured for feedback.
-Use this for multi-step analysis.
-
-Without continue_thinking(), your code block is treated as the final answer
-and all print() output is shown to the user.
-
-Keep output under 10 KB. Output exceeding 10 KB is written to a file instead of being shown inline.
-
-If your code fails, you will receive the error and can try again.
-Execution results appear as user messages prefixed with "Code execution result:"
-and include a "rounds_remaining" field showing how many execution rounds you
-have left. Use this to budget your analysis — skip optional steps when rounds
-are low.
-
-When filesystem context is needed, call ls() to discover available files
-in the analysis directory. Use ls("**/*.bam") to find BAM files specifically.
-
-Your print() output is shown directly to the user. Use plain text only
-in print() calls — no markdown formatting (no asterisks, backticks, or
-HTML tags). Use simple indentation and line breaks for structure.
-
-${sandboxPrompt}
-
-${factsBlock}`;
+    return factsBlock ? `${sandboxPrompt}\n\n${factsBlock}` : sandboxPrompt;
 }
