@@ -70,8 +70,13 @@
       <!-- Connection status indicator. -->
       <div id="connection-status" class="status-indicator"></div>
 
-      <!-- Advanced Options button opens the settings dialog. -->
-      <button type="button" id="btn-advanced">Advanced Options</button>
+      <!-- Link-style buttons for Advanced Options and system prompt preview. -->
+      <div id="config-panel-links">
+        <!-- Opens the advanced options settings dialog. -->
+        <button type="button" id="btn-advanced">Advanced Options</button>
+        <!-- Opens the system prompt preview dialog. -->
+        <button type="button" id="btn-view-system-prompt">View System Prompt</button>
+      </div>
     </section>
 
     <!-- Chat message area displaying user and assistant messages. -->
@@ -231,6 +236,24 @@
     <div class="dialog-actions">
       <button type="button" id="btn-consent-cancel">Cancel</button>
       <button type="button" id="btn-consent-accept">I understand</button>
+    </div>
+  </dialog>
+
+  <!-- System prompt preview dialog showing the static initial LLM prompt. -->
+  <dialog id="system-prompt-dialog">
+    <h2>System Prompt</h2>
+    <!-- Explanatory note: what the prompt is and what is excluded. -->
+    <p class="system-prompt-info">This is the static initial prompt sent to the LLM. During a session, structured facts from code execution are appended, but the content below never changes.</p>
+    <!-- Dynamic note indicating which config settings the prompt reflects. -->
+    <p id="system-prompt-config-note" class="system-prompt-config-note"></p>
+    <!-- Scrollable block containing the prompt text. -->
+    <pre id="system-prompt-pre"></pre>
+    <!-- Dialog action buttons: copy prompt text and close. -->
+    <div class="dialog-actions">
+      <!-- Copies the full prompt text to the clipboard. -->
+      <button type="button" id="btn-copy-system-prompt">Copy</button>
+      <!-- Closes the system prompt preview dialog. -->
+      <button type="button" id="btn-close-system-prompt">Close</button>
     </div>
   </dialog>
 

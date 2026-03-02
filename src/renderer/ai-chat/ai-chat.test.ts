@@ -58,6 +58,8 @@ interface MockApi {
     aiChatGoBack: ReturnType<typeof vi.fn>;
     /** Record endpoint consent. */
     aiChatConsent: ReturnType<typeof vi.fn>;
+    /** Retrieve the static system prompt for the given config. */
+    aiChatGetSystemPrompt: ReturnType<typeof vi.fn>;
     /** Register event listener. */
     onAiChatEvent: ReturnType<typeof vi.fn>;
 }
@@ -91,6 +93,9 @@ function createMockApi(): MockApi {
         aiChatPickDirectory: vi.fn().mockResolvedValue(null),
         aiChatGoBack: vi.fn().mockResolvedValue(undefined),
         aiChatConsent: vi.fn().mockResolvedValue(undefined),
+        aiChatGetSystemPrompt: vi
+            .fn()
+            .mockResolvedValue({ success: true, prompt: "mock prompt" }),
         onAiChatEvent: vi.fn().mockReturnValue(() => {}),
     };
 }

@@ -41,6 +41,25 @@ interface SendMessageFailure {
 /** Discriminated union for the send-message IPC response. */
 type SendMessageResult = SendMessageSuccess | SendMessageFailure;
 
+/** Successful get-system-prompt response with the prompt text. */
+interface GetSystemPromptSuccess {
+    /** Discriminant — the request succeeded. */
+    success: true;
+    /** The static system prompt text. */
+    prompt: string;
+}
+
+/** Failed get-system-prompt response with an error description. */
+interface GetSystemPromptFailure {
+    /** Discriminant — the request failed. */
+    success: false;
+    /** Error message describing the failure. */
+    error: string;
+}
+
+/** Discriminated union for the get-system-prompt IPC response. */
+type GetSystemPromptResult = GetSystemPromptSuccess | GetSystemPromptFailure;
+
 /** Successful list-models response with the available model IDs. */
 interface ListModelsSuccess {
     /** Discriminant — the request succeeded. */
@@ -89,6 +108,11 @@ interface AiChatEvent {
 interface AiChatApi {
     /** Launch the AI Chat mode. */
     launchAiChat: () => Promise<LaunchResult>;
+    /** Retrieve the static system prompt for the given config. */
+    aiChatGetSystemPrompt: (payload: {
+        /** The advanced configuration options. */
+        config: Record<string, unknown>;
+    }) => Promise<GetSystemPromptResult>;
     /** Query endpoint for available models. */
     aiChatListModels: (payload: {
         /** The base URL of the LLM endpoint. */
@@ -191,6 +215,24 @@ const advancedDialog = document.getElementById(
 const consentDialog = document.getElementById(
     "consent-dialog",
 ) as HTMLDialogElement;
+const btnViewSystemPrompt = document.getElementById(
+    "btn-view-system-prompt",
+) as HTMLButtonElement;
+const systemPromptDialog = document.getElementById(
+    "system-prompt-dialog",
+) as HTMLDialogElement;
+const systemPromptPre = document.getElementById(
+    "system-prompt-pre",
+) as HTMLPreElement;
+const systemPromptConfigNote = document.getElementById(
+    "system-prompt-config-note",
+) as HTMLParagraphElement;
+const btnCopySystemPrompt = document.getElementById(
+    "btn-copy-system-prompt",
+) as HTMLButtonElement;
+const btnCloseSystemPrompt = document.getElementById(
+    "btn-close-system-prompt",
+) as HTMLButtonElement;
 const optContextWindow = document.getElementById(
     "opt-context-window",
 ) as HTMLInputElement;
@@ -243,6 +285,13 @@ let codeSteps: Array<{
 let currentCodePage = 0;
 /** Whether a chat has been started (locks advanced options). */
 let chatStarted = false;
+/**
+ * Config snapshot captured when the first send is initiated.
+ * Used so the system-prompt preview reflects the config actually sent to the
+ * LLM, even during the window between clicking Send and the first successful
+ * response (when chatStarted is still false but inputs are temporarily locked).
+ */
+let sessionLockedConfig: Record<string, unknown> | null = null;
 /** Pending consent resolver (for the consent dialog flow). */
 let pendingConsentResolve: ((accepted: boolean) => void) | null = null;
 /** Fetched model IDs for filtering in the custom dropdown. */
@@ -251,6 +300,8 @@ let fetchedModels: string[] = [];
 let connectedOrigin: string | null = null;
 /** Generation counter incremented on New Chat to discard stale async responses. */
 let chatGeneration = 0;
+/** Generation counter incremented on each prompt preview open to discard stale IPC responses. */
+let systemPromptGeneration = 0;
 
 /** Hostnames that count as localhost. */
 const LOCALHOST_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
@@ -765,6 +816,12 @@ async function sendUserMessage(
     if (showBubble) {
         appendMessage("user", message);
     }
+    // Snapshot config on the first send so the system-prompt preview stays
+    // consistent with the config actually sent to the LLM (the advanced inputs
+    // remain editable until lockSessionConfig fires on the first success).
+    if (!chatStarted && sessionLockedConfig === null) {
+        sessionLockedConfig = getConfig();
+    }
     setProcessing(true);
     setSpinner(true, "Waiting for LLM...");
 
@@ -840,6 +897,12 @@ async function sendUserMessage(
             appendMessage("error", `Unexpected error: ${msg}`);
         }
     } finally {
+        // If the send did not establish a session (chatStarted still false),
+        // discard the config snapshot so the next attempt re-captures it from
+        // the current inputs rather than showing stale settings in the preview.
+        if (!chatStarted) {
+            sessionLockedConfig = null;
+        }
         if (generation === chatGeneration) {
             setProcessing(false);
             setSpinner(false);
@@ -882,6 +945,7 @@ btnNewChat.addEventListener("click", async () => {
     // Bump generation first so any in-flight response that resolves during
     // the aiChatNewChat await is discarded by the generation guard.
     chatGeneration++;
+    sessionLockedConfig = null;
 
     await api.aiChatNewChat();
     chatMessages.innerHTML = "";
@@ -954,6 +1018,55 @@ document.getElementById("btn-close-advanced")?.addEventListener("click", () => {
 
 document.getElementById("btn-defaults")?.addEventListener("click", () => {
     if (!chatStarted) resetDefaults();
+});
+
+// View System Prompt button — fetch and display the static system prompt
+btnViewSystemPrompt.addEventListener("click", async () => {
+    // Bump generation so any in-flight request from a previous open is discarded.
+    const generation = ++systemPromptGeneration;
+    systemPromptPre.textContent = "Loading…";
+    // Once the first send has been initiated, sessionLockedConfig holds the
+    // config that was (or will be) sent to the LLM. Use it so the preview
+    // matches the actual session prompt even before chatStarted is set.
+    systemPromptConfigNote.textContent =
+        sessionLockedConfig !== null
+            ? "Based on the settings for this session."
+            : "Based on your current Advanced Options settings.";
+    systemPromptDialog.showModal();
+
+    const result = await api.aiChatGetSystemPrompt({
+        config: sessionLockedConfig ?? getConfig(),
+    });
+    if (generation !== systemPromptGeneration) return;
+    if (result.success) {
+        systemPromptPre.textContent = result.prompt;
+    } else {
+        systemPromptPre.textContent = `Error: ${result.error}`;
+    }
+});
+
+// Copy system prompt button — copies the full prompt text to the clipboard
+btnCopySystemPrompt.addEventListener("click", () => {
+    const text = systemPromptPre.textContent ?? "";
+    navigator.clipboard
+        .writeText(text)
+        .then(() => {
+            btnCopySystemPrompt.textContent = "Copied!";
+            setTimeout(() => {
+                btnCopySystemPrompt.textContent = "Copy";
+            }, 1500);
+        })
+        .catch(() => {
+            btnCopySystemPrompt.textContent = "Failed";
+            setTimeout(() => {
+                btnCopySystemPrompt.textContent = "Copy";
+            }, 1500);
+        });
+});
+
+// Close system prompt dialog button
+btnCloseSystemPrompt.addEventListener("click", () => {
+    systemPromptDialog.close();
 });
 
 /**
