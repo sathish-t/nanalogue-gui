@@ -319,6 +319,15 @@ or CLI REPL. The output is written as plain text to
 `ai_chat_output/` inside your BAM directory. At least one message must have
 been sent to the LLM before the dump command will produce output.
 
+**Inspect the system prompt:**
+
+You can dump the static system prompt (the portion of the LLM instructions
+that describes the sandbox capabilities, without the dynamic conversation
+history) by clicking the **View System Prompt** button in the GUI, or by
+typing `/dump_system_prompt` in the CLI REPL. The output is written to
+`ai_chat_output/` inside your BAM directory and is available at any point,
+even before the first message has been sent.
+
 **Run your own Python scripts:**
 
 You can bypass the LLM entirely and run a Python file directly in the sandbox
@@ -371,6 +380,7 @@ nanalogue-chat --endpoint https://api.openai.com/v1 --api-key $API_KEY --list-mo
 | `/new` | Start a new conversation |
 | `/exec <file.py>` | Run a Python file directly in the sandbox without sending it to the LLM |
 | `/dump_llm_instructions` | Dump the full LLM request payload from the last round to a log file in `ai_chat_output/` |
+| `/dump_system_prompt` | Dump the static system prompt to a log file in `ai_chat_output/` |
 | `/quit` | Exit the CLI |
 | Ctrl+C during a request | Cancel the current request |
 | Ctrl+C at the prompt | Exit |
