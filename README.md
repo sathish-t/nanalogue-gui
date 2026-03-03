@@ -176,9 +176,16 @@ Controls:
 
 **Reviewing an annotation:**
 
+The grey points below are modification probabilities per genomic coordinate
+for which such information is available. The black line is windowed modification
+density i.e. we threshold the modification probability and then ask what fraction
+of bases are modified within each window.
+
 ![Swipe review](demo/screenshot-swipe-review.png)
 
 **Reviewing another annotation:**
+
+The grey and black annotations mean the same as above.
 
 ![Swipe review (another annotation)](demo/screenshot-swipe-review-2.png)
 
