@@ -14,6 +14,7 @@ import type {
 } from "./lib/chat-types";
 import { fetchModels } from "./lib/model-listing";
 import { parseNumericArg, SANDBOX_ARG_DEFS } from "./lib/sandbox-cli-args";
+import { loadSystemAppend } from "./lib/system-append";
 
 // --- ANSI color helpers ---
 
@@ -102,6 +103,11 @@ ${BOLD}Advanced options:${RESET}
 ${BOLD}Other:${RESET}
   --list-models            List available models and exit
   -v, --version            Print version and exit
+
+${BOLD}Custom system prompt:${RESET}
+  Place a SYSTEM_APPEND.md file in the analysis directory (--dir) to append
+  additional instructions to the default system prompt. The file is read once
+  at startup. Use /dump_system_prompt to verify the full effective prompt.
 
 ${BOLD}REPL commands:${RESET}
   /new                     Start a new conversation
@@ -275,6 +281,12 @@ async function main(): Promise<void> {
         })(),
     };
 
+    // Load SYSTEM_APPEND.md from the analysis directory if present.
+    // Declared as let so it can be reloaded when the user starts a new
+    // conversation with /new — ensuring any edits to the file take effect
+    // immediately rather than requiring a full process restart.
+    let appendSystemPrompt = await loadSystemAppend(allowedDir);
+
     const session = new ChatSession();
 
     /**
@@ -329,6 +341,15 @@ async function main(): Promise<void> {
                 "comfortable sharing.",
         ),
     );
+    if (appendSystemPrompt !== undefined) {
+        console.log(
+            color(
+                YELLOW,
+                "Custom system prompt append loaded from SYSTEM_APPEND.md. " +
+                    "Run /dump_system_prompt to verify the full effective prompt.",
+            ),
+        );
+    }
     console.log(
         `Type ${BOLD}/new${RESET} for new chat, ${BOLD}/quit${RESET} to exit.\n`,
     );
@@ -371,6 +392,9 @@ async function main(): Promise<void> {
 
         if (trimmed === "/new") {
             session.reset();
+            // Reload SYSTEM_APPEND.md so any edits since startup are picked up
+            // by the fresh session without needing a process restart.
+            appendSystemPrompt = await loadSystemAppend(allowedDir);
             console.log(color(YELLOW, "[new conversation started]"));
             rl.prompt();
             continue;
@@ -385,6 +409,7 @@ async function main(): Promise<void> {
             allowedDir,
             config,
             emitEvent,
+            appendSystemPrompt,
         });
         requestInFlight = false;
 
