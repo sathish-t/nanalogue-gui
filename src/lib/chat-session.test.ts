@@ -310,4 +310,51 @@ describe("ChatSession", () => {
             });
         });
     });
+
+    describe("appendSystemPrompt threading", () => {
+        it("passes appendSystemPrompt to handleUserMessage when provided", async () => {
+            vi.mocked(handleUserMessage).mockResolvedValue({
+                text: "ok",
+                steps: [],
+            });
+
+            await session.sendMessage({
+                endpointUrl: "http://localhost:11434/v1",
+                apiKey: "",
+                model: "llama3",
+                message: "test",
+                allowedDir: "/tmp",
+                config: defaultConfig,
+                emitEvent: vi.fn(),
+                appendSystemPrompt: "## Extra\nFocus on CpG methylation.",
+            });
+
+            expect(handleUserMessage).toHaveBeenCalledOnce();
+            const args = vi.mocked(handleUserMessage).mock.calls[0][0];
+            expect(args.appendSystemPrompt).toBe(
+                "## Extra\nFocus on CpG methylation.",
+            );
+        });
+
+        it("passes undefined appendSystemPrompt to handleUserMessage when not provided", async () => {
+            vi.mocked(handleUserMessage).mockResolvedValue({
+                text: "ok",
+                steps: [],
+            });
+
+            await session.sendMessage({
+                endpointUrl: "http://localhost:11434/v1",
+                apiKey: "",
+                model: "llama3",
+                message: "test",
+                allowedDir: "/tmp",
+                config: defaultConfig,
+                emitEvent: vi.fn(),
+            });
+
+            expect(handleUserMessage).toHaveBeenCalledOnce();
+            const args = vi.mocked(handleUserMessage).mock.calls[0][0];
+            expect(args.appendSystemPrompt).toBeUndefined();
+        });
+    });
 });

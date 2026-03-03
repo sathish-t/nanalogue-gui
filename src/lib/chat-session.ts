@@ -25,6 +25,11 @@ export interface SendMessageOptions {
     config: AiChatConfig;
     /** Callback for emitting progress events. */
     emitEvent: (event: AiChatEvent) => void;
+    /**
+     * Optional text to append to the default system prompt, loaded from
+     * SYSTEM_APPEND.md in the analysis directory at session start.
+     */
+    appendSystemPrompt?: string;
 }
 
 /** Successful send result. */
@@ -93,6 +98,7 @@ export class ChatSession {
             allowedDir,
             config,
             emitEvent,
+            appendSystemPrompt,
         } = options;
 
         this.requestId += 1;
@@ -113,6 +119,7 @@ export class ChatSession {
                 history: this.history,
                 facts: this.facts,
                 signal: localSignal,
+                appendSystemPrompt,
             });
 
             // Check for cancellation or stale response. Cancel increments

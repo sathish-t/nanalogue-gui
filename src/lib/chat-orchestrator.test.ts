@@ -650,6 +650,7 @@ describe("adversarial/edge-case tests", () => {
      * @param options.message - The user message.
      * @param options.signal - Abort signal.
      * @param options.config - Config overrides.
+     * @param options.appendSystemPrompt - Optional text to append to the system prompt.
      * @returns The orchestrator result, history, facts, and events.
      */
     async function callOrchestrator(
@@ -661,6 +662,8 @@ describe("adversarial/edge-case tests", () => {
             signal?: AbortSignal;
             /** Config overrides. */
             config?: Partial<AiChatConfig>;
+            /** Optional text to append to the system prompt. */
+            appendSystemPrompt?: string;
         } = {},
     ): Promise<{
         /** Orchestrator return value. */
@@ -694,6 +697,7 @@ describe("adversarial/edge-case tests", () => {
             history,
             facts,
             signal: options.signal ?? new AbortController().signal,
+            appendSystemPrompt: options.appendSystemPrompt,
         });
 
         return { result, history, facts, events };
@@ -1828,5 +1832,329 @@ describe("/dump_system_prompt slash command", () => {
         } finally {
             await rm(outsideDir, { recursive: true, force: true });
         }
+    });
+});
+
+// Tests for SYSTEM_APPEND.md support via appendSystemPrompt.
+describe("appendSystemPrompt", () => {
+    let tmpDir: string;
+    let mockServer: MockServer | undefined;
+
+    beforeEach(async () => {
+        tmpDir = await mkdtemp(join(tmpdir(), "append-prompt-"));
+        resetLastSentMessages();
+    });
+
+    afterEach(async () => {
+        if (mockServer) {
+            await mockServer.close();
+            mockServer = undefined;
+        }
+        await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    /** Minimal config for append-prompt tests. */
+    const cfg: AiChatConfig = {
+        contextWindowTokens: 8192,
+        maxRetries: 1,
+        timeoutSeconds: 30,
+        maxRecordsReadInfo: 100,
+        maxRecordsBamMods: 100,
+        maxRecordsWindowReads: 100,
+        maxRecordsSeqTable: 100,
+        maxCodeRounds: 1,
+        maxDurationSecs: 600,
+        maxMemoryMB: 512,
+        maxAllocations: 100_000,
+        maxReadMB: 1,
+        maxWriteMB: 50,
+    };
+
+    /**
+     * Calls handleUserMessage with the given appendSystemPrompt and returns
+     * the request bodies captured by the mock server.
+     *
+     * @param appendText - Text to append to the system prompt, or undefined.
+     * @param serverUrl - The mock server base URL.
+     * @returns The captured LLM request bodies.
+     */
+    async function callWithAppend(
+        appendText: string | undefined,
+        serverUrl: string,
+    ): Promise<Array<Record<string, unknown>>> {
+        const history: HistoryEntry[] = [];
+        const facts: Fact[] = [];
+        await handleUserMessage({
+            message: "test",
+            endpointUrl: serverUrl,
+            apiKey: "",
+            model: "test-model",
+            allowedDir: tmpDir,
+            config: cfg,
+            /** No-op event handler for test isolation. */
+            emitEvent: () => {
+                /* no-op */
+            },
+            history,
+            facts,
+            signal: new AbortController().signal,
+            appendSystemPrompt: appendText,
+        });
+        return mockServer?.requestBodies() ?? [];
+    }
+
+    it("includes appendSystemPrompt content in the system message sent to LLM", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('hello')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const bodies = await callWithAppend(
+            "## Domain context\nThese files are from a cancer methylation study.",
+            mockServer.url,
+        );
+
+        expect(bodies.length).toBeGreaterThan(0);
+        const messages = bodies[0].messages as Array<{
+            /** Message role. */
+            role: string;
+            /** Message content. */
+            content: string;
+        }>;
+        const systemMsg = messages.find((m) => m.role === "system");
+        expect(systemMsg).toBeDefined();
+        // Appended content must be present.
+        expect(systemMsg?.content).toContain("Domain context");
+        expect(systemMsg?.content).toContain("cancer methylation study");
+        // Default sandbox prompt content must still be present.
+        expect(systemMsg?.content).toContain("read_info");
+    });
+
+    it("appended text appears after the sandbox prompt", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('ok')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const appendText = "## Custom instructions\nAlways use read_info.";
+        const bodies = await callWithAppend(appendText, mockServer.url);
+        const messages = bodies[0].messages as Array<{
+            /** Message role. */
+            role: string;
+            /** Message content. */
+            content: string;
+        }>;
+        const systemContent =
+            messages.find((m) => m.role === "system")?.content ?? "";
+
+        // "## Constraints" is near the end of the sandbox prompt.
+        // The custom append must follow it.
+        const sandboxEnd = systemContent.indexOf("## Constraints");
+        const appendStart = systemContent.indexOf("## Custom instructions");
+        expect(sandboxEnd).toBeGreaterThan(-1);
+        expect(appendStart).toBeGreaterThan(sandboxEnd);
+    });
+
+    it("appended text appears before the facts block", async () => {
+        // Pre-seed one fact so that buildSystemPrompt appends a facts block.
+        // The expected ordering is: sandbox prompt → append → facts block.
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('ok')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const history: HistoryEntry[] = [];
+        const facts: Fact[] = [
+            {
+                type: "filter",
+                description: "mapped reads only",
+                roundId: "round-1",
+                timestamp: Date.now(),
+            },
+        ];
+        const appendText =
+            "## Custom instructions\nAlways use read_info first.";
+
+        await handleUserMessage({
+            message: "test",
+            endpointUrl: mockServer.url,
+            apiKey: "",
+            model: "test-model",
+            allowedDir: tmpDir,
+            config: cfg,
+            /** No-op event handler for test isolation. */
+            emitEvent: () => {
+                /* no-op */
+            },
+            history,
+            facts,
+            signal: new AbortController().signal,
+            appendSystemPrompt: appendText,
+        });
+
+        const bodies = mockServer.requestBodies();
+        const messages = bodies[0].messages as Array<{
+            /** Message role. */
+            role: string;
+            /** Message content. */
+            content: string;
+        }>;
+        const systemContent =
+            messages.find((m) => m.role === "system")?.content ?? "";
+
+        const appendStart = systemContent.indexOf("## Custom instructions");
+        const factsStart = systemContent.indexOf("## Conversation facts");
+        expect(appendStart).toBeGreaterThan(-1);
+        expect(factsStart).toBeGreaterThan(-1);
+        expect(appendStart).toBeLessThan(factsStart);
+    });
+
+    it("system message is unchanged when appendSystemPrompt is undefined", async () => {
+        // Capture system content WITH append.
+        // Assign to mockServer so callWithAppend can access requestBodies().
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: { role: "assistant", content: "print('a')" },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+        const bodiesWith = await callWithAppend(
+            "extra instructions",
+            mockServer.url,
+        );
+        await mockServer.close();
+        mockServer = undefined;
+
+        // Capture system content WITHOUT append.
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: { role: "assistant", content: "print('b')" },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+        const bodiesWithout = await callWithAppend(undefined, mockServer.url);
+
+        /**
+         * Extracts the system message content from a captured request body list.
+         *
+         * @param bodies - The captured request bodies.
+         * @returns The system message content string.
+         */
+        function getSystemContent(
+            bodies: Array<Record<string, unknown>>,
+        ): string {
+            const messages = bodies[0].messages as Array<{
+                /** Message role. */
+                role: string;
+                /** Message content. */
+                content: string;
+            }>;
+            return messages.find((m) => m.role === "system")?.content ?? "";
+        }
+
+        const withContent = getSystemContent(bodiesWith);
+        const withoutContent = getSystemContent(bodiesWithout);
+
+        expect(withContent).toContain("extra instructions");
+        expect(withoutContent).not.toContain("extra instructions");
+        // Without append the system prompt must be shorter.
+        expect(withoutContent.length).toBeLessThan(withContent.length);
+    });
+
+    it("/dump_system_prompt includes appendSystemPrompt content in the dump file", async () => {
+        const history: HistoryEntry[] = [];
+        const facts: Fact[] = [];
+
+        const result = await handleUserMessage({
+            message: "/dump_system_prompt",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config: cfg,
+            /** No-op event handler for test isolation. */
+            emitEvent: () => {
+                /* no-op */
+            },
+            history,
+            facts,
+            signal: new AbortController().signal,
+            appendSystemPrompt:
+                "## Experiment notes\nSample is from patient cohort A.",
+        });
+
+        expect(result.text).toContain("System prompt dumped to");
+
+        const outputDir = join(tmpDir, "ai_chat_output");
+        const files = await readdir(outputDir);
+        const content = await readFile(join(outputDir, files[0]), "utf-8");
+
+        // Both default and appended content must appear in the dump.
+        expect(content).toContain("read_info");
+        expect(content).toContain("Experiment notes");
+        expect(content).toContain("patient cohort A");
+    });
+
+    it("/dump_system_prompt without appendSystemPrompt does not include appended content", async () => {
+        const history: HistoryEntry[] = [];
+        const facts: Fact[] = [];
+
+        await handleUserMessage({
+            message: "/dump_system_prompt",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config: cfg,
+            /** No-op event handler for test isolation. */
+            emitEvent: () => {
+                /* no-op */
+            },
+            history,
+            facts,
+            signal: new AbortController().signal,
+        });
+
+        const outputDir = join(tmpDir, "ai_chat_output");
+        const files = await readdir(outputDir);
+        const content = await readFile(join(outputDir, files[0]), "utf-8");
+
+        expect(content).toContain("read_info");
+        expect(content).not.toContain("Experiment notes");
     });
 });

@@ -733,6 +733,12 @@ export interface HandleMessageOptions {
     facts: Fact[];
     /** AbortSignal for cancellation. */
     signal: AbortSignal;
+    /**
+     * Optional text to append to the default system prompt, loaded from
+     * SYSTEM_APPEND.md in the analysis directory. When present, it is
+     * inserted between the sandbox prompt and the dynamic facts block.
+     */
+    appendSystemPrompt?: string;
 }
 
 /**
@@ -766,6 +772,7 @@ export async function handleUserMessage(
         history,
         facts,
         signal,
+        appendSystemPrompt,
     } = options;
 
     // Add user message to history
@@ -871,7 +878,7 @@ export async function handleUserMessage(
             config.contextWindowTokens,
         );
         const maxOutputKBForPrompt = Math.round(maxOutputBytesForPrompt / 1024);
-        const promptContent = buildSandboxPrompt({
+        const baseSandboxPrompt = buildSandboxPrompt({
             maxOutputKB: maxOutputKBForPrompt,
             maxRecordsReadInfo: config.maxRecordsReadInfo,
             maxRecordsBamMods: config.maxRecordsBamMods,
@@ -881,6 +888,11 @@ export async function handleUserMessage(
             maxWriteMB: config.maxWriteMB,
             maxDurationSecs: config.maxDurationSecs,
         });
+        // Include SYSTEM_APPEND.md content in the dump so it accurately
+        // reflects the full system prompt that is sent to the LLM.
+        const promptContent = appendSystemPrompt
+            ? `${baseSandboxPrompt}\n\n${appendSystemPrompt}`
+            : baseSandboxPrompt;
         await writeFile(outputFile, promptContent, "utf-8");
 
         const relPath = relative(allowedDir, outputFile);
@@ -904,8 +916,21 @@ export async function handleUserMessage(
         maxWriteMB: config.maxWriteMB,
         maxDurationSecs: config.maxDurationSecs,
     });
+    // Append SYSTEM_APPEND.md content (if any) between the sandbox prompt
+    // and the dynamic facts block so domain context sits close to the
+    // instructions it extends, while facts remain at the end.
+    //
+    // Note: the context-window budget (maxOutputBytes) is derived from
+    // contextWindowTokens without subtracting the system prompt size — this
+    // is a pre-existing approximation that also applies to the large sandbox
+    // prompt itself. SYSTEM_APPEND.md is intended for small domain context
+    // (a few paragraphs); very large files will reduce usable context just
+    // as any enlarged system prompt would.
+    const effectiveSandboxPrompt = appendSystemPrompt
+        ? `${sandboxPrompt}\n\n${appendSystemPrompt}`
+        : sandboxPrompt;
     const factsBlock = renderFactsBlock(facts);
-    const systemPrompt = buildSystemPrompt(sandboxPrompt, factsBlock);
+    const systemPrompt = buildSystemPrompt(effectiveSandboxPrompt, factsBlock);
 
     // Sandbox options
     const sandboxOptions: SandboxOptions = {
