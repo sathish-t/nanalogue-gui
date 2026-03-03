@@ -229,6 +229,9 @@ const systemPromptPre = document.getElementById(
 const systemPromptConfigNote = document.getElementById(
     "system-prompt-config-note",
 ) as HTMLParagraphElement;
+const systemPromptTokenEstimate = document.getElementById(
+    "system-prompt-token-estimate",
+) as HTMLSpanElement;
 const btnCopySystemPrompt = document.getElementById(
     "btn-copy-system-prompt",
 ) as HTMLButtonElement;
@@ -1027,6 +1030,7 @@ btnViewSystemPrompt.addEventListener("click", async () => {
     // Bump generation so any in-flight request from a previous open is discarded.
     const generation = ++systemPromptGeneration;
     systemPromptPre.textContent = "Loading…";
+    systemPromptTokenEstimate.textContent = "";
     // Once the first send has been initiated, sessionLockedConfig holds the
     // config that was (or will be) sent to the LLM. Use it so the preview
     // matches the actual session prompt even before chatStarted is set.
@@ -1043,8 +1047,16 @@ btnViewSystemPrompt.addEventListener("click", async () => {
     if (generation !== systemPromptGeneration) return;
     if (result.success) {
         systemPromptPre.textContent = result.prompt;
+        // Rough token estimate: 1 token ≈ 4 bytes of UTF-8 text on average.
+        // This is a well-known rule of thumb and is intentionally approximate —
+        // the UI label already says "(rough)". A proper tokenizer is not worth
+        // the dependency cost for a display hint.
+        const byteLength = new TextEncoder().encode(result.prompt).byteLength;
+        const roughTokens = Math.round(byteLength / 4);
+        systemPromptTokenEstimate.textContent = `~${roughTokens.toLocaleString()} tokens (rough)`;
     } else {
         systemPromptPre.textContent = `Error: ${result.error}`;
+        systemPromptTokenEstimate.textContent = "";
     }
 });
 

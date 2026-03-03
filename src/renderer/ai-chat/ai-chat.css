@@ -617,6 +617,14 @@
     margin: 0 0 12px;
 }
 
+/* Rough token count label shown on the left of the system prompt dialog actions bar. */
+.system-prompt-token-estimate {
+    align-self: center;
+    color: #888;
+    flex: 1;
+    font-size: 12px;
+}
+
 /* Scrollable pre block displaying the prompt text. */
 #system-prompt-pre {
     background: #f5f5f5;

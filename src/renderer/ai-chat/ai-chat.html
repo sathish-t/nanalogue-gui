@@ -254,8 +254,10 @@
     <p id="system-prompt-config-note" class="system-prompt-config-note"></p>
     <!-- Scrollable block containing the prompt text. -->
     <pre id="system-prompt-pre"></pre>
-    <!-- Dialog action buttons: copy prompt text and close. -->
+    <!-- Dialog action buttons: token estimate on the left, copy and close on the right. -->
     <div class="dialog-actions">
+      <!-- Rough token count derived from byte length of the prompt text. -->
+      <span id="system-prompt-token-estimate" class="system-prompt-token-estimate"></span>
       <!-- Copies the full prompt text to the clipboard. -->
       <button type="button" id="btn-copy-system-prompt">Copy</button>
       <!-- Closes the system prompt preview dialog. -->
