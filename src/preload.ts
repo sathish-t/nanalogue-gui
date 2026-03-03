@@ -405,18 +405,21 @@ contextBridge.exposeInMainWorld("api", {
         ipcRenderer.invoke("ai-chat-consent", origin),
 
     /**
-     * Retrieve the static system prompt for the given config.
+     * Retrieve the effective system prompt for the given config.
      *
-     * Returns the output of buildSandboxPrompt() only — the dynamic facts
-     * block appended during a live session is not included.
+     * Includes SYSTEM_APPEND.md content when allowedDir is provided.
+     * The dynamic facts block appended during a live session is not included.
      *
-     * @param payload - The config to build the prompt from.
+     * @param payload - The config and optional directory to build the prompt from.
      * @param payload.config - The advanced configuration options.
+     * @param payload.allowedDir - The analysis directory for SYSTEM_APPEND.md lookup.
      * @returns A promise with the prompt string or an error.
      */
     aiChatGetSystemPrompt: (payload: {
         /** The advanced configuration options. */
         config: Record<string, unknown>;
+        /** The analysis directory for SYSTEM_APPEND.md lookup (optional). */
+        allowedDir?: string;
     }) => ipcRenderer.invoke("ai-chat-get-system-prompt", payload),
 
     /**

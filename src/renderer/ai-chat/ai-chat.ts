@@ -108,10 +108,12 @@ interface AiChatEvent {
 interface AiChatApi {
     /** Launch the AI Chat mode. */
     launchAiChat: () => Promise<LaunchResult>;
-    /** Retrieve the static system prompt for the given config. */
+    /** Retrieve the effective system prompt for the given config. */
     aiChatGetSystemPrompt: (payload: {
         /** The advanced configuration options. */
         config: Record<string, unknown>;
+        /** The analysis directory for SYSTEM_APPEND.md lookup (optional). */
+        allowedDir?: string;
     }) => Promise<GetSystemPromptResult>;
     /** Query endpoint for available models. */
     aiChatListModels: (payload: {
@@ -1036,6 +1038,7 @@ btnViewSystemPrompt.addEventListener("click", async () => {
 
     const result = await api.aiChatGetSystemPrompt({
         config: sessionLockedConfig ?? getConfig(),
+        allowedDir: inputDir.value || undefined,
     });
     if (generation !== systemPromptGeneration) return;
     if (result.success) {

@@ -12,6 +12,7 @@ import type { AiChatEvent } from "../lib/chat-types";
 import { fetchModels } from "../lib/model-listing";
 import { deriveMaxOutputBytes } from "../lib/monty-sandbox";
 import { buildSandboxPrompt } from "../lib/sandbox-prompt";
+import { loadSystemAppend } from "../lib/system-append";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -20,6 +21,73 @@ const session = new ChatSession();
 
 /** Set of acknowledged non-localhost endpoint origins (memory-only). */
 const endpointConsent = new Set<string>();
+
+/**
+ * The allowedDir for which SYSTEM_APPEND.md is being (or has been) loaded.
+ * Updated synchronously before the async read begins so that concurrent
+ * callers for the same dir share a single Promise rather than racing.
+ */
+let cachedSystemAppendDir: string | undefined;
+
+/**
+ * Pending or resolved Promise for the SYSTEM_APPEND.md load.
+ * Stored as a Promise (not a resolved value) so that if two sends arrive
+ * while a read is still in-flight, both await the same operation and
+ * loadSystemAppend() is never called twice for the same directory.
+ */
+let cachedSystemAppendPromise: Promise<string | undefined> | undefined;
+
+/**
+ * Returns the SYSTEM_APPEND.md content for the given directory.
+ *
+ * The Promise is stored immediately (before awaiting) so any concurrent
+ * call for the same dir awaits the same read rather than starting a new
+ * one. The cache is invalidated by clearSystemAppendCache() on session
+ * reset, or automatically when allowedDir changes.
+ *
+ * @param allowedDir - Absolute path to the analysis directory.
+ * @returns The file content, or undefined if absent or blocked.
+ */
+function getCachedSystemAppend(
+    allowedDir: string,
+): Promise<string | undefined> {
+    if (cachedSystemAppendDir !== allowedDir) {
+        cachedSystemAppendDir = allowedDir;
+        // Assign the Promise synchronously before any await so concurrent
+        // callers see it and share this single in-flight read.
+        cachedSystemAppendPromise = loadSystemAppend(allowedDir);
+    }
+    // cachedSystemAppendPromise is always defined here: either it was just
+    // assigned above, or it was set on a previous call for the same dir.
+    return cachedSystemAppendPromise as Promise<string | undefined>;
+}
+
+/**
+ * Returns the cached SYSTEM_APPEND.md promise if the cache is warm for the
+ * given directory, otherwise undefined.
+ *
+ * Does not populate the cache — safe to call from preview handlers that
+ * must not affect session state.
+ *
+ * @param allowedDir - Absolute path to the analysis directory.
+ * @returns The in-flight or resolved promise if cached, otherwise undefined.
+ */
+function peekSystemAppendCache(
+    allowedDir: string,
+): Promise<string | undefined> | undefined {
+    return cachedSystemAppendDir === allowedDir
+        ? cachedSystemAppendPromise
+        : undefined;
+}
+
+/**
+ * Clears the SYSTEM_APPEND.md cache so the next session re-reads the file.
+ * Called whenever the session is reset (New Chat or Go Back).
+ */
+function clearSystemAppendCache(): void {
+    cachedSystemAppendDir = undefined;
+    cachedSystemAppendPromise = undefined;
+}
 
 /**
  * Sets the main browser window reference used by IPC handlers.
@@ -138,6 +206,7 @@ export function registerIpcHandlers(): void {
                 }
             }
 
+            const appendSystemPrompt = await getCachedSystemAppend(allowedDir);
             return session.sendMessage({
                 endpointUrl,
                 apiKey,
@@ -146,6 +215,7 @@ export function registerIpcHandlers(): void {
                 allowedDir,
                 config,
                 emitEvent,
+                appendSystemPrompt,
             });
         },
     );
@@ -164,9 +234,12 @@ export function registerIpcHandlers(): void {
         "ai-chat-new-chat",
         /**
          * Resets conversation state without losing connection settings.
+         * Also clears the SYSTEM_APPEND.md cache so the next session
+         * re-reads the file (the user may have edited it between sessions).
          */
         () => {
             session.reset();
+            clearSystemAppendCache();
         },
     );
 
@@ -192,9 +265,12 @@ export function registerIpcHandlers(): void {
         "ai-chat-go-back",
         /**
          * Navigates back to the landing page from the AI Chat screen.
+         * Also clears the SYSTEM_APPEND.md cache so the next session
+         * re-reads the file (the user may have edited it between sessions).
          */
         () => {
             session.reset();
+            clearSystemAppendCache();
         },
     );
 
@@ -214,26 +290,29 @@ export function registerIpcHandlers(): void {
     ipcMain.handle(
         "ai-chat-get-system-prompt",
         /**
-         * Builds and returns the static system prompt for the given config.
+         * Builds and returns the effective system prompt for the given config.
          *
-         * The returned string is the output of buildSandboxPrompt() only —
-         * the dynamic facts block appended during a live session is not included.
+         * Reads SYSTEM_APPEND.md directly (bypassing the session cache) so
+         * that previewing the prompt never freezes stale content into the
+         * cache before the first message is sent. The send-message handler
+         * maintains its own cache independently.
+         * The dynamic facts block is not included (it changes each turn).
          *
          * @param _event - The IPC event (unused).
-         * @param payload - The config payload from the renderer.
-         * @returns The static system prompt string, or an error result.
+         * @param payload - The config and optional allowedDir from the renderer.
+         * @returns The effective system prompt string, or an error result.
          */
-        (_event, payload: unknown) => {
+        async (_event, payload: unknown) => {
             const validation = validateGetSystemPrompt(payload);
             if (!validation.valid) {
                 return { success: false, error: validation.error };
             }
-            const { config } = validation.data;
+            const { config, allowedDir } = validation.data;
             const maxOutputBytes = deriveMaxOutputBytes(
                 config.contextWindowTokens,
             );
             const maxOutputKB = Math.round(maxOutputBytes / 1024);
-            const prompt = buildSandboxPrompt({
+            const sandboxPrompt = buildSandboxPrompt({
                 maxOutputKB,
                 maxRecordsReadInfo: config.maxRecordsReadInfo,
                 maxRecordsBamMods: config.maxRecordsBamMods,
@@ -243,6 +322,18 @@ export function registerIpcHandlers(): void {
                 maxWriteMB: config.maxWriteMB,
                 maxDurationSecs: config.maxDurationSecs,
             });
+            // If the session cache is already warm (first message has been
+            // sent), use the cached value so the preview matches exactly what
+            // the LLM is receiving. If the cache is cold (pre-session), read
+            // directly without populating the cache — so preview cannot prime
+            // it with stale content before the first send.
+            const appendContent = allowedDir
+                ? await (peekSystemAppendCache(allowedDir) ??
+                      loadSystemAppend(allowedDir))
+                : undefined;
+            const prompt = appendContent
+                ? `${sandboxPrompt}\n\n${appendContent}`
+                : sandboxPrompt;
             return { success: true, prompt };
         },
     );

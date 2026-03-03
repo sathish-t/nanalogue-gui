@@ -59,6 +59,11 @@ export interface ListModelsPayload {
 export interface GetSystemPromptPayload {
     /** The orchestrator configuration used to build the prompt. */
     config: AiChatConfig;
+    /**
+     * The analysis directory used to look up SYSTEM_APPEND.md.
+     * Optional — when absent the prompt is shown without any custom append.
+     */
+    allowedDir?: string;
 }
 
 /** Validated payload for ai-chat-send-message. */
@@ -194,7 +199,16 @@ export function validateGetSystemPrompt(
         temperature,
     } as unknown as AiChatConfig;
 
-    return { valid: true, data: { config } };
+    // allowedDir is optional — accept a non-empty absolute path only,
+    // matching the same constraint enforced by ai-chat-send-message.
+    const allowedDir =
+        typeof p.allowedDir === "string" &&
+        p.allowedDir.length > 0 &&
+        isAbsolute(p.allowedDir)
+            ? p.allowedDir
+            : undefined;
+
+    return { valid: true, data: { config, allowedDir } };
 }
 
 /**
