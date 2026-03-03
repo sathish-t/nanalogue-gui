@@ -335,6 +335,17 @@ typing `/dump_system_prompt` in the CLI REPL. The output is written to
 `ai_chat_output/` inside your BAM directory and is available at any point,
 even before the first message has been sent.
 
+**Customise the system prompt:**
+
+Place a `SYSTEM_APPEND.md` file in your BAM directory to append additional
+instructions to the default system prompt. The file is loaded once at session
+start and its content is inserted after the built-in sandbox instructions.
+Use this for small amounts of domain-specific context — for example, organism
+background, project-specific conventions, or guidance on which modification
+types to focus on. Files larger than 64 KB are silently ignored. Use
+`/dump_system_prompt` to verify the full effective prompt after loading.
+This feature is available in both the GUI and the CLI.
+
 **Run your own Python scripts:**
 
 You can bypass the LLM entirely and run a Python file directly in the sandbox
