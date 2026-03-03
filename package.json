@@ -1,6 +1,6 @@
 {
   "name": "@nanalogue/gui",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "GUI tools for nanopore data analysis",
   "main": "dist/main.js",
   "bin": {
