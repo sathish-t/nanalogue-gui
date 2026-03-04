@@ -6,6 +6,7 @@ import { createInterface } from "node:readline";
 import { parseArgs } from "node:util";
 import { version } from "../package.json";
 import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
+import { dumpLlmInstructions } from "./lib/chat-orchestrator";
 import { ChatSession } from "./lib/chat-session";
 import type {
     AiChatConfig,
@@ -61,6 +62,7 @@ const argConfig = {
         "max-code-rounds": { type: "string" as const },
         temperature: { type: "string" as const },
         "non-interactive": { type: "string" as const },
+        "dump-llm-instructions": { type: "boolean" as const, default: false },
         "list-models": { type: "boolean" as const, default: false },
         version: { type: "boolean" as const, short: "v", default: false },
         help: { type: "boolean" as const, short: "h", default: false },
@@ -103,6 +105,8 @@ ${BOLD}Advanced options:${RESET}
 
 ${BOLD}Other:${RESET}
   --non-interactive <msg>  Send a single message, print the response, and exit
+  --dump-llm-instructions  Dump the LLM request payload to a log file
+                           (only valid with --non-interactive)
   --list-models            List available models and exit
   Note: --list-models takes precedence over --non-interactive if both are passed.
   -v, --version            Print version and exit
@@ -213,6 +217,18 @@ async function main(): Promise<void> {
         );
         printUsage();
         process.exit(1);
+    }
+
+    // --dump-llm-instructions is only valid alongside --non-interactive.
+    if (
+        values["dump-llm-instructions"] &&
+        values["non-interactive"] === undefined
+    ) {
+        console.error(
+            "Error: --dump-llm-instructions requires --non-interactive",
+        );
+        process.exitCode = 1;
+        return;
     }
 
     // Guard against an empty or whitespace-only --non-interactive message.
@@ -327,6 +343,29 @@ async function main(): Promise<void> {
         } else if (!result.success) {
             console.error(`Error: ${result.error}`);
         }
+
+        // If --dump-llm-instructions was requested, write the last LLM request
+        // payload to a log file in ai_chat_output/ and print the path to stderr.
+        // This mirrors the /dump_llm_instructions REPL command for scripting use.
+        // Errors are caught and reported cleanly — the LLM response has already
+        // been printed, so a dump failure should not crash the process.
+        if (values["dump-llm-instructions"]) {
+            try {
+                const relPath = await dumpLlmInstructions(allowedDir);
+                if (relPath) {
+                    console.error(`LLM instructions dumped to ${relPath}`);
+                } else {
+                    console.error(
+                        "Warning: no LLM call was made; nothing to dump.",
+                    );
+                }
+            } catch (err) {
+                console.error(
+                    `Warning: failed to dump LLM instructions: ${err instanceof Error ? err.message : String(err)}`,
+                );
+            }
+        }
+
         // Use process.exitCode + return so Node drains stdout and stderr naturally.
         // Calling process.exit() directly risks truncating buffered output.
         process.exitCode = result.success ? 0 : 1;
