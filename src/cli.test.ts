@@ -211,6 +211,9 @@ describe("nanalogue-chat CLI", () => {
                         return;
                     }
                     mockServerUrl = `http://127.0.0.1:${addr.port}/v1`;
+                    /**
+                     * Closes the mock HTTP server and resolves when done.
+                     */
                     closeMockServer = () =>
                         new Promise<void>((res) => server.close(() => res()));
                     resolve();
@@ -227,27 +230,30 @@ describe("nanalogue-chat CLI", () => {
         it("writes a log file to ai_chat_output/ and reports the path on stderr", async () => {
             // Run the CLI against the mock server in non-interactive mode with
             // --dump-llm-instructions and capture stdout + stderr.
-            let stdout = "";
-            let stderr = "";
-            try {
-                ({ stdout, stderr } = await execFileAsync("node", [
-                    CLI_PATH,
-                    "--endpoint",
-                    mockServerUrl,
-                    "--model",
-                    "test-model",
-                    "--dir",
-                    tmpDir,
-                    "--non-interactive",
-                    "What is the average read length?",
-                    "--dump-llm-instructions",
-                ]));
-            } catch (err) {
+            const { stdout, stderr } = await execFileAsync("node", [
+                CLI_PATH,
+                "--endpoint",
+                mockServerUrl,
+                "--model",
+                "test-model",
+                "--dir",
+                tmpDir,
+                "--non-interactive",
+                "What is the average read length?",
+                "--dump-llm-instructions",
+            ]).catch((err: unknown) => {
                 // If the CLI exits non-zero, surface the error clearly.
+                const execErr = err as NodeJS.ErrnoException & {
+                    /** The stdout output of the failed process. */
+                    stdout: string;
+                    /** The stderr output of the failed process. */
+                    stderr: string;
+                };
                 throw new Error(
-                    `CLI exited with error: ${String(err)}\nstdout: ${(err as NodeJS.ErrnoException & { stdout: string }).stdout}\nstderr: ${(err as NodeJS.ErrnoException & { stderr: string }).stderr}`,
+                    `CLI exited with error: ${String(err)}\nstdout: ${execErr.stdout}\nstderr: ${execErr.stderr}`,
+                    { cause: err },
                 );
-            }
+            });
 
             // stdout should contain the LLM reply (sandbox print output).
             expect(stdout.trim()).toBe("42bp");
