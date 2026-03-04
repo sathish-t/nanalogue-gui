@@ -60,6 +60,7 @@ const argConfig = {
         timeout: { type: "string" as const },
         "max-code-rounds": { type: "string" as const },
         temperature: { type: "string" as const },
+        "non-interactive": { type: "string" as const },
         "list-models": { type: "boolean" as const, default: false },
         version: { type: "boolean" as const, short: "v", default: false },
         help: { type: "boolean" as const, short: "h", default: false },
@@ -101,7 +102,9 @@ ${BOLD}Advanced options:${RESET}
   --temperature <n>        LLM sampling temperature 0-2 (default: provider default)
 
 ${BOLD}Other:${RESET}
+  --non-interactive <msg>  Send a single message, print the response, and exit
   --list-models            List available models and exit
+  Note: --list-models takes precedence over --non-interactive if both are passed.
   -v, --version            Print version and exit
 
 ${BOLD}Custom system prompt:${RESET}
@@ -212,6 +215,18 @@ async function main(): Promise<void> {
         process.exit(1);
     }
 
+    // Guard against an empty or whitespace-only --non-interactive message.
+    // Using process.exitCode + return rather than process.exit() so Node drains
+    // stdout and stderr naturally before terminating.
+    if (
+        values["non-interactive"] !== undefined &&
+        values["non-interactive"].trim() === ""
+    ) {
+        console.error("Error: --non-interactive message cannot be empty");
+        process.exitCode = 1;
+        return;
+    }
+
     // Build config from CLI args, clamped to valid ranges
     const config: AiChatConfig = {
         contextWindowTokens: parseNumericArg(
@@ -288,6 +303,35 @@ async function main(): Promise<void> {
     let appendSystemPrompt = await loadSystemAppend(allowedDir);
 
     const session = new ChatSession();
+
+    // Non-interactive mode: send a single message, print the response, and exit.
+    // No banner, no readline, no progress indicators — clean for scripting and piping.
+    if (values["non-interactive"] !== undefined) {
+        const message = values["non-interactive"];
+        const result = await session.sendMessage({
+            endpointUrl,
+            apiKey,
+            model,
+            message,
+            allowedDir,
+            config,
+            appendSystemPrompt,
+            /**
+             * Suppresses all progress events in non-interactive mode.
+             * Only the final response text reaches stdout.
+             */
+            emitEvent: () => {},
+        });
+        if (result.success && result.text) {
+            console.log(result.text);
+        } else if (!result.success) {
+            console.error(`Error: ${result.error}`);
+        }
+        // Use process.exitCode + return so Node drains stdout and stderr naturally.
+        // Calling process.exit() directly risks truncating buffered output.
+        process.exitCode = result.success ? 0 : 1;
+        return;
+    }
 
     /**
      * Handles a progress event from the orchestrator by printing to the terminal.

@@ -297,6 +297,8 @@ context window (see [here](https://huggingface.co/deepseek-ai/DeepSeek-V2-Lite))
 means the model can remember more of your chat, and can respond to longer prompts. Whether this is
 relevant for you depends on how you use the chat feature here.
 
+#### Using the AI chat GUI
+
 **AI Chat with a connected endpoint:**
 
 ![AI Chat with connected endpoint](demo/screenshot-ai-chat-configured-openai.png)
@@ -389,6 +391,16 @@ are available:
 
 ```bash
 nanalogue-chat --endpoint https://api.openai.com/v1 --api-key $API_KEY --list-models
+```
+
+**Non-interactive mode:** use `--non-interactive "<message>"` to send a single
+prompt, print the response, and exit — useful for scripting. You can combine
+this with a custom SYSTEM_APPEND.md to describe complex tasks to the LLM
+(see [above](#using-the-ai-chat-gui)).
+
+```bash
+nanalogue-chat --endpoint <url> --model <name> --dir <path> \
+    --non-interactive "What is the average read length?"
 ```
 
 **REPL commands:**

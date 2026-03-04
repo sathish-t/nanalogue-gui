@@ -28,4 +28,109 @@ describe("nanalogue-chat CLI", () => {
         // Verify it's a valid semver-like string
         expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
     });
+
+    describe("--non-interactive flag", () => {
+        it("exits 1 when --endpoint/--model/--dir are missing", async () => {
+            // Required-arg validation fires before the non-interactive block.
+            await expect(
+                execFileAsync("node", [CLI_PATH, "--non-interactive", "hello"]),
+            ).rejects.toMatchObject({ code: 1 });
+        });
+
+        it("exits 1 when --non-interactive message is empty", async () => {
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--non-interactive",
+                    "",
+                ]),
+            ).rejects.toMatchObject({ code: 1 });
+        });
+
+        it("prints error message when --non-interactive message is empty", async () => {
+            let stderr = "";
+            try {
+                await execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--non-interactive",
+                    "",
+                ]);
+            } catch (err) {
+                stderr = (
+                    err as NodeJS.ErrnoException & {
+                        /** The stderr output of the failed process. */
+                        stderr: string;
+                    }
+                ).stderr;
+            }
+            expect(stderr).toContain(
+                "--non-interactive message cannot be empty",
+            );
+        });
+
+        it("exits 1 when --non-interactive message is whitespace-only", async () => {
+            // A whitespace-only message is treated the same as empty — almost
+            // certainly a bug in the calling script, so we fail loudly.
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--non-interactive",
+                    "   ",
+                ]),
+            ).rejects.toMatchObject({ code: 1 });
+        });
+
+        it("prints error message when --non-interactive message is whitespace-only", async () => {
+            let stderr = "";
+            try {
+                await execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--non-interactive",
+                    "   ",
+                ]);
+            } catch (err) {
+                stderr = (
+                    err as NodeJS.ErrnoException & {
+                        /** The stderr output of the failed process. */
+                        stderr: string;
+                    }
+                ).stderr;
+            }
+            expect(stderr).toContain(
+                "--non-interactive message cannot be empty",
+            );
+        });
+
+        it("exits 1 when --non-interactive has no value", async () => {
+            // parseArgs throws a parse error for a string-type flag with no
+            // following argument, which hits the existing generic error path.
+            await expect(
+                execFileAsync("node", [CLI_PATH, "--non-interactive"]),
+            ).rejects.toMatchObject({ code: 1 });
+        });
+    });
 });
