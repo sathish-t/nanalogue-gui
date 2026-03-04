@@ -72,6 +72,40 @@ export function setLastSentMessages(messages: LlmMessage[] | null): void {
 }
 
 /**
+ * Writes the last LLM request payload to a dated log file in ai_chat_output/
+ * inside the given directory. Used by both the /dump_llm_instructions slash
+ * command and the --dump-llm-instructions CLI flag.
+ *
+ * @param allowedDir - The analysis directory (must be the sandbox root).
+ * @returns The path to the log file relative to allowedDir, or null if no
+ *   LLM call has been made yet.
+ */
+export async function dumpLlmInstructions(
+    allowedDir: string,
+): Promise<string | null> {
+    if (!lastSentMessages) return null;
+
+    const outputDir = join(allowedDir, "ai_chat_output");
+    await mkdir(outputDir, { recursive: true });
+    const safeDir = await resolvePath(allowedDir, "ai_chat_output");
+
+    const date = new Date().toISOString().slice(0, 10);
+    const uuid = randomUUID();
+    const filename = `nanalogue-chat-${date}-${uuid}.log`;
+    const outputFile = join(safeDir, filename);
+
+    const content = lastSentMessages
+        .map(
+            (msg, i) =>
+                `=== Message ${i + 1}: ${msg.role} ===\n\n${msg.content}`,
+        )
+        .join("\n\n");
+    await writeFile(outputFile, content, "utf-8");
+
+    return relative(allowedDir, outputFile);
+}
+
+/**
  * Removes failed code-execute-feedback round pairs from history,
  * keeping the most recent failed pair so the model can see its last error.
  * A failed round is an assistant message (code) followed by a user message
@@ -828,33 +862,11 @@ export async function handleUserMessage(
         history.pop();
         emitEvent({ type: "turn_start" });
 
-        if (!lastSentMessages) {
-            const text = "No LLM call has been made yet, nothing to dump.";
-            emitEvent({ type: "turn_end", text, steps: [] });
-            return { text, steps: [] };
-        }
-
-        const outputDir = join(allowedDir, "ai_chat_output");
-        await mkdir(outputDir, { recursive: true });
-        const safeDir = await resolvePath(allowedDir, "ai_chat_output");
-
-        const date = new Date().toISOString().slice(0, 10);
-        const uuid = randomUUID();
-        const filename = `nanalogue-chat-${date}-${uuid}.log`;
-        const outputFile = join(safeDir, filename);
-
-        const content = lastSentMessages
-            .map(
-                (msg, i) =>
-                    `=== Message ${i + 1}: ${msg.role} ===\n\n${msg.content}`,
-            )
-            .join("\n\n");
-        await writeFile(outputFile, content, "utf-8");
-
-        const relPath = relative(allowedDir, outputFile);
-        const text =
-            `LLM instructions dumped to ${relPath}\n` +
-            "This message is not fed back to the LLM. Do not reference this file in conversations.";
+        const relPath = await dumpLlmInstructions(allowedDir);
+        const text = relPath
+            ? `LLM instructions dumped to ${relPath}\n` +
+              "This message is not fed back to the LLM. Do not reference this file in conversations."
+            : "No LLM call has been made yet, nothing to dump.";
         emitEvent({ type: "turn_end", text, steps: [] });
         return { text, steps: [] };
     }
