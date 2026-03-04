@@ -14,8 +14,15 @@
 <body>
   <!-- Landing page root container centered on screen. -->
   <div id="landing-app">
+    <!-- Header with app title and font-size selector buttons. -->
     <header>
       <h1>nanalogue-gui</h1>
+      <!-- Font size controls: three A buttons for small, medium, and large text. -->
+      <div id="font-size-controls" role="group" aria-label="Font size">
+        <button type="button" class="font-size-btn" id="btn-font-small" data-size="small" aria-label="Small font size" aria-pressed="false">A</button>
+        <button type="button" class="font-size-btn" id="btn-font-medium" data-size="medium" aria-label="Medium font size" aria-pressed="true">A</button>
+        <button type="button" class="font-size-btn" id="btn-font-large" data-size="large" aria-label="Large font size" aria-pressed="false">A</button>
+      </div>
     </header>
 
     <!-- Mode selection buttons in a two-column grid layout. -->

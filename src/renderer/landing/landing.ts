@@ -1,6 +1,7 @@
-// Landing page renderer for nanalogue-gui
+import { applyFontSize } from "../shared/apply-font-size";
 
-export {};
+// Apply font size from URL query param (set when navigating back from another mode).
+applyFontSize();
 
 /**
  * Result returned by mode launch IPC handlers.
@@ -28,6 +29,8 @@ interface LandingApi {
     launchLocate: () => Promise<LaunchResult>;
     /** Launches the AI Chat mode for LLM-powered BAM analysis. */
     launchAiChat: () => Promise<LaunchResult>;
+    /** Updates the font-size preference in the main process. */
+    setFontSize: (size: string) => Promise<void>;
 }
 
 /** The preload API instance retrieved from the window object for invoking main process actions. */
@@ -37,6 +40,48 @@ const api = (
         api: LandingApi;
     }
 ).api;
+
+// --- Font size controls ---
+
+const fontSizeBtns = Array.from(
+    document.querySelectorAll<HTMLButtonElement>(".font-size-btn"),
+);
+
+/**
+ * Updates the active state of the font size buttons to match the given size.
+ *
+ * @param size - The font size that should appear active ('small', 'medium', or 'large').
+ */
+function setActiveFontBtn(size: string): void {
+    for (const btn of fontSizeBtns) {
+        const isActive = btn.dataset.size === size;
+        btn.classList.toggle("active", isActive);
+        btn.setAttribute("aria-pressed", String(isActive));
+    }
+}
+
+// Initialise active state from the URL param (medium when no param is present).
+const initialSize =
+    new URLSearchParams(window.location.search).get("fontSize") ?? "medium";
+setActiveFontBtn(initialSize);
+
+for (const btn of fontSizeBtns) {
+    btn.addEventListener("click", async () => {
+        const size = btn.dataset.size ?? "medium";
+        // Apply class to <html> immediately so the change is instant.
+        const html = document.documentElement;
+        html.classList.remove("font-small", "font-medium", "font-large");
+        html.classList.add(`font-${size}`);
+        setActiveFontBtn(size);
+        try {
+            await api.setFontSize(size);
+        } catch (error) {
+            console.error("Failed to set font size:", error);
+        }
+    });
+}
+
+// --- Mode buttons ---
 
 const btnSwipe = document.getElementById("btn-swipe") as HTMLButtonElement;
 const btnQC = document.getElementById("btn-qc") as HTMLButtonElement;

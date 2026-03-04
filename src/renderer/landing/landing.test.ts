@@ -102,6 +102,65 @@ describe("landing.html", () => {
         });
     });
 
+    describe("font size controls", () => {
+        it("has a font-size-controls container", () => {
+            const doc = loadTemplate();
+            const controls = doc.querySelector("#font-size-controls");
+            expect(controls).not.toBeNull();
+        });
+
+        it("has exactly three font-size buttons", () => {
+            const doc = loadTemplate();
+            const btns = doc.querySelectorAll(".font-size-btn");
+            expect(btns).toHaveLength(3);
+        });
+
+        it("small button has data-size small", () => {
+            const doc = loadTemplate();
+            const btn = doc.querySelector<HTMLButtonElement>("#btn-font-small");
+            expect(btn).not.toBeNull();
+            expect(btn?.dataset.size).toBe("small");
+        });
+
+        it("medium button has data-size medium", () => {
+            const doc = loadTemplate();
+            const btn =
+                doc.querySelector<HTMLButtonElement>("#btn-font-medium");
+            expect(btn).not.toBeNull();
+            expect(btn?.dataset.size).toBe("medium");
+        });
+
+        it("large button has data-size large", () => {
+            const doc = loadTemplate();
+            const btn = doc.querySelector<HTMLButtonElement>("#btn-font-large");
+            expect(btn).not.toBeNull();
+            expect(btn?.dataset.size).toBe("large");
+        });
+
+        it("medium button is pressed by default", () => {
+            const doc = loadTemplate();
+            const btn =
+                doc.querySelector<HTMLButtonElement>("#btn-font-medium");
+            expect(btn?.getAttribute("aria-pressed")).toBe("true");
+        });
+
+        it("small and large buttons are not pressed by default", () => {
+            const doc = loadTemplate();
+            const small =
+                doc.querySelector<HTMLButtonElement>("#btn-font-small");
+            const large =
+                doc.querySelector<HTMLButtonElement>("#btn-font-large");
+            expect(small?.getAttribute("aria-pressed")).toBe("false");
+            expect(large?.getAttribute("aria-pressed")).toBe("false");
+        });
+
+        it("font-size-controls uses group role", () => {
+            const doc = loadTemplate();
+            const controls = doc.querySelector("#font-size-controls");
+            expect(controls?.getAttribute("role")).toBe("group");
+        });
+    });
+
     describe("page structure", () => {
         it("has a mode-selection main element", () => {
             const doc = loadTemplate();
