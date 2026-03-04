@@ -20,7 +20,7 @@
 /* Header title styling. */
 #ai-chat-header h1 {
     color: #333;
-    font-size: 18px;
+    font-size: 1.286rem;
     font-weight: 500;
     margin: 0;
 }
@@ -37,7 +37,7 @@
     border: 1px solid #ddd;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 0.929rem;
     padding: 6px 12px;
 }
 
@@ -61,7 +61,7 @@
 /* Configuration section heading. */
 #config-panel h2 {
     color: #333;
-    font-size: 14px;
+    font-size: 1rem;
     font-weight: 600;
     margin: 0 0 8px;
 }
@@ -77,7 +77,7 @@
 /* Label width for consistent alignment. */
 .config-row label {
     color: #555;
-    font-size: 13px;
+    font-size: 0.929rem;
     min-width: 100px;
 }
 
@@ -88,7 +88,7 @@
     border: 1px solid #ddd;
     border-radius: 4px;
     flex: 1;
-    font-size: 13px;
+    font-size: 0.929rem;
     padding: 6px 8px;
 }
 
@@ -98,7 +98,7 @@
     border: 1px solid #ddd;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 0.857rem;
     padding: 6px 10px;
     white-space: nowrap;
 }
@@ -109,7 +109,7 @@
     border: 1px solid #ddd;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 0.929rem;
     padding: 8px 16px;
 }
 
@@ -152,7 +152,7 @@
 /* Individual option in the model dropdown. */
 .model-option {
     cursor: pointer;
-    font-size: 13px;
+    font-size: 0.929rem;
     padding: 6px 8px;
 }
 
@@ -164,7 +164,7 @@
 /* Inline status message for fetch results. */
 .status-message {
     color: #888;
-    font-size: 12px;
+    font-size: 0.857rem;
     margin: 4px 0;
     min-height: 16px;
 }
@@ -172,7 +172,7 @@
 /* Connection status indicator. */
 .status-indicator {
     color: #888;
-    font-size: 12px;
+    font-size: 0.857rem;
     margin: 4px 0;
 }
 
@@ -217,7 +217,7 @@
 /* User message label. */
 .chat-msg-user .msg-label {
     color: #1565c0;
-    font-size: 11px;
+    font-size: 0.786rem;
     font-weight: 600;
     margin-bottom: 4px;
 }
@@ -234,7 +234,7 @@
 /* Assistant message label. */
 .chat-msg-assistant .msg-label {
     color: #333;
-    font-size: 11px;
+    font-size: 0.786rem;
     font-weight: 600;
     margin-bottom: 4px;
 }
@@ -242,7 +242,7 @@
 /* Message text content. */
 .msg-text {
     color: #333;
-    font-size: 14px;
+    font-size: 1rem;
     line-height: 1.5;
     overflow-wrap: break-word;
     white-space: pre-wrap;
@@ -269,7 +269,7 @@
 /* Spinner text. */
 #spinner-text {
     color: #888;
-    font-size: 13px;
+    font-size: 0.929rem;
 }
 
 /* CSS spinner animation. */
@@ -300,7 +300,7 @@
     border: none;
     color: #555;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 0.929rem;
     padding: 8px 16px;
     text-align: left;
     width: 100%;
@@ -323,7 +323,7 @@
     border-radius: 6px;
     color: #d4d4d4;
     font-family: "Courier New", Courier, monospace;
-    font-size: 13px;
+    font-size: 0.929rem;
     line-height: 1.5;
     max-height: 200px;
     overflow-wrap: break-word;
@@ -347,7 +347,7 @@
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 1rem;
     padding: 4px 8px;
 }
 
@@ -364,7 +364,7 @@
     border: none;
     color: #1a73e8;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 0.857rem;
     padding: 0;
     text-decoration: underline;
 }
@@ -377,7 +377,7 @@
 /* Page indicator text. */
 #code-page-indicator {
     color: #888;
-    font-size: 12px;
+    font-size: 0.857rem;
 }
 
 /* Copy-to-clipboard button in the code panel pagination row. */
@@ -387,7 +387,7 @@
     border-radius: 4px;
     color: #1a73e8;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 0.857rem;
     margin-left: 8px;
     padding: 4px 10px;
 }
@@ -408,7 +408,7 @@
 /* Disclaimer text in the code panel. */
 .code-disclaimer {
     color: #888;
-    font-size: 11px;
+    font-size: 0.786rem;
     margin: 4px 0 0;
 }
 
@@ -426,7 +426,7 @@
     border: 1px solid #ddd;
     border-radius: 6px;
     flex: 1;
-    font-size: 14px;
+    font-size: 1rem;
     padding: 8px 12px;
 }
 
@@ -436,7 +436,7 @@
     border: none;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 1rem;
     padding: 8px 16px;
 }
 
@@ -502,7 +502,7 @@
 /* Dialog heading. */
 #advanced-dialog h2 {
     color: #333;
-    font-size: 16px;
+    font-size: 1.143rem;
     margin: 0 0 16px;
 }
 
@@ -517,7 +517,7 @@
 /* Dialog label width. */
 .dialog-row label {
     color: #555;
-    font-size: 13px;
+    font-size: 0.929rem;
     min-width: 180px;
 }
 
@@ -525,7 +525,7 @@
 .dialog-row input[type="number"] {
     border: 1px solid #ddd;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 0.929rem;
     padding: 6px 8px;
     width: 120px;
 }
@@ -533,7 +533,7 @@
 /* Warning text for sandbox limit fields. */
 .dialog-warning {
     color: #f57c00;
-    font-size: 12px;
+    font-size: 0.857rem;
     margin: 12px 0 8px;
 }
 
@@ -562,14 +562,14 @@
 /* Consent dialog heading. */
 #consent-dialog h2 {
     color: #333;
-    font-size: 16px;
+    font-size: 1.143rem;
     margin: 0 0 12px;
 }
 
 /* Consent dialog body text. */
 #consent-dialog p {
     color: #333;
-    font-size: 14px;
+    font-size: 1rem;
     line-height: 1.5;
     margin: 0 0 8px;
 }
@@ -597,14 +597,14 @@
 /* System prompt dialog heading. */
 #system-prompt-dialog h2 {
     color: #333;
-    font-size: 16px;
+    font-size: 1.143rem;
     margin: 0 0 12px;
 }
 
 /* Italicised explanatory note above the prompt text. */
 .system-prompt-info {
     color: #555;
-    font-size: 13px;
+    font-size: 0.929rem;
     font-style: italic;
     line-height: 1.5;
     margin: 0 0 6px;
@@ -613,7 +613,7 @@
 /* Dynamic config-context note below the explanatory note. */
 .system-prompt-config-note {
     color: #888;
-    font-size: 12px;
+    font-size: 0.857rem;
     margin: 0 0 12px;
 }
 
@@ -622,7 +622,7 @@
     align-self: center;
     color: #888;
     flex: 1;
-    font-size: 12px;
+    font-size: 0.857rem;
 }
 
 /* Scrollable pre block displaying the prompt text. */
@@ -631,7 +631,7 @@
     border: 1px solid #e0e0e0;
     border-radius: 6px;
     font-family: "Courier New", Courier, monospace;
-    font-size: 12px;
+    font-size: 0.857rem;
     line-height: 1.5;
     margin: 0 0 16px;
     max-height: 400px;

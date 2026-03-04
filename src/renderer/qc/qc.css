@@ -23,14 +23,14 @@
 #qc-config-app header h1,
 #qc-results-app header h1 {
     color: #333;
-    font-size: 18px;
+    font-size: 1.286rem;
     font-weight: 500;
 }
 
 /* Subtle display of the subsampling seed in the results header. */
 .sample-seed-display {
     color: #999;
-    font-size: 12px;
+    font-size: 0.857rem;
     margin: 0;
     margin-left: auto;
 }
@@ -42,7 +42,7 @@
     border-radius: 6px;
     color: #666;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 1rem;
     padding: 8px 16px;
     transition: all 0.15s ease;
 }
@@ -71,7 +71,7 @@
 /* Section heading within the configuration form. */
 .config-section h2 {
     color: #333;
-    font-size: 14px;
+    font-size: 1rem;
     font-weight: 600;
     margin-bottom: 8px;
 }
@@ -92,7 +92,7 @@
     color: #666;
     cursor: pointer;
     display: flex;
-    font-size: 12px;
+    font-size: 0.857rem;
     gap: 6px;
     margin-top: 8px;
 }
@@ -110,7 +110,7 @@
     color: #666;
     cursor: pointer;
     display: flex;
-    font-size: 14px;
+    font-size: 1rem;
     gap: 6px;
 }
 
@@ -130,7 +130,7 @@ input[type="text"],
 input[type="number"] {
     border: 1px solid #ddd;
     border-radius: 6px;
-    font-size: 14px;
+    font-size: 1rem;
     padding: 10px 12px;
     width: 100%;
 }
@@ -157,13 +157,13 @@ input[type="number"]:focus {
 /* Unit text displayed next to the input field. */
 .input-with-unit .unit {
     color: #666;
-    font-size: 14px;
+    font-size: 1rem;
 }
 
 /* Small helper text below form fields. */
 .hint {
     color: #888;
-    font-size: 12px;
+    font-size: 0.857rem;
     margin-top: 6px;
 }
 
@@ -185,7 +185,7 @@ input[type="number"]:focus {
     border-radius: 8px;
     color: #fff;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 1.143rem;
     font-weight: 500;
     padding: 12px 32px;
     transition: all 0.15s ease;
@@ -212,13 +212,13 @@ input[type="number"]:focus {
 /* Default text styling for file info content. */
 #file-info-content {
     color: #666;
-    font-size: 14px;
+    font-size: 1rem;
 }
 
 /* Small muted label above file info details. */
 #file-info-content .info-label {
     color: #888;
-    font-size: 12px;
+    font-size: 0.857rem;
     margin-bottom: 8px;
 }
 
@@ -282,7 +282,7 @@ input[type="number"]:focus {
     border-bottom: 2px solid transparent;
     color: #666;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 1rem;
     padding: 12px 20px;
     transition: all 0.15s ease;
 }
@@ -327,7 +327,7 @@ input[type="number"]:focus {
 /* Section heading for density chart subsections. */
 .density-heading {
     color: #333;
-    font-size: 16px;
+    font-size: 1.143rem;
     font-weight: 600;
     margin-bottom: 16px;
 }
@@ -335,7 +335,7 @@ input[type="number"]:focus {
 /* Density heading with additional top margin for vertical separation. */
 .density-heading-spaced {
     color: #333;
-    font-size: 16px;
+    font-size: 1.143rem;
     font-weight: 600;
     margin: 24px 0 16px;
 }
@@ -369,7 +369,7 @@ input[type="number"]:focus {
 /* Bold title inside the stats panel header. */
 .stats-header h3 {
     color: #333;
-    font-size: 14px;
+    font-size: 1rem;
     font-weight: 600;
 }
 
@@ -379,14 +379,14 @@ input[type="number"]:focus {
     border: none;
     color: #666;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 0.857rem;
     text-decoration: underline;
 }
 
 /* Small note below the stats header clarifying data semantics. */
 .alignment-note {
     color: #888;
-    font-size: 11px;
+    font-size: 0.786rem;
     margin: 8px 0;
 }
 
@@ -399,7 +399,7 @@ input[type="number"]:focus {
 
 /* Individual statistic item within the grid. */
 .stat-item {
-    font-size: 13px;
+    font-size: 0.929rem;
 }
 
 /* Muted label text for a statistic name. */
@@ -427,7 +427,7 @@ input[type="number"]:focus {
 /* Heading for the read type counts section inside the expanded stats. */
 .read-type-heading {
     color: #666;
-    font-size: 13px;
+    font-size: 0.929rem;
     font-weight: 600;
     margin: 0 0 8px;
 }
@@ -445,7 +445,7 @@ input[type="number"]:focus {
     border-radius: 8px;
     color: #888;
     display: flex;
-    font-size: 14px;
+    font-size: 1rem;
     justify-content: center;
     min-height: 200px;
     padding: 24px;
@@ -458,7 +458,7 @@ input[type="number"]:focus {
     border: 1px solid #ffcc80;
     border-radius: 6px;
     color: #e65100;
-    font-size: 13px;
+    font-size: 0.929rem;
     margin-bottom: 16px;
     padding: 10px 14px;
 }
@@ -475,7 +475,7 @@ input[type="number"]:focus {
     color: #666;
     cursor: pointer;
     display: inline-flex;
-    font-size: 13px;
+    font-size: 0.929rem;
     gap: 6px;
 }
 
@@ -483,7 +483,7 @@ input[type="number"]:focus {
 .filter-inputs {
     align-items: center;
     display: flex;
-    font-size: 13px;
+    font-size: 0.929rem;
     gap: 8px;
     margin-top: 8px;
 }
@@ -497,7 +497,7 @@ input[type="number"]:focus {
 .filter-inputs input[type="number"] {
     border: 1px solid #ddd;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 0.929rem;
     padding: 4px 8px;
     width: 80px;
 }
@@ -509,7 +509,7 @@ input[type="number"]:focus {
     border-radius: 4px;
     color: #666;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 0.857rem;
     padding: 4px 12px;
 }
 
@@ -522,7 +522,7 @@ input[type="number"]:focus {
 /* Error message shown below the filter inputs. */
 .filter-error {
     color: #d32f2f;
-    font-size: 12px;
+    font-size: 0.857rem;
     margin-top: 4px;
 }
 
@@ -555,7 +555,7 @@ input[type="number"]:focus {
 /* Heading inside the dialog. */
 #more-info-dialog h2 {
     color: #333;
-    font-size: 16px;
+    font-size: 1.143rem;
     font-weight: 600;
     margin: 0 0 16px;
 }
@@ -563,7 +563,7 @@ input[type="number"]:focus {
 /* Section headings inside the dialog content. */
 #more-info-content h3 {
     color: #333;
-    font-size: 14px;
+    font-size: 1rem;
     font-weight: 600;
     margin: 16px 0 8px;
 }
@@ -582,7 +582,7 @@ input[type="number"]:focus {
 /* Table for contig name-length pairs. */
 .more-info-table {
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 0.929rem;
     width: 100%;
 }
 
@@ -612,7 +612,7 @@ input[type="number"]:focus {
 /* Simple list for modifications. */
 .more-info-list {
     color: #333;
-    font-size: 13px;
+    font-size: 0.929rem;
     list-style: disc;
     margin: 0;
     padding-left: 20px;
@@ -626,7 +626,7 @@ input[type="number"]:focus {
 /* Explanatory note about modification strand conventions. */
 .more-info-note {
     color: #888;
-    font-size: 12px;
+    font-size: 0.857rem;
     line-height: 1.5;
     margin-top: 12px;
 }
@@ -642,7 +642,7 @@ input[type="number"]:focus {
 #read-length-granularity {
     border: 1px solid #ddd;
     border-radius: 6px;
-    font-size: 14px;
+    font-size: 1rem;
     padding: 10px 12px;
     width: 100%;
 }
@@ -677,7 +677,7 @@ input[type="number"]:focus {
 /* Group legend styled as a small heading. */
 .advanced-group legend {
     color: #333;
-    font-size: 13px;
+    font-size: 0.929rem;
     font-weight: 600;
     padding: 0 4px;
 }
@@ -691,7 +691,7 @@ input[type="number"]:focus {
 .advanced-row > label {
     color: #666;
     display: block;
-    font-size: 13px;
+    font-size: 0.929rem;
     margin-bottom: 4px;
 }
 
@@ -706,7 +706,7 @@ input[type="number"]:focus {
 .mod-prob-filter-row {
     align-items: center;
     display: flex;
-    font-size: 13px;
+    font-size: 0.929rem;
     gap: 6px;
 }
 
@@ -714,7 +714,7 @@ input[type="number"]:focus {
 .narrow-input {
     border: 1px solid #ddd;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 0.929rem;
     padding: 4px 8px;
     width: 70px;
 }
@@ -722,7 +722,7 @@ input[type="number"]:focus {
 /* Inline hint text next to form controls. */
 .hint-inline {
     color: #999;
-    font-size: 12px;
+    font-size: 0.857rem;
 }
 
 /* Wider input for the sample seed value. */
@@ -733,7 +733,7 @@ input[type="number"]:focus {
 /* Disclaimer text above the sequence table. */
 .seq-disclaimer {
     color: #888;
-    font-size: 12px;
+    font-size: 0.857rem;
     font-style: italic;
     margin-bottom: 16px;
 }
@@ -748,7 +748,7 @@ input[type="number"]:focus {
 /* Full-width sequence table ensuring the sequence column clears frozen columns. */
 .seq-table {
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 0.929rem;
     min-width: 100%;
     white-space: nowrap;
 }
@@ -874,7 +874,7 @@ input[type="number"]:focus {
     background: #333;
     border-radius: 4px;
     color: #fff;
-    font-size: 11px;
+    font-size: 0.786rem;
     padding: 2px 8px;
     position: absolute;
     transform: translateY(-100%);

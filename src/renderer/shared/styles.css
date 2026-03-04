@@ -1,5 +1,22 @@
 /* Shared styles for the swipe mode renderer page. */
 
+/* Root font size: 14px for medium (the default). Overridden by the font-small
+   and font-large classes applied by applyFontSize() on each page load.
+   All font-size values below use rem so they scale with this root setting. */
+html {
+    font-size: 14px;
+}
+
+/* Small font-size preset — 12px base. */
+html.font-small {
+    font-size: 12px;
+}
+
+/* Large font-size preset — 18px base. */
+html.font-large {
+    font-size: 18px;
+}
+
 /* Global reset to ensure consistent box model and spacing across elements. */
 * {
     box-sizing: border-box;
@@ -64,7 +81,7 @@ body {
 #plot-title {
     color: #333;
     font-family: Monaco, Menlo, monospace;
-    font-size: 16px;
+    font-size: 1.143rem;
     font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -135,21 +152,21 @@ body {
 #no-data-message .hint,
 #done-message .hint {
     color: #888;
-    font-size: 13px;
+    font-size: 0.929rem;
     margin-top: 8px;
 }
 
 /* Large green heading shown on the completion screen. */
 #done-message h2 {
     color: #4caf50;
-    font-size: 28px;
+    font-size: 2rem;
     margin-bottom: 16px;
 }
 
 /* Summary line displaying accept/reject counts after completion. */
 .done-summary {
     color: #666;
-    font-size: 18px;
+    font-size: 1.286rem;
 }
 
 /* Footer bar containing reject/accept controls and the progress indicator. */
@@ -191,7 +208,7 @@ body {
     border-radius: 6px;
     color: #666;
     display: flex;
-    font-size: 20px;
+    font-size: 1.429rem;
     height: 40px;
     justify-content: center;
     width: 40px;
@@ -210,7 +227,7 @@ body {
 /* Label text beneath the keyboard key icons. */
 .control-hint .label {
     color: #888;
-    font-size: 13px;
+    font-size: 0.929rem;
     font-weight: 600;
     letter-spacing: 0.5px;
 }
@@ -257,7 +274,7 @@ body {
 /* Numeric progress counter text with tabular number alignment. */
 #progress-text {
     color: #666;
-    font-size: 13px;
+    font-size: 0.929rem;
     font-variant-numeric: tabular-nums;
 }
 
@@ -265,7 +282,7 @@ body {
 #clamp-warning {
     background: #fff8e1;
     color: #e65100;
-    font-size: 12px;
+    font-size: 0.857rem;
     padding: 4px 24px;
 }
 
@@ -279,7 +296,7 @@ body {
     background: #f0f4f8;
     color: #546e7a;
     font-family: Monaco, Menlo, monospace;
-    font-size: 12px;
+    font-size: 0.857rem;
     overflow: hidden;
     padding: 4px 24px;
     text-overflow: ellipsis;
