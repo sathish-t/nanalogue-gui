@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--dump-llm-instructions` flag for `nanalogue-chat`: when used alongside `--non-interactive`, writes the full LLM request payload (system prompt + conversation) to a dated log file in `ai_chat_output/` and prints the path to stderr; errors with exit 1 if passed without `--non-interactive` ([`4e33fbe`](https://github.com/sathish-t/nanalogue-gui/commit/4e33fbe60307672978898e488a333514dd3a61e6), [`c5e53ce`](https://github.com/sathish-t/nanalogue-gui/commit/c5e53cedab9a97ec0102aa98df18d14b4527dee5))
+- `--non-interactive <msg>` flag for `nanalogue-chat`: sends a single message to the LLM, prints the response, and exits with no banner or readline — clean for scripting; validates that the message is non-empty and non-whitespace; README documents usage with a `SYSTEM_APPEND.md` example ([`c3b6747`](https://github.com/sathish-t/nanalogue-gui/commit/c3b67477b4d725ae55b788efc2aaeb3f4c94b358))
 - Rough token estimate shown in the system prompt dialog: `~N tokens (rough)` appears on the left of the actions bar when the prompt loads, using UTF-8 byte length divided by 4 ([`a3253f1`](https://github.com/sathish-t/nanalogue-gui/commit/a3253f1cb129602d04acb0eff86476e96e974dce))
 
 ## [0.2.4] - 2026-03-03
