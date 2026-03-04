@@ -10,6 +10,7 @@ import {
     trimZeroHistogramBins,
     trimZeroYieldBins,
 } from "../../lib/format-utils";
+import { getChartFontSizes } from "../shared/chart-font-size";
 
 /**
  * Chart.js constructor declared as an ambient global.
@@ -457,6 +458,8 @@ function renderHistogram(
         : bins.map((b) => b.binStart.toFixed(labelDecimals));
     const data = bins.map((b) => b.count);
 
+    const fontSizes = getChartFontSizes();
+
     const chart = new Chart(ctx, {
         type: "bar",
         data: {
@@ -479,12 +482,24 @@ function renderHistogram(
             },
             scales: {
                 x: {
-                    title: { display: true, text: xLabel },
-                    ticks: { maxRotation: 45 },
+                    title: {
+                        display: true,
+                        text: xLabel,
+                        font: { size: fontSizes.title },
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        font: { size: fontSizes.tick },
+                    },
                 },
                 y: {
-                    title: { display: true, text: yLabel },
+                    title: {
+                        display: true,
+                        text: yLabel,
+                        font: { size: fontSizes.title },
+                    },
                     beginAtZero: true,
+                    ticks: { font: { size: fontSizes.tick } },
                 },
             },
         },
@@ -519,6 +534,8 @@ function renderYieldChart(
     const labels = bins.map((b) => formatYieldLabel(b.binStart, binWidth));
     const data = bins.map((b) => b.yield);
 
+    const fontSizes = getChartFontSizes();
+
     const chart = new Chart(ctx, {
         type: "bar",
         data: {
@@ -541,12 +558,24 @@ function renderYieldChart(
             },
             scales: {
                 x: {
-                    title: { display: true, text: "Read Length (bp)" },
-                    ticks: { maxRotation: 45 },
+                    title: {
+                        display: true,
+                        text: "Read Length (bp)",
+                        font: { size: fontSizes.title },
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        font: { size: fontSizes.tick },
+                    },
                 },
                 y: {
-                    title: { display: true, text: "Yield (bases)" },
+                    title: {
+                        display: true,
+                        text: "Yield (bases)",
+                        font: { size: fontSizes.title },
+                    },
                     beginAtZero: true,
+                    ticks: { font: { size: fontSizes.tick } },
                 },
             },
         },
