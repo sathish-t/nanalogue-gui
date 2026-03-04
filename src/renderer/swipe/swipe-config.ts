@@ -1,6 +1,10 @@
 // Swipe configuration page renderer
 
 import { formatContigLength } from "../../lib/format-utils";
+import { applyFontSize } from "../shared/apply-font-size";
+
+applyFontSize();
+
 import type {
     BamResourceInput,
     BamSelectedDetail,

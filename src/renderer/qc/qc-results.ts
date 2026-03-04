@@ -1,5 +1,9 @@
 // QC results page renderer
 
+import { applyFontSize } from "../shared/apply-font-size";
+
+applyFontSize();
+
 import {
     formatNumber,
     formatYieldLabel,
@@ -649,7 +653,7 @@ function setupHistogramFilter(
             note.textContent = " (all reads)";
             note.style.fontWeight = "normal";
             note.style.color = "#999";
-            note.style.fontSize = "12px";
+            note.style.fontSize = "0.857rem";
             statsPanel.prepend(note);
         } else if (!show && existing) {
             existing.remove();
@@ -788,7 +792,7 @@ function renderSeqTable(
 
     const countLabel = document.createElement("span");
     countLabel.style.color = "#888";
-    countLabel.style.fontSize = "12px";
+    countLabel.style.fontSize = "0.857rem";
     const uniqueReadCount = new Set(rows.map((r) => r.readId)).size;
     countLabel.textContent = `${uniqueReadCount} read${uniqueReadCount !== 1 ? "s" : ""}`;
     toolbar.appendChild(countLabel);
@@ -980,7 +984,7 @@ async function initialize(): Promise<void> {
             seedDisplay.textContent = `Sample seed: ${data.sampleSeed} `;
             const hint = document.createElement("span");
             hint.style.color = "#bbb";
-            hint.style.fontSize = "11px";
+            hint.style.fontSize = "0.786rem";
             hint.textContent = "(only used if subsampling)";
             seedDisplay.appendChild(hint);
         }

@@ -10,6 +10,15 @@ contextBridge.exposeInMainWorld("api", {
     // Landing page
 
     /**
+     * Updates the in-memory font-size preference in the main process.
+     * The new size is passed as a query parameter to all subsequent page loads.
+     *
+     * @param size - The desired font size ('small', 'medium', or 'large').
+     * @returns A promise that resolves when the preference has been recorded.
+     */
+    setFontSize: (size: string) => ipcRenderer.invoke("set-font-size", size),
+
+    /**
      * Returns the application version from package.json.
      *
      * @returns A promise that resolves with the version string.

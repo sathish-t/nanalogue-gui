@@ -2,6 +2,10 @@
 // Handles file selection, BAM peek, region validation, and BED generation.
 
 import { formatContigLength } from "../../lib/format-utils";
+import { applyFontSize } from "../shared/apply-font-size";
+
+applyFontSize();
+
 import { parseRegion } from "../../lib/region-parser";
 import type {
     BamResourceInput,

@@ -1,6 +1,10 @@
 // QC config page renderer
 
 import { formatContigLength } from "../../lib/format-utils";
+import { applyFontSize } from "../shared/apply-font-size";
+
+applyFontSize();
+
 import { parseRegion, validateModRegionOverlap } from "../../lib/region-parser";
 import type { BamSelectedDetail } from "../shared/bam-resource-input";
 import "../shared/bam-resource-input";

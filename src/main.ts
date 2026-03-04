@@ -7,6 +7,8 @@ import { type ChildProcess, fork } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
+import type { FontSize } from "./font-size";
+import { getFontSize, setFontSize } from "./font-size";
 import { countBedDataLines, countNonEmptyLines } from "./lib/line-counter";
 import * as aiChatModule from "./modes/ai-chat";
 import * as qcModule from "./modes/qc";
@@ -123,14 +125,38 @@ function getWindowTitle(mode: AppMode): string {
 }
 
 /**
- * Measures the rendered content height and resizes the window to fit.
+ * Measures the intrinsic landing-page content height and resizes the window to
+ * match, in both directions (grow and shrink).
  *
- * @param win - The BrowserWindow whose height should adapt to content.
+ * Two CSS rules pin scrollHeight to the current viewport when content is
+ * shorter than the window:
+ *   - shared/styles.css sets body { height: 100vh }
+ *   - landing.css sets #landing-app { min-height: 100vh }
+ * Both are temporarily cleared before measuring and restored immediately after
+ * so the layout returns to its normal state without a visible flicker.
+ *
+ * Guards against navigation races: if the mode is no longer "landing" when
+ * the async measurement completes, the resize is skipped.
+ *
+ * @param win - The BrowserWindow to resize.
  */
-async function fitToContent(win: BrowserWindow): Promise<void> {
-    const contentHeight: number = await win.webContents.executeJavaScript(
-        "document.documentElement.scrollHeight",
-    );
+async function fitLandingContent(win: BrowserWindow): Promise<void> {
+    const contentHeight: number = await win.webContents.executeJavaScript(`
+        (function () {
+            const app = document.getElementById('landing-app');
+            const body = document.body;
+            const prevAppMinHeight = app ? app.style.minHeight : '';
+            const prevBodyHeight = body.style.height;
+            if (app) app.style.minHeight = '0';
+            body.style.height = 'auto';
+            const h = document.documentElement.scrollHeight;
+            if (app) app.style.minHeight = prevAppMinHeight;
+            body.style.height = prevBodyHeight;
+            return h;
+        })()
+    `);
+    // Guard: the user may have navigated away while the JS was executing.
+    if (currentMode !== "landing") return;
     const [contentWidth] = win.getContentSize();
     win.setContentSize(contentWidth, contentHeight);
     win.center();
@@ -140,18 +166,20 @@ async function fitToContent(win: BrowserWindow): Promise<void> {
 /**
  * Adjusts a window's height to match its rendered content.
  * Runs immediately if the page already loaded, otherwise waits for did-finish-load.
+ * Uses fitLandingContent so that the min-height: 100vh on #landing-app does
+ * not prevent the window from shrinking when a smaller font is active.
  *
  * @param win - The BrowserWindow whose height should adapt to content.
  */
 function autoFitHeight(win: BrowserWindow): void {
     if (!win.webContents.isLoading()) {
-        fitToContent(win);
+        void fitLandingContent(win);
         return;
     }
     win.webContents.once("did-finish-load", () => {
         // Guard against mode changes that happened while the page was loading
         if (currentMode !== "landing") return;
-        fitToContent(win);
+        void fitLandingContent(win);
     });
 }
 
@@ -179,7 +207,9 @@ function createWindow(mode: AppMode) {
         title: getWindowTitle(mode),
     });
 
-    mainWindow.loadFile(getHtmlPath(mode));
+    mainWindow.loadFile(getHtmlPath(mode), {
+        query: { fontSize: getFontSize() },
+    });
 
     // Auto-fit the landing page so the window matches its content height
     if (mode === "landing") {
@@ -220,7 +250,9 @@ function resizeAndLoadMode(mode: AppMode) {
     mainWindow.setSize(width, height);
     mainWindow.center();
     mainWindow.setTitle(getWindowTitle(mode));
-    mainWindow.loadFile(getHtmlPath(mode));
+    mainWindow.loadFile(getHtmlPath(mode), {
+        query: { fontSize: getFontSize() },
+    });
 
     // Auto-fit the landing page so the window matches its content height
     if (mode === "landing") {
@@ -229,6 +261,28 @@ function resizeAndLoadMode(mode: AppMode) {
 }
 
 // Landing page IPC handlers
+
+ipcMain.handle(
+    "set-font-size",
+    /**
+     * Updates the in-memory font size preference used for all subsequent page navigations.
+     * The value is never written to disk.
+     * When called from the landing page, also re-fits the window height so that
+     * the larger or smaller text does not overflow or leave empty space.
+     *
+     * @param _event - The IPC event (unused).
+     * @param size - The requested font size ('small', 'medium', or 'large').
+     */
+    (_event, size: unknown) => {
+        if (size === "small" || size === "medium" || size === "large") {
+            setFontSize(size as FontSize);
+            if (currentMode === "landing" && mainWindow) {
+                void fitLandingContent(mainWindow);
+            }
+        }
+    },
+);
+
 ipcMain.handle(
     "launch-swipe",
     /**
@@ -239,12 +293,16 @@ ipcMain.handle(
     async () => {
         if (!mainWindow) return { success: false, reason: "No window" };
 
+        // Set currentMode before loadFile so any concurrent set-font-size
+        // IPC call sees the updated mode and skips the landing-only resize.
+        currentMode = "swipe";
         const { width, height } = getWindowSize("swipe");
         mainWindow.setSize(width, height);
         mainWindow.center();
         mainWindow.setTitle("nanalogue-swipe");
         mainWindow.loadFile(
             resolve(__dirname, "renderer", "swipe", "swipe-config.html"),
+            { query: { fontSize: getFontSize() } },
         );
         return { success: true };
     },

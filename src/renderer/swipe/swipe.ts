@@ -1,6 +1,6 @@
-// Renderer script for nanalogue-swipe
+import { applyFontSize } from "../shared/apply-font-size";
 
-export {};
+applyFontSize();
 
 /**
  * External Chart.js constructor available on the global window object.

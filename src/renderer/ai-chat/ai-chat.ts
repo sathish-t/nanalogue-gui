@@ -2,6 +2,9 @@
 // Handles the chat UI, configuration panel, code panel, and IPC communication.
 
 import { CONFIG_FIELD_SPECS } from "../../lib/ai-chat-shared-constants";
+import { applyFontSize } from "../shared/apply-font-size";
+
+applyFontSize();
 
 /** Result returned by mode launch IPC handlers. */
 interface LaunchResult {

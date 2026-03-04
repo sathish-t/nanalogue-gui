@@ -2,6 +2,7 @@
 
 import { resolve } from "node:path";
 import { type BrowserWindow, dialog, ipcMain } from "electron";
+import { getFontSize } from "../font-size";
 import { generateQCData, peekBam } from "../lib/qc-data-loader";
 import type { QCConfig, QCData } from "../lib/types";
 
@@ -88,6 +89,7 @@ export function registerIpcHandlers() {
         // Navigate to results page
         mainWindow?.loadFile(
             resolve(__dirname, "renderer", "qc", "qc-results.html"),
+            { query: { fontSize: getFontSize() } },
         );
     });
 
