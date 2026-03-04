@@ -2,6 +2,8 @@ import { applyFontSize } from "../shared/apply-font-size";
 
 applyFontSize();
 
+import { getChartFontSizes } from "../shared/chart-font-size";
+
 /**
  * External Chart.js constructor available on the global window object.
  */
@@ -342,6 +344,8 @@ function renderChart(plotData: PlotData) {
         stepLineData.push({ x: wp.refWinEnd, y: wp.winVal });
     }
 
+    const fontSizes = getChartFontSizes();
+
     chart = new Chart(ctx, {
         type: "scatter",
         data: {
@@ -381,6 +385,7 @@ function renderChart(plotData: PlotData) {
                     labels: {
                         color: "#333",
                         usePointStyle: true,
+                        font: { size: fontSizes.legend },
                     },
                 },
                 tooltip: {
@@ -426,9 +431,11 @@ function renderChart(plotData: PlotData) {
                         display: true,
                         text: "Genomic Position (bp)",
                         color: "#333",
+                        font: { size: fontSizes.title },
                     },
                     ticks: {
                         color: "#666",
+                        font: { size: fontSizes.tick },
                         /**
                          * Formats tick values with locale-aware number formatting.
                          *
@@ -446,9 +453,11 @@ function renderChart(plotData: PlotData) {
                         display: true,
                         text: "Modification level",
                         color: "#333",
+                        font: { size: fontSizes.title },
                     },
                     ticks: {
                         color: "#666",
+                        font: { size: fontSizes.tick },
                     },
                     grid: {
                         color: "rgba(0, 0, 0, 0.1)",
