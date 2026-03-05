@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Infrastructure
 
 - `scripts/generate-script-tree.mjs` generates `documentation/script-tree.md` — an auto-annotated file tree of `src/` extracted from each file's first comment line; the pre-commit hook regenerates and stages it whenever any `src/` file is committed ([`696c384`](https://github.com/sathish-t/nanalogue-gui/commit/696c3849b0be4846f706578a5835470d675bc2d1), [`dcc4be7`](https://github.com/sathish-t/nanalogue-gui/commit/dcc4be7007dceab020f066ec7b6134d1948bf0fd))
+- `scripts/validate-changelog.mjs` enforces CHANGELOG format rules; runs in the pre-commit hook when `CHANGELOG.md` is staged and as a dedicated CI job ([`38ced9a`](https://github.com/sathish-t/nanalogue-gui/commit/38ced9a0adc966947784afc19b67ef9ad294567b), [`f37cc66`](https://github.com/sathish-t/nanalogue-gui/commit/f37cc6670d2dcecd7618c016331955a9687e7cda))
 
 ## [0.2.4] - 2026-03-03
 
