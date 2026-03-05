@@ -28,3 +28,12 @@ if git diff --cached --name-only | grep -q '^package\(-lock\)\?\.json$'; then
   trap - EXIT INT TERM
   git add package-lock.json
 fi
+
+# Regenerate documentation/script-tree.md whenever src/ files are staged.
+if git diff --cached --name-only | grep -q '^src/'; then
+  if ! node scripts/generate-script-tree.mjs; then
+    echo "pre-commit: generate-script-tree.mjs failed, aborting commit" >&2
+    exit 1
+  fi
+  git add documentation/script-tree.md
+fi
