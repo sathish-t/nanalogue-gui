@@ -43,8 +43,8 @@ are created.
 | Module | Tests | Grade | Notes |
 |---|---|---|---|
 | `ai-chat.ts` | `modes/ai-chat.test.ts` | B | Core IPC paths tested; Electron dialog flows not |
-| `qc.ts` | none | D | No unit tests; logic is relatively thin IPC glue |
-| `swipe.ts` | none | D | No unit tests |
+| `qc.ts` | `modes/qc.test.ts` | B | Core IPC paths tested; Electron dialog flows covered |
+| `swipe.ts` | `modes/swipe.test.ts` | B | initialize(), IPC handlers, and printSummary covered |
 
 ---
 
@@ -62,8 +62,8 @@ are created.
 | `shared/mod-filter-input.ts` | `mod-filter-input.test.ts` | B | |
 | `shared/window-size-input.ts` | `window-size-input.test.ts` | B | |
 | `shared/chart-font-size.ts` | `chart-font-size.test.ts` | A | |
-| `shared/output-file-input.ts` | none | C | No tests |
-| `locate/locate-config.ts` | none | C | No tests |
+| `shared/output-file-input.ts` | `output-file-input.test.ts` | B | DOM structure, state, events, overwrite flow |
+| `locate/locate-config.ts` | `locate-config.test.ts` | B | HTML template structure and default state |
 | `shared/apply-font-size.ts` | none | C | Simple DOM mutation; low risk |
 
 ---
@@ -73,9 +73,9 @@ are created.
 | Module | Tests | Grade | Notes |
 |---|---|---|---|
 | `cli.ts` | `cli.test.ts` | B | Major CLI paths covered |
-| `execute-cli.ts` | none | C | No dedicated tests; sandbox path covered by `monty-sandbox.test.ts` |
+| `execute-cli.ts` | `execute-cli.test.ts` | B | Flag validation, silent/print/truncate/error paths |
 | `main.ts` | none | C | Electron main process — hard to unit-test; covered by E2E |
-| `preload.ts` | none | C | Electron preload — contextBridge IPC bridge; hard to unit-test |
+| `preload.ts` | `preload.test.ts` | B | contextBridge call verified; all IPC channel names checked |
 | `exit-watchdog.ts` | none | C | Forked child process; hard to unit-test |
 | `font-size.ts` | none | C | Simple state; low risk |
 
@@ -85,6 +85,6 @@ are created.
 
 | Gap | Impact | Status |
 |---|---|---|
-| No structural lint for import-layer rules | Agent could import `electron` in `lib/` and CI would pass | Open |
+| No structural lint for import-layer rules | Agent could import `electron` in `lib/` and CI would pass | Resolved — `no-restricted-imports` rules in `eslint.config.mjs` |
 | No E2E test suite wired into CI | Electron UI not automatically tested | Open — `demo/playwright.config.mjs` exists but is not part of `npm test` |
 | Integration tests require live API keys | `model-listing.integration.test.ts` is skipped in CI | By design |
