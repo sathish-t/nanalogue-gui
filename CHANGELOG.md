@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--non-interactive <msg>` flag for `nanalogue-chat`: sends a single message to the LLM, prints the response, and exits with no banner or readline — clean for scripting; validates that the message is non-empty and non-whitespace; README documents usage with a `SYSTEM_APPEND.md` example ([`c3b6747`](https://github.com/sathish-t/nanalogue-gui/commit/c3b67477b4d725ae55b788efc2aaeb3f4c94b358))
 - Rough token estimate shown in the system prompt dialog: `~N tokens (rough)` appears on the left of the actions bar when the prompt loads, using UTF-8 byte length divided by 4 ([`a3253f1`](https://github.com/sathish-t/nanalogue-gui/commit/a3253f1cb129602d04acb0eff86476e96e974dce))
 
+### Infrastructure
+
+- `scripts/generate-script-tree.mjs` generates `documentation/script-tree.md` — an auto-annotated file tree of `src/` extracted from each file's first comment line; the pre-commit hook regenerates and stages it whenever any `src/` file is committed ([`696c384`](https://github.com/sathish-t/nanalogue-gui/commit/696c384), [`dcc4be7`](https://github.com/sathish-t/nanalogue-gui/commit/dcc4be7))
+
 ## [0.2.4] - 2026-03-03
 
 ### Added
