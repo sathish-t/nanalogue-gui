@@ -57,6 +57,24 @@ interpreter runs it; results feed back to the LLM in an agentic loop.
 
 ---
 
+## UI verification (renderer changes)
+
+If your change affects anything the user sees in the app, run the smoke tests
+after `npm run test`.
+
+→ Full instructions and workflow: [`scripts/smoke/SMOKE.md`](scripts/smoke/SMOKE.md)
+
+**Short version:**
+
+1. `npm run build`
+2. `./scripts/smoke/smoke-all.sh`
+3. Screenshots are saved to `/tmp/smoke-<suite>-<timestamp>/` — only read
+   them if you have a specific reason to doubt the visual output (e.g. you
+   changed a layout or chart). Each image costs ~3,000–6,000 tokens; do not
+   read them routinely.
+
+---
+
 ## Before you finish any task
 
 Run these in order:
@@ -70,7 +88,8 @@ npm run lint:fix       # auto-fix what can be fixed
 ```
 
 Then run both reviews in parallel (redirect each to a temp file to avoid
-interleaved output; use `mktemp` so concurrent runs never collide):
+interleaved output; use `mktemp` so concurrent runs never collide).
+Run them in parallel; do not run them one after the other.
 
 ```bash
 CR_OUT=$(mktemp) && CODEX_OUT=$(mktemp)
