@@ -30,7 +30,7 @@
     "copy:ai-chat": "mkdir -p dist/renderer/ai-chat && cp src/renderer/ai-chat/*.html src/renderer/ai-chat/*.css dist/renderer/ai-chat/ 2>/dev/null || true",
     "start": "npm run build && electron dist/main.js",
     "dev": "npm run build && electron dist/main.js",
-    "lint": "biome check src/ scripts/ demo/ && eslint src/ && stylelint \"src/**/*.css\" && html-validate \"src/**/*.html\"",
+    "lint": "biome check src/ scripts/ demo/ && eslint src/ && stylelint \"src/**/*.css\" && html-validate \"src/**/*.html\" && node scripts/check-empty-jsdoc.mjs",
     "lint:fix": "biome check --write src/ scripts/ demo/ && eslint --fix src/ && stylelint --fix \"src/**/*.css\"",
     "lint:docs": "eslint src/",
     "lint:css": "stylelint \"src/**/*.css\"",

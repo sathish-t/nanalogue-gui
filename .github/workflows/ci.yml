@@ -59,7 +59,7 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Lint (Biome, ESLint, Stylelint, html-validate)
+      - name: Lint (Biome, ESLint, Stylelint, html-validate, empty JSDoc)
         run: npm run lint
 
       - name: TypeScript typecheck
