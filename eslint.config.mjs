@@ -9,6 +9,100 @@ export default tseslint.config(
     eslint.configs.recommended,
     ...tseslint.configs.recommended,
     jsdoc.configs["flat/recommended-typescript-error"],
+
+    // -------------------------------------------------------------------------
+    // Import-layer rules — enforce architectural boundaries defined in
+    // ARCHITECTURE.md.  Test files are excluded so mocks can import any module.
+    // -------------------------------------------------------------------------
+
+    // lib/ must not import electron (lib/ is shared with the standalone CLIs).
+    {
+        files: ["src/lib/**/*.ts"],
+        ignores: ["src/lib/**/*.test.ts"],
+        rules: {
+            "no-restricted-imports": [
+                "error",
+                {
+                    patterns: [
+                        {
+                            group: ["electron", "electron/*"],
+                            message:
+                                "lib/ must not import electron — it is reused by cli.ts and execute-cli.ts which have no Electron dependency.",
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+
+    // renderer/ must not import electron, native addons, or Node.js built-ins.
+    {
+        files: ["src/renderer/**/*.ts"],
+        ignores: ["src/renderer/**/*.test.ts"],
+        rules: {
+            "no-restricted-imports": [
+                "error",
+                {
+                    patterns: [
+                        {
+                            group: ["electron", "electron/*"],
+                            message:
+                                "renderer/ must not import electron — communicate via window.electronAPI (contextBridge).",
+                        },
+                        {
+                            group: ["@nanalogue/node"],
+                            message:
+                                "renderer/ must not import @nanalogue/node — native addons crash the renderer process.",
+                        },
+                        {
+                            group: ["@pydantic/monty"],
+                            message:
+                                "renderer/ must not import @pydantic/monty — native addons crash the renderer process.",
+                        },
+                        {
+                            group: ["node:*"],
+                            message:
+                                "renderer/ must not use Node.js built-ins — the renderer runs in a browser context.",
+                        },
+                    ],
+                    paths: [
+                        { name: "fs", message: "renderer/ must not use Node.js built-ins." },
+                        { name: "path", message: "renderer/ must not use Node.js built-ins." },
+                        { name: "os", message: "renderer/ must not use Node.js built-ins." },
+                        { name: "crypto", message: "renderer/ must not use Node.js built-ins." },
+                        { name: "child_process", message: "renderer/ must not use Node.js built-ins." },
+                        { name: "readline", message: "renderer/ must not use Node.js built-ins." },
+                        { name: "util", message: "renderer/ must not use Node.js built-ins." },
+                        { name: "http", message: "renderer/ must not use Node.js built-ins." },
+                        { name: "https", message: "renderer/ must not use Node.js built-ins." },
+                        { name: "stream", message: "renderer/ must not use Node.js built-ins." },
+                        { name: "buffer", message: "renderer/ must not use Node.js built-ins." },
+                        { name: "events", message: "renderer/ must not use Node.js built-ins." },
+                    ],
+                },
+            ],
+        },
+    },
+
+    // cli.ts and execute-cli.ts must not import electron.
+    {
+        files: ["src/cli.ts", "src/execute-cli.ts"],
+        rules: {
+            "no-restricted-imports": [
+                "error",
+                {
+                    patterns: [
+                        {
+                            group: ["electron", "electron/*"],
+                            message:
+                                "CLI entry points must not import electron — they run outside the Electron process.",
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+
     {
         files: ["src/**/*.ts"],
         plugins: {
