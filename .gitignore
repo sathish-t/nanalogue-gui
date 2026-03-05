@@ -71,8 +71,6 @@ Desktop.ini
 # Project-specific (local development)
 # ===================
 # Claude AI assistant files
-claude.md
-CLAUDE.md
 .claude/
 docs/
 
