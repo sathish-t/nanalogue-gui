@@ -11,6 +11,21 @@ on:
   workflow_call: # Allow calling from ci-nightly.yml
 
 jobs:
+  check-agents-symlink:
+    name: Check AGENTS.md symlink
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Verify AGENTS.md is a symlink to CLAUDE.md
+        run: |
+          if [ ! -L AGENTS.md ] || [ "$(readlink AGENTS.md)" != "CLAUDE.md" ]; then
+            echo "AGENTS.md must be a symbolic link to CLAUDE.md" >&2
+            echo "Fix with: rm AGENTS.md && ln -s CLAUDE.md AGENTS.md" >&2
+            exit 1
+          fi
+
   validate-changelog:
     name: Validate CHANGELOG
     runs-on: ubuntu-latest

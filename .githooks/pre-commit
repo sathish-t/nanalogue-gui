@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+# Ensure AGENTS.md remains a symbolic link to CLAUDE.md.
+# Tools like sed -i silently replace symlinks with regular files.
+if [ ! -L AGENTS.md ] || [ "$(readlink AGENTS.md)" != "CLAUDE.md" ]; then
+  echo "pre-commit: AGENTS.md must be a symbolic link to CLAUDE.md" >&2
+  echo "  Fix with: rm AGENTS.md && ln -s CLAUDE.md AGENTS.md" >&2
+  exit 1
+fi
+
 # Keeps package-lock.json in sync with package.json so that
 # npm ci in CI does not fail on optional-dependency mismatches.
 
