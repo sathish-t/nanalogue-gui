@@ -29,6 +29,14 @@ if git diff --cached --name-only | grep -q '^package\(-lock\)\?\.json$'; then
   git add package-lock.json
 fi
 
+# Validate CHANGELOG.md format whenever it is staged.
+if git diff --cached --name-only | grep -q '^CHANGELOG\.md$'; then
+  if ! node scripts/validate-changelog.mjs; then
+    echo "pre-commit: CHANGELOG.md validation failed, aborting commit" >&2
+    exit 1
+  fi
+fi
+
 # Regenerate documentation/script-tree.md whenever src/ files are staged.
 if git diff --cached --name-only | grep -q '^src/'; then
   if ! node scripts/generate-script-tree.mjs; then

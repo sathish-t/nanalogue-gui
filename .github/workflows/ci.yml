@@ -11,6 +11,16 @@ on:
   workflow_call: # Allow calling from ci-nightly.yml
 
 jobs:
+  validate-changelog:
+    name: Validate CHANGELOG
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Validate CHANGELOG.md
+        run: node scripts/validate-changelog.mjs
+
   lint-and-typecheck:
     name: Lint & Typecheck
     runs-on: ubuntu-latest
