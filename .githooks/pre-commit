@@ -29,6 +29,16 @@ if git diff --cached --name-only | grep -q '^package\(-lock\)\?\.json$'; then
   git add package-lock.json
 fi
 
+# Check markdown links whenever any .md file is staged.
+# --cached-only limits the check to staged/committed files so that local
+# untracked draft markdown files cannot block unrelated commits.
+if git diff --cached --name-only | grep -q '\.md$'; then
+  if ! node scripts/check-md-links.mjs --cached-only; then
+    echo "pre-commit: markdown link check failed, aborting commit" >&2
+    exit 1
+  fi
+fi
+
 # Validate CHANGELOG.md format whenever it is staged.
 if git diff --cached --name-only | grep -q '^CHANGELOG\.md$'; then
   if ! node scripts/validate-changelog.mjs; then
