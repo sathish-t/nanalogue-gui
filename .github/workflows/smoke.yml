@@ -1,0 +1,52 @@
+# Smoke test workflow for nanalogue-gui.
+# Launches the Electron app via Playwright and runs structural checks across
+# landing, swipe, and QC modes.  Covers both renderer and main process changes
+# since a fresh Electron instance is launched for each suite.
+
+name: Smoke tests
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  smoke:
+    name: Smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install display dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb openbox
+
+      - name: Install Playwright Electron deps
+        run: npx playwright install --with-deps
+
+      - name: Build
+        run: npm run build
+
+      - name: Run smoke tests
+        run: >-
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24"
+          ./scripts/smoke/smoke-all.sh
+        env:
+          ELECTRON_EXTRA_LAUNCH_ARGS: "--no-sandbox --disable-gpu"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-screenshots
+          path: /tmp/smoke-*/
