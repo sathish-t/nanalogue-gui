@@ -2,7 +2,7 @@
 // Run with: npx playwright test --config demo/playwright.config.mjs
 
 import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "@playwright/test";
 import { _electron as electron } from "playwright";
@@ -199,7 +199,10 @@ for (const provider of AI_PROVIDERS) {
         await page.waitForURL(/ai-chat\.html/);
         await page.waitForLoadState("domcontentloaded");
         await page.screenshot({
-            path: resolve(dir, `screenshot-ai-chat-config-${provider.name}.png`),
+            path: resolve(
+                dir,
+                `screenshot-ai-chat-config-${provider.name}.png`,
+            ),
         });
 
         // Fill in the endpoint URL

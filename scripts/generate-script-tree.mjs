@@ -3,23 +3,27 @@
 // Extracts the first meaningful comment from each source file and uses it
 // as a description in the tree. Run: node scripts/generate-script-tree.mjs
 
-import { readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join, extname, dirname, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {
+    mkdirSync,
+    readdirSync,
+    readFileSync,
+    statSync,
+    writeFileSync,
+} from "node:fs";
+import { dirname, extname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..');
-const SRC_DIR = join(ROOT, 'src');
-const OUT_FILE = join(ROOT, 'documentation', 'script-tree.md');
+const ROOT = join(__dirname, "..");
+const SRC_DIR = join(ROOT, "src");
+const OUT_FILE = join(ROOT, "documentation", "script-tree.md");
 
 // --- Exclusion rules ---
 
-const EXCLUDE_FILE_PATTERNS = [
-  /\.test\.ts$/,
-];
+const EXCLUDE_FILE_PATTERNS = [/\.test\.ts$/];
 
 function isExcluded(name) {
-  return EXCLUDE_FILE_PATTERNS.some(p => p.test(name));
+    return EXCLUDE_FILE_PATTERNS.some((p) => p.test(name));
 }
 
 // --- Description extraction ---
@@ -32,50 +36,50 @@ function isExcluded(name) {
  * - .html         : no description (DOCTYPE is not useful)
  */
 function extractDescription(filePath) {
-  const ext = extname(filePath);
+    const ext = extname(filePath);
 
-  let content;
-  try {
-    content = readFileSync(filePath, 'utf-8');
-  } catch {
-    return null;
-  }
-
-  const lines = content.split('\n');
-
-  if (ext === '.ts' || ext === '.js' || ext === '.mjs') {
-    // Only accept a comment that appears before any non-blank, non-comment line.
-    // A file that starts with imports does not have a file-level description comment.
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed === '') continue;                  // blank line — keep scanning
-      if (trimmed.startsWith('//')) {
-        const desc = trimmed.replace(/^\/\/\s*/, '').trim();
-        if (desc.length > 0) return desc;
-        continue;                                    // empty comment line — keep scanning
-      }
-      break;                                         // hit real code — no file-level comment
+    let content;
+    try {
+        content = readFileSync(filePath, "utf-8");
+    } catch {
+        return null;
     }
-    return null;
-  }
 
-  if (ext === '.css') {
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('/*')) {
-        // Handle both `/* text */` (single line) and `/* text` (opening of multi-line)
-        const desc = trimmed
-          .replace(/^\/\*+\s*/, '')   // strip leading /*
-          .replace(/\s*\*+\/$/, '')   // strip trailing */
-          .trim();
-        if (desc.length > 0) return desc;
-      }
+    const lines = content.split("\n");
+
+    if (ext === ".ts" || ext === ".js" || ext === ".mjs") {
+        // Only accept a comment that appears before any non-blank, non-comment line.
+        // A file that starts with imports does not have a file-level description comment.
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed === "") continue; // blank line — keep scanning
+            if (trimmed.startsWith("//")) {
+                const desc = trimmed.replace(/^\/\/\s*/, "").trim();
+                if (desc.length > 0) return desc;
+                continue; // empty comment line — keep scanning
+            }
+            break; // hit real code — no file-level comment
+        }
+        return null;
     }
-    return null;
-  }
 
-  // .html and everything else: no description
-  return null;
+    if (ext === ".css") {
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith("/*")) {
+                // Handle both `/* text */` (single line) and `/* text` (opening of multi-line)
+                const desc = trimmed
+                    .replace(/^\/\*+\s*/, "") // strip leading /*
+                    .replace(/\s*\*+\/$/, "") // strip trailing */
+                    .trim();
+                if (desc.length > 0) return desc;
+            }
+        }
+        return null;
+    }
+
+    // .html and everything else: no description
+    return null;
 }
 
 // --- Tree building ---
@@ -85,69 +89,69 @@ function extractDescription(filePath) {
  * Files are listed before subdirectories; both groups are sorted alphabetically.
  */
 function buildTree(dir, indentLevel) {
-  const entries = readdirSync(dir);
+    const entries = readdirSync(dir);
 
-  const files = [];
-  const subdirs = [];
+    const files = [];
+    const subdirs = [];
 
-  for (const entry of entries) {
-    if (entry.startsWith('.')) continue;
-    if (isExcluded(entry)) continue;
+    for (const entry of entries) {
+        if (entry.startsWith(".")) continue;
+        if (isExcluded(entry)) continue;
 
-    const fullPath = join(dir, entry);
-    const stat = statSync(fullPath);
+        const fullPath = join(dir, entry);
+        const stat = statSync(fullPath);
 
-    if (stat.isDirectory()) {
-      subdirs.push(entry);
-    } else {
-      files.push(entry);
+        if (stat.isDirectory()) {
+            subdirs.push(entry);
+        } else {
+            files.push(entry);
+        }
     }
-  }
 
-  files.sort();
-  subdirs.sort();
+    files.sort();
+    subdirs.sort();
 
-  // Compute column width for alignment: longest name in this directory + 2 spaces gap
-  const allNames = [...files, ...subdirs.map(d => `${d}/`)];
-  const maxNameLen = allNames.reduce((m, n) => Math.max(m, n.length), 0);
-  const colWidth = Math.max(maxNameLen + 2, 22); // minimum 22 so short names still align
+    // Compute column width for alignment: longest name in this directory + 2 spaces gap
+    const allNames = [...files, ...subdirs.map((d) => `${d}/`)];
+    const maxNameLen = allNames.reduce((m, n) => Math.max(m, n.length), 0);
+    const colWidth = Math.max(maxNameLen + 2, 22); // minimum 22 so short names still align
 
-  const pad = '  '.repeat(indentLevel);
-  const lines = [];
+    const pad = "  ".repeat(indentLevel);
+    const lines = [];
 
-  for (const file of files) {
-    const desc = extractDescription(join(dir, file));
-    if (desc) {
-      lines.push(`${pad}${file.padEnd(colWidth)}# ${desc}`);
-    } else {
-      lines.push(`${pad}${file}`);
+    for (const file of files) {
+        const desc = extractDescription(join(dir, file));
+        if (desc) {
+            lines.push(`${pad}${file.padEnd(colWidth)}# ${desc}`);
+        } else {
+            lines.push(`${pad}${file}`);
+        }
     }
-  }
 
-  for (const sub of subdirs) {
-    lines.push(`${pad}${sub}/`);
-    lines.push(...buildTree(join(dir, sub), indentLevel + 1));
-  }
+    for (const sub of subdirs) {
+        lines.push(`${pad}${sub}/`);
+        lines.push(...buildTree(join(dir, sub), indentLevel + 1));
+    }
 
-  return lines;
+    return lines;
 }
 
 // --- Main ---
 
-const treeLines = ['src/', ...buildTree(SRC_DIR, 1)];
+const treeLines = ["src/", ...buildTree(SRC_DIR, 1)];
 
 const output = [
-  '# nanalogue-gui File Structure',
-  '',
-  '> Auto-generated by `scripts/generate-script-tree.mjs` — do not edit by hand.',
-  '> Regenerated automatically on each commit via the pre-commit hook.',
-  '',
-  '```',
-  ...treeLines,
-  '```',
-  '',
-].join('\n');
+    "# nanalogue-gui File Structure",
+    "",
+    "> Auto-generated by `scripts/generate-script-tree.mjs` — do not edit by hand.",
+    "> Regenerated automatically on each commit via the pre-commit hook.",
+    "",
+    "```",
+    ...treeLines,
+    "```",
+    "",
+].join("\n");
 
 mkdirSync(dirname(OUT_FILE), { recursive: true });
-writeFileSync(OUT_FILE, output, 'utf-8');
+writeFileSync(OUT_FILE, output, "utf-8");
 console.log(`Written: ${relative(ROOT, OUT_FILE)}`);
