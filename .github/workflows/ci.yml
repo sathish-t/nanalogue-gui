@@ -21,6 +21,16 @@ jobs:
       - name: Validate CHANGELOG.md
         run: node scripts/validate-changelog.mjs
 
+  validate-css-comments:
+    name: Validate CSS comments
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Validate CSS comments
+        run: node scripts/validate-css-comments.mjs
+
   lint-and-typecheck:
     name: Lint & Typecheck
     runs-on: ubuntu-latest

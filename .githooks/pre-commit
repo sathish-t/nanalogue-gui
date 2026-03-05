@@ -37,6 +37,14 @@ if git diff --cached --name-only | grep -q '^CHANGELOG\.md$'; then
   fi
 fi
 
+# Validate CSS comments whenever any src/ CSS file is staged.
+if git diff --cached --name-only | grep -q '\.css$'; then
+  if ! node scripts/validate-css-comments.mjs; then
+    echo "pre-commit: CSS comment validation failed, aborting commit" >&2
+    exit 1
+  fi
+fi
+
 # Regenerate documentation/script-tree.md whenever src/ files are staged.
 if git diff --cached --name-only | grep -q '^src/'; then
   if ! node scripts/generate-script-tree.mjs; then
