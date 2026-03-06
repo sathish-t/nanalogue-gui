@@ -56,30 +56,60 @@ function error(msg) {
     errors.push(msg);
 }
 
-// Memoised commit existence check using execFileSync to avoid shell invocation.
+// Memoised commit reachability check using execFileSync to avoid shell invocation.
+// Uses `git for-each-ref --contains=<sha> refs/heads refs/remotes/origin` rather
+// than `git rev-parse --verify` so that dangling objects (present in the local
+// object store but not reachable from any real ref) are correctly rejected. This
+// catches the failure mode the old check missed: a commit created locally and then
+// reset away (`git reset --soft`) still exists as an object but is never pushed, so
+// it would be absent from all other clones.
+//
+// Scope rationale:
+//   refs/heads         — commits on local branches, valid in the pre-commit hook
+//                        context where changes are about to be pushed.
+//   refs/remotes/origin — commits already pushed to origin, valid in CI where the
+//                        working copy has no local branch refs.
+// refs/stash and other local-only refs are intentionally excluded.
+//
+// Exit codes: git for-each-ref exits 128 or 129 when the --contains value is not
+// a valid commit object; both are treated as "not found".
 const commitCache = new Map();
 function commitExists(sha) {
     if (commitCache.has(sha)) return commitCache.get(sha);
     try {
-        execFileSync("git", ["rev-parse", "--verify", `${sha}^{commit}`], {
-            stdio: "pipe",
-            cwd: ROOT,
-        });
-        commitCache.set(sha, true);
-        return true;
+        const out = execFileSync(
+            "git",
+            [
+                "for-each-ref",
+                `--contains=${sha}`,
+                "--format=%(refname)",
+                "refs/heads",
+                "refs/remotes/origin",
+            ],
+            { stdio: "pipe", cwd: ROOT },
+        );
+        // Non-empty output means at least one branch or origin ref contains the
+        // commit — it is part of real (non-dangling) history.
+        const reachable = out.toString().trim().length > 0;
+        commitCache.set(sha, reachable);
+        return reachable;
     } catch (err) {
         // ENOENT means git binary is not on PATH — propagate as a hard error
         if (err.code === "ENOENT") {
             throw new Error("git is not available on PATH");
         }
-        // Any exit status other than 128 is an unexpected git failure — propagate
-        if (err.status !== 128) {
+        // git for-each-ref exits 129 when the --contains value is not a valid
+        // commit object (unknown SHA or wrong object type) — treat as not found.
+        // Exit 128 is git's generic fatal-error code (e.g. not a git repo,
+        // corrupted object store) and should surface as a hard failure so the
+        // caller sees a clear message rather than a list of spurious "missing
+        // commit" errors.
+        if (err.status !== 129) {
             throw new Error(
-                `git rev-parse failed unexpectedly (exit ${err.status}): ` +
+                `git for-each-ref failed unexpectedly (exit ${err.status}): ` +
                     (err.stderr?.toString().trim() ?? ""),
             );
         }
-        // Exit status 128 means the commit is not found
         commitCache.set(sha, false);
         return false;
     }
