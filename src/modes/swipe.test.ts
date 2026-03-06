@@ -75,8 +75,9 @@ vi.mock("../lib/bed-parser", () => ({
 // Top-level imports (after mocks are hoisted).
 // ---------------------------------------------------------------------------
 
-const { appendFileSync, existsSync, realpathSync, writeFileSync } =
+const { appendFileSync, existsSync, realpathSync, unlinkSync, writeFileSync } =
     await import("node:fs");
+const { dialog } = await import("electron");
 const { loadContigSizes, loadPlotData } = await import(
     "../lib/swipe-data-loader"
 );
@@ -462,5 +463,135 @@ describe("swipe mode — printSummary()", () => {
             .map((c) => String(c[0]))
             .join("\n");
         expect(output).toContain("/data/output.bed");
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Overwrite dialog (skipOverwriteConfirm = false)
+// ---------------------------------------------------------------------------
+
+describe("swipe mode — initialize() overwrite dialog", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(realpathSync as ReturnType<typeof vi.fn>).mockImplementation(
+            (p: string) => p,
+        );
+        vi.mocked(loadContigSizes).mockResolvedValue({ chr1: 5000 });
+        vi.mocked(parseBedFile).mockReturnValue({
+            capped: false,
+            annotations: [
+                {
+                    contig: "chr1",
+                    start: 100,
+                    end: 200,
+                    readId: "r1",
+                    rawLine: "chr1\t100\t200\tr1",
+                },
+            ],
+        });
+        // Output file exists by default in these tests
+        vi.mocked(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+        // Default dialog response: user confirms (response 0 = Overwrite)
+        vi.mocked(dialog.showMessageBox).mockResolvedValue({ response: 0 });
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it("shows the overwrite dialog when output file exists and skipOverwriteConfirm is false", async () => {
+        await initialize(BASE_ARGS, false);
+
+        expect(dialog.showMessageBox).toHaveBeenCalledOnce();
+    });
+
+    it("deletes the existing output file when user confirms overwrite", async () => {
+        await initialize(BASE_ARGS, false);
+
+        expect(vi.mocked(unlinkSync)).toHaveBeenCalledWith(
+            BASE_ARGS.outputPath,
+        );
+    });
+
+    it("does not show the dialog when skipOverwriteConfirm is true", async () => {
+        await initialize(BASE_ARGS, true);
+
+        expect(dialog.showMessageBox).not.toHaveBeenCalled();
+    });
+
+    it("throws when user cancels the overwrite dialog", async () => {
+        // Response 1 = Cancel button
+        vi.mocked(dialog.showMessageBox).mockResolvedValue({ response: 1 });
+
+        await expect(initialize(BASE_ARGS, false)).rejects.toThrow(
+            "User cancelled",
+        );
+    });
+
+    it("does not delete the file when user cancels", async () => {
+        vi.mocked(dialog.showMessageBox).mockResolvedValue({ response: 1 });
+
+        await expect(initialize(BASE_ARGS, false)).rejects.toThrow();
+        expect(vi.mocked(unlinkSync)).not.toHaveBeenCalled();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Additional IPC handler edge cases
+// ---------------------------------------------------------------------------
+
+describe("swipe mode — IPC handler edge cases", () => {
+    beforeEach(async () => {
+        vi.clearAllMocks();
+        vi.mocked(realpathSync as ReturnType<typeof vi.fn>).mockImplementation(
+            (p: string) => p,
+        );
+        await initializeWithFakes();
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it("get-plot-data returns null after all annotations have been reviewed", async () => {
+        // Accept both annotations to exhaust the list
+        vi.mocked(loadPlotData).mockResolvedValue({
+            rawPoints: [],
+            windowedPoints: [],
+        } as unknown as PlotData);
+        await ipcHandlers.get("accept")?.(undefined);
+        await ipcHandlers.get("accept")?.(undefined);
+
+        // Subsequent get-plot-data should short-circuit and return null
+        vi.mocked(loadPlotData).mockClear();
+        const result = await ipcHandlers.get("get-plot-data")?.(undefined);
+
+        expect(result).toBeNull();
+        // loadPlotData should never be called when there are no more annotations
+        expect(vi.mocked(loadPlotData)).not.toHaveBeenCalled();
+    });
+
+    it("accept handles appendFileSync errors gracefully without throwing", async () => {
+        vi.mocked(loadPlotData).mockResolvedValue({
+            rawPoints: [],
+            windowedPoints: [],
+        } as unknown as PlotData);
+        vi.mocked(
+            appendFileSync as ReturnType<typeof vi.fn>,
+        ).mockImplementation(() => {
+            throw new Error("disk full");
+        });
+        const consoleSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+
+        // Should resolve rather than propagating the appendFileSync error
+        await expect(
+            ipcHandlers.get("accept")?.(undefined),
+        ).resolves.toBeDefined();
+        expect(consoleSpy).toHaveBeenCalledWith(
+            "Error writing annotation:",
+            expect.any(Error),
+        );
     });
 });

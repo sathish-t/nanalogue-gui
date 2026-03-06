@@ -357,4 +357,102 @@ describe("ChatSession", () => {
             expect(args.appendSystemPrompt).toBeUndefined();
         });
     });
+
+    describe("error handling", () => {
+        it("emits turn_error and returns failure for a generic non-abort error", async () => {
+            vi.mocked(handleUserMessage).mockRejectedValue(
+                new Error("network failure"),
+            );
+
+            const emitEvent = vi.fn();
+            const result = await session.sendMessage({
+                endpointUrl: "http://localhost:11434/v1",
+                apiKey: "",
+                model: "llama3",
+                message: "test",
+                allowedDir: "/tmp",
+                config: defaultConfig,
+                emitEvent,
+            });
+
+            expect(result).toEqual({
+                success: false,
+                error: "network failure",
+                isTimeout: false,
+            });
+            expect(emitEvent).toHaveBeenCalledWith({
+                type: "turn_error",
+                error: "network failure",
+                isTimeout: false,
+            });
+        });
+
+        it("marks the result as a timeout when the error name is TimeoutError", async () => {
+            const timeoutErr = new Error("timed out waiting for response");
+            timeoutErr.name = "TimeoutError";
+            vi.mocked(handleUserMessage).mockRejectedValue(timeoutErr);
+
+            const emitEvent = vi.fn();
+            const result = await session.sendMessage({
+                endpointUrl: "http://localhost:11434/v1",
+                apiKey: "",
+                model: "llama3",
+                message: "test",
+                allowedDir: "/tmp",
+                config: defaultConfig,
+                emitEvent,
+            });
+
+            expect(result).toEqual({
+                success: false,
+                error: "timed out waiting for response",
+                isTimeout: true,
+            });
+            expect(emitEvent).toHaveBeenCalledWith({
+                type: "turn_error",
+                error: "timed out waiting for response",
+                isTimeout: true,
+            });
+        });
+
+        it("marks the result as a timeout when the error message contains 'timed out'", async () => {
+            vi.mocked(handleUserMessage).mockRejectedValue(
+                new Error("request timed out after 120s"),
+            );
+
+            const result = await session.sendMessage({
+                endpointUrl: "http://localhost:11434/v1",
+                apiKey: "",
+                model: "llama3",
+                message: "test",
+                allowedDir: "/tmp",
+                config: defaultConfig,
+                emitEvent: vi.fn(),
+            });
+
+            expect(result).toMatchObject({ success: false, isTimeout: true });
+        });
+
+        it("converts non-Error rejections to a string error message", async () => {
+            vi.mocked(handleUserMessage).mockRejectedValue(
+                "something went wrong",
+            );
+
+            const result = await session.sendMessage({
+                endpointUrl: "http://localhost:11434/v1",
+                apiKey: "",
+                model: "llama3",
+                message: "test",
+                allowedDir: "/tmp",
+                config: defaultConfig,
+                emitEvent: vi.fn(),
+            });
+
+            expect(result).toEqual({
+                success: false,
+                error: "something went wrong",
+                isTimeout: false,
+            });
+        });
+    });
 });
