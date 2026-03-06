@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Infrastructure
 
+- Adds `scripts/check-coverage.mjs` which enforces a %Lines coverage floor stored in `documentation/script-coverage.tsv`: pre-existing tracked files must not regress, and any newly-instrumented file must debut at 100%; wired into the pre-commit hook (fires on `src/` TypeScript changes) and as a dedicated CI job ([`e56b9a3`](https://github.com/sathish-t/nanalogue-gui/commit/e56b9a31f176a6ee1df159de2ff973b8f12c036c), [`dc2e210`](https://github.com/sathish-t/nanalogue-gui/commit/dc2e210aebb94869eea20f7c2e98158fcb53fc53))
 - Adds ESLint `no-restricted-imports` rules enforcing import-layer boundaries (`lib/` forbids `electron`; `renderer/` forbids `electron`, native addons, and Node.js built-ins; CLI entry points forbid `electron`); test files excluded ([`062885f`](https://github.com/sathish-t/nanalogue-gui/commit/062885fb3e90945ec572774ed38a28cb338aa5f6))
 - Adds Playwright smoke test suite (`scripts/smoke/`) with suites for landing, swipe, and QC modes; `smoke-all.sh` runner; `start-debug.sh` for interactive CDP sessions ([`b3e72ba`](https://github.com/sathish-t/nanalogue-gui/commit/b3e72baa0e4c8c6ccf617d3ad116d2e3ddcbaa0d))
 - Adds `smoke` GitHub Actions workflow running the full Playwright suite under `xvfb-run` with screenshot artifact upload ([`2303267`](https://github.com/sathish-t/nanalogue-gui/commit/230326737a406dde46c68ab8c45100e6eb802fed))
