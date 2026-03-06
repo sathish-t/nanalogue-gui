@@ -72,6 +72,12 @@ Node.js built-ins (`fs`, `path`, `process`, etc.).
 **Why:** Renderer pages are loaded as browser pages; native module imports
 crash the renderer.
 
+**Type imports:** Renderer files that need types already exported from
+`lib/` must import them with `import type { … } from "../../lib/…"` rather
+than redefining them locally. Local redefinitions are a DRY violation: if
+the `lib/` definition gains a new field, the renderer's copy silently drifts
+and TypeScript will not catch the divergence.
+
 ### `src/cli.ts` / `src/execute-cli.ts`
 **May use:** `lib/`, Node.js built-ins, `readline`, `process`.
 

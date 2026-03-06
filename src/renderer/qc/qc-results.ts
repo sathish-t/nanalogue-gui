@@ -10,6 +10,8 @@ import {
     trimZeroHistogramBins,
     trimZeroYieldBins,
 } from "../../lib/format-utils";
+import type { HistogramBin, Stats, YieldBin } from "../../lib/stats";
+import type { SeqTableRow } from "../../lib/types";
 import { getChartFontSizes } from "../shared/chart-font-size";
 
 /**
@@ -33,56 +35,6 @@ interface ChartInstance {
     destroy(): void;
     /** Triggers a resize of the chart to fit its container. */
     resize(): void;
-}
-
-/**
- * Summary statistics computed over a set of numeric values.
- */
-interface Stats {
-    /** Total number of values in the dataset. */
-    count: number;
-    /** Sum of all values in the dataset. */
-    sum: number;
-    /** Minimum value in the dataset. */
-    min: number;
-    /** Maximum value in the dataset. */
-    max: number;
-    /** Arithmetic mean of the dataset. */
-    mean: number;
-    /** Tenth percentile value. */
-    p10: number;
-    /** Fiftieth percentile (median) value. */
-    p50: number;
-    /** Ninetieth percentile value. */
-    p90: number;
-    /** Standard deviation of the dataset. */
-    stddev: number;
-    /** N50 metric, present only for length-based statistics. */
-    n50?: number;
-}
-
-/**
- * A single bin in a histogram representing a count of observations.
- */
-interface HistogramBin {
-    /** Inclusive lower bound of the bin range. */
-    binStart: number;
-    /** Exclusive upper bound of the bin range. */
-    binEnd: number;
-    /** Number of observations falling within this bin. */
-    count: number;
-}
-
-/**
- * A single bin representing yield accumulated within a length range.
- */
-interface YieldBin {
-    /** Inclusive lower bound of the bin range in base pairs. */
-    binStart: number;
-    /** Exclusive upper bound of the bin range in base pairs. */
-    binEnd: number;
-    /** Total yield in bases for reads within this bin. */
-    yield: number;
 }
 
 /**
@@ -113,22 +65,6 @@ interface ReadTypeCounts {
     supplementaryReverse: number;
     /** Number of unmapped reads. */
     unmapped: number;
-}
-
-/**
- * A single row of sequence data from the QC pipeline.
- */
-interface SeqTableRow {
-    /** The unique read identifier. */
-    readId: string;
-    /** The sequence string with modification tag applied. */
-    sequence: string;
-    /** The sequence string with no modification tag. */
-    baseSequence: string;
-    /** Per-base quality scores. */
-    qualities: number[];
-    /** Average quality excluding missing (255) values, or null. */
-    avgQuality: number | null;
 }
 
 /**
