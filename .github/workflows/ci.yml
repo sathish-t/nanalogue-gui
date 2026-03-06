@@ -141,6 +141,18 @@ jobs:
       - name: Check file sizes
         run: node scripts/check-file-size.mjs --all
 
+  # Verify that every exported function in *-validation.ts files is named
+  # validate* so the naming convention cannot drift silently.
+  check-validate-prefix:
+    name: validate* prefix check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Check validate* prefix
+        run: node scripts/check-validate-prefix.mjs --all
+
   # Verify that %Lines coverage has not regressed for any tracked file
   # and that any brand-new file debuts at 100%.
   check-coverage:

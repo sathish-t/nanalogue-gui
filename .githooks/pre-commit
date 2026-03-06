@@ -92,3 +92,13 @@ if git diff --cached --name-only | grep -q '^src/.*\.ts$'; then
     exit 1
   fi
 fi
+
+# Enforce validate* prefix on all exported functions in *-validation.ts files.
+# Every function a validation module exports is a validation entry point; naming
+# it validate* makes that contract self-documenting and grep-friendly.
+if git diff --cached --name-only | grep -qE '^src/.*-validation\.ts$'; then
+  if ! node scripts/check-validate-prefix.mjs; then
+    echo "pre-commit: validate* prefix check failed, aborting commit" >&2
+    exit 1
+  fi
+fi
