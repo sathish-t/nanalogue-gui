@@ -71,3 +71,14 @@ if git diff --cached --name-only | grep -q '^src/'; then
   fi
   git add documentation/script-tree.md
 fi
+
+# Enforce coverage floor whenever any src/ TypeScript file is staged.
+# New files must debut at 100%; existing files must not regress.
+# On a clean pass the TSV floor is updated and staged automatically.
+if git diff --cached --name-only | grep -q '^src/.*\.ts$'; then
+  if ! node scripts/check-coverage.mjs; then
+    echo "pre-commit: coverage check failed, aborting commit" >&2
+    exit 1
+  fi
+  git add documentation/script-coverage.tsv
+fi
