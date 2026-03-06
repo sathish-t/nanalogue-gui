@@ -74,7 +74,7 @@ are created.
 |---|---|---|---|
 | `cli.ts` | `cli.test.ts` | B | Major CLI paths covered |
 | `execute-cli.ts` | `execute-cli.test.ts` | B | Flag validation, silent/print/truncate/error paths |
-| `main.ts` | none | C | Electron main process — hard to unit-test; covered by E2E |
+| `main.ts` | none | B | Electron main process — hard to unit-test; covered by E2E smoke tests wired into CI (`smoke.yml`) |
 | `preload.ts` | `preload.test.ts` | B | contextBridge call verified; all IPC channel names checked |
 | `exit-watchdog.ts` | none | C | Forked child process; hard to unit-test |
 | `font-size.ts` | none | C | Simple state; low risk |
@@ -86,5 +86,5 @@ are created.
 | Gap | Impact | Status |
 |---|---|---|
 | No structural lint for import-layer rules | Agent could import `electron` in `lib/` and CI would pass | Resolved — `no-restricted-imports` rules in `eslint.config.mjs` |
-| No E2E test suite wired into CI | Electron UI not automatically tested | Open — `demo/playwright.config.mjs` exists but is not part of `npm test` |
+| No E2E test suite wired into CI | Electron UI not automatically tested | Resolved — smoke tests (`scripts/smoke/`) run on every push/PR via `smoke.yml`, covering landing, swipe, and QC modes; AI Chat covered by `demo.yml` |
 | Integration tests require live API keys | `model-listing.integration.test.ts` is skipped in CI | By design |
