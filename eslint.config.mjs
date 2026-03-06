@@ -114,6 +114,20 @@ export default tseslint.config(
             },
         },
         rules: {
+            // --- Naming conventions ---
+
+            // Interfaces, type aliases, classes, enums, and generic type parameters
+            // must all use PascalCase.  This mirrors the existing convention across
+            // the codebase and prevents agents from introducing camelCase or
+            // snake_case type names in future.
+            "@typescript-eslint/naming-convention": [
+                "error",
+                {
+                    selector: "typeLike",
+                    format: ["PascalCase"],
+                },
+            ],
+
             // --- Documentation presence (equivalent to missing_docs = "deny") ---
 
             // Require JSDoc on all declarations: functions, classes, methods, arrows, etc.
