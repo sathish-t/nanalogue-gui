@@ -20,11 +20,11 @@ are created.
 | `mod-filter.ts` | `mod-filter.test.ts` | A | |
 | `region-parser.ts` | `region-parser.test.ts` | A | |
 | `bed-parser.ts` | `bed-parser.test.ts` | A | |
-| `qc-data-loader.ts` | `qc-data-loader.test.ts` | A | Uses simulated BAM |
-| `swipe-data-loader.ts` | `swipe-data-loader.test.ts` | A | |
+| `qc-data-loader.ts` | `qc-data-loader.test.ts`, `qc-data-loader-async.test.ts` | A | Pure helpers + async functions (`peekBam`, `generateQCData`, paginators, `fetchSeqTable`) covered via mocked `@nanalogue/node` |
+| `swipe-data-loader.ts` | `swipe-data-loader.test.ts`, `swipe-data-loader-async.test.ts` | A | Pure helpers + async functions (`loadContigSizes`, `loadPlotData`) covered via mocked `@nanalogue/node` |
 | `locate-data-loader.ts` | `locate-data-loader.test.ts` | A | |
 | `chat-orchestrator.ts` | `chat-orchestrator.test.ts` | A | Mocked LLM responses in `tests/fixtures/` |
-| `chat-session.ts` | `chat-session.test.ts` | A | |
+| `chat-session.ts` | `chat-session.test.ts` | A | Includes error paths: generic errors, TimeoutError by name and message, non-Error rejections |
 | `monty-sandbox.ts` | `monty-sandbox.test.ts`, `monty-sandbox-helpers.test.ts`, `monty-sandbox-deny-list.test.ts` | A | Three test files; deny-list coverage is thorough |
 | `model-listing.ts` | `model-listing.test.ts` (+ integration) | A | Integration test skipped unless live keys present |
 | `ai-chat-constants.ts` | `ai-chat-constants.test.ts` | A | |
@@ -44,7 +44,7 @@ are created.
 |---|---|---|---|
 | `ai-chat.ts` | `modes/ai-chat.test.ts` | B | Core IPC paths tested; Electron dialog flows not |
 | `qc.ts` | `modes/qc.test.ts` | B | Core IPC paths tested; Electron dialog flows covered |
-| `swipe.ts` | `modes/swipe.test.ts` | B | initialize(), IPC handlers, and printSummary covered |
+| `swipe.ts` | `modes/swipe.test.ts` | B | initialize(), IPC handlers, and printSummary covered; overwrite-dialog flow and exhausted-annotation path covered; Electron dialog flows for other cases not tested |
 
 ---
 
@@ -75,7 +75,7 @@ are created.
 | `cli.ts` | `cli.test.ts` | B | Major CLI paths covered |
 | `execute-cli.ts` | `execute-cli.test.ts` | B | Flag validation, silent/print/truncate/error paths |
 | `main.ts` | none | B | Electron main process — hard to unit-test; covered by E2E smoke tests wired into CI (`smoke.yml`) |
-| `preload.ts` | `preload.test.ts` | B | contextBridge call verified; all IPC channel names checked |
+| `preload.ts` | `preload.test.ts` | A | Every exposed function called and its IPC channel + arguments verified; listener handler invocation and cleanup tested; 100% coverage |
 | `exit-watchdog.ts` | none | C | Forked child process; hard to unit-test |
 | `font-size.ts` | none | C | Simple state; low risk |
 
