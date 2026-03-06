@@ -148,6 +148,9 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Build
+        run: npm run build
+
       - name: Check coverage floor
         run: node scripts/check-coverage.mjs
 
