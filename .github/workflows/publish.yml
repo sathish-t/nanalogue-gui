@@ -20,8 +20,12 @@ jobs:
       - name: Check tag matches version
         id: check
         if: github.event_name == 'release'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          TITLE: ${{ github.event.release.name }}
         run: |
-          TAG="${{ github.event.release.tag_name }}"
+          [[ "$TAG" == v* ]] || { echo "Tag '$TAG' must begin with a lowercase 'v' (e.g. v1.2.3)"; exit 1; }
+          [[ "$TITLE" != v* && "$TITLE" != V* ]] || { echo "Release title '$TITLE' must not begin with 'v' or 'V' (e.g. 1.2.3)"; exit 1; }
           TAG_V="${TAG#v}"
           V=$(jq -r '.version' package.json)
           [ "$TAG_V" = "$V" ] || { echo "Tag $TAG_V != package.json $V"; exit 1; }
