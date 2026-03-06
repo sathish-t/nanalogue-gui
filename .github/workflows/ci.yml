@@ -128,6 +128,19 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
+  # Verify that no tracked src/*.ts file exceeds its line-count ceiling.
+  # Source files: max 800 lines. Test files: max 1500 lines.
+  # Grandfathered files must not grow beyond their individual ceiling.
+  check-file-size:
+    name: File size check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Check file sizes
+        run: node scripts/check-file-size.mjs --all
+
   # Verify that %Lines coverage has not regressed for any tracked file
   # and that any brand-new file debuts at 100%.
   check-coverage:

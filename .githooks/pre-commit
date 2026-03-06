@@ -82,3 +82,13 @@ if git diff --cached --name-only | grep -q '^src/.*\.ts$'; then
   fi
   git add documentation/script-coverage.tsv
 fi
+
+# Enforce per-file line-count limits whenever any src/ TypeScript file is staged.
+# Source files: max 800 lines. Test files: max 1500 lines.
+# Grandfathered exceptions (files already above their ceiling) must not grow further.
+if git diff --cached --name-only | grep -q '^src/.*\.ts$'; then
+  if ! node scripts/check-file-size.mjs; then
+    echo "pre-commit: file size check failed, aborting commit" >&2
+    exit 1
+  fi
+fi
