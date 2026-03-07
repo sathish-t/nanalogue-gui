@@ -30,6 +30,14 @@ export interface SendMessageOptions {
      * SYSTEM_APPEND.md in the analysis directory at session start.
      */
     appendSystemPrompt?: string;
+    /**
+     * Optional text to replace the default system prompt entirely. When
+     * provided, the built-in sandbox prompt is not used; this text becomes
+     * the base instead. AppendSystemPrompt (from SYSTEM_APPEND.md) and the
+     * dynamic facts block are still appended on top. CLI-only feature;
+     * pass the content directly (e.g. From a shell variable).
+     */
+    replaceSystemPrompt?: string;
 }
 
 /** Successful send result. */
@@ -99,6 +107,7 @@ export class ChatSession {
             config,
             emitEvent,
             appendSystemPrompt,
+            replaceSystemPrompt,
         } = options;
 
         this.requestId += 1;
@@ -120,6 +129,7 @@ export class ChatSession {
                 facts: this.facts,
                 signal: localSignal,
                 appendSystemPrompt,
+                replaceSystemPrompt,
             });
 
             // Check for cancellation or stale response. Cancel increments
