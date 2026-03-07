@@ -773,6 +773,13 @@ export interface HandleMessageOptions {
      * inserted between the sandbox prompt and the dynamic facts block.
      */
     appendSystemPrompt?: string;
+    /**
+     * Optional text to replace the default system prompt entirely. When
+     * provided, buildSandboxPrompt() is not used; this text becomes the base
+     * instead. AppendSystemPrompt and the dynamic facts block still stack on
+     * top in the usual order. CLI-only feature.
+     */
+    replaceSystemPrompt?: string;
 }
 
 /**
@@ -807,6 +814,7 @@ export async function handleUserMessage(
         facts,
         signal,
         appendSystemPrompt,
+        replaceSystemPrompt,
     } = options;
 
     // Add user message to history
@@ -890,21 +898,26 @@ export async function handleUserMessage(
             config.contextWindowTokens,
         );
         const maxOutputKBForPrompt = Math.round(maxOutputBytesForPrompt / 1024);
-        const baseSandboxPrompt = buildSandboxPrompt({
-            maxOutputKB: maxOutputKBForPrompt,
-            maxRecordsReadInfo: config.maxRecordsReadInfo,
-            maxRecordsBamMods: config.maxRecordsBamMods,
-            maxRecordsWindowReads: config.maxRecordsWindowReads,
-            maxRecordsSeqTable: config.maxRecordsSeqTable,
-            maxReadMB: config.maxReadMB,
-            maxWriteMB: config.maxWriteMB,
-            maxDurationSecs: config.maxDurationSecs,
-        });
+        // When --system-prompt (replaceSystemPrompt) is active, use it as the
+        // base; otherwise build the default sandbox prompt. appendSystemPrompt
+        // (SYSTEM_APPEND.md) stacks on top of whichever base is active.
+        const basePromptForDump =
+            replaceSystemPrompt ??
+            buildSandboxPrompt({
+                maxOutputKB: maxOutputKBForPrompt,
+                maxRecordsReadInfo: config.maxRecordsReadInfo,
+                maxRecordsBamMods: config.maxRecordsBamMods,
+                maxRecordsWindowReads: config.maxRecordsWindowReads,
+                maxRecordsSeqTable: config.maxRecordsSeqTable,
+                maxReadMB: config.maxReadMB,
+                maxWriteMB: config.maxWriteMB,
+                maxDurationSecs: config.maxDurationSecs,
+            });
         // Include SYSTEM_APPEND.md content in the dump so it accurately
         // reflects the full system prompt that is sent to the LLM.
         const promptContent = appendSystemPrompt
-            ? `${baseSandboxPrompt}\n\n${appendSystemPrompt}`
-            : baseSandboxPrompt;
+            ? `${basePromptForDump}\n\n${appendSystemPrompt}`
+            : basePromptForDump;
         await writeFile(outputFile, promptContent, "utf-8");
 
         const relPath = relative(allowedDir, outputFile);
@@ -918,19 +931,10 @@ export async function handleUserMessage(
     // Build system prompt
     const maxOutputBytes = deriveMaxOutputBytes(config.contextWindowTokens);
     const maxOutputKB = Math.round(maxOutputBytes / 1024);
-    const sandboxPrompt = buildSandboxPrompt({
-        maxOutputKB,
-        maxRecordsReadInfo: config.maxRecordsReadInfo,
-        maxRecordsBamMods: config.maxRecordsBamMods,
-        maxRecordsWindowReads: config.maxRecordsWindowReads,
-        maxRecordsSeqTable: config.maxRecordsSeqTable,
-        maxReadMB: config.maxReadMB,
-        maxWriteMB: config.maxWriteMB,
-        maxDurationSecs: config.maxDurationSecs,
-    });
-    // Append SYSTEM_APPEND.md content (if any) between the sandbox prompt
-    // and the dynamic facts block so domain context sits close to the
-    // instructions it extends, while facts remain at the end.
+    // When --system-prompt (replaceSystemPrompt) is active, use it as the
+    // base instead of the built-in sandbox prompt. appendSystemPrompt
+    // (SYSTEM_APPEND.md) and the dynamic facts block still stack on top of
+    // whichever base is active, in the usual order.
     //
     // Note: the context-window budget (maxOutputBytes) is derived from
     // contextWindowTokens without subtracting the system prompt size — this
@@ -938,9 +942,21 @@ export async function handleUserMessage(
     // prompt itself. SYSTEM_APPEND.md is intended for small domain context
     // (a few paragraphs); very large files will reduce usable context just
     // as any enlarged system prompt would.
+    const basePrompt =
+        replaceSystemPrompt ??
+        buildSandboxPrompt({
+            maxOutputKB,
+            maxRecordsReadInfo: config.maxRecordsReadInfo,
+            maxRecordsBamMods: config.maxRecordsBamMods,
+            maxRecordsWindowReads: config.maxRecordsWindowReads,
+            maxRecordsSeqTable: config.maxRecordsSeqTable,
+            maxReadMB: config.maxReadMB,
+            maxWriteMB: config.maxWriteMB,
+            maxDurationSecs: config.maxDurationSecs,
+        });
     const effectiveSandboxPrompt = appendSystemPrompt
-        ? `${sandboxPrompt}\n\n${appendSystemPrompt}`
-        : sandboxPrompt;
+        ? `${basePrompt}\n\n${appendSystemPrompt}`
+        : basePrompt;
     const factsBlock = renderFactsBlock(facts);
     const systemPrompt = buildSystemPrompt(effectiveSandboxPrompt, factsBlock);
 

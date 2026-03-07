@@ -2158,3 +2158,273 @@ describe("appendSystemPrompt", () => {
         expect(content).not.toContain("Experiment notes");
     });
 });
+
+// Tests for --system-prompt CLI flag support via replaceSystemPrompt.
+describe("replaceSystemPrompt", () => {
+    let tmpDir: string;
+    let mockServer: MockServer | undefined;
+
+    beforeEach(async () => {
+        tmpDir = await mkdtemp(join(tmpdir(), "replace-prompt-"));
+        resetLastSentMessages();
+    });
+
+    afterEach(async () => {
+        if (mockServer) {
+            await mockServer.close();
+            mockServer = undefined;
+        }
+        await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    /** Minimal config for replace-prompt tests. */
+    const cfg: AiChatConfig = {
+        contextWindowTokens: 8192,
+        maxRetries: 1,
+        timeoutSeconds: 30,
+        maxRecordsReadInfo: 100,
+        maxRecordsBamMods: 100,
+        maxRecordsWindowReads: 100,
+        maxRecordsSeqTable: 100,
+        maxCodeRounds: 1,
+        maxDurationSecs: 600,
+        maxMemoryMB: 512,
+        maxAllocations: 100_000,
+        maxReadMB: 1,
+        maxWriteMB: 50,
+    };
+
+    /**
+     * Calls handleUserMessage with the given replaceSystemPrompt and optional
+     * appendSystemPrompt, then returns the captured LLM request bodies.
+     *
+     * @param replaceText - Text to replace the system prompt with, or undefined.
+     * @param serverUrl - The mock server base URL.
+     * @param appendText - Optional text to append after the base prompt.
+     * @returns The captured LLM request bodies.
+     */
+    async function callWithReplace(
+        replaceText: string | undefined,
+        serverUrl: string,
+        appendText?: string,
+    ): Promise<Array<Record<string, unknown>>> {
+        const history: HistoryEntry[] = [];
+        const facts: Fact[] = [];
+        await handleUserMessage({
+            message: "test",
+            endpointUrl: serverUrl,
+            apiKey: "",
+            model: "test-model",
+            allowedDir: tmpDir,
+            config: cfg,
+            /** No-op event handler for test isolation. */
+            emitEvent: () => {
+                /* no-op */
+            },
+            history,
+            facts,
+            signal: new AbortController().signal,
+            replaceSystemPrompt: replaceText,
+            appendSystemPrompt: appendText,
+        });
+        return mockServer?.requestBodies() ?? [];
+    }
+
+    it("replaces the default sandbox prompt with the supplied text", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: { role: "assistant", content: "print('hi')" },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const bodies = await callWithReplace(
+            "You are a custom assistant.",
+            mockServer.url,
+        );
+
+        expect(bodies.length).toBeGreaterThan(0);
+        const messages = bodies[0].messages as Array<{
+            /** Message role. */
+            role: string;
+            /** Message content. */
+            content: string;
+        }>;
+        const systemMsg = messages.find((m) => m.role === "system");
+        expect(systemMsg).toBeDefined();
+        // Replacement content must be present.
+        expect(systemMsg?.content).toContain("You are a custom assistant.");
+        // Default sandbox prompt content must NOT be present.
+        expect(systemMsg?.content).not.toContain(
+            "You are a Python REPL for bioinformatics analysis.",
+        );
+    });
+
+    it("appendSystemPrompt still stacks on top of replaceSystemPrompt", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: { role: "assistant", content: "print('hi')" },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const bodies = await callWithReplace(
+            "Custom base prompt.",
+            mockServer.url,
+            "## Appended section\nExtra domain context.",
+        );
+
+        const messages = bodies[0].messages as Array<{
+            /** Message role. */
+            role: string;
+            /** Message content. */
+            content: string;
+        }>;
+        const systemContent =
+            messages.find((m) => m.role === "system")?.content ?? "";
+
+        expect(systemContent).toContain("Custom base prompt.");
+        expect(systemContent).toContain("Appended section");
+        // Appended text must follow the replacement base.
+        const baseIdx = systemContent.indexOf("Custom base prompt.");
+        const appendIdx = systemContent.indexOf("## Appended section");
+        expect(baseIdx).toBeGreaterThan(-1);
+        expect(appendIdx).toBeGreaterThan(baseIdx);
+    });
+
+    it("default sandbox prompt content is absent when replaceSystemPrompt is set", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: { role: "assistant", content: "print('hi')" },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const bodies = await callWithReplace(
+            "Completely different instructions.",
+            mockServer.url,
+        );
+
+        const messages = bodies[0].messages as Array<{
+            /** Message role. */
+            role: string;
+            /** Message content. */
+            content: string;
+        }>;
+        const systemContent =
+            messages.find((m) => m.role === "system")?.content ?? "";
+
+        // Key phrases unique to the built-in sandbox prompt must not appear.
+        expect(systemContent).not.toContain("Python REPL");
+        expect(systemContent).not.toContain("bam_mods");
+        expect(systemContent).not.toContain("continue_thinking");
+    });
+
+    it("when replaceSystemPrompt is undefined the default prompt is used", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: { role: "assistant", content: "print('hi')" },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const bodies = await callWithReplace(undefined, mockServer.url);
+
+        const messages = bodies[0].messages as Array<{
+            /** Message role. */
+            role: string;
+            /** Message content. */
+            content: string;
+        }>;
+        const systemContent =
+            messages.find((m) => m.role === "system")?.content ?? "";
+
+        // Default sandbox prompt content must be present.
+        expect(systemContent).toContain("Python REPL");
+        expect(systemContent).toContain("bam_mods");
+    });
+
+    it("/dump_system_prompt writes replacement content, not the default sandbox prompt", async () => {
+        const history: HistoryEntry[] = [];
+        const facts: Fact[] = [];
+
+        const result = await handleUserMessage({
+            message: "/dump_system_prompt",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config: cfg,
+            /** No-op event handler for test isolation. */
+            emitEvent: () => {
+                /* no-op */
+            },
+            history,
+            facts,
+            signal: new AbortController().signal,
+            replaceSystemPrompt: "Custom prompt for dump test.",
+        });
+
+        expect(result.text).toContain("System prompt dumped to");
+
+        const outputDir = join(tmpDir, "ai_chat_output");
+        const files = await readdir(outputDir);
+        const content = await readFile(join(outputDir, files[0]), "utf-8");
+
+        expect(content).toContain("Custom prompt for dump test.");
+        // Default sandbox prompt content must not appear.
+        expect(content).not.toContain("Python REPL");
+    });
+
+    it("/dump_system_prompt includes both replacement and appended content", async () => {
+        const history: HistoryEntry[] = [];
+        const facts: Fact[] = [];
+
+        await handleUserMessage({
+            message: "/dump_system_prompt",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config: cfg,
+            /** No-op event handler for test isolation. */
+            emitEvent: () => {
+                /* no-op */
+            },
+            history,
+            facts,
+            signal: new AbortController().signal,
+            replaceSystemPrompt: "Replacement base.",
+            appendSystemPrompt: "Appended section.",
+        });
+
+        const outputDir = join(tmpDir, "ai_chat_output");
+        const files = await readdir(outputDir);
+        const content = await readFile(join(outputDir, files[0]), "utf-8");
+
+        expect(content).toContain("Replacement base.");
+        expect(content).toContain("Appended section.");
+        // Replacement must precede the append.
+        expect(content.indexOf("Replacement base.")).toBeLessThan(
+            content.indexOf("Appended section."),
+        );
+        // Default sandbox content must not appear.
+        expect(content).not.toContain("Python REPL");
+    });
+});
