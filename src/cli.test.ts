@@ -318,4 +318,88 @@ describe("nanalogue-chat CLI", () => {
             );
         });
     });
+
+    describe("--system-prompt flag", () => {
+        it("exits 1 when --system-prompt is empty", async () => {
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--system-prompt",
+                    "",
+                ]),
+            ).rejects.toMatchObject({ code: 1 });
+        });
+
+        it("prints an error message when --system-prompt is empty", async () => {
+            let stderr = "";
+            try {
+                await execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--system-prompt",
+                    "",
+                ]);
+            } catch (err) {
+                stderr = (
+                    err as NodeJS.ErrnoException & {
+                        /** The stderr output of the failed process. */
+                        stderr: string;
+                    }
+                ).stderr;
+            }
+            expect(stderr).toContain("--system-prompt value cannot be empty");
+        });
+
+        it("exits 1 when --system-prompt is whitespace-only", async () => {
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--system-prompt",
+                    "   ",
+                ]),
+            ).rejects.toMatchObject({ code: 1 });
+        });
+
+        it("prints an error message when --system-prompt is whitespace-only", async () => {
+            let stderr = "";
+            try {
+                await execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--system-prompt",
+                    "   ",
+                ]);
+            } catch (err) {
+                stderr = (
+                    err as NodeJS.ErrnoException & {
+                        /** The stderr output of the failed process. */
+                        stderr: string;
+                    }
+                ).stderr;
+            }
+            expect(stderr).toContain("--system-prompt value cannot be empty");
+        });
+    });
 });

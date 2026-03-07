@@ -62,6 +62,7 @@ const argConfig = {
         "max-code-rounds": { type: "string" as const },
         temperature: { type: "string" as const },
         "non-interactive": { type: "string" as const },
+        "system-prompt": { type: "string" as const },
         "dump-llm-instructions": { type: "boolean" as const, default: false },
         "list-models": { type: "boolean" as const, default: false },
         version: { type: "boolean" as const, short: "v", default: false },
@@ -112,9 +113,17 @@ ${BOLD}Other:${RESET}
   -v, --version            Print version and exit
 
 ${BOLD}Custom system prompt:${RESET}
+  --system-prompt <text>       Replace the default system prompt. Pass content
+                               directly or via a shell variable:
+                               --system-prompt "$MY_PROMPT"
+                               --system-prompt "$(cat prompt.md)"
+                               SYSTEM_APPEND.md and the facts block still apply.
+                               Run /dump_system_prompt to verify.
+
   Place a SYSTEM_APPEND.md file in the analysis directory (--dir) to append
-  additional instructions to the default system prompt. The file is read once
-  at startup. Use /dump_system_prompt to verify the full effective prompt.
+  additional instructions to the default (or replaced) system prompt. The
+  file is read once at startup. Use /dump_system_prompt to verify the full
+  effective prompt.
 
 ${BOLD}REPL commands:${RESET}
   /new                     Start a new conversation
@@ -318,6 +327,22 @@ async function main(): Promise<void> {
     // immediately rather than requiring a full process restart.
     let appendSystemPrompt = await loadSystemAppend(allowedDir);
 
+    // --system-prompt replaces the built-in sandbox prompt entirely.
+    // Declared as const — it is a startup flag, not a per-directory
+    // convention, so it does not reload on /new.
+    // Reject empty or whitespace-only values — most likely an unset shell
+    // variable (`--system-prompt "$UNSET_VAR"`), which would silently wipe
+    // all built-in instructions.
+    if (
+        values["system-prompt"] !== undefined &&
+        values["system-prompt"].trim() === ""
+    ) {
+        console.error("Error: --system-prompt value cannot be empty");
+        process.exitCode = 1;
+        return;
+    }
+    const replaceSystemPrompt: string | undefined = values["system-prompt"];
+
     const session = new ChatSession();
 
     // Non-interactive mode: send a single message, print the response, and exit.
@@ -332,6 +357,7 @@ async function main(): Promise<void> {
             allowedDir,
             config,
             appendSystemPrompt,
+            replaceSystemPrompt,
             /**
              * Suppresses all progress events in non-interactive mode.
              * Only the final response text reaches stdout.
@@ -424,6 +450,15 @@ async function main(): Promise<void> {
                 "comfortable sharing.",
         ),
     );
+    if (replaceSystemPrompt !== undefined) {
+        console.log(
+            color(
+                YELLOW,
+                "Default system prompt replaced via --system-prompt. " +
+                    "Run /dump_system_prompt to verify the full effective prompt.",
+            ),
+        );
+    }
     if (appendSystemPrompt !== undefined) {
         console.log(
             color(
@@ -493,6 +528,7 @@ async function main(): Promise<void> {
             config,
             emitEvent,
             appendSystemPrompt,
+            replaceSystemPrompt,
         });
         requestInFlight = false;
 
