@@ -12,28 +12,29 @@ src/
   main.ts               # Electron main process for nanalogue-gui with multi-mode support
   preload.ts            # Preload script for nanalogue-gui
   lib/
-    ai-chat-constants.ts         # Main-process constants for the AI Chat feature.
-    ai-chat-ipc-validation.ts    # Per-channel IPC payload validation for AI Chat mode.
-    ai-chat-shared-constants.ts  # Config field specs and shared constants for the AI Chat feature.
-    bed-parser.ts                # BED file parser for nanalogue-swipe
-    chat-orchestrator.ts         # Chat orchestrator for AI Chat mode.
-    chat-session.ts              # Reusable chat session state for the AI Chat feature.
-    chat-types.ts                # Shared types for the AI Chat feature.
-    format-utils.ts              # Pure formatting and trimming utilities shared across renderer pages.
-    histogram.ts                 # Streaming histogram accumulator for binning data without storing raw arrays
-    line-counter.ts              # Streaming utilities for counting lines in text and BED files
-    locate-data-loader.ts        # Locate-reads data loader for parsing read ID files and generating BED output
-    mod-filter.ts                # Parses modification filter strings into tag and strand components.
-    model-listing.ts             # Provider detection and model listing for multi-provider LLM endpoints.
-    monty-sandbox.ts             # Monty sandbox wrapper for AI Chat mode.
-    qc-data-loader.ts            # QC data loader: paginated BAM data retrieval with streaming histograms
-    region-parser.ts             # Parses and validates genomic region strings (e.g. "chr3", "chrI:1000-50000")
-    sandbox-cli-args.ts          # Shared sandbox CLI argument definitions, numeric arg parser, and sandbox
-    sandbox-prompt.ts            # Builds the LLM system prompt describing sandbox capabilities, and assembles
-    stats.ts                     # Statistics utilities for QC calculations
-    swipe-data-loader.ts         # Swipe data loader using nanalogue-node
-    system-append.ts             # Loads the optional SYSTEM_APPEND.md file from an analysis directory.
-    types.ts                     # Type definitions shared across nanalogue-gui modes
+    ai-chat-constants.ts             # Main-process constants for the AI Chat feature.
+    ai-chat-ipc-validation.ts        # Per-channel IPC payload validation for AI Chat mode.
+    ai-chat-shared-constants.ts      # Config field specs and shared constants for the AI Chat feature.
+    bed-parser.ts                    # BED file parser for nanalogue-swipe
+    chat-orchestrator-test-utils.ts  # Shared mock server infrastructure for chat-orchestrator tests.
+    chat-orchestrator.ts             # Chat orchestrator for AI Chat mode.
+    chat-session.ts                  # Reusable chat session state for the AI Chat feature.
+    chat-types.ts                    # Shared types for the AI Chat feature.
+    format-utils.ts                  # Pure formatting and trimming utilities shared across renderer pages.
+    histogram.ts                     # Streaming histogram accumulator for binning data without storing raw arrays
+    line-counter.ts                  # Streaming utilities for counting lines in text and BED files
+    locate-data-loader.ts            # Locate-reads data loader for parsing read ID files and generating BED output
+    mod-filter.ts                    # Parses modification filter strings into tag and strand components.
+    model-listing.ts                 # Provider detection and model listing for multi-provider LLM endpoints.
+    monty-sandbox.ts                 # Monty sandbox wrapper for AI Chat mode.
+    qc-data-loader.ts                # QC data loader: paginated BAM data retrieval with streaming histograms
+    region-parser.ts                 # Parses and validates genomic region strings (e.g. "chr3", "chrI:1000-50000")
+    sandbox-cli-args.ts              # Shared sandbox CLI argument definitions, numeric arg parser, and sandbox
+    sandbox-prompt.ts                # Builds the LLM system prompt describing sandbox capabilities, and assembles
+    stats.ts                         # Statistics utilities for QC calculations
+    swipe-data-loader.ts             # Swipe data loader using nanalogue-node
+    system-append.ts                 # Loads the optional SYSTEM_APPEND.md file from an analysis directory.
+    types.ts                         # Type definitions shared across nanalogue-gui modes
   modes/
     ai-chat.ts            # AI Chat mode logic for nanalogue-gui.
     qc.ts                 # QC mode logic for nanalogue-gui
