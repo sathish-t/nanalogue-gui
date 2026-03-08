@@ -12,7 +12,7 @@ import {
     resolvePath,
     toReadOptions,
     toWindowOptions,
-} from "./monty-sandbox";
+} from "./monty-sandbox-helpers";
 import { buildSandboxPrompt } from "./sandbox-prompt";
 
 let tmpDir: string;

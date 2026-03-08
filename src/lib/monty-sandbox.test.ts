@@ -15,7 +15,8 @@ import { simulateModBam } from "@nanalogue/node";
 import { runMontyAsync } from "@pydantic/monty";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MAX_PRINT_CAPTURE_BYTES } from "./ai-chat-constants";
-import { resolvePath, runSandboxCode } from "./monty-sandbox";
+import { runSandboxCode } from "./monty-sandbox";
+import { resolvePath } from "./monty-sandbox-helpers";
 
 let allowedDir: string;
 let bamName: string;

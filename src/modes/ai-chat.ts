@@ -10,7 +10,7 @@ import {
 import { ChatSession } from "../lib/chat-session";
 import type { AiChatEvent } from "../lib/chat-types";
 import { fetchModels } from "../lib/model-listing";
-import { deriveMaxOutputBytes } from "../lib/monty-sandbox";
+import { deriveMaxOutputBytes } from "../lib/monty-sandbox-helpers";
 import { buildSandboxPrompt } from "../lib/sandbox-prompt";
 import { loadSystemAppend } from "../lib/system-append";
 

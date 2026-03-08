@@ -3,7 +3,7 @@
 // instructions to the default system prompt at session start.
 
 import { readFile, stat } from "node:fs/promises";
-import { resolvePath } from "./monty-sandbox";
+import { resolvePath } from "./monty-sandbox-helpers";
 
 // Files larger than this limit are rejected (return undefined) to prevent an
 // oversized append from consuming the model's context budget on every turn.

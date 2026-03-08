@@ -22,13 +22,12 @@ import type {
     SandboxOptions,
     SandboxResult,
 } from "./chat-types";
+import { collectTerminalOutput, runSandboxCode } from "./monty-sandbox";
 import {
-    collectTerminalOutput,
     deriveMaxOutputBytes,
     resolvePath,
-    runSandboxCode,
     safeStringify,
-} from "./monty-sandbox";
+} from "./monty-sandbox-helpers";
 import {
     buildSandboxPrompt,
     buildSystemPrompt,

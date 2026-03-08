@@ -26,6 +26,7 @@ src/
     locate-data-loader.ts            # Locate-reads data loader for parsing read ID files and generating BED output
     mod-filter.ts                    # Parses modification filter strings into tag and strand components.
     model-listing.ts                 # Provider detection and model listing for multi-provider LLM endpoints.
+    monty-sandbox-helpers.ts         # Utility helpers for monty-sandbox: path security, option translation,
     monty-sandbox.ts                 # Monty sandbox wrapper for AI Chat mode.
     qc-data-loader.ts                # QC data loader: paginated BAM data retrieval with streaming histograms
     region-parser.ts                 # Parses and validates genomic region strings (e.g. "chr3", "chrI:1000-50000")

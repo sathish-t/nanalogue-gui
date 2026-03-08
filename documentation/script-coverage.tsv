@@ -12,7 +12,8 @@ src/lib/line-counter.ts	100
 src/lib/locate-data-loader.ts	100
 src/lib/mod-filter.ts	100
 src/lib/model-listing.ts	92.42
-src/lib/monty-sandbox.ts	85.41
+src/lib/monty-sandbox-helpers.ts	78.37
+src/lib/monty-sandbox.ts	92.85
 src/lib/qc-data-loader.ts	93.14
 src/lib/region-parser.ts	95.65
 src/lib/sandbox-prompt.ts	100

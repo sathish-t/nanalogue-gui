@@ -50,7 +50,6 @@ const TEST_MAX = 1500;
 const EXCEPTIONS = new Map([
     // Source files above the 800-line ceiling:
     ["src/lib/chat-orchestrator.ts", 1298], // raised from 1282: replaceSystemPrompt support
-    ["src/lib/monty-sandbox.ts", 1156],
     ["src/renderer/ai-chat/ai-chat.ts", 1149],
     ["src/renderer/qc/qc-results.ts", 1146],
     // Test files above the 1500-line ceiling:
