@@ -402,6 +402,51 @@ describe("nanalogue-chat CLI", () => {
             expect(stderr).toContain('"nonexistent_tool"');
         });
 
+        it("exits 1 when --rm-tools value contains a space after a comma", async () => {
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--system-prompt",
+                    "my prompt",
+                    "--rm-tools",
+                    "peek, ls",
+                ]),
+            ).rejects.toMatchObject({ code: 1 });
+        });
+
+        it("prints error naming the space-padded tool when --rm-tools has a space after comma", async () => {
+            let stderr = "";
+            try {
+                await execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--system-prompt",
+                    "my prompt",
+                    "--rm-tools",
+                    "peek, ls",
+                ]);
+            } catch (err) {
+                stderr = (
+                    err as NodeJS.ErrnoException & {
+                        /** The stderr output of the failed process. */
+                        stderr: string;
+                    }
+                ).stderr;
+            }
+            expect(stderr).toContain('" ls"');
+        });
+
         it("exits 1 when --rm-tools is used without --system-prompt", async () => {
             await expect(
                 execFileAsync("node", [

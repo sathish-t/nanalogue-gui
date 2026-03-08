@@ -127,10 +127,11 @@ ${BOLD}Custom system prompt:${RESET}
   file is read once at startup. Use /dump_system_prompt to verify the full
   effective prompt.
 
-  --rm-tools <t1,t2,...>       Comma-separated list of sandbox tool names to
-                               remove. Requires --system-prompt (provide a
-                               prompt that describes only the kept tools).
-                               Valid names: ${[...EXTERNAL_FUNCTIONS].join(", ")}.
+  --rm-tools <t1,t2,...>       Comma-separated (no spaces) list of sandbox tool
+                               names to remove. Requires --system-prompt.
+                               Valid names: ${EXTERNAL_FUNCTIONS.slice(0, 4).join(", ")},
+                                            ${EXTERNAL_FUNCTIONS.slice(4, 8).join(", ")},
+                                            ${EXTERNAL_FUNCTIONS.slice(8).join(", ")}.
                                Hard error on unknown names.
 
 ${BOLD}REPL commands:${RESET}
@@ -354,10 +355,7 @@ async function main(): Promise<void> {
     // --rm-tools: parse, validate, and build the removal set.
     let removedTools: ReadonlySet<string> | undefined;
     if (values["rm-tools"] !== undefined) {
-        const names = values["rm-tools"]
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
+        const names = values["rm-tools"].split(",").filter(Boolean);
         if (names.length === 0) {
             console.error("Error: --rm-tools value cannot be empty");
             process.exitCode = 1;
