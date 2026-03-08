@@ -26,7 +26,7 @@ src/modes/swipe.ts	98.82
 src/preload.ts	100
 src/renderer/ai-chat/ai-chat.ts	71.71
 src/renderer/shared/apply-font-size.ts	100
-src/renderer/shared/bam-resource-input.ts	90.78
+src/renderer/shared/bam-resource-input.ts	100
 src/renderer/shared/chart-font-size.ts	100
 src/renderer/shared/mod-filter-input.ts	100
 src/renderer/shared/output-file-input.ts	98.68

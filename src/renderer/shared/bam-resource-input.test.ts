@@ -232,6 +232,136 @@ describe("BamResourceInput", () => {
         });
     });
 
+    describe("file radio change (switch back to file mode)", () => {
+        it("calls handleSourceChange and restores file mode", () => {
+            // Switch to URL mode first.
+            const radios = Array.from(
+                el.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
+            );
+            const urlRadio = radios.find((r) => r.value === "url");
+            const fileRadio = radios.find((r) => r.value === "file");
+            if (!urlRadio || !fileRadio)
+                throw new Error("radio buttons not found");
+            urlRadio.checked = true;
+            urlRadio.dispatchEvent(new Event("change"));
+            expect(el.isUrl).toBe(true);
+
+            // Now fire change on the fileRadio (covers the fileRadio listener body).
+            fileRadio.checked = true;
+            fileRadio.dispatchEvent(new Event("change"));
+            expect(el.isUrl).toBe(false);
+
+            // Browse button should be visible again in file mode.
+            const btn = el.querySelector<HTMLButtonElement>("button");
+            expect(btn?.style.display).toBe("block");
+        });
+    });
+
+    describe("text input change event", () => {
+        /**
+         * Switches to URL mode and returns the text input element.
+         *
+         * @returns The text input element.
+         */
+        function goUrlMode(): HTMLInputElement {
+            const urlRadio = Array.from(
+                el.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
+            ).find((r) => r.value === "url");
+            if (!urlRadio) throw new Error("url radio not found");
+            urlRadio.checked = true;
+            urlRadio.dispatchEvent(new Event("change"));
+            const textInput =
+                el.querySelector<HTMLInputElement>('input[type="text"]');
+            if (!textInput) throw new Error("text input not found");
+            return textInput;
+        }
+
+        it("fires bam-selected in URL mode with a non-empty value", () => {
+            const textInput = goUrlMode();
+            textInput.value = "https://example.com/file.bam";
+            const handler = vi.fn();
+            el.addEventListener("bam-selected", handler);
+            textInput.dispatchEvent(new Event("change"));
+            expect(handler).toHaveBeenCalledTimes(1);
+            expect(handler.mock.calls[0][0].detail.value).toBe(
+                "https://example.com/file.bam",
+            );
+            expect(handler.mock.calls[0][0].detail.isUrl).toBe(true);
+        });
+
+        it("does not fire bam-selected in URL mode when value is empty", () => {
+            const textInput = goUrlMode();
+            // handleSourceChange cleared the value on mode switch.
+            const handler = vi.fn();
+            el.addEventListener("bam-selected", handler);
+            textInput.dispatchEvent(new Event("change"));
+            expect(handler).not.toHaveBeenCalled();
+        });
+
+        it("does not fire bam-selected in file mode", () => {
+            const textInput =
+                el.querySelector<HTMLInputElement>('input[type="text"]');
+            if (!textInput) throw new Error("text input not found");
+            const handler = vi.fn();
+            el.addEventListener("bam-selected", handler);
+            textInput.dispatchEvent(new Event("change"));
+            expect(handler).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("text input keypress event", () => {
+        /**
+         * Switches to URL mode, sets a value, and returns the text input.
+         *
+         * @returns The text input element.
+         */
+        function goUrlModeWithValue(): HTMLInputElement {
+            const urlRadio = Array.from(
+                el.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
+            ).find((r) => r.value === "url");
+            if (!urlRadio) throw new Error("url radio not found");
+            urlRadio.checked = true;
+            urlRadio.dispatchEvent(new Event("change"));
+            const textInput =
+                el.querySelector<HTMLInputElement>('input[type="text"]');
+            if (!textInput) throw new Error("text input not found");
+            textInput.value = "https://example.com/file.bam";
+            return textInput;
+        }
+
+        it("fires bam-selected on Enter in URL mode", () => {
+            const textInput = goUrlModeWithValue();
+            const handler = vi.fn();
+            el.addEventListener("bam-selected", handler);
+            textInput.dispatchEvent(
+                new KeyboardEvent("keypress", { key: "Enter" }),
+            );
+            expect(handler).toHaveBeenCalledTimes(1);
+        });
+
+        it("does not fire bam-selected on a non-Enter key in URL mode", () => {
+            const textInput = goUrlModeWithValue();
+            const handler = vi.fn();
+            el.addEventListener("bam-selected", handler);
+            textInput.dispatchEvent(
+                new KeyboardEvent("keypress", { key: "a" }),
+            );
+            expect(handler).not.toHaveBeenCalled();
+        });
+
+        it("does not fire bam-selected on Enter in file mode", () => {
+            const textInput =
+                el.querySelector<HTMLInputElement>('input[type="text"]');
+            if (!textInput) throw new Error("text input not found");
+            const handler = vi.fn();
+            el.addEventListener("bam-selected", handler);
+            textInput.dispatchEvent(
+                new KeyboardEvent("keypress", { key: "Enter" }),
+            );
+            expect(handler).not.toHaveBeenCalled();
+        });
+    });
+
     describe("connectedCallback idempotency", () => {
         it("does not duplicate DOM on repeated connectedCallback calls", () => {
             el.connectedCallback();
