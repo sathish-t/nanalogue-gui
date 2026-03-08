@@ -1,0 +1,113 @@
+// Integration tests for the ai-external-tools factory functions.
+// Calls each factory directly (not through runSandboxCode) against real on-the-fly
+// BAM files generated with simulateModBam, following the same pattern as
+// monty-sandbox.test.ts.
+
+import { mkdir, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { simulateModBam } from "@nanalogue/node";
+import { afterAll, beforeAll, expect, it } from "vitest";
+import { MAX_FILENAME_LENGTH } from "../ai-chat-constants";
+import { SandboxError } from "../monty-sandbox-helpers";
+import { makeLs } from "./ls";
+import { makeWindowReads } from "./window-reads";
+import { makeWriteFile } from "./write-file";
+
+let allowedDir: string;
+let bamName: string;
+
+beforeAll(async () => {
+    const raw = await mkdtemp(join(tmpdir(), "ai-ext-tools-test-"));
+    // Resolve symlinks so macOS /var → /private/var matches realpath output.
+    allowedDir = await realpath(raw);
+    const configPath = resolve(
+        __dirname,
+        "../../../tests/data/simulation_configs/simple_bam.json",
+    );
+    const config = await readFile(configPath, "utf-8");
+    bamName = "simple_test.bam";
+    await simulateModBam({
+        jsonConfig: config,
+        bamPath: join(allowedDir, bamName),
+        fastaPath: join(allowedDir, "simple_test.fasta"),
+    });
+}, 60_000);
+
+afterAll(async () => {
+    await rm(allowedDir, { recursive: true });
+});
+
+// --- makeWindowReads ---
+
+it("makeWindowReads returns an array of records for a real BAM file", async () => {
+    const fn = makeWindowReads(allowedDir, 1_000);
+    const result = await fn(bamName, { win: 100, step: 50 });
+    expect(Array.isArray(result)).toBe(true);
+    expect((result as unknown[]).length).toBeGreaterThan(0);
+});
+
+// --- makeLs ---
+
+it("makeLs returns truncated result when file count exceeds MAX_LS_ENTRIES", async () => {
+    // Create enough files to exceed the 500-entry cap.
+    const capDir = join(allowedDir, "cap_test");
+    await mkdir(capDir, { recursive: true });
+    await Promise.all(
+        Array.from({ length: 501 }, (_, i) =>
+            // Use writeFile from the already-imported fs/promises via top-level import.
+            import("node:fs/promises").then((fs) =>
+                fs.writeFile(join(capDir, `f${i}.txt`), ""),
+            ),
+        ),
+    );
+    const fn = makeLs(allowedDir);
+    const result = await fn();
+    const truncated = result as Record<string, unknown>;
+    expect(truncated._truncated).toMatchObject({ cap: 500 });
+    expect((truncated.files as unknown[]).length).toBe(500);
+});
+
+// --- makeWriteFile ---
+
+it("makeWriteFile rejects a filename component longer than MAX_FILENAME_LENGTH", async () => {
+    const longName = "a".repeat(MAX_FILENAME_LENGTH + 1);
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await expect(fn(longName, "content")).rejects.toMatchObject({
+        name: "ValueError",
+        message: expect.stringMatching(/exceeds.*character limit/),
+    });
+});
+
+it("makeWriteFile rejects a filename component containing control characters", async () => {
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await expect(fn("file\x00name.txt", "content")).rejects.toMatchObject({
+        name: "ValueError",
+        message: expect.stringMatching(/control characters/),
+    });
+});
+
+it("makeWriteFile rejects content that exceeds maxWriteBytes", async () => {
+    const fn = makeWriteFile(allowedDir, 10);
+    await expect(fn("big.txt", "x".repeat(100))).rejects.toMatchObject({
+        name: "ValueError",
+        message: expect.stringMatching(/exceeds write limit/),
+    });
+    // Verify no file was created.
+    await expect(
+        import("node:fs/promises").then((fs) =>
+            fs.access(join(allowedDir, "big.txt")),
+        ),
+    ).rejects.toThrow();
+});
+
+it("makeWriteFile throws SandboxError (not plain Error) for all guard failures", async () => {
+    const fn = makeWriteFile(allowedDir, 10);
+    let err: unknown;
+    try {
+        await fn("x".repeat(MAX_FILENAME_LENGTH + 1), "");
+    } catch (e) {
+        err = e;
+    }
+    expect(err).toBeInstanceOf(SandboxError);
+});

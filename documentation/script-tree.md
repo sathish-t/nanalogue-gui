@@ -36,6 +36,17 @@ src/
     swipe-data-loader.ts             # Swipe data loader using nanalogue-node
     system-append.ts                 # Loads the optional SYSTEM_APPEND.md file from an analysis directory.
     types.ts                         # Type definitions shared across nanalogue-gui modes
+    ai-external-tools/
+      bam-mods.ts           # External tool: bam_mods
+      continue-thinking.ts  # External tool: continue_thinking
+      index.ts              # Index of all external tools registered with the Monty sandbox.
+      ls.ts                 # External tool: ls
+      peek.ts               # External tool: peek
+      read-file.ts          # External tool: read_file
+      read-info.ts          # External tool: read_info
+      seq-table.ts          # External tool: seq_table
+      window-reads.ts       # External tool: window_reads
+      write-file.ts         # External tool: write_file
   modes/
     ai-chat.ts            # AI Chat mode logic for nanalogue-gui.
     qc.ts                 # QC mode logic for nanalogue-gui

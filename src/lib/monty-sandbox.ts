@@ -1,22 +1,12 @@
 // Monty sandbox wrapper for AI Chat mode.
 // Encapsulates @pydantic/monty with @nanalogue/node external functions and security guards.
 
-import { access, mkdir, open, realpath, writeFile } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
-import {
-    bamMods,
-    peek as peekFn,
-    readInfo,
-    seqTable,
-    windowReads,
-} from "@nanalogue/node";
 import {
     Monty,
     MontyRuntimeError,
     MontySnapshot,
     MontySyntaxError,
 } from "@pydantic/monty";
-import picomatch from "picomatch";
 import {
     DEFAULT_MAX_ALLOCATIONS,
     DEFAULT_MAX_DURATION_SECS,
@@ -29,28 +19,25 @@ import {
     DEFAULT_MAX_RECORDS_WINDOW_READS,
     DEFAULT_MAX_WRITE_BYTES,
     EXTERNAL_FUNCTIONS,
-    MAX_FILENAME_LENGTH,
-    MAX_LS_ENTRIES,
     MAX_PRINT_CAPTURE_BYTES,
 } from "./ai-chat-constants";
+import {
+    makeBamMods,
+    makeContinueThinking,
+    makeLs,
+    makePeek,
+    makeReadFile,
+    makeReadInfo,
+    makeSeqTable,
+    makeWindowReads,
+    makeWriteFile,
+} from "./ai-external-tools";
 import type { SandboxOptions, SandboxResult } from "./chat-types";
 import {
-    assertExistingAncestorInside,
-    assertInside,
     convertMaps,
-    enforceDataSizeLimit,
-    enforceRecordLimit,
     gateOutputSize,
-    hasControlChars,
-    isDeniedPath,
-    listFilesRecursive,
-    rejectTreatAsUrl,
-    resolvePath,
     SandboxError,
     safeStringify,
-    toForwardSlashes,
-    toReadOptions,
-    toWindowOptions,
 } from "./monty-sandbox-helpers";
 
 export {
@@ -271,309 +258,24 @@ export async function runSandboxCode(
                 }
             },
             externalFunctions: wrapForMonty({
-                /**
-                 * Signals that the LLM needs another execution round.
-                 * Sets the continueThinkingCalled flag and returns null to Python.
-                 *
-                 * @returns Null.
-                 */
-                continue_thinking: () => {
+                continue_thinking: makeContinueThinking(() => {
                     continueThinkingCalled = true;
-                    return null;
-                },
-
-                /**
-                 * Peeks at BAM file headers and summary info.
-                 *
-                 * @param bamPath - Path to the BAM file.
-                 * @param opts - Optional snake_case options from sandbox code.
-                 * @returns The BAM file metadata including contigs and modifications.
-                 */
-                peek: async (
-                    bamPath: string,
-                    opts?: Record<string, unknown>,
-                ) => {
-                    rejectTreatAsUrl(opts);
-                    const resolved = await resolvePath(allowedDir, bamPath);
-                    return peekFn({ bamPath: resolved });
-                },
-
-                /**
-                 * Reads per-read alignment info from a BAM file.
-                 *
-                 * @param bamPath - Path to the BAM file.
-                 * @param opts - Optional snake_case options from sandbox code.
-                 * @returns An array of per-read alignment records.
-                 */
-                read_info: async (
-                    bamPath: string,
-                    opts?: Record<string, unknown>,
-                ) => {
-                    rejectTreatAsUrl(opts);
-                    const resolved = await resolvePath(allowedDir, bamPath);
-                    const result = await readInfo(
-                        toReadOptions(resolved, opts, maxRecordsReadInfo),
-                    );
-                    enforceRecordLimit(result, "read_info", maxRecordsReadInfo);
-                    return result;
-                },
-
-                /**
-                 * Reads base modification data from a BAM file.
-                 *
-                 * @param bamPath - Path to the BAM file.
-                 * @param opts - Optional snake_case options from sandbox code.
-                 * @returns An array of base modification records.
-                 */
-                bam_mods: async (
-                    bamPath: string,
-                    opts?: Record<string, unknown>,
-                ) => {
-                    rejectTreatAsUrl(opts);
-                    const resolved = await resolvePath(allowedDir, bamPath);
-                    const result = await bamMods(
-                        toReadOptions(resolved, opts, maxRecordsBamMods),
-                    );
-                    enforceRecordLimit(result, "bam_mods", maxRecordsBamMods);
-                    return result;
-                },
-
-                /**
-                 * Computes windowed read statistics from a BAM file.
-                 *
-                 * @param bamPath - Path to the BAM file.
-                 * @param opts - Optional snake_case options from sandbox code.
-                 * @returns The windowed statistics as a parsed JSON array.
-                 */
-                window_reads: async (
-                    bamPath: string,
-                    opts?: Record<string, unknown>,
-                ) => {
-                    rejectTreatAsUrl(opts);
-                    const resolved = await resolvePath(allowedDir, bamPath);
-                    const json = await windowReads(
-                        toWindowOptions(resolved, opts, maxRecordsWindowReads),
-                    );
-                    const parsed: unknown = JSON.parse(json);
-                    if (!Array.isArray(parsed)) {
-                        throw new SandboxError(
-                            "RuntimeError",
-                            "window_reads returned non-array JSON",
-                        );
-                    }
-                    const records = parsed as unknown[];
-                    enforceRecordLimit(
-                        records,
-                        "window_reads",
-                        maxRecordsWindowReads,
-                    );
-                    return records;
-                },
-
-                /**
-                 * Extracts per-read sequence table as TSV from a BAM file.
-                 *
-                 * @param bamPath - Path to the BAM file.
-                 * @param opts - Optional snake_case options from sandbox code.
-                 * @returns The sequence table as a TSV string.
-                 */
-                seq_table: async (
-                    bamPath: string,
-                    opts?: Record<string, unknown>,
-                ) => {
-                    rejectTreatAsUrl(opts);
-                    const resolved = await resolvePath(allowedDir, bamPath);
-                    const tsv = await seqTable(
-                        toReadOptions(resolved, opts, maxRecordsSeqTable),
-                    );
-                    return enforceDataSizeLimit(
-                        tsv,
-                        "seq_table",
-                        maxOutputBytes,
-                    );
-                },
-
-                /**
-                 * Lists files in the allowed directory, with optional glob filtering.
-                 *
-                 * @param pattern - Optional glob pattern or options object.
-                 * @returns A list of relative file paths, or an object with truncation info.
-                 */
-                ls: async (pattern?: string | Record<string, unknown>) => {
-                    const patternStr =
-                        typeof pattern === "string" ? pattern : undefined;
-                    const matcher = patternStr
-                        ? picomatch(patternStr)
-                        : undefined;
-                    // Resolve allowedDir to its real path so that
-                    // relative(allowedDir, resolved) inside listFilesRecursive
-                    // always yields a clean subpath even when allowedDir itself
-                    // contains symlinks (resolved is always a real path).
-                    const allowedDirReal = await realpath(allowedDir);
-                    const { files, capped } = await listFilesRecursive(
-                        allowedDirReal,
-                        allowedDirReal,
-                        { pattern: matcher, deny: isDeniedPath },
-                    );
-                    if (capped) {
-                        return {
-                            files,
-                            _truncated: {
-                                message:
-                                    `Listing capped at ${MAX_LS_ENTRIES} entries. ` +
-                                    "Use a glob pattern to narrow results (e.g. ls('**/*.bam')).",
-                                cap: MAX_LS_ENTRIES,
-                            },
-                        };
-                    }
-                    return files;
-                },
-
-                /**
-                 * Reads a text file from the allowed directory with optional offset and size limit.
-                 *
-                 * @param filePath - Path to the file to read.
-                 * @param opts - Optional options with offset and max_bytes.
-                 * @returns An object with content, bytes_read, total_size, and offset.
-                 */
-                read_file: async (
-                    filePath: string,
-                    opts?: Record<string, unknown>,
-                ) => {
-                    const resolved = await resolvePath(allowedDir, filePath);
-                    // Use the real path of allowedDir as the base so that
-                    // relative() produces a clean subpath even when allowedDir
-                    // itself contains symlinks (resolved is always a real path).
-                    // Normalise to forward slashes so the picomatch patterns
-                    // match correctly on Windows.
-                    const allowedDirReal = await realpath(allowedDir);
-                    const relResolved = toForwardSlashes(
-                        relative(allowedDirReal, resolved),
-                    );
-                    if (isDeniedPath(relResolved)) {
-                        // OSError maps to Python's OSError, which Monty accepts.
-                        // PermissionError is a subclass of OSError in CPython but
-                        // Monty does not recognise it by name, so we use OSError.
-                        throw new SandboxError(
-                            "OSError",
-                            `Reading "${filePath}" is not permitted`,
-                        );
-                    }
-
-                    const rawOffset = opts?.offset ?? 0;
-                    if (
-                        typeof rawOffset !== "number" ||
-                        !Number.isFinite(rawOffset) ||
-                        !Number.isInteger(rawOffset) ||
-                        rawOffset < 0
-                    ) {
-                        throw new SandboxError(
-                            "ValueError",
-                            `read_file: offset must be a non-negative integer, got ${String(rawOffset)}`,
-                        );
-                    }
-                    const rawMaxBytes = opts?.max_bytes ?? maxReadBytes;
-                    if (
-                        typeof rawMaxBytes !== "number" ||
-                        !Number.isFinite(rawMaxBytes) ||
-                        !Number.isInteger(rawMaxBytes) ||
-                        rawMaxBytes < 0
-                    ) {
-                        throw new SandboxError(
-                            "ValueError",
-                            `read_file: max_bytes must be a non-negative integer, got ${String(rawMaxBytes)}`,
-                        );
-                    }
-                    const offset = rawOffset;
-                    const requestedBytes = Math.min(rawMaxBytes, maxReadBytes);
-                    const fd = await open(resolved, "r");
-                    try {
-                        const stat = await fd.stat();
-                        const totalSize = stat.size;
-                        const buf = Buffer.alloc(requestedBytes);
-                        const { bytesRead } = await fd.read(
-                            buf,
-                            0,
-                            requestedBytes,
-                            offset,
-                        );
-                        return {
-                            content: buf.toString("utf-8", 0, bytesRead),
-                            bytes_read: bytesRead,
-                            total_size: totalSize,
-                            offset,
-                        };
-                    } finally {
-                        await fd.close();
-                    }
-                },
-
-                /**
-                 * Writes a text file to the allowed directory (no overwrites).
-                 *
-                 * @param filePath - Path for the new file (relative to the allowed directory).
-                 * @param content - The text content to write.
-                 * @returns An object with the written path and bytes_written.
-                 */
-                write_file: async (filePath: string, content: string) => {
-                    for (const component of filePath.split("/")) {
-                        if (component.length > MAX_FILENAME_LENGTH) {
-                            throw new SandboxError(
-                                "ValueError",
-                                `Filename component "${component.slice(0, 50)}..." exceeds ` +
-                                    `${MAX_FILENAME_LENGTH} character limit`,
-                            );
-                        }
-                        if (hasControlChars(component)) {
-                            throw new SandboxError(
-                                "ValueError",
-                                `Filename "${component}" contains control characters`,
-                            );
-                        }
-                    }
-                    const contentBytes = Buffer.byteLength(content, "utf-8");
-                    if (contentBytes > maxWriteBytes) {
-                        throw new SandboxError(
-                            "ValueError",
-                            `Content size ${contentBytes} bytes exceeds write limit of ` +
-                                `${maxWriteBytes} bytes (${maxWriteBytes / 1024 / 1024} MB)`,
-                        );
-                    }
-                    // Pre-symlink traversal guard: reject escaping paths before
-                    // any filesystem mutations.
-                    const tentative = resolve(allowedDir, filePath);
-                    assertInside(
-                        allowedDir,
-                        tentative,
-                        `Path "${filePath}" is outside the allowed directory`,
-                    );
-                    // Check existing ancestors before mkdir to prevent following
-                    // pre-existing symlinks outside allowedDir.
-                    await assertExistingAncestorInside(
-                        allowedDir,
-                        tentative,
-                        `Path "${filePath}" is outside the allowed directory`,
-                    );
-                    const parentDir = join(tentative, "..");
-                    await mkdir(parentDir, { recursive: true });
-                    // Symlink-safe resolution: verify canonical path stays within allowedDir.
-                    const resolved = await resolvePath(allowedDir, filePath);
-                    try {
-                        await access(resolved);
-                        throw new SandboxError(
-                            "FileExistsError",
-                            `File "${filePath}" already exists. Choose a different name.`,
-                        );
-                    } catch (e) {
-                        if ((e as NodeJS.ErrnoException).code !== "ENOENT")
-                            throw e;
-                    }
-                    await writeFile(resolved, content, "utf-8");
-                    return {
-                        path: filePath,
-                        bytes_written: contentBytes,
-                    };
-                },
+                }),
+                peek: makePeek(allowedDir),
+                read_info: makeReadInfo(allowedDir, maxRecordsReadInfo),
+                bam_mods: makeBamMods(allowedDir, maxRecordsBamMods),
+                window_reads: makeWindowReads(
+                    allowedDir,
+                    maxRecordsWindowReads,
+                ),
+                seq_table: makeSeqTable(
+                    allowedDir,
+                    maxRecordsSeqTable,
+                    maxOutputBytes,
+                ),
+                ls: makeLs(allowedDir),
+                read_file: makeReadFile(allowedDir, maxReadBytes),
+                write_file: makeWriteFile(allowedDir, maxWriteBytes),
             }),
         });
 

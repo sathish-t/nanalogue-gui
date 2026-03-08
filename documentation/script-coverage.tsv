@@ -2,6 +2,16 @@ filename	%lines
 src/lib/ai-chat-constants.ts	100
 src/lib/ai-chat-ipc-validation.ts	89.41
 src/lib/ai-chat-shared-constants.ts	77.77
+src/lib/ai-external-tools/bam-mods.ts	100
+src/lib/ai-external-tools/continue-thinking.ts	100
+src/lib/ai-external-tools/index.ts	100
+src/lib/ai-external-tools/ls.ts	100
+src/lib/ai-external-tools/peek.ts	100
+src/lib/ai-external-tools/read-file.ts	100
+src/lib/ai-external-tools/read-info.ts	100
+src/lib/ai-external-tools/seq-table.ts	100
+src/lib/ai-external-tools/window-reads.ts	100
+src/lib/ai-external-tools/write-file.ts	100
 src/lib/bed-parser.ts	93.1
 src/lib/chat-orchestrator-test-utils.ts	100
 src/lib/chat-orchestrator.ts	92.24
@@ -12,8 +22,8 @@ src/lib/line-counter.ts	100
 src/lib/locate-data-loader.ts	100
 src/lib/mod-filter.ts	100
 src/lib/model-listing.ts	92.42
-src/lib/monty-sandbox-helpers.ts	97.29
-src/lib/monty-sandbox.ts	92.85
+src/lib/monty-sandbox-helpers.ts	98.64
+src/lib/monty-sandbox.ts	95.31
 src/lib/qc-data-loader.ts	93.14
 src/lib/region-parser.ts	95.65
 src/lib/sandbox-prompt.ts	100

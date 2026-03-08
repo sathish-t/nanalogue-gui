@@ -15,7 +15,7 @@ import { simulateModBam } from "@nanalogue/node";
 import { runMontyAsync } from "@pydantic/monty";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MAX_PRINT_CAPTURE_BYTES } from "./ai-chat-constants";
-import { runSandboxCode } from "./monty-sandbox";
+import { collectTerminalOutput, runSandboxCode } from "./monty-sandbox";
 import { resolvePath } from "./monty-sandbox-helpers";
 
 let allowedDir: string;
@@ -658,4 +658,49 @@ describe("runMontyAsyncWithPrint parity with runMontyAsync", () => {
         // But also captures print output (upstream does not)
         expect(wrapped.prints?.join("")).toContain("parity test");
     });
+});
+
+// --- collectTerminalOutput ---
+
+it("collectTerminalOutput uses safeStringify fallback for non-serializable values", () => {
+    // BigInt cannot be JSON-serialised, so safeStringify returns ok: false,
+    // exercising the valStr.fallback branch in collectTerminalOutput.
+    const result = collectTerminalOutput({
+        success: true,
+        endedWithExpression: true,
+        value: BigInt(42),
+        continueThinkingCalled: false,
+        prints: [],
+        printsTruncated: false,
+    });
+    expect(result).toContain("cyclic or non-serializable");
+});
+
+it("collectTerminalOutput joins prints with serialized expression value", () => {
+    const result = collectTerminalOutput({
+        success: true,
+        endedWithExpression: true,
+        value: 99,
+        continueThinkingCalled: false,
+        prints: ["hello\n"],
+        printsTruncated: false,
+    });
+    expect(result).toBe("hello\n99\n");
+});
+
+// --- printCallback UTF-8 boundary ---
+
+it("printCallback backs off to a UTF-8 boundary when cap splits a multi-byte character", async () => {
+    // '🎉' is 4 bytes in UTF-8 (F0 9F 8E 89).  With maxPrintBytes=3 the cap
+    // falls inside the codepoint; the while loop in printCallback must step
+    // back to position 0 to avoid emitting a broken sequence.
+    const result = await runSandboxCode('print("🎉")', allowedDir, {
+        maxPrintBytes: 3,
+    });
+    expect(result.success).toBe(true);
+    expect(result.printsTruncated).toBe(true);
+    // Nothing valid fits before the boundary, so prints may be empty or
+    // contain only the safe leading bytes (zero in this case).
+    const total = Buffer.byteLength(result.prints?.join("") ?? "", "utf-8");
+    expect(total).toBeLessThanOrEqual(3);
 });
