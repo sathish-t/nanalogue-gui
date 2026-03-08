@@ -40,7 +40,7 @@ jobs:
 
       - name: Take screenshots
         run: >-
-          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24"
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24"
           sh -c "openbox & sleep 1 && npx playwright test --config demo/playwright.config.mjs"
         env:
           ELECTRON_EXTRA_LAUNCH_ARGS: "--no-sandbox --disable-gpu"
