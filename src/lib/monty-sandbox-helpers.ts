@@ -101,6 +101,7 @@ export async function assertExistingAncestorInside(
         } catch (e) {
             if ((e as NodeJS.ErrnoException).code === "ENOENT") {
                 const parent = resolve(current, "..");
+                /* c8 ignore next -- reaching the filesystem root requires traversing to / */
                 if (parent === current) return; // reached filesystem root
                 current = parent;
                 continue;
@@ -153,6 +154,7 @@ export async function resolvePath(
             assertInside(allowedDirReal, parentReal, errorMessage);
             return resolved;
         }
+        /* c8 ignore next -- non-ENOENT realpath errors (e.g. EACCES) are not practical to test */
         throw e;
     }
     assertInside(allowedDirReal, candidateReal, errorMessage);
