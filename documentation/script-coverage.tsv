@@ -3,6 +3,7 @@ src/lib/ai-chat-constants.ts	100
 src/lib/ai-chat-ipc-validation.ts	89.41
 src/lib/ai-chat-shared-constants.ts	77.77
 src/lib/bed-parser.ts	93.1
+src/lib/chat-orchestrator-test-utils.ts	100
 src/lib/chat-orchestrator.ts	92.24
 src/lib/chat-session.ts	89.47
 src/lib/format-utils.ts	100

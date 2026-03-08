@@ -125,9 +125,8 @@ export async function startMockServer(
     });
 
     const addr = server.address();
-    if (addr === null || typeof addr === "string") {
-        throw new Error("Mock server did not bind to a port");
-    }
+    /* c8 ignore next -- listen(0) always returns an AddressInfo object */
+    if (addr === null || typeof addr === "string") throw new Error("Mock server did not bind to a port");
     return {
         url: `http://127.0.0.1:${addr.port}/v1`,
         /** Closes the server and resolves when done. */

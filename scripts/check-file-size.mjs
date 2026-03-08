@@ -54,7 +54,7 @@ const EXCEPTIONS = new Map([
     ["src/renderer/ai-chat/ai-chat.ts", 1149],
     ["src/renderer/qc/qc-results.ts", 1146],
     // Test files above the 1500-line ceiling:
-    ["src/lib/chat-orchestrator.test.ts", 2430], // raised from 2160: replaceSystemPrompt tests
+    // (none)
 ]);
 
 // --- File discovery ---
