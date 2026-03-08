@@ -319,6 +319,131 @@ describe("nanalogue-chat CLI", () => {
         });
     });
 
+    describe("--rm-tools flag", () => {
+        it("exits 1 when --rm-tools value is empty", async () => {
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--rm-tools",
+                    "",
+                ]),
+            ).rejects.toMatchObject({ code: 1 });
+        });
+
+        it("prints error when --rm-tools value is empty", async () => {
+            let stderr = "";
+            try {
+                await execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--rm-tools",
+                    "",
+                ]);
+            } catch (err) {
+                stderr = (
+                    err as NodeJS.ErrnoException & {
+                        /** The stderr output of the failed process. */
+                        stderr: string;
+                    }
+                ).stderr;
+            }
+            expect(stderr).toContain("--rm-tools value cannot be empty");
+        });
+
+        it("exits 1 when --rm-tools contains an unknown tool name", async () => {
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--rm-tools",
+                    "nonexistent_tool",
+                ]),
+            ).rejects.toMatchObject({ code: 1 });
+        });
+
+        it("prints error naming the bad tool when --rm-tools contains an unknown name", async () => {
+            let stderr = "";
+            try {
+                await execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--rm-tools",
+                    "nonexistent_tool",
+                ]);
+            } catch (err) {
+                stderr = (
+                    err as NodeJS.ErrnoException & {
+                        /** The stderr output of the failed process. */
+                        stderr: string;
+                    }
+                ).stderr;
+            }
+            expect(stderr).toContain('"nonexistent_tool"');
+        });
+
+        it("exits 1 when --rm-tools is used without --system-prompt", async () => {
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--rm-tools",
+                    "peek",
+                ]),
+            ).rejects.toMatchObject({ code: 1 });
+        });
+
+        it("prints error when --rm-tools is used without --system-prompt", async () => {
+            let stderr = "";
+            try {
+                await execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--rm-tools",
+                    "peek",
+                ]);
+            } catch (err) {
+                stderr = (
+                    err as NodeJS.ErrnoException & {
+                        /** The stderr output of the failed process. */
+                        stderr: string;
+                    }
+                ).stderr;
+            }
+            expect(stderr).toContain("--rm-tools requires --system-prompt");
+        });
+    });
+
     describe("--system-prompt flag", () => {
         it("exits 1 when --system-prompt is empty", async () => {
             await expect(

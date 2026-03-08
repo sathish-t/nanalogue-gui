@@ -358,6 +358,52 @@ describe("ChatSession", () => {
         });
     });
 
+    describe("removedTools threading", () => {
+        it("passes removedTools to handleUserMessage when provided", async () => {
+            vi.mocked(handleUserMessage).mockResolvedValue({
+                text: "ok",
+                steps: [],
+            });
+
+            const removedTools = new Set(["peek", "ls"]);
+            await session.sendMessage({
+                endpointUrl: "http://localhost:11434/v1",
+                apiKey: "",
+                model: "llama3",
+                message: "test",
+                allowedDir: "/tmp",
+                config: defaultConfig,
+                emitEvent: vi.fn(),
+                removedTools,
+            });
+
+            expect(handleUserMessage).toHaveBeenCalledOnce();
+            const args = vi.mocked(handleUserMessage).mock.calls[0][0];
+            expect(args.removedTools).toBe(removedTools);
+        });
+
+        it("passes undefined removedTools to handleUserMessage when not provided", async () => {
+            vi.mocked(handleUserMessage).mockResolvedValue({
+                text: "ok",
+                steps: [],
+            });
+
+            await session.sendMessage({
+                endpointUrl: "http://localhost:11434/v1",
+                apiKey: "",
+                model: "llama3",
+                message: "test",
+                allowedDir: "/tmp",
+                config: defaultConfig,
+                emitEvent: vi.fn(),
+            });
+
+            expect(handleUserMessage).toHaveBeenCalledOnce();
+            const args = vi.mocked(handleUserMessage).mock.calls[0][0];
+            expect(args.removedTools).toBeUndefined();
+        });
+    });
+
     describe("error handling", () => {
         it("emits turn_error and returns failure for a generic non-abort error", async () => {
             vi.mocked(handleUserMessage).mockRejectedValue(

@@ -779,6 +779,11 @@ export interface HandleMessageOptions {
      * top in the usual order. CLI-only feature.
      */
     replaceSystemPrompt?: string;
+    /**
+     * Optional set of tool names to omit from the Monty sandbox. Each name
+     * must be a member of EXTERNAL_FUNCTIONS. CLI-only feature.
+     */
+    removedTools?: ReadonlySet<string>;
 }
 
 /**
@@ -814,6 +819,7 @@ export async function handleUserMessage(
         signal,
         appendSystemPrompt,
         replaceSystemPrompt,
+        removedTools,
     } = options;
 
     // Add user message to history
@@ -847,6 +853,7 @@ export async function handleUserMessage(
                 maxAllocations: config.maxAllocations,
                 maxReadBytes: config.maxReadMB * 1024 * 1024,
                 maxWriteBytes: config.maxWriteMB * 1024 * 1024,
+                removedTools,
             },
             signal,
         );
@@ -976,6 +983,7 @@ export async function handleUserMessage(
         // can be redirected to an overflow file by handleTerminalOverflow.
         // The LLM-facing truncation at the context budget is already enforced
         // downstream by truncatePrints() in buildExecutionFeedback.
+        removedTools,
     };
 
     const steps: Array<{

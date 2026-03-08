@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { parseArgs } from "node:util";
 import { version } from "../package.json";
+import { EXTERNAL_FUNCTIONS } from "./lib/ai-chat-constants";
 import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
 import { dumpLlmInstructions } from "./lib/chat-orchestrator";
 import { ChatSession } from "./lib/chat-session";
@@ -63,6 +64,7 @@ const argConfig = {
         temperature: { type: "string" as const },
         "non-interactive": { type: "string" as const },
         "system-prompt": { type: "string" as const },
+        "rm-tools": { type: "string" as const },
         "dump-llm-instructions": { type: "boolean" as const, default: false },
         "list-models": { type: "boolean" as const, default: false },
         version: { type: "boolean" as const, short: "v", default: false },
@@ -124,6 +126,12 @@ ${BOLD}Custom system prompt:${RESET}
   additional instructions to the default (or replaced) system prompt. The
   file is read once at startup. Use /dump_system_prompt to verify the full
   effective prompt.
+
+  --rm-tools <t1,t2,...>       Comma-separated list of sandbox tool names to
+                               remove. Requires --system-prompt (provide a
+                               prompt that describes only the kept tools).
+                               Valid names: ${[...EXTERNAL_FUNCTIONS].join(", ")}.
+                               Hard error on unknown names.
 
 ${BOLD}REPL commands:${RESET}
   /new                     Start a new conversation
@@ -343,6 +351,40 @@ async function main(): Promise<void> {
     }
     const replaceSystemPrompt: string | undefined = values["system-prompt"];
 
+    // --rm-tools: parse, validate, and build the removal set.
+    let removedTools: ReadonlySet<string> | undefined;
+    if (values["rm-tools"] !== undefined) {
+        const names = values["rm-tools"]
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+        if (names.length === 0) {
+            console.error("Error: --rm-tools value cannot be empty");
+            process.exitCode = 1;
+            return;
+        }
+        const validTools = new Set<string>(EXTERNAL_FUNCTIONS);
+        for (const name of names) {
+            if (!validTools.has(name)) {
+                console.error(
+                    `Error: --rm-tools: unknown tool "${name}". Valid tools: ${[...EXTERNAL_FUNCTIONS].join(", ")}`,
+                );
+                process.exitCode = 1;
+                return;
+            }
+        }
+        removedTools = new Set(names);
+    }
+
+    if (removedTools !== undefined && replaceSystemPrompt === undefined) {
+        console.error(
+            "Error: --rm-tools requires --system-prompt. " +
+                "Provide a custom system prompt that describes only the tools you are keeping.",
+        );
+        process.exitCode = 1;
+        return;
+    }
+
     const session = new ChatSession();
 
     // Non-interactive mode: send a single message, print the response, and exit.
@@ -358,6 +400,7 @@ async function main(): Promise<void> {
             config,
             appendSystemPrompt,
             replaceSystemPrompt,
+            removedTools,
             /**
              * Suppresses all progress events in non-interactive mode.
              * Only the final response text reaches stdout.
@@ -529,6 +572,7 @@ async function main(): Promise<void> {
             emitEvent,
             appendSystemPrompt,
             replaceSystemPrompt,
+            removedTools,
         });
         requestInFlight = false;
 

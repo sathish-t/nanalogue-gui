@@ -175,6 +175,7 @@ export async function runSandboxCode(
         maxReadBytes = DEFAULT_MAX_READ_BYTES,
         maxWriteBytes = DEFAULT_MAX_WRITE_BYTES,
         maxPrintBytes = MAX_PRINT_CAPTURE_BYTES,
+        removedTools,
     } = options;
 
     let continueThinkingCalled = false;
@@ -184,7 +185,9 @@ export async function runSandboxCode(
 
     try {
         const m = new Monty(code, {
-            externalFunctions: [...EXTERNAL_FUNCTIONS],
+            externalFunctions: removedTools
+                ? EXTERNAL_FUNCTIONS.filter((n) => !removedTools.has(n))
+                : [...EXTERNAL_FUNCTIONS],
         });
 
         /**
@@ -257,26 +260,31 @@ export async function runSandboxCode(
                     printsTruncated = true;
                 }
             },
-            externalFunctions: wrapForMonty({
-                continue_thinking: makeContinueThinking(() => {
-                    continueThinkingCalled = true;
-                }),
-                peek: makePeek(allowedDir),
-                read_info: makeReadInfo(allowedDir, maxRecordsReadInfo),
-                bam_mods: makeBamMods(allowedDir, maxRecordsBamMods),
-                window_reads: makeWindowReads(
-                    allowedDir,
-                    maxRecordsWindowReads,
-                ),
-                seq_table: makeSeqTable(
-                    allowedDir,
-                    maxRecordsSeqTable,
-                    maxOutputBytes,
-                ),
-                ls: makeLs(allowedDir),
-                read_file: makeReadFile(allowedDir, maxReadBytes),
-                write_file: makeWriteFile(allowedDir, maxWriteBytes),
-            }),
+            externalFunctions: wrapForMonty(
+                // Build all implementations, then drop any the caller removed.
+                Object.fromEntries(
+                    Object.entries({
+                        continue_thinking: makeContinueThinking(() => {
+                            continueThinkingCalled = true;
+                        }),
+                        peek: makePeek(allowedDir),
+                        read_info: makeReadInfo(allowedDir, maxRecordsReadInfo),
+                        bam_mods: makeBamMods(allowedDir, maxRecordsBamMods),
+                        window_reads: makeWindowReads(
+                            allowedDir,
+                            maxRecordsWindowReads,
+                        ),
+                        seq_table: makeSeqTable(
+                            allowedDir,
+                            maxRecordsSeqTable,
+                            maxOutputBytes,
+                        ),
+                        ls: makeLs(allowedDir),
+                        read_file: makeReadFile(allowedDir, maxReadBytes),
+                        write_file: makeWriteFile(allowedDir, maxWriteBytes),
+                    }).filter(([name]) => !removedTools?.has(name)),
+                ) as Record<string, (...args: never[]) => unknown>,
+            ),
         });
 
         const converted = convertMaps(value);

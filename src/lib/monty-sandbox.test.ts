@@ -688,6 +688,29 @@ it("collectTerminalOutput joins prints with serialized expression value", () => 
     expect(result).toBe("hello\n99\n");
 });
 
+// --- removedTools ---
+
+it("removedTools prevents a removed tool from being called", async () => {
+    const result = await runSandboxCode("peek('nonexistent.bam')", allowedDir, {
+        removedTools: new Set(["peek"]),
+    });
+    expect(result.success).toBe(false);
+});
+
+it("removedTools does not affect tools that are not removed", async () => {
+    const result = await runSandboxCode("ls()", allowedDir, {
+        removedTools: new Set(["peek"]),
+    });
+    expect(result.success).toBe(true);
+});
+
+it("removedTools with empty set leaves all tools available", async () => {
+    const result = await runSandboxCode("ls()", allowedDir, {
+        removedTools: new Set(),
+    });
+    expect(result.success).toBe(true);
+});
+
 // --- printCallback UTF-8 boundary ---
 
 it("printCallback backs off to a UTF-8 boundary when cap splits a multi-byte character", async () => {

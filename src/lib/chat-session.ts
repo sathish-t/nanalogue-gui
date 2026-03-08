@@ -38,6 +38,11 @@ export interface SendMessageOptions {
      * pass the content directly (e.g. From a shell variable).
      */
     replaceSystemPrompt?: string;
+    /**
+     * Optional set of tool names to omit from the Monty sandbox. Each name
+     * must be a member of EXTERNAL_FUNCTIONS. CLI-only feature.
+     */
+    removedTools?: ReadonlySet<string>;
 }
 
 /** Successful send result. */
@@ -108,6 +113,7 @@ export class ChatSession {
             emitEvent,
             appendSystemPrompt,
             replaceSystemPrompt,
+            removedTools,
         } = options;
 
         this.requestId += 1;
@@ -130,6 +136,7 @@ export class ChatSession {
                 signal: localSignal,
                 appendSystemPrompt,
                 replaceSystemPrompt,
+                removedTools,
             });
 
             // Check for cancellation or stale response. Cancel increments
