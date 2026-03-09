@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Adds `demo/rodney-demo/` — a shell script that drives the landing page via [rodney](https://github.com/simonw/rodney) (Chrome DevTools Protocol automation, run with `uvx rodney`): connects to a live Electron debug instance, asserts all mode buttons and font-size controls, exercises the version dialog, and saves screenshots; a companion CI workflow (`.github/workflows/rodney.yml`) runs it on every push and PR ([`daf014f`](https://github.com/sathish-t/nanalogue-gui/commit/daf014f3502a21aec97766465fc0e39c2ca5d525))
 - Widened AI chat option bounds across all numeric fields (timeout, record counts, duration, memory, allocations, read size); docs updated ([`3dc605a`](https://github.com/sathish-t/nanalogue-gui/commit/3dc605a08d776307005236d1dc6245748630bb68), [`828f539`](https://github.com/sathish-t/nanalogue-gui/commit/828f5397c1bb43b5c2a720b128058eb1fedf831c))
 - CLI numeric flags now report out-of-range errors (with flag name and allowed range) instead of silently clamping; all errors collected before exiting so the user sees every bad flag at once ([`f89fb5b`](https://github.com/sathish-t/nanalogue-gui/commit/f89fb5b36b4ac78028934ffe5edd166a294aae51))
 - LLM timeout errors now show "LLM response timed out (i.e. a message from the LLM took too much time to arrive)" in both CLI and GUI instead of a raw `AbortError` string ([`42cc3d0`](https://github.com/sathish-t/nanalogue-gui/commit/42cc3d004fb77862eb2012ea613095e6adac8a54))
