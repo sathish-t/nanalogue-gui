@@ -766,5 +766,4 @@ describe("nanalogue-chat CLI", () => {
             expect(stdout).toContain("SYSTEM_APPEND.md");
         });
     });
-
 });
