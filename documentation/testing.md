@@ -1,12 +1,43 @@
 # Testing Guide
 
+## UI verification (renderer changes)
+
+If your change affects anything the user sees in the app, run the smoke tests
+after `npm run test`.
+
+→ Full instructions and workflow: [`scripts/smoke/SMOKE.md`](../scripts/smoke/SMOKE.md)
+
+**Short version:**
+
+1. `npm run build`
+2. `./scripts/smoke/smoke-all.sh`
+3. Screenshots are saved to `/tmp/smoke-<suite>-<timestamp>/` — only read
+   them if you have a specific reason to doubt the visual output (e.g. you
+   changed a layout or chart). Each image costs ~3,000–6,000 tokens; do not
+   read them routinely.
+
+Two further screenshot-based test suites live in `demo/`:
+
+- **Playwright** (`demo/`) — launches its own Electron instance and drives
+  QC, Swipe, and AI Chat modes end-to-end.
+  See [`demo/README.md`](../demo/README.md) for setup and usage.
+- **Rodney** (`demo/rodney-demo/`) — connects to a running Electron instance
+  on port 9222 and drives the landing page and the locate-bed roundtrip.
+  See [`demo/rodney-demo/README.md`](../demo/rodney-demo/README.md) for setup
+  and usage.
+
+---
+
 ## Running tests
 
 | Command | Purpose |
 |---|---|
 | `npm test` | Run all unit and integration tests once. Exit 1 on failure. |
 | `npm run test:watch` | Watch mode; re-run tests on file changes. |
-| `./scripts/smoke/smoke-all.sh` | E2E smoke tests via Playwright. Tests landing, QC, Swipe. |
+| `./scripts/smoke/smoke-all.sh` | Smoke tests: landing, QC, Swipe. See `scripts/smoke/`. |
+| `npx playwright test --config demo/playwright.config.mjs` | Playwright screenshot tests: QC, Swipe, AI Chat. See `demo/`. |
+| `for s in demo/rodney-demo/*.sh; do bash "$s"; done` | Rodney: all tests. Requires app on port 9222. See `demo/rodney-demo/`. |
+| `uvx showboat verify <doc>` | Re-executes code blocks in a Showboat demo and checks output matches. See `demo/showboat-notes/`. |
 | `npx tsc --noEmit` | TypeScript type checking (no output files). Enforced pre-commit. |
 | `npm run lint` | Linting: Biome, ESLint, Stylelint, html-validate. |
 | `npm run lint:fix` | Auto-fix linting issues. |
@@ -77,6 +108,9 @@ Test the orchestrator's orchestration loop, error handling, and context manageme
 - Shared test utilities: `src/lib/chat-orchestrator-test-utils.ts` (used by multiple test files).
 - Mock fixtures: `tests/fixtures/` (e.g., canned LLM responses).
 - Smoke tests: `scripts/smoke/`.
+- Playwright screenshot tests: `demo/`. See [`demo/README.md`](../demo/README.md).
+- Rodney browser-automation tests: `demo/rodney-demo/`. See [`demo/rodney-demo/README.md`](../demo/rodney-demo/README.md).
+- Showboat CLI narrative demos: `demo/showboat-notes/`. See [`demo/showboat-notes/README.md`](../demo/showboat-notes/README.md).
 
 ## Before committing
 

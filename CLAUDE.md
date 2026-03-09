@@ -57,24 +57,6 @@ interpreter runs it; results feed back to the LLM in an agentic loop.
 
 ---
 
-## UI verification (renderer changes)
-
-If your change affects anything the user sees in the app, run the smoke tests
-after `npm run test`.
-
-→ Full instructions and workflow: [`scripts/smoke/SMOKE.md`](scripts/smoke/SMOKE.md)
-
-**Short version:**
-
-1. `npm run build`
-2. `./scripts/smoke/smoke-all.sh`
-3. Screenshots are saved to `/tmp/smoke-<suite>-<timestamp>/` — only read
-   them if you have a specific reason to doubt the visual output (e.g. you
-   changed a layout or chart). Each image costs ~3,000–6,000 tokens; do not
-   read them routinely.
-
----
-
 ## Before you finish any task
 
 Run these in order:
@@ -111,8 +93,9 @@ parallel — deal with its previous output first.
 
 ## Testing
 
-For detailed guidance on running tests, coverage enforcement, and mocking
-patterns, see [`documentation/testing.md`](documentation/testing.md).
+For detailed guidance on running tests, coverage enforcement, mocking
+patterns, and UI verification (smoke tests, Playwright, Rodney, Showboat),
+see [`documentation/testing.md`](documentation/testing.md).
 
 ---
 
