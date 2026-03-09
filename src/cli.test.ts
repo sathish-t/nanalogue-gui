@@ -1,7 +1,8 @@
 // Tests for the nanalogue-chat CLI entry point.
-// Spawns the built CLI binary and verifies flag behavior.
+// Spawns the built CLI binary and verifies flag behavior, including
+// interactive REPL mode via stdin/stdout.
 
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import {
     createServer,
@@ -317,6 +318,42 @@ describe("nanalogue-chat CLI", () => {
                 "--dump-llm-instructions requires --non-interactive",
             );
         });
+
+        it("sends a user message and the sandbox output appears on stdout", async () => {
+            // Runs the CLI in non-interactive mode against the mock server.
+            // The mock returns print("42bp") which the sandbox executes, so
+            // stdout should contain exactly "42bp".
+            const { stdout } = await execFileAsync("node", [
+                CLI_PATH,
+                "--endpoint",
+                mockServerUrl,
+                "--model",
+                "test-model",
+                "--dir",
+                tmpDir,
+                "--non-interactive",
+                "hello",
+            ]);
+            expect(stdout.trim()).toBe("42bp");
+        });
+
+        it("exits with code 0 after a successful non-interactive turn", async () => {
+            // execFileAsync rejects on non-zero exit codes, so resolving
+            // is sufficient to assert exit 0.
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    mockServerUrl,
+                    "--model",
+                    "test-model",
+                    "--dir",
+                    tmpDir,
+                    "--non-interactive",
+                    "hello",
+                ]),
+            ).resolves.toBeDefined();
+        });
     });
 
     describe("--rm-tools flag", () => {
@@ -572,4 +609,162 @@ describe("nanalogue-chat CLI", () => {
             expect(stderr).toContain("--system-prompt value cannot be empty");
         });
     });
+
+    // -----------------------------------------------------------------------
+    // REPL interactive mode — stdin/stdout integration tests.
+    // These tests spawn the CLI with piped stdio, write commands to stdin,
+    // and collect stdout to verify the interactive REPL loop behaviour.
+    // -----------------------------------------------------------------------
+
+    /** Result shape returned by the REPL helper functions below. */
+    interface ReplResult {
+        /** All text written to stdout by the spawned CLI process. */
+        stdout: string;
+        /** The process exit code, or null if the process was killed. */
+        code: number | null;
+    }
+
+    describe("REPL interactive mode", () => {
+        /** Temp directory created before each test and cleaned up after. */
+        let tmpDir = "";
+
+        beforeEach(async () => {
+            tmpDir = await mkdtemp(join(tmpdir(), "nanalogue-cli-repl-test-"));
+        });
+
+        afterEach(async () => {
+            await rm(tmpDir, { recursive: true, force: true });
+        });
+
+        /**
+         * Spawns the CLI in interactive mode, writes commands to stdin, and
+         * collects stdout + exit code.  Closes stdin after writing so the
+         * readline `for await` loop terminates naturally when the process has
+         * consumed all input.
+         *
+         * @param args - Extra CLI arguments (endpoint, model, dir are required).
+         * @param commands - Lines to write to stdin, one per element.
+         * @param timeoutMs - Kill the process after this many ms if still running.
+         * @returns Collected stdout and the process exit code.
+         */
+        async function runInteractiveCli(
+            args: string[],
+            commands: string[],
+            timeoutMs = 15_000,
+        ): Promise<ReplResult> {
+            return new Promise((resolve, reject) => {
+                const proc = spawn("node", [CLI_PATH, ...args], {
+                    stdio: ["pipe", "pipe", "pipe"],
+                });
+
+                let stdout = "";
+                let stderr = "";
+
+                proc.stdout.on("data", (chunk: Buffer) => {
+                    stdout += chunk.toString();
+                });
+                proc.stderr.on("data", (chunk: Buffer) => {
+                    stderr += chunk.toString();
+                });
+
+                const timer = setTimeout(() => {
+                    proc.kill();
+                    reject(
+                        new Error(
+                            `CLI timed out after ${timeoutMs}ms\n` +
+                                `stdout: ${stdout}\nstderr: ${stderr}`,
+                        ),
+                    );
+                }, timeoutMs);
+
+                proc.on("close", (code) => {
+                    clearTimeout(timer);
+                    resolve({ stdout, code });
+                });
+
+                proc.on("error", (err) => {
+                    clearTimeout(timer);
+                    reject(err);
+                });
+
+                // Write all commands, then close stdin so readline ends.
+                for (const cmd of commands) {
+                    proc.stdin.write(`${cmd}\n`);
+                }
+                proc.stdin.end();
+            });
+        }
+
+        /**
+         * Standard REPL flags that are always required for interactive mode.
+         *
+         * @param dir - The analysis directory path to pass as --dir.
+         * @returns The argument array for the CLI invocation.
+         */
+        function replArgs(dir: string): string[] {
+            return [
+                "--endpoint",
+                "http://127.0.0.1:19999/v1",
+                "--model",
+                "test-model",
+                "--dir",
+                dir,
+            ];
+        }
+
+        it("/quit exits with code 0 and prints Goodbye!", async () => {
+            const { stdout, code } = await runInteractiveCli(replArgs(tmpDir), [
+                "/quit",
+            ]);
+            expect(code).toBe(0);
+            expect(stdout).toContain("Goodbye!");
+        });
+
+        it("/new prints [new conversation started]", async () => {
+            const { stdout } = await runInteractiveCli(replArgs(tmpDir), [
+                "/new",
+                "/quit",
+            ]);
+            expect(stdout).toContain("[new conversation started]");
+        });
+
+        it("banner includes the endpoint URL and model name", async () => {
+            const { stdout } = await runInteractiveCli(
+                [
+                    "--endpoint",
+                    "http://127.0.0.1:19999/v1",
+                    "--model",
+                    "banner-model",
+                    "--dir",
+                    tmpDir,
+                ],
+                ["/quit"],
+            );
+            expect(stdout).toContain("http://127.0.0.1:19999/v1");
+            expect(stdout).toContain("banner-model");
+        });
+
+        it("banner includes the analysis directory path", async () => {
+            const { stdout } = await runInteractiveCli(replArgs(tmpDir), [
+                "/quit",
+            ]);
+            expect(stdout).toContain(tmpDir);
+        });
+
+        it("SYSTEM_APPEND.md presence is reflected in the startup banner", async () => {
+            // Write a SYSTEM_APPEND.md into the analysis dir, then start the
+            // CLI and quit immediately — the banner should note it was loaded.
+            const { writeFile } = await import("node:fs/promises");
+            await writeFile(
+                join(tmpDir, "SYSTEM_APPEND.md"),
+                "## Extra context\nFocus on CpG islands.",
+                "utf-8",
+            );
+            const { stdout } = await runInteractiveCli(replArgs(tmpDir), [
+                "/quit",
+            ]);
+            expect(stdout).toContain("SYSTEM_APPEND.md");
+        });
+    });
+
 });
