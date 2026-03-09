@@ -190,7 +190,13 @@ export function toReadOptions(
 ): ReadOptions {
     return {
         bamPath: resolved,
-        limit: (opts?.limit as number | undefined) ?? limitOverride,
+        limit:
+            limitOverride !== undefined
+                ? Math.min(
+                      (opts?.limit as number | undefined) ?? limitOverride,
+                      limitOverride,
+                  )
+                : (opts?.limit as number | undefined),
         offset: opts?.offset as number | undefined,
         sampleFraction: opts?.sample_fraction as number | undefined,
         sampleSeed: opts?.sample_seed as number | undefined,

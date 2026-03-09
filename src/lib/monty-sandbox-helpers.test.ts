@@ -106,9 +106,14 @@ describe("toReadOptions", () => {
         expect(opts.limit).toBe(200_000);
     });
 
-    it("kwargs.limit takes precedence over limitOverride", () => {
+    it("kwargs.limit is used when below limitOverride", () => {
         const opts = toReadOptions("/data/test.bam", { limit: 100 }, 200_000);
         expect(opts.limit).toBe(100);
+    });
+
+    it("limitOverride caps kwargs.limit when kwargs.limit exceeds it", () => {
+        const opts = toReadOptions("/data/test.bam", { limit: 200_000 }, 500);
+        expect(opts.limit).toBe(500);
     });
 
     it("handles empty opts", () => {
