@@ -631,6 +631,32 @@ function unlockSessionConfig(): void {
 }
 
 /**
+ * Applies min/max bounds to all numeric config inputs from CONFIG_FIELD_SPECS.
+ * Called once at page load so the HTML attributes are never the source of truth.
+ */
+function applyConfigBounds(): void {
+    const entries = [
+        [optContextWindow, CONFIG_FIELD_SPECS.contextWindowTokens],
+        [optMaxRetries, CONFIG_FIELD_SPECS.maxRetries],
+        [optTimeout, CONFIG_FIELD_SPECS.timeoutSeconds],
+        [optMaxReadInfo, CONFIG_FIELD_SPECS.maxRecordsReadInfo],
+        [optMaxBamMods, CONFIG_FIELD_SPECS.maxRecordsBamMods],
+        [optMaxWindowReads, CONFIG_FIELD_SPECS.maxRecordsWindowReads],
+        [optMaxSeqTable, CONFIG_FIELD_SPECS.maxRecordsSeqTable],
+        [optMaxCodeRounds, CONFIG_FIELD_SPECS.maxCodeRounds],
+        [optMaxDuration, CONFIG_FIELD_SPECS.maxDurationSecs],
+        [optMaxMemory, CONFIG_FIELD_SPECS.maxMemoryMB],
+        [optMaxAllocations, CONFIG_FIELD_SPECS.maxAllocations],
+        [optMaxReadMB, CONFIG_FIELD_SPECS.maxReadMB],
+        [optMaxWriteMB, CONFIG_FIELD_SPECS.maxWriteMB],
+    ];
+    for (const [input, spec] of entries) {
+        input.min = String(spec.min);
+        input.max = String(spec.max);
+    }
+}
+
+/**
  * Resets the advanced options to default values.
  */
 function resetDefaults(): void {
@@ -1150,3 +1176,8 @@ api.onAiChatEvent((event: AiChatEvent) => {
             break;
     }
 });
+
+// Apply bounds and defaults from CONFIG_FIELD_SPECS on page load so the
+// HTML attributes are never the source of truth for min, max, or initial value.
+applyConfigBounds();
+resetDefaults();

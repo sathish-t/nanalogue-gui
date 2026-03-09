@@ -155,10 +155,10 @@
     <!-- Warning for sandbox limit fields. -->
     <p class="dialog-warning">Sandbox limits — change with caution</p>
 
-    <!-- LLM request timeout in seconds. -->
+    <!-- LLM response timeout in seconds. -->
     <div class="dialog-row">
-      <label for="opt-timeout">Timeout (seconds):</label>
-      <input type="number" id="opt-timeout" value="120" min="10" max="600">
+      <label for="opt-timeout">LLM response timeout (s):</label>
+      <input type="number" id="opt-timeout" value="60" min="1" max="120">
     </div>
 
     <!-- Maximum records from read_info. -->
@@ -206,7 +206,7 @@
     <!-- Maximum read_file size in megabytes. -->
     <div class="dialog-row">
       <label for="opt-max-read-mb">Max read_file size (MB):</label>
-      <input type="number" id="opt-max-read-mb" value="1" min="1" max="10">
+      <input type="number" id="opt-max-read-mb" value="1" min="1" max="100">
     </div>
 
     <!-- Maximum write_file size in megabytes. -->
