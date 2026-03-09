@@ -413,12 +413,12 @@ describe("validateSendMessage config validation", () => {
 
     it("rejects below-minimum values", () => {
         const result = validateSendMessage(
-            validSendPayload({ config: { timeoutSeconds: 1 } }),
+            validSendPayload({ config: { timeoutSeconds: 0 } }),
         );
         expect(result.valid).toBe(false);
         if (!result.valid) {
             expect(result.error).toContain("timeout seconds");
-            expect(result.error).toContain("got 1");
+            expect(result.error).toContain("got 0");
         }
     });
 
@@ -456,7 +456,7 @@ describe("validateSendMessage config validation", () => {
     it("collects multiple field errors", () => {
         const result = validateSendMessage(
             validSendPayload({
-                config: { timeoutSeconds: 1, maxRetries: 100 },
+                config: { timeoutSeconds: 0, maxRetries: 100 },
             }),
         );
         expect(result.valid).toBe(false);

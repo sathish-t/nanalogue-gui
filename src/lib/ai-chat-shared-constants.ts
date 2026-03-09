@@ -22,37 +22,37 @@ export const /** Validation specs for each integer AiChatConfig field (temperatu
         },
         /** At least one attempt; cap to avoid runaway retry loops. */
         maxRetries: { min: 1, max: 20, fallback: 5, label: "max retries" },
-        /** Minimum meaningful request time vs. 10-minute hard ceiling. */
+        /** Per-request HTTP timeout; 1 s floor, 2-minute ceiling. */
         timeoutSeconds: {
-            min: 10,
-            max: 600,
-            fallback: 120,
+            min: 1,
+            max: 120,
+            fallback: 60,
             label: "timeout seconds",
         },
-        /** Floor prevents degenerate queries; ceiling prevents memory blowup. */
+        /** Floor of 1 record; ceiling of 1 M to prevent memory blowup. */
         maxRecordsReadInfo: {
-            min: 100,
+            min: 1,
             max: 1_000_000,
             fallback: 200_000,
             label: "max read_info records",
         },
-        /** Floor prevents degenerate queries; ceiling prevents memory blowup. */
+        /** Floor of 1 record; ceiling of 1 M to prevent memory blowup. */
         maxRecordsBamMods: {
-            min: 100,
-            max: 100_000,
+            min: 1,
+            max: 1_000_000,
             fallback: 5_000,
             label: "max bam_mods records",
         },
-        /** Floor prevents degenerate queries; ceiling prevents memory blowup. */
+        /** Floor of 1 record; ceiling of 1 M to prevent memory blowup. */
         maxRecordsWindowReads: {
-            min: 100,
-            max: 100_000,
+            min: 1,
+            max: 1_000_000,
             fallback: 5_000,
             label: "max window_reads records",
         },
-        /** Floor prevents degenerate queries; ceiling prevents memory blowup. */
+        /** Floor of 1 record; ceiling of 100 k (bounded by single-region read count). */
         maxRecordsSeqTable: {
-            min: 100,
+            min: 1,
             max: 100_000,
             fallback: 5_000,
             label: "max seq_table records",
@@ -64,35 +64,35 @@ export const /** Validation specs for each integer AiChatConfig field (temperatu
             fallback: 10,
             label: "max code rounds",
         },
-        /** Minimum meaningful timeout vs. 1-hour hard ceiling. */
+        /** Total sandbox wall-clock limit; 1 s floor, 7-day ceiling. */
         maxDurationSecs: {
-            min: 10,
-            max: 3600,
+            min: 1,
+            max: 604_800,
             fallback: 600,
             label: "max sandbox duration (seconds)",
         },
-        /** Floor prevents undersized heaps; ceiling prevents host OOM. */
+        /** Sandbox heap limit; 1 MB floor, 64 GB ceiling. */
         maxMemoryMB: {
-            min: 64,
-            max: 4096,
+            min: 1,
+            max: 65_536,
             fallback: 512,
             label: "max sandbox memory (MB)",
         },
-        /** Floor prevents trivial limits; ceiling prevents host blowup. */
+        /** Sandbox allocation count; 1 floor, 100 M ceiling. */
         maxAllocations: {
-            min: 10_000,
-            max: 10_000_000,
+            min: 1,
+            max: 100_000_000,
             fallback: 100_000,
             label: "max sandbox allocations",
         },
-        /** Floor of 1 MB; ceiling of 10 MB per read_file call. */
+        /** Per read_file call limit; 1 MB floor, 100 MB ceiling (Buffer.alloc constraint). */
         maxReadMB: {
             min: 1,
-            max: 10,
+            max: 100,
             fallback: 1,
             label: "max read_file size (MB)",
         },
-        /** Floor of 1 MB; ceiling of 100 MB per write_file call. */
+        /** Per write_file call limit; 1 MB floor, 100 MB ceiling (V8 string length constraint). */
         maxWriteMB: {
             min: 1,
             max: 100,
