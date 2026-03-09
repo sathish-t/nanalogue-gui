@@ -87,16 +87,17 @@ npm run lint           # no lint errors
 npm run lint:fix       # auto-fix what can be fixed
 ```
 
-Then run both reviews in parallel (redirect each to a temp file to avoid
+Then run both ai reviews (redirect each to a temp file to avoid
 interleaved output; use `mktemp` so concurrent runs never collide).
-Run them in parallel; do not run them one after the other.
+Give each a timeout of 300s.
 
 ```bash
 CR_OUT=$(mktemp) && CODEX_OUT=$(mktemp)
-coderabbit review --prompt-only -t uncommitted > "$CR_OUT" 2>&1 &
-codex review --uncommitted > "$CODEX_OUT" 2>&1 &
-wait
+coderabbit review --prompt-only -t uncommitted > "$CR_OUT" 2>&1
+codex review --uncommitted > "$CODEX_OUT" 2>&1
+echo "== coderabbit review =="
 cat "$CR_OUT"
+echo "== codex review =="
 cat "$CODEX_OUT"
 rm "$CR_OUT" "$CODEX_OUT"
 ```
