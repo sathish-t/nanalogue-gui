@@ -108,6 +108,13 @@ parallel — deal with its previous output first.
 
 ---
 
+## Testing
+
+For detailed guidance on running tests, coverage enforcement, and mocking
+patterns, see [`documentation/testing.md`](documentation/testing.md).
+
+---
+
 ## HTML and CSS
 
 Every HTML block and every CSS block must have a comment above it,

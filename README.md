@@ -5,6 +5,7 @@ on single molecules and DNA/RNA modifications.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![codecov](https://codecov.io/gh/sathish-t/nanalogue-gui/graph/badge.svg?token=A9AQCSCMHD)](https://codecov.io/gh/sathish-t/nanalogue-gui)
+[![CI](https://github.com/sathish-t/nanalogue-gui/actions/workflows/ci.yml/badge.svg)](https://github.com/sathish-t/nanalogue-gui/actions/workflows/ci.yml)
 
 Nanalogue-gui provides a desktop application for working with BAM/CRAM/Mod-BAM
 files, with a focus on single-molecule DNA/RNA modifications. It builds on
@@ -90,7 +91,8 @@ npm start
 ```
 
 This launches the landing page where you can choose between QC, Swipe,
-Locate Reads, and AI Chat modes.
+Locate Reads, and AI Chat modes. Three font-size buttons (small/medium/large)
+in the header scale all text in the app, including chart labels and legend.
 
 ## Modes
 
@@ -330,6 +332,7 @@ We use a Python sandbox to receive code from the LLM and execute it.
 Our sandbox uses the [Monty](https://github.com/pydantic/monty) package from pydantic to run Python
 code in a secure way so that it has access only to our files and to specific functions.
 This ensures our sandbox is secure, and allows us to inspect what the LLM is doing.
+A copy button in the code panel lets you copy the Python code to your clipboard.
 
 ![AI Chat multi-turn conversation with sandbox](demo/screenshot-ai-chat-sandbox-openai.png)
 
@@ -348,7 +351,8 @@ that describes the sandbox capabilities, without the dynamic conversation
 history) by clicking the **View System Prompt** button in the GUI, or by
 typing `/dump_system_prompt` in the CLI REPL. The output is written to
 `ai_chat_output/` inside your BAM directory and is available at any point,
-even before the first message has been sent.
+even before the first message has been sent. The button also shows a rough
+token count (`~N tokens`) for the prompt.
 
 **Customise the system prompt:**
 
@@ -415,6 +419,16 @@ this with a custom SYSTEM_APPEND.md to describe complex tasks to the LLM
 nanalogue-chat --endpoint <url> --model <name> --dir <path> \
     --non-interactive "What is the average read length?"
 ```
+
+**System prompt customisation:** use `--system-prompt "<text>"` to replace
+the built-in sandbox prompt (the SYSTEM_APPEND.md file and facts array are
+still appended to the prompt). Use `--dump-llm-instructions --non-interactive "<msg>"`
+to write the full LLM request payload (system prompt + conversation) to a dated
+log file in `ai_chat_output/`.
+
+**Remove tools:** use `--rm-tools "tool1,tool2"` to disable specific external
+functions (e.g. `--rm-tools "write_file,read_file"`) — useful for restricting
+sandbox capabilities.
 
 **REPL commands:**
 
@@ -519,6 +533,9 @@ the [installation](#installation) section of this document.
 The `documentation/code-explainers/` folder contains short write-ups explaining
 how specific parts of the codebase work — useful if you want to understand a
 feature before diving into the source.
+
+For detailed testing guidance (how to run tests, coverage enforcement, mocking
+patterns), see [`documentation/testing.md`](documentation/testing.md).
 
 ## Versioning
 
