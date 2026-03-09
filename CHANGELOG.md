@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--non-interactive <msg>` flag for `nanalogue-chat`: sends a single message to the LLM, prints the response, and exits with no banner or readline — clean for scripting; validates that the message is non-empty and non-whitespace; README documents usage with a `SYSTEM_APPEND.md` example ([`c3b6747`](https://github.com/sathish-t/nanalogue-gui/commit/c3b67477b4d725ae55b788efc2aaeb3f4c94b358))
 - Rough token estimate shown in the system prompt dialog: `~N tokens (rough)` appears on the left of the actions bar when the prompt loads, using UTF-8 byte length divided by 4 ([`a3253f1`](https://github.com/sathish-t/nanalogue-gui/commit/a3253f1cb129602d04acb0eff86476e96e974dce))
 
+### Fixed
+
+- `read_info`, `bam_mods`, `window_reads`, and `seq_table` now correctly honour the sandbox record-count cap (`--max-records-read-info` etc.) even when the Python script passes its own `limit` keyword argument that exceeds the cap; previously the script's `limit` bypassed the CLI cap entirely at the Rust layer, causing `enforceRecordLimit` to throw an error rather than silently returning a capped result ([`660de27`](https://github.com/sathish-t/nanalogue-gui/commit/660de275282ad078599adb639290146f7f367c27))
+
 ### Infrastructure
 
 - `scripts/check-external-tools-sync.mjs` cross-checks that the three declarations of external tool names stay in sync: the `EXTERNAL_FUNCTIONS` array in `ai-chat-constants.ts`, the source files under `src/lib/ai-external-tools/`, and the registration object in `monty-sandbox.ts`; names are derived automatically from each source with no hardcoded list; in pre-commit mode reads from the git index so unstaged edits cannot skew the result; `--all` mode reads from disk for CI use; includes a minimum-set guard for four foundational tool names to catch parser failures early ([`cb098af`](https://github.com/sathish-t/nanalogue-gui/commit/cb098afcd2dc31d3db1d9a7b5d871b79e6019943))
