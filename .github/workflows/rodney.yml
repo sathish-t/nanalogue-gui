@@ -1,6 +1,9 @@
-# Runs the rodney landing-page demo against a live Electron instance.
+# Runs the rodney tests against a live Electron instance.
 # Starts Electron in debug mode on port 9222, waits for it to be ready,
 # then drives it with rodney via uvx.
+#
+# All .sh files in demo/rodney-demo/ are discovered and run automatically —
+# no changes to this file are needed when new test scripts are added.
 
 name: Rodney demo
 
@@ -38,7 +41,7 @@ jobs:
 
       - name: Start Xvfb
         run: |
-          Xvfb :99 -screen 0 1280x720x24 &
+          Xvfb :99 -screen 0 1920x1080x24 &
           echo "DISPLAY=:99" >> $GITHUB_ENV
 
       - name: Start Electron in debug mode
@@ -61,12 +64,16 @@ jobs:
           echo "Electron did not become ready in time"
           exit 1
 
-      - name: Run rodney demo
-        run: ./demo/rodney-demo/demo.sh
+      - name: Run rodney tests
+        run: |
+          for script in demo/rodney-demo/*.sh; do
+            echo "=== running $script ==="
+            bash "$script"
+          done
 
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: rodney-screenshots
-          path: /tmp/rodney-demo-*/
+          path: /tmp/rodney-*/
