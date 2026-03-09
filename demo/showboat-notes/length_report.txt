@@ -1,0 +1,4 @@
+Reads: 900
+Min length: 902
+Max length: 2399
+Mean length: 1778.9
