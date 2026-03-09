@@ -102,3 +102,13 @@ if git diff --cached --name-only | grep -qE '^src/.*-validation\.ts$'; then
     exit 1
   fi
 fi
+
+# Verify external tool names are in sync across the three declaration sites:
+#   EXTERNAL_FUNCTIONS constant, ai-external-tools/ files, monty-sandbox.ts registration.
+# Triggers whenever any of the three sources is staged.
+if git diff --cached --name-only | grep -qE '^src/lib/(ai-chat-constants\.ts|ai-external-tools/|monty-sandbox\.ts)'; then
+  if ! node scripts/check-external-tools-sync.mjs; then
+    echo "pre-commit: external tool sync check failed, aborting commit" >&2
+    exit 1
+  fi
+fi
