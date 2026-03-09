@@ -151,6 +151,41 @@ export function collectTerminalOutput(result: SandboxResult): string {
 }
 
 /**
+ * Wraps external functions to convert plain JS Error to Monty-compatible SandboxError.
+ * Monty only accepts specific Python exception type names (e.g. RuntimeError, ValueError).
+ *
+ * @param fns - Map of function names to their implementations.
+ * @returns A new map with each function wrapped in SandboxError conversion.
+ */
+function wrapForMonty(
+    fns: Record<string, (...args: never[]) => unknown>,
+): Record<string, (...args: unknown[]) => unknown> {
+    const wrapped: Record<string, (...args: unknown[]) => unknown> = {};
+    for (const [name, fn] of Object.entries(fns)) {
+        /**
+         * Wraps an external function to convert native errors into SandboxErrors.
+         *
+         * @param args - The arguments forwarded to the external function.
+         * @returns The result of the external function call.
+         */
+        wrapped[name] = async (...args: unknown[]) => {
+            try {
+                return await (fn as (...a: unknown[]) => Promise<unknown>)(
+                    ...args,
+                );
+            } catch (e) {
+                if (e instanceof SandboxError) throw e;
+                if (e instanceof Error) {
+                    throw new SandboxError("RuntimeError", e.message);
+                }
+                throw new SandboxError("RuntimeError", String(e));
+            }
+        };
+    }
+    return wrapped;
+}
+
+/**
  * Runs Python code in the Monty sandbox with all external functions bound.
  *
  * @param code - The Python code to execute.
@@ -190,40 +225,6 @@ export async function runSandboxCode(
                 : [...EXTERNAL_FUNCTIONS],
         });
 
-        /**
-         * Wraps external functions to convert plain JS Error to Monty-compatible SandboxError.
-         * Monty only accepts specific Python exception type names (e.g. RuntimeError, ValueError).
-         *
-         * @param fns - Map of function names to their implementations.
-         * @returns A new map with each function wrapped in SandboxError conversion.
-         */
-        function wrapForMonty(
-            fns: Record<string, (...args: never[]) => unknown>,
-        ): Record<string, (...args: unknown[]) => unknown> {
-            const wrapped: Record<string, (...args: unknown[]) => unknown> = {};
-            for (const [name, fn] of Object.entries(fns)) {
-                /**
-                 * Wraps an external function to convert native errors into SandboxErrors.
-                 *
-                 * @param args - The arguments forwarded to the external function.
-                 * @returns The result of the external function call.
-                 */
-                wrapped[name] = async (...args: unknown[]) => {
-                    try {
-                        return await (
-                            fn as (...a: unknown[]) => Promise<unknown>
-                        )(...args);
-                    } catch (e) {
-                        if (e instanceof SandboxError) throw e;
-                        if (e instanceof Error) {
-                            throw new SandboxError("RuntimeError", e.message);
-                        }
-                        throw new SandboxError("RuntimeError", String(e));
-                    }
-                };
-            }
-            return wrapped;
-        }
         const value = await runMontyAsyncWithPrint(m, {
             limits: {
                 maxDurationSecs,

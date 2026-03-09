@@ -171,6 +171,44 @@ function formatSandboxResult(result: SandboxResult): string {
 }
 
 /**
+ * Handles a progress event from the orchestrator by printing to the terminal.
+ *
+ * @param event - The AI Chat event to display.
+ */
+function emitEvent(event: AiChatEvent): void {
+    switch (event.type) {
+        case "turn_start":
+            process.stdout.write(color(YELLOW, "[thinking...]"));
+            break;
+        case "code_execution_start":
+            // Clear the thinking indicator and show code
+            process.stdout.write("\r\x1b[K");
+            console.log(
+                color(LIGHT_BLUE, `\`\`\`python\n${event.code}\n\`\`\``),
+            );
+            process.stdout.write(color(YELLOW, "[running code...]"));
+            break;
+        case "code_execution_end":
+            process.stdout.write("\r\x1b[K");
+            console.log(color(DIM, formatSandboxResult(event.result)));
+            break;
+        case "turn_end":
+            process.stdout.write("\r\x1b[K");
+            break;
+        case "turn_error":
+            process.stdout.write("\r\x1b[K");
+            console.error(color(RED, `Error: ${event.error}`));
+            break;
+        case "turn_cancelled":
+            process.stdout.write("\r\x1b[K");
+            console.log(color(YELLOW, "[cancelled]"));
+            break;
+        default:
+            break;
+    }
+}
+
+/**
  * Main entry point for the CLI.
  * Parses arguments, optionally lists models, then runs the interactive REPL.
  */
@@ -437,44 +475,6 @@ async function main(): Promise<void> {
         // Calling process.exit() directly risks truncating buffered output.
         process.exitCode = result.success ? 0 : 1;
         return;
-    }
-
-    /**
-     * Handles a progress event from the orchestrator by printing to the terminal.
-     *
-     * @param event - The AI Chat event to display.
-     */
-    function emitEvent(event: AiChatEvent): void {
-        switch (event.type) {
-            case "turn_start":
-                process.stdout.write(color(YELLOW, "[thinking...]"));
-                break;
-            case "code_execution_start":
-                // Clear the thinking indicator and show code
-                process.stdout.write("\r\x1b[K");
-                console.log(
-                    color(LIGHT_BLUE, `\`\`\`python\n${event.code}\n\`\`\``),
-                );
-                process.stdout.write(color(YELLOW, "[running code...]"));
-                break;
-            case "code_execution_end":
-                process.stdout.write("\r\x1b[K");
-                console.log(color(DIM, formatSandboxResult(event.result)));
-                break;
-            case "turn_end":
-                process.stdout.write("\r\x1b[K");
-                break;
-            case "turn_error":
-                process.stdout.write("\r\x1b[K");
-                console.error(color(RED, `Error: ${event.error}`));
-                break;
-            case "turn_cancelled":
-                process.stdout.write("\r\x1b[K");
-                console.log(color(YELLOW, "[cancelled]"));
-                break;
-            default:
-                break;
-        }
     }
 
     console.log(
