@@ -112,3 +112,29 @@ if git diff --cached --name-only | grep -qE '^src/lib/(ai-chat-constants\.ts|ai-
     exit 1
   fi
 fi
+
+# Block staged files that contain the local username as part of a filesystem
+# path (e.g. /home/<user>/...).  The bare name on its own is fine; only
+# path-embedded occurrences (preceded by /) are rejected.
+PATH_LEAK_FOUND=0
+PATH_LEAK_PATTERN="/$USER"
+while IFS= read -r staged_file; do
+  if git show ":$staged_file" | file --mime - | grep -q 'charset=binary'; then
+    continue
+  fi
+  if git show ":$staged_file" | grep -qF "$PATH_LEAK_PATTERN"; then
+    if [ "$PATH_LEAK_FOUND" -eq 0 ]; then
+      echo "pre-commit: blocked — staged files contain a hardcoded path with '$USER':" >&2
+    fi
+    git show ":$staged_file" | grep -nF "$PATH_LEAK_PATTERN" | while IFS= read -r match; do
+      echo "  $staged_file: $match" >&2
+    done
+    PATH_LEAK_FOUND=1
+  fi
+done < <(git diff --cached --name-only --diff-filter=d)
+
+if [ "$PATH_LEAK_FOUND" -ne 0 ]; then
+  echo "" >&2
+  echo "  Remove or replace any hardcoded paths containing your local username before committing." >&2
+  exit 1
+fi
