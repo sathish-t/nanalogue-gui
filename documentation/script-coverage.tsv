@@ -26,6 +26,7 @@ src/lib/monty-sandbox-helpers.ts	98.64
 src/lib/monty-sandbox.ts	95.38
 src/lib/qc-data-loader.ts	93.14
 src/lib/region-parser.ts	95.65
+src/lib/sandbox-cli-args.ts	100
 src/lib/sandbox-prompt.ts	100
 src/lib/stats.ts	98.33
 src/lib/swipe-data-loader.ts	100

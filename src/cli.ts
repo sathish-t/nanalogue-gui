@@ -299,57 +299,94 @@ async function main(): Promise<void> {
         return;
     }
 
-    // Build config from CLI args, clamped to valid ranges
+    // Build config from CLI args, validating each value against its allowed range.
+    // All errors are collected before reporting so the user sees every problem at once.
+    const configErrors: string[] = [];
+
+    /**
+     * Calls parseNumericArg, accumulates any error, and returns the fallback on failure.
+     *
+     * @param flagName - CLI flag name without leading dashes, used in error messages.
+     * @param value - Raw string from parseArgs, or undefined if the flag was omitted.
+     * @param spec - Allowed range and fallback for the field.
+     * @returns The parsed integer on success, or the spec fallback on failure.
+     */
+    function checkedArg(
+        flagName: string,
+        value: string | undefined,
+        spec: (typeof CONFIG_FIELD_SPECS)[keyof typeof CONFIG_FIELD_SPECS],
+    ): number {
+        const result = parseNumericArg(flagName, value, spec);
+        if (!result.ok) {
+            configErrors.push(result.error);
+            return spec.fallback;
+        }
+        return result.value;
+    }
+
     const config: AiChatConfig = {
-        contextWindowTokens: parseNumericArg(
+        contextWindowTokens: checkedArg(
+            "context-window",
             values["context-window"],
             CONFIG_FIELD_SPECS.contextWindowTokens,
         ),
-        maxRetries: parseNumericArg(
+        maxRetries: checkedArg(
+            "max-retries",
             values["max-retries"],
             CONFIG_FIELD_SPECS.maxRetries,
         ),
-        timeoutSeconds: parseNumericArg(
+        timeoutSeconds: checkedArg(
+            "timeout",
             values.timeout,
             CONFIG_FIELD_SPECS.timeoutSeconds,
         ),
-        maxRecordsReadInfo: parseNumericArg(
+        maxRecordsReadInfo: checkedArg(
+            "max-records-read-info",
             values["max-records-read-info"],
             CONFIG_FIELD_SPECS.maxRecordsReadInfo,
         ),
-        maxRecordsBamMods: parseNumericArg(
+        maxRecordsBamMods: checkedArg(
+            "max-records-bam-mods",
             values["max-records-bam-mods"],
             CONFIG_FIELD_SPECS.maxRecordsBamMods,
         ),
-        maxRecordsWindowReads: parseNumericArg(
+        maxRecordsWindowReads: checkedArg(
+            "max-records-window-reads",
             values["max-records-window-reads"],
             CONFIG_FIELD_SPECS.maxRecordsWindowReads,
         ),
-        maxRecordsSeqTable: parseNumericArg(
+        maxRecordsSeqTable: checkedArg(
+            "max-records-seq-table",
             values["max-records-seq-table"],
             CONFIG_FIELD_SPECS.maxRecordsSeqTable,
         ),
-        maxCodeRounds: parseNumericArg(
+        maxCodeRounds: checkedArg(
+            "max-code-rounds",
             values["max-code-rounds"],
             CONFIG_FIELD_SPECS.maxCodeRounds,
         ),
-        maxDurationSecs: parseNumericArg(
+        maxDurationSecs: checkedArg(
+            "max-duration-secs",
             values["max-duration-secs"],
             CONFIG_FIELD_SPECS.maxDurationSecs,
         ),
-        maxMemoryMB: parseNumericArg(
+        maxMemoryMB: checkedArg(
+            "max-memory-mb",
             values["max-memory-mb"],
             CONFIG_FIELD_SPECS.maxMemoryMB,
         ),
-        maxAllocations: parseNumericArg(
+        maxAllocations: checkedArg(
+            "max-allocations",
             values["max-allocations"],
             CONFIG_FIELD_SPECS.maxAllocations,
         ),
-        maxReadMB: parseNumericArg(
+        maxReadMB: checkedArg(
+            "max-read-mb",
             values["max-read-mb"],
             CONFIG_FIELD_SPECS.maxReadMB,
         ),
-        maxWriteMB: parseNumericArg(
+        maxWriteMB: checkedArg(
+            "max-write-mb",
             values["max-write-mb"],
             CONFIG_FIELD_SPECS.maxWriteMB,
         ),
@@ -367,6 +404,15 @@ async function main(): Promise<void> {
             return t;
         })(),
     };
+
+    // Report all config argument errors at once and abort.
+    if (configErrors.length > 0) {
+        console.error(
+            `Error: invalid argument value(s):\n${configErrors.join("\n")}`,
+        );
+        process.exitCode = 1;
+        return;
+    }
 
     // Load SYSTEM_APPEND.md from the analysis directory if present.
     // Declared as let so it can be reloaded when the user starts a new

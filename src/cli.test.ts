@@ -624,6 +624,79 @@ describe("nanalogue-chat CLI", () => {
         code: number | null;
     }
 
+    // -----------------------------------------------------------------------
+    // Numeric flag validation — invalid values must be rejected with a clear
+    // error message rather than silently clamped to the nearest bound.
+    // -----------------------------------------------------------------------
+
+    describe("numeric flag validation", () => {
+        /**
+         * Runs the CLI with the given args and captures stderr.
+         * The process is expected to exit with code 1.
+         *
+         * @param args - Full CLI argument list.
+         * @returns The stderr output of the failed process.
+         */
+        async function stderrOf(args: string[]): Promise<string> {
+            let stderr = "";
+            try {
+                await execFileAsync("node", args);
+            } catch (err) {
+                stderr = (
+                    err as NodeJS.ErrnoException & {
+                        /** The stderr output of the failed process. */
+                        stderr: string;
+                    }
+                ).stderr;
+            }
+            return stderr;
+        }
+
+        /** Baseline valid args shared across numeric-flag tests. */
+        const baseArgs = [
+            CLI_PATH,
+            "--endpoint",
+            "http://localhost:11434/v1",
+            "--model",
+            "llama3",
+            "--dir",
+            ".",
+        ];
+
+        it("exits 1 when a numeric flag is below its minimum", async () => {
+            await expect(
+                execFileAsync("node", [...baseArgs, "--timeout", "0"]),
+            ).rejects.toMatchObject({ code: 1 });
+        });
+
+        it("prints a descriptive error when a numeric flag is below its minimum", async () => {
+            const stderr = await stderrOf([...baseArgs, "--timeout", "0"]);
+            expect(stderr).toContain("--timeout");
+            expect(stderr).toContain("below the minimum");
+        });
+
+        it("exits 1 when a numeric flag is above its maximum", async () => {
+            await expect(
+                execFileAsync("node", [...baseArgs, "--timeout", "99999"]),
+            ).rejects.toMatchObject({ code: 1 });
+        });
+
+        it("reports all invalid numeric flags at once when multiple are bad", async () => {
+            const stderr = await stderrOf([
+                ...baseArgs,
+                "--timeout",
+                "0",
+                "--max-duration-secs",
+                "99999999",
+                "--max-memory-mb",
+                "banana",
+            ]);
+            expect(stderr).toContain("--timeout");
+            expect(stderr).toContain("--max-duration-secs");
+            expect(stderr).toContain("--max-memory-mb");
+        });
+    });
+
     describe("REPL interactive mode", () => {
         /** Temp directory created before each test and cleaned up after. */
         let tmpDir = "";
