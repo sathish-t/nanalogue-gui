@@ -975,6 +975,41 @@ describe("AI Chat permanent session config locking", () => {
         expect(chatMessages.textContent).toContain("Unexpected error");
     });
 
+    it("shows descriptive timeout message when send returns isTimeout: true", async () => {
+        fillRequiredFields();
+        mockApi.aiChatSendMessage.mockResolvedValueOnce({
+            success: false,
+            error: "The operation was aborted due to timeout",
+            isTimeout: true,
+        });
+        await sendMessage("hello");
+
+        const chatMessages = document.getElementById(
+            "chat-messages",
+        ) as HTMLDivElement;
+        expect(chatMessages.textContent).toContain("LLM response timed out");
+        expect(chatMessages.textContent).not.toContain(
+            "The operation was aborted due to timeout",
+        );
+    });
+
+    it("shows raw error message when send fails without isTimeout", async () => {
+        fillRequiredFields();
+        mockApi.aiChatSendMessage.mockResolvedValueOnce({
+            success: false,
+            error: "connection refused",
+        });
+        await sendMessage("hello");
+
+        const chatMessages = document.getElementById(
+            "chat-messages",
+        ) as HTMLDivElement;
+        expect(chatMessages.textContent).toContain("connection refused");
+        expect(chatMessages.textContent).not.toContain(
+            "LLM response timed out",
+        );
+    });
+
     it("recovers UI when fetch-models IPC rejects unexpectedly", async () => {
         mockApi.aiChatListModels.mockRejectedValueOnce(
             new Error("IPC channel error"),

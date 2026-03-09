@@ -893,7 +893,10 @@ async function sendUserMessage(
         } else if (result.error === "Cancelled") {
             appendMessage("error", "Request cancelled.");
         } else {
-            appendMessage("error", result.error ?? "Unknown error occurred.");
+            const errorMsg = result.isTimeout
+                ? "LLM response timed out (i.e. a message from the LLM took too much time to arrive)"
+                : (result.error ?? "Unknown error occurred.");
+            appendMessage("error", errorMsg);
             if (endpointStillMatches) {
                 connectedOrigin = null;
                 updateConnectionStatus(false);

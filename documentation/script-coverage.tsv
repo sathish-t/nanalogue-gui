@@ -35,7 +35,7 @@ src/modes/ai-chat.ts	96.96
 src/modes/qc.ts	100
 src/modes/swipe.ts	98.82
 src/preload.ts	100
-src/renderer/ai-chat/ai-chat.ts	71.71
+src/renderer/ai-chat/ai-chat.ts	71.78
 src/renderer/shared/apply-font-size.ts	100
 src/renderer/shared/bam-resource-input.ts	100
 src/renderer/shared/chart-font-size.ts	100

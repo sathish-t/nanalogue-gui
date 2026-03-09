@@ -197,7 +197,16 @@ function emitEvent(event: AiChatEvent): void {
             break;
         case "turn_error":
             process.stdout.write("\r\x1b[K");
-            console.error(color(RED, `Error: ${event.error}`));
+            console.error(
+                color(
+                    RED,
+                    `Error: ${
+                        event.isTimeout
+                            ? "LLM response timed out (i.e. a message from the LLM took too much time to arrive)"
+                            : event.error
+                    }`,
+                ),
+            );
             break;
         case "turn_cancelled":
             process.stdout.write("\r\x1b[K");
