@@ -69,5 +69,5 @@ the orchestrator can send typed error feedback to the LLM.
 The Python code the LLM writes can only interact with the outside world
 through the registered `externalFunctions`. There is no `import`, no
 filesystem access, no network — only the functions explicitly registered
-in `src/lib/monty-sandbox.ts`. See [`documentation/ai-chat.md`](../../documentation/ai-chat.md)
+in `src/lib/monty-sandbox.ts`. See [`ai-chat.md`](../ai-chat.md)
 for the full list of external functions and their resource limits.

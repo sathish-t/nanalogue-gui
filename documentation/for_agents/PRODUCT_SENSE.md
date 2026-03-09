@@ -80,6 +80,41 @@ They are **not** necessarily JavaScript or TypeScript developers.
 
 ---
 
+## Data flow through modes
+
+Every mode follows the same basic pattern: **config → load → display**.
+
+**Config screen:**
+User specifies a BAM/CRAM source (local path or HTTP URL), genomic filters
+(region, MAPQ, read type), modification filters (tag, strand, probability
+threshold), and output options (sampling, window size, record limits for
+pagination). These settings are collected as a configuration object and
+validated before proceeding.
+
+**Load phase:**
+The `src/lib/` loaders (`qc-data-loader.ts`, `swipe-data-loader.ts`,
+`locate-data-loader.ts`) call `@nanalogue/node` functions to fetch raw data
+from the BAM file. For large files, data is streamed (e.g., a running histogram
+accumulates bins without storing raw read lengths), paginated (e.g., reads
+are fetched in chunks with a deterministic seed for reproducibility), or
+both. Filters are applied by the native layer, not in JavaScript, so filtering
+is fast and memory-efficient.
+
+**Display phase:**
+The `src/renderer/` pages render the filtered data as interactive charts (QC,
+Swipe), tables (Sequences tab in QC), or text summaries (Locate Reads BED
+output). Configuration state is typically preserved as a query parameter
+or URL state so the user can navigate back and forth without re-loading data.
+
+**AI Chat differs:** Instead of a fixed display, the user sends a natural-language
+question. The orchestrator (in `src/lib/chat-orchestrator.ts`) runs an agentic
+loop: the LLM generates Python code, the Monty sandbox executes it (with
+access to the same loader functions), and the output is fed back to the LLM
+or shown to the user. This loop can take multiple rounds if the LLM calls
+`continue_thinking()`.
+
+---
+
 ## Non-goals
 
 - Real-time streaming data from the sequencer.

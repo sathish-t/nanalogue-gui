@@ -26,6 +26,7 @@ wrapper), and [@nanalogue/node](https://github.com/sathish-t/nanalogue-node)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Modes](#modes)
+  - [Mode overview](#mode-overview)
   - [QC](#qc)
   - [Swipe](#swipe)
   - [Locate Reads](#locate-reads)
@@ -92,6 +93,18 @@ This launches the landing page where you can choose between QC, Swipe,
 Locate Reads, and AI Chat modes.
 
 ## Modes
+
+### Mode overview
+
+| Mode | Entry point | Input | Output | Key use case |
+|---|---|---|---|---|
+| **QC** | GUI button | BAM/CRAM/Mod-BAM file or URL | Interactive charts (no file output) | Assess read quality, length distribution, modification patterns |
+| **Swipe** | GUI button | BAM/CRAM + BED file (annotations) | Modified BED file with decisions | Accept/reject annotated features by visual inspection |
+| **Locate Reads** | GUI button | BAM/CRAM + text file (read IDs) | BED6 file with coordinates | Find genomic positions of specific reads |
+| **AI Chat** | GUI button or `nanalogue-chat` CLI | BAM/CRAM directory + natural language question | LLM response + optional exported files | Ask complex questions; LLM generates and executes Python |
+| **nanalogue-sandbox-exec** | `nanalogue-sandbox-exec` CLI | Directory + Python script | Script output (stdout/files) | Run reproducible analysis scripts without LLM involvement |
+
+---
 
 ### QC
 
