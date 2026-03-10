@@ -43,7 +43,7 @@
   },
   "dependencies": {
     "@nanalogue/node": "^0.1.4",
-    "@pydantic/monty": "^0.0.7",
+    "@pydantic/monty": "^0.0.8",
     "chart.js": "^4.4.0",
     "chartjs-plugin-annotation": "^3.1.0",
     "picomatch": "^4.0.3"

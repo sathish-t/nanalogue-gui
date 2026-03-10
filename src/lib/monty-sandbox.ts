@@ -4,8 +4,8 @@
 import {
     Monty,
     MontyRuntimeError,
-    MontySnapshot,
     MontySyntaxError,
+    runMontyAsync,
 } from "@pydantic/monty";
 import {
     DEFAULT_MAX_ALLOCATIONS,
@@ -18,7 +18,6 @@ import {
     DEFAULT_MAX_RECORDS_SEQ_TABLE,
     DEFAULT_MAX_RECORDS_WINDOW_READS,
     DEFAULT_MAX_WRITE_BYTES,
-    EXTERNAL_FUNCTIONS,
     MAX_PRINT_CAPTURE_BYTES,
 } from "./ai-chat-constants";
 import {
@@ -49,89 +48,6 @@ export {
     toReadOptions,
     toWindowOptions,
 } from "./monty-sandbox-helpers";
-
-// --- runMontyAsyncWithPrint ---
-// Vendored reimplementation of runMontyAsync from @pydantic/monty that
-// forwards printCallback to Monty.start(). The upstream runMontyAsync omits
-// printCallback from RunMontyAsyncOptions. If Monty ships native support,
-// remove this function and use the upstream version.
-// TODO: track upstream Monty support for printCallback in runMontyAsync.
-
-/**
- * Runs a Monty instance asynchronously with printCallback support.
- * Reimplements the runMontyAsync loop (~45 lines) to pass printCallback to start().
- *
- * @param montyRunner - The Monty instance to execute.
- * @param options - Execution options including limits, external functions, and printCallback.
- * @param options.inputs - Input values to inject into the Python namespace.
- * @param options.externalFunctions - External functions callable from Python.
- * @param options.limits - Resource limits for the Monty VM.
- * @param options.limits.maxDurationSecs - Maximum execution duration in seconds.
- * @param options.limits.maxMemory - Maximum memory usage in bytes.
- * @param options.limits.maxAllocations - Maximum number of allocations.
- * @param options.printCallback - Callback invoked when Python calls print().
- * @returns The final output value from the Monty execution.
- */
-async function runMontyAsyncWithPrint(
-    montyRunner: Monty,
-    options: {
-        /** Input values to inject into the Python namespace. */
-        inputs?: Record<string, unknown>;
-        /** External functions callable from Python. */
-        externalFunctions?: Record<string, (...args: unknown[]) => unknown>;
-        /** Resource limits for the Monty VM. */
-        limits?: {
-            /** Maximum wall-clock time in seconds before the VM is terminated. */
-            maxDurationSecs?: number;
-            /** Maximum memory in bytes the VM is allowed to allocate. */
-            maxMemory?: number;
-            /** Maximum number of heap allocations before the VM is terminated. */
-            maxAllocations?: number;
-        };
-        /** Callback for captured print() output. */
-        printCallback?: (stream: string, text: string) => void;
-    },
-): Promise<unknown> {
-    const { inputs, externalFunctions = {}, limits, printCallback } = options;
-    let progress = montyRunner.start({
-        inputs,
-        limits,
-        printCallback,
-    });
-    while (progress instanceof MontySnapshot) {
-        const snapshot = progress;
-        const funcName = snapshot.functionName;
-        const extFunction = externalFunctions[funcName];
-        if (!extFunction) {
-            progress = snapshot.resume({
-                exception: {
-                    type: "KeyError",
-                    message: `"External function '${funcName}' not found"`,
-                },
-            });
-            continue;
-        }
-        try {
-            let result = extFunction(...snapshot.args, snapshot.kwargs);
-            if (
-                result &&
-                typeof (result as Promise<unknown>).then === "function"
-            ) {
-                result = await (result as Promise<unknown>);
-            }
-            progress = snapshot.resume({ returnValue: result });
-        } catch (error) {
-            const err = error as Error;
-            progress = snapshot.resume({
-                exception: {
-                    type: err.name || "RuntimeError",
-                    message: err.message || String(error),
-                },
-            });
-        }
-    }
-    return progress.output;
-}
 
 /**
  * Collects all terminal output from a sandbox result into a single string.
@@ -219,13 +135,9 @@ export async function runSandboxCode(
     let printsTruncated = false;
 
     try {
-        const m = new Monty(code, {
-            externalFunctions: removedTools
-                ? EXTERNAL_FUNCTIONS.filter((n) => !removedTools.has(n))
-                : [...EXTERNAL_FUNCTIONS],
-        });
+        const m = new Monty(code);
 
-        const value = await runMontyAsyncWithPrint(m, {
+        const value = await runMontyAsync(m, {
             limits: {
                 maxDurationSecs,
                 maxMemory,
