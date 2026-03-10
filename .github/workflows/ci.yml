@@ -10,6 +10,9 @@ on:
     branches: ["main"]
   workflow_call: # Allow calling from ci-nightly.yml
 
+permissions:
+  read-all
+
 jobs:
   check-agents-symlink:
     name: Check AGENTS.md symlink

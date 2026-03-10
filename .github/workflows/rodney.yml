@@ -13,6 +13,10 @@ on:
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   rodney:
     name: Rodney demo
