@@ -125,6 +125,7 @@ Not `add`, `fix`, `extract` — think "this commit **adds** …".
 
 ## Conventions
 
+- **No Co-Authored-By trailers** — never add `Co-Authored-By:` lines to commit messages.
 - **TypeScript strict mode** — no `any` unless unavoidable; prefer explicit types.
 - **No Electron in `lib/`** — pure Node.js or browser-compatible only.
 - **No DOM or browser globals in `lib/` or `modes/`** — renderer only.
