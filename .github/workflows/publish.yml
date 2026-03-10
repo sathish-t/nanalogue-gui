@@ -132,3 +132,4 @@ jobs:
       version: ${{ needs.version-check.outputs.version }}
     permissions:
       contents: write
+      actions: write
