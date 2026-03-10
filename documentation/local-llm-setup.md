@@ -20,7 +20,7 @@ while running through the instructions below.
 - Optional but recommended: one or more NVIDIA GPUs (this guide uses dual
   RTX 5090s)
 
-## Step 1: Install Hugging Face Hub
+## Step 1: Install Hugging Face Hub and download models
 
 The `huggingface_hub` package lets llama.cpp download models directly from
 Hugging Face by name.
@@ -28,6 +28,23 @@ Hugging Face by name.
 ```bash
 pip install huggingface_hub
 ```
+
+Following are sample commands to download a sample model from hugging face hub
+
+```bash
+export HF_HOME=/a/suitable/models/folder
+cd $HF_HOME # may not need to cd to the folder
+python3.10 -c "from huggingface_hub import snapshot_download; snapshot_download('unsloth/Qwen3-Coder-Next-GGUF', allow_patterns=['*BF16*'])"
+```
+
+If the model downloads as several GGUF files, you may want to merge them as shown below
+
+```bash
+llama-gguf-split --merge something-00001-of-00002.gguf merged_model.gguf
+# Just pass the first shard — it auto-detects the rest in the same directory.
+```
+
+Then, you can use the merged file with llama.cpp.
 
 ## Step 2: Quick Start Without GPU Compilation
 
@@ -249,3 +266,22 @@ curl http://<your-ip>:9800/v1/models
 
 This should return a JSON response listing the loaded model.
 
+## Step 7: Using llama.cpp on an HPC with slurm
+
+If your goal is to run the LLM on a GPU on an HPC, the following commands
+may be of help. If this is not your goal, then ignore this section.
+
+You can use `salloc` to gain an allocation on a GPU node.
+Remember to use your HPC's GPU queue name here and adjust other parameters suitably.
+
+```bash
+salloc --nodes=1 -p <gpu-queue> -c 1  --gres=gpu:1 --time=01:20:00 --mem=80G
+```
+
+The above command will print the name of a node. Now you can ssh into that node,
+and then start llama.cpp in one session. Keep this session alive.
+In another ssh session to the same node, you can run `nanalogue-chat` or any other
+program that depends on an AI endpoint using the http server from the first session.
+
+If you are using singularity and have llama.cpp installed in a singularity image,
+remember to use the `--nv` flag when running on any GPU node.
