@@ -3,6 +3,7 @@ src/lib/ai-chat-constants.ts	100
 src/lib/ai-chat-ipc-validation.ts	89.41
 src/lib/ai-chat-shared-constants.ts	77.77
 src/lib/ai-external-tools/bam-mods.ts	100
+src/lib/ai-external-tools/bash.ts	100
 src/lib/ai-external-tools/continue-thinking.ts	100
 src/lib/ai-external-tools/index.ts	100
 src/lib/ai-external-tools/ls.ts	100
@@ -22,7 +23,7 @@ src/lib/line-counter.ts	100
 src/lib/locate-data-loader.ts	100
 src/lib/mod-filter.ts	100
 src/lib/model-listing.ts	92.42
-src/lib/monty-sandbox-helpers.ts	98.64
+src/lib/monty-sandbox-helpers.ts	98.69
 src/lib/monty-sandbox.ts	95.74
 src/lib/qc-data-loader.ts	93.14
 src/lib/region-parser.ts	95.65

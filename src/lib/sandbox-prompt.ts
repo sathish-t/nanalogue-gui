@@ -2,7 +2,11 @@
 // the full system message sent to the LLM on every turn.
 // All numeric limits are derived from code constants, not hardcoded in prose.
 
-import { MAX_FILENAME_LENGTH, MAX_LS_ENTRIES } from "./ai-chat-constants";
+import {
+    bashTimeoutMs,
+    MAX_FILENAME_LENGTH,
+    MAX_LS_ENTRIES,
+} from "./ai-chat-constants";
 import type { Fact } from "./chat-types";
 
 /** Options for building the sandbox prompt. */
@@ -48,6 +52,7 @@ export function buildSandboxPrompt(options: SandboxPromptOptions): string {
 
     const maxReadBytes = maxReadMB * 1024 * 1024;
     const maxDurationMinutes = Math.round(maxDurationSecs / 60);
+    const bashTimeoutSecs = Math.round(bashTimeoutMs(maxDurationSecs) / 1000);
     const readInfoLimit = maxRecordsReadInfo.toLocaleString();
     const bamModsLimit = maxRecordsBamMods.toLocaleString();
     const windowReadsLimit = maxRecordsWindowReads.toLocaleString();
@@ -98,7 +103,7 @@ You have access to Python builtins (len, range, sorted, sum, min, max etc.) and 
 external functions listed below. No classes, no stdlib, no third-party libraries.
 No imports of any kind are available.
 External functions (peek, read_info,
-bam_mods, window_reads, seq_table, ls, read_file, write_file, continue_thinking) call
+bam_mods, window_reads, seq_table, ls, read_file, write_file, bash, continue_thinking) call
 into the host application. You do not have Python classes.
 You do not have network access, and have read/write file access only to a specified folder
 and its subfolders.
@@ -232,6 +237,37 @@ result = write_file("chr1/filtered_reads.tsv", tsv_content)
   cannot import files, so you must copy the code into each call.)
   The user can also find these files in the allowed directory after the
   session and adapt them for real Python.
+
+### bash(command: str) -> dict
+
+Runs a shell command in an in-process bash interpreter. Files written
+in bash (e.g. echo "data" > scratch.txt) are visible to subsequent
+bash() calls in the same round but are not visible to ls() or read_file()
+i.e. these are ephemeral files. Shell state (cwd, variables) does not
+persist between calls; use compound commands for multi-step pipelines
+(e.g. cd subdir && grep pattern *.bed). Writes do not persist to disk
+after the round ends; use write_file() to save results permanently.
+
+Returns a dict:
+
+\`\`\`json
+{"stdout": "...", "stderr": "...", "exit_code": 0}
+\`\`\`
+
+Exit code 124 means the command timed out (${bashTimeoutSecs} second limit per call).
+
+**Available:** grep, sed, awk, sort, uniq, wc, cut, head, tail, cat,
+find, tr, paste, jq, and standard bash builtins (echo, printf, pipes,
+redirects, variables, loops, etc.).
+
+**Not available:** samtools, bedtools, minimap2, bwa, bgzip, tabix,
+python, R, perl, or any other bioinformatics or language runtimes. Use
+external functions provided in the prompt for BAM/CRAM data.
+
+**Output warning:** stdout and stderr are each capped at ${maxOutputKB} KB.
+Dumping raw file contents (cat, unfiltered awk, unfiltered find) will
+flood your context window. Prefer targeted commands (wc -l, head, grep)
+and compute summaries rather than returning raw data.
 
 ### peek(bam_path: str) -> dict
 
@@ -543,7 +579,8 @@ lengths = [r["sequence_length"] for r in reads]
 
 - You cannot use Python's open() or os module. Use ls() to discover
   files, peek/read_info/bam_mods/window_reads/seq_table for BAM/CRAM
-  data, read_file() for text files, and write_file() to save results.
+  data, read_file() for text files, write_file() to save results, and
+  bash() for shell text-processing pipelines.
 - write_file() writes anywhere within the allowed directory and never
   overwrites existing files.`;
 }

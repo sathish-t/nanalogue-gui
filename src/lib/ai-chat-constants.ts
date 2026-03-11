@@ -25,6 +25,18 @@ export const /** Default maximum code execution rounds per user message. */ DEFA
 // --- Sandbox execution defaults ---
 
 export const /** Default sandbox execution timeout in seconds (10 minutes). */ DEFAULT_MAX_DURATION_SECS = 600;
+/**
+ * Computes the per-call bash() timeout in milliseconds from total sandbox
+ * duration. Uses 1/10 of the sandbox duration, clamped to a minimum of
+ * 5 000 ms so that trivial commands do not time out when maxDurationSecs
+ * is set to its minimum allowed value (1 s).
+ *
+ * @param maxDurationSecs - Total sandbox execution duration in seconds.
+ * @returns Per-call bash timeout in milliseconds.
+ */
+export function bashTimeoutMs(maxDurationSecs: number): number {
+    return Math.max(5_000, Math.round((maxDurationSecs * 1000) / 10));
+}
 export const /** Default heap memory cap in bytes (512 MB). */ DEFAULT_MAX_MEMORY =
         512 * 1024 * 1024;
 export const /** Default Monty VM allocation cap. */ DEFAULT_MAX_ALLOCATIONS = 100_000;
@@ -103,5 +115,6 @@ export const /** All external function names registered with Monty. */ EXTERNAL_
             "ls",
             "read_file",
             "write_file",
+            "bash",
             "continue_thinking",
         ] as const;

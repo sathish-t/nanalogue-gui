@@ -8,6 +8,7 @@ import {
     runMontyAsync,
 } from "@pydantic/monty";
 import {
+    bashTimeoutMs,
     DEFAULT_MAX_ALLOCATIONS,
     DEFAULT_MAX_DURATION_SECS,
     DEFAULT_MAX_MEMORY,
@@ -22,6 +23,7 @@ import {
 } from "./ai-chat-constants";
 import {
     makeBamMods,
+    makeBash,
     makeContinueThinking,
     makeLs,
     makePeek,
@@ -180,6 +182,11 @@ export async function runSandboxCode(
                         continue_thinking: makeContinueThinking(() => {
                             continueThinkingCalled = true;
                         }),
+                        bash: makeBash(
+                            allowedDir,
+                            bashTimeoutMs(maxDurationSecs),
+                            maxOutputBytes,
+                        ),
                         peek: makePeek(allowedDir),
                         read_info: makeReadInfo(allowedDir, maxRecordsReadInfo),
                         bam_mods: makeBamMods(allowedDir, maxRecordsBamMods),

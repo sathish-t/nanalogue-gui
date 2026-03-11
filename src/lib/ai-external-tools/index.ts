@@ -3,6 +3,7 @@
 // Add new tools here and register their names in ai-chat-constants.ts (EXTERNAL_FUNCTIONS).
 
 export { makeBamMods } from "./bam-mods";
+export { makeBash } from "./bash";
 export { makeContinueThinking } from "./continue-thinking";
 export { makeLs } from "./ls";
 export { makePeek } from "./peek";

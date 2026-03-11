@@ -393,6 +393,25 @@ export async function listFilesRecursive(
 }
 
 /**
+ * Slices a UTF-8 string to at most maxBytes bytes, backing off to a codepoint
+ * boundary so the result is always valid UTF-8. Returns the original string
+ * unchanged when it is already within the limit.
+ *
+ * @param s - The string to slice.
+ * @param maxBytes - Maximum byte length of the returned string.
+ * @returns The (possibly shorter) string.
+ */
+export function safeUtf8Slice(s: string, maxBytes: number): string {
+    const buf = Buffer.from(s, "utf-8");
+    if (buf.length <= maxBytes) return s;
+    let end = maxBytes;
+    // Back off past UTF-8 continuation bytes (10xxxxxx) to land on a
+    // codepoint boundary and never emit a partial multi-byte character.
+    while (end > 0 && (buf[end] & 0xc0) === 0x80) end--;
+    return buf.subarray(0, end).toString("utf-8");
+}
+
+/**
  * Safe JSON.stringify that handles cyclic references.
  *
  * @param value - The value to serialize.
