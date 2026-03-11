@@ -240,13 +240,25 @@ result = write_file("chr1/filtered_reads.tsv", tsv_content)
 
 ### bash(command: str) -> dict
 
-Runs a shell command in an in-process bash interpreter. Files written
-in bash (e.g. echo "data" > scratch.txt) are visible to subsequent
-bash() calls in the same round but are not visible to ls() or read_file()
-i.e. these are ephemeral files. Shell state (cwd, variables) does not
-persist between calls; use compound commands for multi-step pipelines
-(e.g. cd subdir && grep pattern *.bed). Writes do not persist to disk
-after the round ends; use write_file() to save results permanently.
+Runs a shell command in an in-process bash interpreter. Shell state
+(cwd, variables) does not persist between calls; use compound commands
+for multi-step pipelines (e.g. cd subdir && grep pattern *.bed).
+
+**Write restriction:** bash can only write to the \`ai_chat_temp_files/\`
+subdirectory. Writes anywhere else in the allowed directory fail with
+a permission error (EROFS: read-only file system). To save pipeline
+output, redirect into \`ai_chat_temp_files/\`:
+
+\`\`\`python
+bash("sort data.tsv > ai_chat_temp_files/sorted.tsv")
+\`\`\`
+
+Files written to \`ai_chat_temp_files/\` persist to disk and survive the
+session. Use \`ls("ai_chat_temp_files/**")\` or
+\`read_file("ai_chat_temp_files/sorted.tsv")\` to inspect them afterwards.
+\`write_file()\` can write to any new path in the allowed directory but
+refuses to overwrite; \`bash\` writes only to \`ai_chat_temp_files/\` but
+can overwrite files it previously created there.
 
 Returns a dict:
 

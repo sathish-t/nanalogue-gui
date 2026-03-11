@@ -1,8 +1,11 @@
 // External tool: bash
 // Runs shell commands in a stateful in-process bash interpreter backed by
-// OverlayFs: reads come from the real filesystem, writes stay in memory only.
+// a MountableFs: reads from allowedDir (via a read-only OverlayFs) and
+// writes to ai_chat_temp_files/ (via a ReadWriteFs backed by real disk).
 
-import { Bash, OverlayFs } from "just-bash";
+import { lstatSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { Bash, MountableFs, OverlayFs, ReadWriteFs } from "just-bash";
 import {
     isDeniedPath,
     SandboxError,
@@ -11,23 +14,25 @@ import {
 } from "../monty-sandbox-helpers";
 
 /**
- * Wraps an OverlayFs instance with a deny-list gate on read operations.
+ * Wraps a filesystem instance with a deny-list gate on read operations.
  *
- * Creates a prototypical delegate via Object.create so that all OverlayFs
+ * Creates a prototypical delegate via Object.create so that all filesystem
  * methods (including the sync variants used by initFilesystem such as
  * mkdirSync and writeFileSync) continue to work without being enumerated here.
- * Only readFile and readFileBuffer are overridden to enforce
+ * Only readFile, readFileBuffer, and readdir are overridden to enforce
  * SENSITIVE_FILE_DENY_LIST, applying the same protection already present in
  * read_file() and ls(). When an inherited method (cp, chmod, utimes, …)
  * internally calls this.readFileBuffer, it calls the override — so the deny
- * list is enforced transitively for all read paths.
+ * list is enforced transitively for all read paths. MountableFs does not
+ * expose readdirWithFileTypes; bash falls back to the filtered readdir()
+ * automatically, which provides equivalent protection.
  *
- * @param fs - The OverlayFs instance to wrap.
+ * @param fs - The filesystem instance to wrap (OverlayFs or MountableFs).
  * @param mountPoint - The virtual mount point (equals allowedDir); used to
  *   derive the relative path for deny-list matching.
- * @returns An OverlayFs-compatible object that blocks reads of denied paths.
+ * @returns A filesystem-compatible wrapper that blocks reads of denied paths.
  */
-function withDenyList(fs: OverlayFs, mountPoint: string): OverlayFs {
+function withDenyList<T extends object>(fs: T, mountPoint: string): T {
     // mountPrefix has a trailing slash so startsWith only matches genuine
     // children, not a sibling directory sharing the same prefix string.
     const mountPrefix = `${mountPoint}/`;
@@ -70,39 +75,45 @@ function withDenyList(fs: OverlayFs, mountPoint: string): OverlayFs {
         return isDeniedPath(entryRel);
     };
 
-    // Object.create(fs) produces an object whose prototype is the OverlayFs
+    // Object.create(fs) produces an object whose prototype is the fs
     // instance. Property lookups fall through to fs for everything except the
     // methods defined directly on the wrapper below, preserving the full
-    // OverlayFs surface (including mkdirSync/writeFileSync needed by Bash's
+    // filesystem surface (including mkdirSync/writeFileSync needed by Bash's
     // internal initFilesystem call).
-    const wrapper = Object.create(fs) as OverlayFs;
+    //
+    // Both OverlayFs and MountableFs implement the same IFileSystem interface.
+    // We cast internally to OverlayFs to get full type-safe method access; the
+    // cast is safe because all required methods exist on both types.
+    const fsTyped = fs as unknown as OverlayFs;
+    const wrapper = Object.create(fs) as T;
+    const wrapperTyped = wrapper as unknown as OverlayFs;
 
     /**
      * Deny-list-gated readFile: checks the path before delegating to the
-     * underlying OverlayFs instance.
+     * underlying filesystem instance.
      *
      * @param path - Virtual path to read.
-     * @param options - Encoding options forwarded to OverlayFs.readFile.
+     * @param options - Encoding options forwarded to readFile.
      * @returns The file contents as a string.
      */
-    wrapper.readFile = async (
+    wrapperTyped.readFile = async (
         path: string,
         options?: Parameters<OverlayFs["readFile"]>[1],
     ): Promise<string> => {
         checkPath(path);
-        return fs.readFile(path, options);
+        return fsTyped.readFile(path, options);
     };
 
     /**
      * Deny-list-gated readFileBuffer: checks the path before delegating to
-     * the underlying OverlayFs instance.
+     * the underlying filesystem instance.
      *
      * @param path - Virtual path to read.
      * @returns The file contents as a Uint8Array.
      */
-    wrapper.readFileBuffer = async (path: string): Promise<Uint8Array> => {
+    wrapperTyped.readFileBuffer = async (path: string): Promise<Uint8Array> => {
         checkPath(path);
-        return fs.readFileBuffer(path);
+        return fsTyped.readFileBuffer(path);
     };
 
     /**
@@ -112,24 +123,14 @@ function withDenyList(fs: OverlayFs, mountPoint: string): OverlayFs {
      * @param path - Virtual path of the directory to list.
      * @returns Names of non-denied directory entries.
      */
-    wrapper.readdir = async (path: string): Promise<string[]> => {
-        const entries = await fs.readdir(path);
+    wrapperTyped.readdir = async (path: string): Promise<string[]> => {
+        const entries = await fsTyped.readdir(path);
         return entries.filter((name) => !isHiddenEntry(path, name));
     };
 
-    /**
-     * Filtered readdirWithFileTypes: same as readdir but preserves dirent
-     * metadata, used by commands such as ls -l.
-     *
-     * @param path - Virtual path of the directory to list.
-     * @returns Dirent objects for non-denied directory entries.
-     */
-    wrapper.readdirWithFileTypes = async (
-        path: string,
-    ): ReturnType<OverlayFs["readdirWithFileTypes"]> => {
-        const entries = await fs.readdirWithFileTypes(path);
-        return entries.filter((e) => !isHiddenEntry(path, e.name));
-    };
+    // MountableFs does not expose readdirWithFileTypes, so bash falls back to
+    // the filtered readdir() above, which provides the same deny-list
+    // protection. No readdirWithFileTypes override is needed.
 
     return wrapper;
 }
@@ -151,11 +152,17 @@ function truncateOutput(s: string, maxBytes: number): string {
 /**
  * Returns the bash tool implementation bound to the given context.
  *
- * Creates one OverlayFs (root = allowedDir, mountPoint = allowedDir) wrapped
- * with the sensitive-file deny list, and one Bash instance reused across all
- * bash() calls within a single sandbox execution round. Filesystem writes
- * made in bash persist between calls (the OverlayFs is shared); shell state
- * such as cwd and variables does not persist between calls.
+ * Sets up a MountableFs composition:
+ * - allowedDir → read-only OverlayFs base (LLM can read, never write)
+ * - allowedDir/ai_chat_temp_files → ReadWriteFs mount (LLM writes persist to disk).
+ *
+ * If setup fails (unwritable directory, symlink at ai_chat_temp_files pointing
+ * outside allowedDir, etc.) falls back to a writable in-memory OverlayFs so
+ * bash remains functional with ephemeral writes.
+ *
+ * The filesystem is wrapped with the sensitive-file deny list so blocked
+ * reads are enforced uniformly. Shell state (cwd, variables) does not
+ * persist between calls; use compound commands for multi-step pipelines.
  *
  * @param allowedDir - The sandboxed root directory (also used as mount point).
  * @param timeoutMs - Per-call abort timeout in milliseconds.
@@ -167,13 +174,33 @@ export function makeBash(
     timeoutMs: number,
     maxOutputBytes: number,
 ): (command: string) => Promise<unknown> {
+    // ai_chat_temp_files must exist on disk before ReadWriteFs is constructed
+    // because ReadWriteFs calls realpathSync(root) in its constructor.
+    const outputDir = join(allowedDir, "ai_chat_temp_files");
+    mkdirSync(outputDir, { recursive: true });
+
+    // Reject symlinks: ReadWriteFs resolves root to its canonical real path,
+    // so a symlink pointing outside allowedDir would allow bash writes to
+    // escape the sandbox boundary.
+    if (lstatSync(outputDir).isSymbolicLink()) {
+        throw new Error("ai_chat_temp_files must not be a symlink");
+    }
+
     const overlayFs = new OverlayFs({
         root: allowedDir,
         mountPoint: allowedDir,
+        readOnly: true,
     });
 
+    const readWriteFs = new ReadWriteFs({ root: outputDir });
+
+    // overlayFs is the base (not a mount) to bypass MountableFs's restriction
+    // against nesting a mount inside another.
+    const mountable = new MountableFs({ base: overlayFs });
+    mountable.mount(outputDir, readWriteFs);
+
     const shell = new Bash({
-        fs: withDenyList(overlayFs, allowedDir),
+        fs: withDenyList(mountable, allowedDir),
         cwd: allowedDir,
     });
 

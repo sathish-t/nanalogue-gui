@@ -1,6 +1,15 @@
 // Tests for the bash external tool: deny-list enforcement and basic behaviour.
 
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import {
+    mkdir,
+    mkdtemp,
+    readFile,
+    realpath,
+    rm,
+    stat,
+    symlink,
+    writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -169,8 +178,14 @@ describe("basic functionality", () => {
     });
 
     it("filesystem writes in one call are visible in the next", async () => {
-        await bash(`echo persistent > ${allowedDir}/scratch.txt`);
-        const r = (await bash(`cat ${allowedDir}/scratch.txt`)) as BashResult;
+        // Writes to ai_chat_temp_files/ persist across bash() calls within the
+        // same makeBash instance via the shared ReadWriteFs.
+        await bash(
+            `echo persistent > ${allowedDir}/ai_chat_temp_files/scratch.txt`,
+        );
+        const r = (await bash(
+            `cat ${allowedDir}/ai_chat_temp_files/scratch.txt`,
+        )) as BashResult;
         expect(r.exit_code).toBe(0);
         expect(r.stdout).toContain("persistent");
     });
@@ -195,5 +210,71 @@ describe("basic functionality", () => {
         await expect(bash(42 as unknown as string)).rejects.toMatchObject({
             name: "TypeError",
         });
+    });
+});
+
+// --- read-write filesystem ---
+
+describe("read-write filesystem", () => {
+    it("creates ai_chat_temp_files directory automatically", async () => {
+        // makeBash (called in beforeEach) must create ai_chat_temp_files even
+        // when it did not pre-exist in the fresh tmpdir.
+        const outputDir = join(allowedDir, "ai_chat_temp_files");
+        const s = await stat(outputDir);
+        expect(s.isDirectory()).toBe(true);
+    });
+
+    it("ls on allowedDir includes ai_chat_temp_files", async () => {
+        const r = (await bash(`ls ${allowedDir}`)) as BashResult;
+        expect(r.exit_code).toBe(0);
+        expect(r.stdout).toContain("ai_chat_temp_files");
+    });
+
+    it("write to ai_chat_temp_files succeeds and persists to real disk", async () => {
+        const r = (await bash(
+            `echo result > ${allowedDir}/ai_chat_temp_files/result.txt`,
+        )) as BashResult;
+        expect(r.exit_code).toBe(0);
+        // File must exist on the real filesystem, not just in memory.
+        const content = await readFile(
+            join(allowedDir, "ai_chat_temp_files", "result.txt"),
+            "utf-8",
+        );
+        expect(content).toContain("result");
+    });
+
+    it("writes to ai_chat_temp_files persist across bash() calls", async () => {
+        await bash(`echo line1 > ${allowedDir}/ai_chat_temp_files/out.txt`);
+        const r = (await bash(
+            `cat ${allowedDir}/ai_chat_temp_files/out.txt`,
+        )) as BashResult;
+        expect(r.exit_code).toBe(0);
+        expect(r.stdout).toContain("line1");
+    });
+
+    it("write outside ai_chat_temp_files fails with a permission error", async () => {
+        // allowedDir is backed by a read-only OverlayFs; just-bash surfaces
+        // the EROFS error as a thrown exception for redirect operations.
+        await expect(bash(`echo x > ${allowedDir}/data.txt`)).rejects.toThrow(
+            /EROFS|read-only/,
+        );
+    });
+
+    it("throws when ai_chat_temp_files is a pre-existing symlink", async () => {
+        // Replace the real ai_chat_temp_files directory with a symlink pointing
+        // outside allowedDir to simulate a pre-placed symlink escape attempt.
+        await rm(join(allowedDir, "ai_chat_temp_files"), { recursive: true });
+        const outsideDir = await realpath(
+            await mkdtemp(join(tmpdir(), "outside-")),
+        );
+        await symlink(outsideDir, join(allowedDir, "ai_chat_temp_files"));
+
+        // makeBash must detect the symlink and throw rather than mount a
+        // ReadWriteFs that would write outside the sandbox boundary.
+        expect(() =>
+            makeBash(allowedDir, TIMEOUT_MS, MAX_OUTPUT_BYTES),
+        ).toThrow(/symlink/);
+
+        await rm(outsideDir, { recursive: true });
     });
 });
