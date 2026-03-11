@@ -70,6 +70,8 @@ Desktop.ini
 # ===================
 # Project-specific (local development)
 # ===================
+# Sandbox temp files created by bash() inside the allowed directory
+ai_chat_temp_files/
 # Claude AI assistant files
 .claude/
 docs/
