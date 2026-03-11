@@ -10,13 +10,14 @@ The sandbox exposes a `bash()` function that lets Python scripts run shell comma
 Every `bash()` call returns a dict with three keys: `stdout`, `stderr`, and `exit_code`. A zero exit code means success.
 
 ```bash
-cat > /tmp/bash_return.py << 'EOF'
+mkdir -p /tmp/bash-demo
+cat > /tmp/bash-demo/bash_return.py << 'EOF'
 result = bash("echo hello from bash")
 print("stdout:    " + repr(result["stdout"].strip()))
 print("stderr:    " + repr(result["stderr"]))
 print("exit_code: " + str(result["exit_code"]))
 EOF
-node ./dist/execute-cli.mjs --dir ./demo /tmp/bash_return.py
+node ./dist/execute-cli.mjs --dir ./demo /tmp/bash-demo/bash_return.py
 
 ```
 
@@ -31,7 +32,7 @@ exit_code: 0
 Shell state does not persist between calls, but within a single call you can chain commands with `&&` and pipes. Here we count lines in the BED files and peek at the first few records.
 
 ```bash
-cat > /tmp/bash_inspect.py << 'EOF'
+cat > /tmp/bash-demo/bash_inspect.py << 'EOF'
 # wc on both BED files
 r = bash("wc -l swipe.bed demo-swipe-output.bed")
 print("wc -l:\n" + r["stdout"])
@@ -47,7 +48,7 @@ r = bash("awk '$6==\"-\"' swipe.bed | wc -l")
 minus = r["stdout"].strip()
 print("plus-strand: " + plus + "  minus-strand: " + minus)
 EOF
-node ./dist/execute-cli.mjs --dir ./demo /tmp/bash_inspect.py
+node ./dist/execute-cli.mjs --dir ./demo /tmp/bash-demo/bash_inspect.py
 
 ```
 
@@ -70,13 +71,13 @@ plus-strand: 5  minus-strand: 5
 Shell state does not persist between `bash()` calls (cwd, variables, etc.), so multi-step work must be done in a single call using `&&` or pipes. Here we compute the fragment-length distribution from the BED file entirely in shell.
 
 ```bash
-cat > /tmp/bash_pipeline.py << 'EOF'
+cat > /tmp/bash-demo/bash_pipeline.py << 'EOF'
 # Compute fragment lengths (col3 - col2) and sort/count them in one pipeline
 r = bash("awk '{print $3-$2}' swipe.bed | sort -n | uniq -c | awk '{print $2, $1}'")
 print("fragment_len count")
 print(r["stdout"])
 EOF
-node ./dist/execute-cli.mjs --dir ./demo /tmp/bash_pipeline.py
+node ./dist/execute-cli.mjs --dir ./demo /tmp/bash-demo/bash_pipeline.py
 
 ```
 
@@ -91,7 +92,7 @@ fragment_len count
 The FASTA file is also in the allowed directory. We can count sequences, check contig names, and compute per-base composition without loading the whole file into Python.
 
 ```bash
-cat > /tmp/bash_fasta.py << 'EOF'
+cat > /tmp/bash-demo/bash_fasta.py << 'EOF'
 # Count sequences
 r = bash("grep -c '^>' swipe.fasta")
 print("sequences: " + r["stdout"].strip())
@@ -104,7 +105,7 @@ print("headers:\n" + r["stdout"].strip())
 r = bash("grep -v '^>' swipe.fasta | tr -d '\\n' | fold -w1 | sort | uniq -c | sort -rn")
 print("base counts:\n" + r["stdout"])
 EOF
-node ./dist/execute-cli.mjs --dir ./demo /tmp/bash_fasta.py
+node ./dist/execute-cli.mjs --dir ./demo /tmp/bash-demo/bash_fasta.py
 
 ```
 
@@ -126,7 +127,7 @@ base counts:
 `bash()` can only write inside the `ai_chat_temp_files/` subdirectory of the allowed directory. Redirects to any other path fail with a read-only filesystem error. Files written there persist to disk and can be read back with `read_file()` or another `bash()` call.
 
 ```bash
-cat > /tmp/bash_write.py << 'EOF'
+cat > /tmp/bash-demo/bash_write.py << 'EOF'
 # Sort the BED file by start position and save it
 r = bash("sort -k2,2n swipe.bed > ai_chat_temp_files/swipe_sorted.bed")
 print("write exit_code: " + str(r["exit_code"]))
@@ -135,7 +136,7 @@ print("write exit_code: " + str(r["exit_code"]))
 r2 = bash("head -4 ai_chat_temp_files/swipe_sorted.bed")
 print("first 4 lines of sorted BED:\n" + r2["stdout"])
 EOF
-rm -rf ./demo/ai_chat_temp_files && node ./dist/execute-cli.mjs --dir ./demo /tmp/bash_write.py
+rm -rf ./demo/ai_chat_temp_files && node ./dist/execute-cli.mjs --dir ./demo /tmp/bash-demo/bash_write.py
 
 ```
 
@@ -152,7 +153,7 @@ contig_00001	12635	37635	1.a4652b11-87e8-4eb5-8d06-db06b43fa5a3	1	-
 Writes outside `ai_chat_temp_files/` fail with EROFS (read-only filesystem).
 
 ```bash
-cat > /tmp/bash_write_denied.py << 'EOF'
+cat > /tmp/bash-demo/bash_write_denied.py << 'EOF'
 # Try to write outside ai_chat_temp_files/ — the filesystem error propagates
 # as a RuntimeError from bash() itself
 try:
@@ -164,7 +165,7 @@ except Exception as e:
     print("caught: " + str(type(e).__name__))
     print("message: " + msg.split(", write '")[0])
 EOF
-node ./dist/execute-cli.mjs --dir ./demo /tmp/bash_write_denied.py
+node ./dist/execute-cli.mjs --dir ./demo /tmp/bash-demo/bash_write_denied.py
 
 ```
 
@@ -178,7 +179,7 @@ message: EROFS: read-only file system
 A command that exits with a non-zero code does not raise an exception — the exit code is returned inside the dict. This lets scripts distinguish between an empty result and an actual error.
 
 ```bash
-cat > /tmp/bash_exitcodes.py << 'EOF'
+cat > /tmp/bash-demo/bash_exitcodes.py << 'EOF'
 # grep returns 1 when no match is found — not an exception
 r = bash("grep 'contig_99999' swipe.bed")
 print("no-match exit_code: " + str(r["exit_code"]))
@@ -189,7 +190,7 @@ r2 = bash("cat nonexistent_file.txt")
 print("missing-file exit_code: " + str(r2["exit_code"]))
 print("stderr: " + r2["stderr"].strip())
 EOF
-node ./dist/execute-cli.mjs --dir ./demo /tmp/bash_exitcodes.py
+node ./dist/execute-cli.mjs --dir ./demo /tmp/bash-demo/bash_exitcodes.py
 
 ```
 
@@ -205,13 +206,13 @@ stderr: cat: nonexistent_file.txt: No such file or directory
 Bioinformatics tools and language runtimes are not available. Attempting to call them returns a non-zero exit code with `command not found` in stderr. The available set is: grep, sed, awk, sort, uniq, wc, cut, head, tail, cat, find, tr, paste, jq, and standard bash builtins.
 
 ```bash
-cat > /tmp/bash_unavailable.py << 'EOF'
+cat > /tmp/bash-demo/bash_unavailable.py << 'EOF'
 for cmd in ["samtools view demo.bam", "python3 --version", "bedtools --version"]:
     r = bash(cmd)
     label = cmd.split()[0]
     print(label + ": exit_code=" + str(r["exit_code"]) + " stderr=" + repr(r["stderr"].strip()[:50]))
 EOF
-node ./dist/execute-cli.mjs --dir ./demo /tmp/bash_unavailable.py
+node ./dist/execute-cli.mjs --dir ./demo /tmp/bash-demo/bash_unavailable.py
 
 ```
 
@@ -226,7 +227,7 @@ bedtools: exit_code=127 stderr='bash: bedtools: command not found'
 `bash()` is most useful when paired with the BAM query functions. Here we fetch all read lengths from the BAM with `read_info()`, write them to `ai_chat_temp_files/` as a TSV, then use `bash()` to compute summary statistics and find the top-5 longest reads.
 
 ```bash
-cat > /tmp/bash_combined.py << 'EOF'
+cat > /tmp/bash-demo/bash_combined.py << 'EOF'
 # Fetch all read lengths from the BAM and write as TSV for bash processing
 rows = read_info("demo.bam", limit=200000)
 lines = ["read_id\tlength"]
@@ -244,7 +245,7 @@ print("length stats: " + r["stdout"].strip())
 r2 = bash("tail -n +2 ai_chat_temp_files/reads.tsv | sort -k2,2rn | head -5 | awk '{print $2, $1}'")
 print("top-5 by length (len read_id):\n" + r2["stdout"])
 EOF
-rm -rf ./demo/ai_chat_temp_files && node ./dist/execute-cli.mjs --dir ./demo /tmp/bash_combined.py
+rm -rf ./demo/ai_chat_temp_files && node ./dist/execute-cli.mjs --dir ./demo /tmp/bash-demo/bash_combined.py
 
 ```
 
@@ -265,11 +266,12 @@ top-5 by length (len read_id):
 `bash()` is well-suited for summarising data already written to `ai_chat_temp_files/`. Here we compute a read-length histogram from the TSV written in the previous section and render it as a text bar chart entirely in shell using awk and sort.
 
 ```bash
-cat > /tmp/bash_histogram.py << 'EOF'
+cat > /tmp/bash-demo/bash_histogram.py << 'EOF'
 r = bash("tail -n +2 ai_chat_temp_files/reads.tsv | awk '{bin=int($2/200)*200; count[bin]++; total++} END{for(k in count){pct=count[k]*100/total; bar=\"\"; for(j=0;j<int(pct/2+0.5);j++) bar=bar \"#\"; printf \"%d-%d bp  %3d  %s\\n\", k, k+199, count[k], bar}}' | sort -n")
 print(r["stdout"])
 EOF
-node ./dist/execute-cli.mjs --dir ./demo /tmp/bash_histogram.py
+node ./dist/execute-cli.mjs --dir ./demo /tmp/bash-demo/bash_histogram.py
+rm -rf /tmp/bash-demo
 
 ```
 
