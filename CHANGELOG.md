@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Adds `bash(command)` to the AI chat sandbox: runs shell commands (grep, sed, awk, sort, jq, and standard builtins) with a deny-list blocking reads of sensitive files (`.env`, `*.pem`, `id_rsa`, etc.); per-call timeout and truncated stdout/stderr ([`aed7afa`](https://github.com/sathish-t/nanalogue-gui/commit/aed7afafa8c0705ba46849a0919b630b2be2e625))
+
+### Changed
+
+- `bash()` writes now persist to disk in `ai_chat_temp_files/` via a `ReadWriteFs` mount; the rest of `allowedDir` is read-only (EROFS on writes); a symlink guard prevents write escapes out of `allowedDir` ([`778d299`](https://github.com/sathish-t/nanalogue-gui/commit/778d29931b53942eb1213ed69422c55ccb35bbda))
+
+### Dependencies
+
+- Updates `@pydantic/monty` to v0.0.8, which ships the sandbox execution loop natively; removes the vendored loop from `monty-sandbox.ts` ([`d0f6209`](https://github.com/sathish-t/nanalogue-gui/commit/d0f6209a2e60a8e564d271a4567ae5074e8acb57))
+
 ## [0.2.5] - 2026-03-10
 
 ### Added
