@@ -39,6 +39,7 @@ import {
     gateOutputSize,
     SandboxError,
     safeStringify,
+    safeUtf8Slice,
 } from "./monty-sandbox-helpers";
 
 export {
@@ -75,7 +76,7 @@ export function collectTerminalOutput(result: SandboxResult): string {
  * @param fns - Map of function names to their implementations.
  * @returns A new map with each function wrapped in SandboxError conversion.
  */
-function wrapForMonty(
+export function wrapForMonty(
     fns: Record<string, (...args: never[]) => unknown>,
 ): Record<string, (...args: unknown[]) => unknown> {
     const wrapped: Record<string, (...args: unknown[]) => unknown> = {};
@@ -165,12 +166,7 @@ export async function runSandboxCode(
                     prints.push(text);
                     printBytes += textBytes;
                 } else {
-                    // Keep the leading bytes that still fit, backing off to a
-                    // UTF-8 boundary so no multi-byte character is split.
-                    const buf = Buffer.from(text);
-                    let end = remaining;
-                    while (end > 0 && (buf[end] & 0xc0) === 0x80) end--;
-                    prints.push(buf.subarray(0, end).toString("utf-8"));
+                    prints.push(safeUtf8Slice(text, remaining));
                     printBytes = maxPrintBytes;
                     printsTruncated = true;
                 }

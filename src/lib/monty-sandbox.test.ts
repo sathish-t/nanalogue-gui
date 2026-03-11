@@ -15,8 +15,12 @@ import { simulateModBam } from "@nanalogue/node";
 import { runMontyAsync } from "@pydantic/monty";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MAX_PRINT_CAPTURE_BYTES } from "./ai-chat-constants";
-import { collectTerminalOutput, runSandboxCode } from "./monty-sandbox";
-import { resolvePath } from "./monty-sandbox-helpers";
+import {
+    collectTerminalOutput,
+    runSandboxCode,
+    wrapForMonty,
+} from "./monty-sandbox";
+import { resolvePath, SandboxError } from "./monty-sandbox-helpers";
 
 let allowedDir: string;
 let bamName: string;
@@ -511,6 +515,38 @@ it("continue_thinking returns false when not called", async () => {
     expect(result.continueThinkingCalled).toBe(false);
 });
 
+// --- wrapForMonty error conversion ---
+
+it("wrapForMonty converts a non-Error throw to SandboxError", async () => {
+    // f(0) re-throws a SandboxError as-is; f(1) wraps an Error; f(2) wraps a
+    // plain string — the only branch (line 100) not covered by other tests.
+    /**
+     *
+     * @param n
+     */
+    /**
+     * Throws different error types depending on n: SandboxError (0), Error (1),
+     * or a plain string (anything else).
+     *
+     * @param n - Selector for which throw type to use.
+     */
+    function f(n: number): Promise<void> {
+        if (n === 0) throw new SandboxError("RuntimeError", "sandbox");
+        if (n === 1) throw new Error("native");
+        throw "plain string";
+    }
+    const wrapped = wrapForMonty({ f });
+    await expect(wrapped.f(0)).rejects.toThrow("sandbox");
+    await expect(wrapped.f(1)).rejects.toThrow("native");
+    await expect(wrapped.f(2)).rejects.toThrow("plain string");
+});
+
+it("returns GenericError when sandbox setup throws a non-Monty error", async () => {
+    const result = await runSandboxCode("1+1", "/nonexistent/path/xyz");
+    expect(result.success).toBe(false);
+    expect(result.errorType).toBe("GenericError");
+});
+
 // --- print() capture ---
 
 it("captures print output in SandboxResult", async () => {
@@ -581,6 +617,21 @@ for i in range(200):
         "utf-8",
     );
     expect(totalBytes).toBeLessThanOrEqual(MAX_PRINT_CAPTURE_BYTES);
+});
+
+it("truncates the final print chunk when it partially overflows the budget", async () => {
+    // "hello" is 5 bytes; maxPrintBytes=8 leaves 3 bytes remaining for the
+    // second print, so the partial-fit else-branch in printCallback fires.
+    const code = 'print("hello")\nprint("world!")';
+    const result = await runSandboxCode(code, allowedDir, {
+        maxPrintBytes: 8,
+    });
+    expect(result.success).toBe(true);
+    expect(result.printsTruncated).toBe(true);
+    // "hello\n" = 6 bytes, leaving 2 bytes → "wo" from "world!\n"
+    const joined = result.prints?.join("") ?? "";
+    expect(joined.startsWith("hello")).toBe(true);
+    expect(joined.length).toBeLessThanOrEqual(8);
 });
 
 // --- Parity tests: runMontyAsyncWithPrint vs runMontyAsync ---

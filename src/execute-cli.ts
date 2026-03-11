@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { version } from "../package.json";
 import { collectTerminalOutput, runSandboxCode } from "./lib/monty-sandbox";
+import { safeUtf8Slice } from "./lib/monty-sandbox-helpers";
 import {
     buildSandboxRunOptions,
     SANDBOX_ARG_DEFS,
@@ -33,24 +34,6 @@ const argConfig = {
     allowPositionals: true,
     strict: true,
 } as const;
-
-/**
- * Slices a UTF-8 string to at most maxBytes bytes, backing off to the nearest
- * valid codepoint boundary so no multi-byte character is split.
- *
- * @param text - The string to slice.
- * @param maxBytes - Maximum number of bytes to keep.
- * @returns The sliced string, guaranteed to be valid UTF-8.
- */
-function safeUtf8Slice(text: string, maxBytes: number): string {
-    const buf = Buffer.from(text, "utf-8");
-    if (buf.length <= maxBytes) return text;
-    let end = maxBytes;
-    // Back off past any UTF-8 continuation bytes (10xxxxxx) so we end on a
-    // codepoint boundary and never emit a partial multi-byte character.
-    while (end > 0 && (buf[end] & 0xc0) === 0x80) end--;
-    return buf.subarray(0, end).toString("utf-8");
-}
 
 /**
  * Writes data to stdout and waits for the buffer to drain before returning.

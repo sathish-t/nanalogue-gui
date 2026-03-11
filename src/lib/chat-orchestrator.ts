@@ -27,6 +27,7 @@ import {
     deriveMaxOutputBytes,
     resolvePath,
     safeStringify,
+    safeUtf8Slice,
 } from "./monty-sandbox-helpers";
 import {
     buildSandboxPrompt,
@@ -641,14 +642,8 @@ function truncatePrints(
 } {
     const bytes = Buffer.byteLength(prints, "utf-8");
     if (bytes <= maxBytes) return { text: prints, truncated: false };
-    const buf = Buffer.from(prints, "utf-8");
-    let cutPoint = maxBytes;
-    // Step backward to avoid splitting a multi-byte UTF-8 character
-    while (cutPoint > 0 && (buf[cutPoint] & 0xc0) === 0x80) {
-        cutPoint--;
-    }
     return {
-        text: `${buf.subarray(0, cutPoint).toString("utf-8")}\n...(truncated)`,
+        text: `${safeUtf8Slice(prints, maxBytes)}\n...(truncated)`,
         truncated: true,
     };
 }
@@ -694,13 +689,7 @@ function buildExecutionFeedback(
                 FEEDBACK_OUTPUT_MAX_BYTES - printsBytes - overhead;
             const serializedBytes = Buffer.byteLength(serialized, "utf-8");
             if (serializedBytes > valueBudget) {
-                const buf = Buffer.from(serialized, "utf-8");
-                let cutPoint = Math.max(0, valueBudget);
-                // Step backward to avoid splitting a multi-byte UTF-8 character
-                while (cutPoint > 0 && (buf[cutPoint] & 0xc0) === 0x80) {
-                    cutPoint--;
-                }
-                feedback.value = `${buf.subarray(0, cutPoint).toString("utf-8")}\n...(truncated)`;
+                feedback.value = `${safeUtf8Slice(serialized, Math.max(0, valueBudget))}\n...(truncated)`;
                 feedback.value_truncated = true;
             } else {
                 // Round-trip through JSON.parse to ensure the value is safe for
