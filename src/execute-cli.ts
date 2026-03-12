@@ -75,7 +75,7 @@ Sandbox limits:
   --max-records-bam-mods <n>     Max bam_mods records (default: ${5_000})
   --max-records-window-reads <n> Max window_reads records (default: ${5_000})
   --max-records-seq-table <n>    Max seq_table records (default: ${5_000})
-  --max-duration-secs <n>  Max sandbox duration in seconds (default: ${600})
+  --max-duration-secs <n>  Best-effort sandbox time limit in seconds (bash cancelled at limit; native reads in progress may finish) (default: ${600})
   --max-memory-mb <n>      Max sandbox memory in MB (default: ${512})
   --max-allocations <n>    Max sandbox VM allocations (default: ${100_000})
   --max-read-mb <n>        Max read_file size in MB (default: ${1})

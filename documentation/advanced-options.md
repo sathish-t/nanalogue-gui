@@ -39,7 +39,7 @@ Monty sandbox. They apply to both `nanalogue-chat` and
 
 | Option | CLI flag | Default | Range | Description |
 |---|---|---|---|---|
-| Max sandbox duration (seconds) | `--max-duration-secs` | 600 | 1–604,800 | Wall-clock time limit per sandbox execution. The LLM is told the actual value you set, so it can plan accordingly. Increase for computationally heavy scripts. |
+| Max execution time (seconds) | `--max-duration-secs` | 600 | 1–604,800 | Best-effort execution time limit per sandbox run. Bash commands are actively cancelled when this fires; native data-access operations already in progress may complete in the background. The LLM is told the actual value you set, so it can plan accordingly. Increase for computationally heavy scripts. |
 | Max sandbox memory (MB) | `--max-memory-mb` | 512 | 1–65,536 | Heap memory cap for the sandbox process. Increase when working with large dataframes or high-coverage BAM regions. |
 | Max sandbox allocations | `--max-allocations` | 100,000 | 1–100,000,000 | Monty VM allocation cap. Acts as a secondary safety net independent of memory. Rarely needs changing. |
 | Max read_file size (MB) | `--max-read-mb` | 1 | 1–100 | Maximum bytes the sandbox `read_file()` function may read in a single call. Increase if your analysis scripts need to read large text or CSV files. |
@@ -47,7 +47,7 @@ Monty sandbox. They apply to both `nanalogue-chat` and
 
 **When to change:**
 
-- *Script times out during heavy computation* — increase max duration.
+- *Script hits the execution time limit during heavy computation* — increase max execution time.
 - *Script crashes with memory errors on large datasets* — increase max memory.
 - *Script needs to ingest a large reference or annotation file* — increase max read_file size.
 - *Script produces a large output file* — increase max write_file size.

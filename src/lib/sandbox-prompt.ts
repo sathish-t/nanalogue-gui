@@ -576,7 +576,7 @@ lengths = [r["sequence_length"] for r in reads]
 
 ## Performance constraints
 
-- Your code runs with a time limit (default ${maxDurationMinutes} minutes).
+- Your code runs with a best-effort time limit (default ${maxDurationMinutes} minutes). Bash commands are cancelled at this limit; data-access calls already in progress may complete slightly beyond it.
 - Avoid infinite loops and unbounded iteration.
 - Keep operations linear in the number of reads.
 

@@ -64,12 +64,12 @@ export const /** Validation specs for each integer AiChatConfig field (temperatu
             fallback: 10,
             label: "max code rounds",
         },
-        /** Total sandbox wall-clock limit; 1 s floor, 7-day ceiling. */
+        /** Best-effort sandbox execution time limit; bash is cancelled at this limit, native reads in progress may complete in the background. */
         maxDurationSecs: {
             min: 1,
             max: 604_800,
             fallback: 600,
-            label: "max sandbox duration (seconds)",
+            label: "max execution time (seconds)",
         },
         /** Sandbox heap limit; 1 MB floor, 64 GB ceiling. */
         maxMemoryMB: {

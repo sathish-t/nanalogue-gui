@@ -136,6 +136,16 @@ export async function runSandboxCode(
     let printBytes = 0;
     let printsTruncated = false;
 
+    // Wall-clock abort for bash: fires after maxDurationSecs and cancels any
+    // in-flight bash command via AbortSignal. Other external functions (native
+    // Rust calls) cannot be interrupted mid-flight and are not affected.
+    const bashAbortController = new AbortController();
+    let bashTimedOut = false;
+    const bashTimer = setTimeout(() => {
+        bashTimedOut = true;
+        bashAbortController.abort();
+    }, maxDurationSecs * 1000);
+
     try {
         const m = new Monty(code);
 
@@ -177,7 +187,11 @@ export async function runSandboxCode(
                         continue_thinking: makeContinueThinking(() => {
                             continueThinkingCalled = true;
                         }),
-                        bash: makeBash(allowedDir, maxOutputBytes),
+                        bash: makeBash(
+                            allowedDir,
+                            maxOutputBytes,
+                            bashAbortController.signal,
+                        ),
                         peek: makePeek(allowedDir),
                         read_info: makeReadInfo(allowedDir, maxRecordsReadInfo),
                         bam_mods: makeBamMods(allowedDir, maxRecordsBamMods),
@@ -201,6 +215,20 @@ export async function runSandboxCode(
         const converted = convertMaps(value);
         const { gated, truncated } = gateOutputSize(converted, maxOutputBytes);
 
+        // If the bash abort timer fired while Python was catching the abort
+        // error (try/except), runMontyAsync may still complete successfully.
+        // Treat this as a timeout rather than letting a partial result through.
+        if (bashTimedOut) {
+            return {
+                success: false,
+                errorType: "RuntimeError",
+                message: "execution aborted",
+                isTimeout: true,
+                prints,
+                printsTruncated,
+            };
+        }
+
         return {
             success: true,
             value: gated,
@@ -218,7 +246,7 @@ export async function runSandboxCode(
                 success: false,
                 errorType: "RuntimeError",
                 message: error.message,
-                isTimeout: error.message.includes("time limit"),
+                isTimeout: bashTimedOut || error.message.includes("time limit"),
                 prints,
                 printsTruncated,
             };
@@ -241,5 +269,9 @@ export async function runSandboxCode(
             prints,
             printsTruncated,
         };
+    } finally {
+        // Always clear the bash abort timer so it does not fire after
+        // runMontyAsync has already completed (success or error).
+        clearTimeout(bashTimer);
     }
 }

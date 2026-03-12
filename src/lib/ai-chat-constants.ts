@@ -24,7 +24,7 @@ export const /** Default maximum code execution rounds per user message. */ DEFA
 
 // --- Sandbox execution defaults ---
 
-export const /** Default sandbox execution timeout in seconds (10 minutes). */ DEFAULT_MAX_DURATION_SECS = 600;
+export const /** Default best-effort sandbox execution time limit in seconds (10 minutes). Bash is cancelled at this limit; native reads in progress may complete in the background. */ DEFAULT_MAX_DURATION_SECS = 600;
 
 export const /** Default heap memory cap in bytes (512 MB). */ DEFAULT_MAX_MEMORY =
         512 * 1024 * 1024;

@@ -166,11 +166,13 @@ function truncateOutput(s: string, maxBytes: number): string {
  *
  * @param allowedDir - The sandboxed root directory (also used as mount point).
  * @param maxOutputBytes - Maximum bytes for stdout/stderr before truncation.
+ * @param signal - Optional abort signal; when fired, cancels the in-flight bash command.
  * @returns An async function callable from Python that runs shell commands.
  */
 export function makeBash(
     allowedDir: string,
     maxOutputBytes: number,
+    signal?: AbortSignal,
 ): (command: string) => Promise<unknown> {
     // ai_chat_temp_files must exist on disk before ReadWriteFs is constructed
     // because ReadWriteFs calls realpathSync(root) in its constructor.
@@ -219,9 +221,8 @@ export function makeBash(
      * Runs a shell command and returns its output.
      *
      * Runaway commands are bounded by just-bash's executionLimits (loop/awk/sed/jq
-     * iteration caps), which protect against CPU-bound infinite loops. Note that
-     * the Monty VM's maxDurationSecs only counts pure Python opcode execution time
-     * and does not bound the duration of external function calls like bash().
+     * iteration caps), which protect against CPU-bound infinite loops.
+     * When a signal is provided and aborted, the in-flight command is cancelled.
      *
      * @param command - The shell command to execute.
      * @returns A dict with stdout, stderr, and exit_code.
@@ -234,7 +235,10 @@ export function makeBash(
             );
         }
 
-        const result = await shell.exec(command);
+        const result = await shell.exec(
+            command,
+            signal ? { signal } : undefined,
+        );
 
         return {
             stdout: truncateOutput(result.stdout, maxOutputBytes),

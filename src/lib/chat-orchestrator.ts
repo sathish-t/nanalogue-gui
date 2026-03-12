@@ -711,6 +711,9 @@ function buildExecutionFeedback(
         error_type: result.errorType,
         message: result.message,
         is_timeout: result.isTimeout ?? false,
+        ...(result.isTimeout && {
+            timeout_note: "The sandbox execution time limit was reached.",
+        }),
         rounds_remaining: roundsRemaining,
     };
     if (result.prints?.length) {
