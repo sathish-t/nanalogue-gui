@@ -165,13 +165,11 @@ function truncateOutput(s: string, maxBytes: number): string {
  * persist between calls; use compound commands for multi-step pipelines.
  *
  * @param allowedDir - The sandboxed root directory (also used as mount point).
- * @param timeoutMs - Per-call abort timeout in milliseconds.
  * @param maxOutputBytes - Maximum bytes for stdout/stderr before truncation.
  * @returns An async function callable from Python that runs shell commands.
  */
 export function makeBash(
     allowedDir: string,
-    timeoutMs: number,
     maxOutputBytes: number,
 ): (command: string) => Promise<unknown> {
     // ai_chat_temp_files must exist on disk before ReadWriteFs is constructed
@@ -202,14 +200,28 @@ export function makeBash(
     const shell = new Bash({
         fs: withDenyList(mountable, allowedDir),
         cwd: allowedDir,
+        // Execution limits: the six values below are the just-bash defaults,
+        // restated here explicitly so their values are visible and intentional.
+        // just-bash has several additional limits (output size caps, string
+        // length, array elements, etc.) that are also active but not listed
+        // here — they are left at their defaults.
+        executionLimits: {
+            maxCallDepth: 100,
+            maxCommandCount: 10_000,
+            maxLoopIterations: 10_000,
+            maxAwkIterations: 10_000,
+            maxSedIterations: 10_000,
+            maxJqIterations: 10_000,
+        },
     });
 
     /**
      * Runs a shell command and returns its output.
      *
-     * Uses an AbortController to enforce the per-call timeout. When the
-     * timeout fires, just-bash catches the abort signal internally and
-     * returns exit code 124 (same as the POSIX timeout command).
+     * Runaway commands are bounded by just-bash's executionLimits (loop/awk/sed/jq
+     * iteration caps), which protect against CPU-bound infinite loops. Note that
+     * the Monty VM's maxDurationSecs only counts pure Python opcode execution time
+     * and does not bound the duration of external function calls like bash().
      *
      * @param command - The shell command to execute.
      * @returns A dict with stdout, stderr, and exit_code.
@@ -222,22 +234,7 @@ export function makeBash(
             );
         }
 
-        const controller = new AbortController();
-        // The abort callback is a safety net for commands that hang beyond
-        // timeoutMs.  It is intentionally unreachable in unit tests because
-        // in-process bash commands always complete (or hit just-bash's own
-        // iteration limits) before the timer fires in a test environment.
-        /* v8 ignore start */
-        const timer = setTimeout(() => {
-            controller.abort();
-        }, timeoutMs); /* v8 ignore stop */
-
-        let result: Awaited<ReturnType<typeof shell.exec>>;
-        try {
-            result = await shell.exec(command, { signal: controller.signal });
-        } finally {
-            clearTimeout(timer);
-        }
+        const result = await shell.exec(command);
 
         return {
             stdout: truncateOutput(result.stdout, maxOutputBytes),

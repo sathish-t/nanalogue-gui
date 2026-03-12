@@ -25,7 +25,6 @@ interface BashResult {
     exit_code: number;
 }
 
-const TIMEOUT_MS = 10_000;
 const MAX_OUTPUT_BYTES = 1024 * 1024;
 
 let allowedDir: string;
@@ -51,7 +50,7 @@ beforeEach(async () => {
     await writeFile(join(allowedDir, "subdir", ".env"), "NESTED_SECRET=abc");
     await writeFile(join(allowedDir, "subdir", "data.tsv"), "col1\tcol2\n");
 
-    bash = makeBash(allowedDir, TIMEOUT_MS, MAX_OUTPUT_BYTES);
+    bash = makeBash(allowedDir, MAX_OUTPUT_BYTES);
 });
 
 afterEach(async () => {
@@ -200,7 +199,7 @@ describe("basic functionality", () => {
     });
 
     it("truncates stdout when it exceeds maxOutputBytes", async () => {
-        const tinyBash = makeBash(allowedDir, TIMEOUT_MS, 5);
+        const tinyBash = makeBash(allowedDir, 5);
         // "hello\n" is 6 bytes, exceeds the 5-byte cap.
         const r = (await tinyBash("echo hello")) as BashResult;
         expect(r.stdout).toContain("[output truncated]");
@@ -210,6 +209,13 @@ describe("basic functionality", () => {
         await expect(bash(42 as unknown as string)).rejects.toMatchObject({
             name: "TypeError",
         });
+    });
+
+    it("infinite loop terminates due to maxLoopIterations limit", async () => {
+        // just-bash enforces maxLoopIterations, once hit the command is killed
+        // and returns exit code 126.
+        const r = (await bash("while true; do :; done")) as BashResult;
+        expect(r.exit_code).toBe(126);
     });
 });
 
@@ -271,9 +277,7 @@ describe("read-write filesystem", () => {
 
         // makeBash must detect the symlink and throw rather than mount a
         // ReadWriteFs that would write outside the sandbox boundary.
-        expect(() =>
-            makeBash(allowedDir, TIMEOUT_MS, MAX_OUTPUT_BYTES),
-        ).toThrow(/symlink/);
+        expect(() => makeBash(allowedDir, MAX_OUTPUT_BYTES)).toThrow(/symlink/);
 
         await rm(outsideDir, { recursive: true });
     });

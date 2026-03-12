@@ -2,11 +2,7 @@
 // the full system message sent to the LLM on every turn.
 // All numeric limits are derived from code constants, not hardcoded in prose.
 
-import {
-    bashTimeoutMs,
-    MAX_FILENAME_LENGTH,
-    MAX_LS_ENTRIES,
-} from "./ai-chat-constants";
+import { MAX_FILENAME_LENGTH, MAX_LS_ENTRIES } from "./ai-chat-constants";
 import type { Fact } from "./chat-types";
 
 /** Options for building the sandbox prompt. */
@@ -52,7 +48,6 @@ export function buildSandboxPrompt(options: SandboxPromptOptions): string {
 
     const maxReadBytes = maxReadMB * 1024 * 1024;
     const maxDurationMinutes = Math.round(maxDurationSecs / 60);
-    const bashTimeoutSecs = Math.round(bashTimeoutMs(maxDurationSecs) / 1000);
     const readInfoLimit = maxRecordsReadInfo.toLocaleString();
     const bamModsLimit = maxRecordsBamMods.toLocaleString();
     const windowReadsLimit = maxRecordsWindowReads.toLocaleString();
@@ -265,8 +260,6 @@ Returns a dict:
 \`\`\`json
 {"stdout": "...", "stderr": "...", "exit_code": 0}
 \`\`\`
-
-Exit code 124 means the command timed out (${bashTimeoutSecs} second limit per call).
 
 **Available:** grep, sed, awk, sort, uniq, wc, cut, head, tail, cat,
 find, tr, paste, jq, and standard bash builtins (echo, printf, pipes,
