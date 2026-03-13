@@ -7,17 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-03-13
+
 ### Added
 
-- Adds `bash(command)` to the AI chat sandbox: runs shell commands (grep, sed, awk, sort, jq, and standard builtins) with a deny-list blocking reads of sensitive files (`.env`, `*.pem`, `id_rsa`, etc.); per-call timeout and truncated stdout/stderr ([`aed7afa`](https://github.com/sathish-t/nanalogue-gui/commit/aed7afafa8c0705ba46849a0919b630b2be2e625))
-
-### Changed
-
-- `bash()` writes now persist to disk in `ai_chat_temp_files/` via a `ReadWriteFs` mount; the rest of `allowedDir` is read-only (EROFS on writes); a symlink guard prevents write escapes out of `allowedDir` ([`778d299`](https://github.com/sathish-t/nanalogue-gui/commit/778d29931b53942eb1213ed69422c55ccb35bbda))
+- `/dump_llm_instructions` (and `--dump-llm-instructions` CLI flag) now writes a self-contained `.html` transcript alongside the existing `.log` file; system messages are collapsible, assistant Python is syntax-highlighted, and code execution results are rendered as structured ✓/✗ cards; copy buttons on every message bubble; links and images in message content are stripped to plain text to prevent XSS ([`e779ab2`](https://github.com/sathish-t/nanalogue-gui/commit/e779ab2892cbb8f95d4b5b7ff2523686d021f2e9))
+- Adds `bash(command)` to the AI chat sandbox: runs shell commands (grep, sed, awk, sort, jq, and standard builtins) with a deny-list blocking reads of sensitive files (`.env`, `*.pem`, `id_rsa`, etc.); wall-clock timeout via `AbortSignal.timeout`; writes persist to disk in `ai_chat_temp_files/` via a `ReadWriteFs` mount; the rest of `allowedDir` is read-only (EROFS on writes); a symlink guard prevents write escapes out of `allowedDir`; truncated stdout/stderr ([`aed7afa`](https://github.com/sathish-t/nanalogue-gui/commit/aed7afafa8c0705ba46849a0919b630b2be2e625), [`a151bf6`](https://github.com/sathish-t/nanalogue-gui/commit/a151bf6732d6746f60ed8db7ece74238884ae31e), [`778d299`](https://github.com/sathish-t/nanalogue-gui/commit/778d29931b53942eb1213ed69422c55ccb35bbda))
 
 ### Dependencies
 
 - Updates `@pydantic/monty` to v0.0.8, which ships the sandbox execution loop natively; removes the vendored loop from `monty-sandbox.ts` ([`d0f6209`](https://github.com/sathish-t/nanalogue-gui/commit/d0f6209a2e60a8e564d271a4567ae5074e8acb57))
+
+### Infrastructure
+
+- Dependency bumps: `electron` 40.6.1→41.0.2, `eslint-plugin-jsdoc` 62.7.1→62.8.0, `just-bash` 2.12.8→2.13.0, `@vitest/coverage-v8` 4.0.18→4.1.0, `esbuild` 0.27.3→0.27.4, `typescript-eslint` 8.56.1→8.57.0, `eslint` 10.0.2→10.0.3, `@biomejs/biome` 2.4.4→2.4.6, `html-validate` 10.9.0→10.11.1, `astral-sh/setup-uv` v5→v7
 
 ## [0.2.5] - 2026-03-10
 

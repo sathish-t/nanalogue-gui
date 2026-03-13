@@ -340,9 +340,17 @@ A copy button in the code panel lets you copy the Python code to your clipboard.
 
 You can dump the full request payload sent to the LLM (system prompt and
 conversation history) by typing `/dump_llm_instructions` in the chat input
-or CLI REPL. The output is written as plain text to
-`ai_chat_output/` inside your BAM directory. At least one message must have
-been sent to the LLM before the dump command will produce output.
+or CLI REPL. Two files are written to `ai_chat_output/` inside your BAM
+directory: a plain-text `.log` file and a self-contained `.html` file for
+easy browser viewing (collapsible system prompt, syntax-highlighted Python,
+structured execution result cards, and a copy button on every message).
+At least one message must have been sent to the LLM before the dump command
+will produce output.
+
+The HTML viewer was inspired by
+[claude-code-transcripts](https://github.com/simonw/claude-code-transcripts)
+and uses the atom-one-dark syntax theme — see
+[Third-party notices](#third-party-notices) for the licence.
 
 **Inspect the system prompt:**
 
@@ -424,7 +432,7 @@ nanalogue-chat --endpoint <url> --model <name> --dir <path> \
 the built-in sandbox prompt (the SYSTEM_APPEND.md file and facts array are
 still appended to the prompt). Use `--dump-llm-instructions --non-interactive "<msg>"`
 to write the full LLM request payload (system prompt + conversation) to a dated
-log file in `ai_chat_output/`.
+`.log` file and a self-contained `.html` viewer in `ai_chat_output/`.
 
 **Remove tools:** use `--rm-tools "tool1,tool2"` to disable specific external
 functions (e.g. `--rm-tools "write_file,read_file"`) — useful for restricting
@@ -436,7 +444,7 @@ sandbox capabilities.
 |---|---|
 | `/new` | Start a new conversation |
 | `/exec <file.py>` | Run a Python file directly in the sandbox without sending it to the LLM |
-| `/dump_llm_instructions` | Dump the full LLM request payload from the last round to a log file in `ai_chat_output/` |
+| `/dump_llm_instructions` | Dump the full LLM request payload from the last round to a `.log` file and a self-contained `.html` viewer in `ai_chat_output/` |
 | `/dump_system_prompt` | Dump the static system prompt to a log file in `ai_chat_output/` |
 | `/quit` | Exit the CLI |
 | Ctrl+C during a request | Cancel the current request |
