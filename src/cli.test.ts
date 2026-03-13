@@ -259,14 +259,17 @@ describe("nanalogue-chat CLI", () => {
             // stdout should contain the LLM reply (sandbox print output).
             expect(stdout.trim()).toBe("42bp");
 
-            // stderr should contain the path announcement.
+            // stderr should contain the path announcement for both files.
             expect(stderr).toContain("LLM instructions dumped to");
+            expect(stderr).toContain("HTML view:");
 
-            // A log file should exist inside ai_chat_output/.
+            // Both a .log and a .html file should exist inside ai_chat_output/.
             const outputDir = join(tmpDir, "ai_chat_output");
             const files = await readdir(outputDir);
             const logFiles = files.filter((f) => f.endsWith(".log"));
             expect(logFiles).toHaveLength(1);
+            const htmlFiles = files.filter((f) => f.endsWith(".html"));
+            expect(htmlFiles).toHaveLength(1);
 
             // The log file should contain the system message and the user message.
             const logContent = await readFile(

@@ -511,9 +511,10 @@ async function main(): Promise<void> {
         // been printed, so a dump failure should not crash the process.
         if (values["dump-llm-instructions"]) {
             try {
-                const relPath = await dumpLlmInstructions(allowedDir);
-                if (relPath) {
-                    console.error(`LLM instructions dumped to ${relPath}`);
+                const dump = await dumpLlmInstructions(allowedDir);
+                if (dump) {
+                    console.error(`LLM instructions dumped to ${dump.log}`);
+                    console.error(`HTML view: ${dump.html}`);
                 } else {
                     console.error(
                         "Warning: no LLM call was made; nothing to dump.",

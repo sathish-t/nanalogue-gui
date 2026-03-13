@@ -24,6 +24,7 @@ src/
     histogram.ts                     # Streaming histogram accumulator for binning data without storing raw arrays
     line-counter.ts                  # Streaming utilities for counting lines in text and BED files
     locate-data-loader.ts            # Locate-reads data loader for parsing read ID files and generating BED output
+    log-to-html.ts                   # Converts LLM message arrays into self-contained HTML files for session review.
     mod-filter.ts                    # Parses modification filter strings into tag and strand components.
     model-listing.ts                 # Provider detection and model listing for multi-provider LLM endpoints.
     monty-sandbox-helpers.ts         # Utility helpers for monty-sandbox: path security, option translation,

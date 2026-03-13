@@ -22,6 +22,7 @@ import type {
     SandboxOptions,
     SandboxResult,
 } from "./chat-types";
+import { generateChatHtml } from "./log-to-html.js";
 import { collectTerminalOutput, runSandboxCode } from "./monty-sandbox";
 import {
     deriveMaxOutputBytes,
@@ -72,18 +73,34 @@ export function setLastSentMessages(messages: LlmMessage[] | null): void {
 }
 
 /**
- * Writes the last LLM request payload to a dated log file in ai_chat_output/
- * inside the given directory. Used by both the /dump_llm_instructions slash
- * command and the --dump-llm-instructions CLI flag.
+ * Paths produced by a successful dumpLlmInstructions call, both relative to
+ * the allowedDir sandbox root.
+ */
+export interface DumpLlmInstructionsResult {
+    /** Relative path to the plain-text .log file. */
+    log: string;
+    /** Relative path to the self-contained .html file. */
+    html: string;
+}
+
+/**
+ * Writes the last LLM request payload to a dated log file and a sibling HTML
+ * file in ai_chat_output/ inside the given directory. Used by both the
+ * /dump_llm_instructions slash command and the --dump-llm-instructions CLI
+ * flag.
  *
  * @param allowedDir - The analysis directory (must be the sandbox root).
- * @returns The path to the log file relative to allowedDir, or null if no
+ * @returns Paths to both output files relative to allowedDir, or null if no
  *   LLM call has been made yet.
  */
 export async function dumpLlmInstructions(
     allowedDir: string,
-): Promise<string | null> {
+): Promise<DumpLlmInstructionsResult | null> {
     if (!lastSentMessages) return null;
+    /* Snapshot the messages immediately, before any await, so that both the
+       .log and .html outputs always describe the same conversation even if
+       another chat turn updates lastSentMessages while we are writing. */
+    const messages = lastSentMessages;
 
     const outputDir = join(allowedDir, "ai_chat_output");
     await mkdir(outputDir, { recursive: true });
@@ -91,18 +108,25 @@ export async function dumpLlmInstructions(
 
     const date = new Date().toISOString().slice(0, 10);
     const uuid = randomUUID();
-    const filename = `nanalogue-chat-${date}-${uuid}.log`;
-    const outputFile = join(safeDir, filename);
+    const stem = `nanalogue-chat-${date}-${uuid}`;
+    const logFile = join(safeDir, `${stem}.log`);
+    const htmlFile = join(safeDir, `${stem}.html`);
 
-    const content = lastSentMessages
+    const logContent = messages
         .map(
             (msg, i) =>
                 `=== Message ${i + 1}: ${msg.role} ===\n\n${msg.content}`,
         )
         .join("\n\n");
-    await writeFile(outputFile, content, "utf-8");
+    await writeFile(logFile, logContent, "utf-8");
 
-    return relative(allowedDir, outputFile);
+    const htmlContent = generateChatHtml(messages, uuid);
+    await writeFile(htmlFile, htmlContent, "utf-8");
+
+    return {
+        log: relative(allowedDir, logFile),
+        html: relative(allowedDir, htmlFile),
+    };
 }
 
 /**
@@ -868,10 +892,11 @@ export async function handleUserMessage(
         history.pop();
         emitEvent({ type: "turn_start" });
 
-        const relPath = await dumpLlmInstructions(allowedDir);
-        const text = relPath
-            ? `LLM instructions dumped to ${relPath}\n` +
-              "This message is not fed back to the LLM. Do not reference this file in conversations."
+        const dump = await dumpLlmInstructions(allowedDir);
+        const text = dump
+            ? `LLM instructions dumped to ${dump.log}\n` +
+              `HTML view: ${dump.html}\n` +
+              "These files are not fed back to the LLM. Do not reference them in conversations."
             : "No LLM call has been made yet, nothing to dump.";
         emitEvent({ type: "turn_end", text, steps: [] });
         return { text, steps: [] };

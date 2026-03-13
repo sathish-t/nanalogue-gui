@@ -409,7 +409,12 @@ describe("/dump_llm_instructions slash command", () => {
 
         const outputDir = join(tmpDir, "ai_chat_output");
         const files = await readdir(outputDir);
-        const content = await readFile(join(outputDir, files[0]), "utf-8");
+        const logFile = files.find((f) => f.endsWith(".log"));
+        expect(logFile).toBeDefined();
+        const content = await readFile(
+            join(outputDir, logFile as string),
+            "utf-8",
+        );
 
         expect(content).toContain("=== Message 1: system ===");
         expect(content).toContain("You are a helpful assistant.");
@@ -442,8 +447,15 @@ describe("/dump_llm_instructions slash command", () => {
         });
 
         const files = await readdir(join(tmpDir, "ai_chat_output"));
-        expect(files[0]).toMatch(
+        const logFiles = files.filter((f) => f.endsWith(".log"));
+        expect(logFiles).toHaveLength(1);
+        expect(logFiles[0]).toMatch(
             /^nanalogue-chat-\d{4}-\d{2}-\d{2}-[\da-f-]+\.log$/,
+        );
+        const htmlFiles = files.filter((f) => f.endsWith(".html"));
+        expect(htmlFiles).toHaveLength(1);
+        expect(htmlFiles[0]).toMatch(
+            /^nanalogue-chat-\d{4}-\d{2}-\d{2}-[\da-f-]+\.html$/,
         );
     });
 
@@ -474,8 +486,13 @@ describe("/dump_llm_instructions slash command", () => {
         await handleUserMessage(opts);
 
         const files = await readdir(join(tmpDir, "ai_chat_output"));
-        expect(files).toHaveLength(2);
-        expect(files[0]).not.toBe(files[1]);
+        const logFiles = files.filter((f) => f.endsWith(".log"));
+        const htmlFiles = files.filter((f) => f.endsWith(".html"));
+        // Two invocations produce two distinct .log files and two distinct .html files.
+        expect(logFiles).toHaveLength(2);
+        expect(htmlFiles).toHaveLength(2);
+        expect(logFiles[0]).not.toBe(logFiles[1]);
+        expect(htmlFiles[0]).not.toBe(htmlFiles[1]);
     });
 
     it("handles trailing whitespace in command", async () => {
@@ -505,7 +522,9 @@ describe("/dump_llm_instructions slash command", () => {
         expect(result.text).toContain("LLM instructions dumped to");
         expect(result.text).toContain("not fed back to the LLM");
         const files = await readdir(join(tmpDir, "ai_chat_output"));
-        expect(files).toHaveLength(1);
+        // One .log and one .html are written per invocation.
+        expect(files.filter((f) => f.endsWith(".log"))).toHaveLength(1);
+        expect(files.filter((f) => f.endsWith(".html"))).toHaveLength(1);
     });
 
     it("rejects when ai_chat_output is a symlink outside allowed dir", async () => {

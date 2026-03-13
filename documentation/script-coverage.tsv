@@ -15,12 +15,13 @@ src/lib/ai-external-tools/window-reads.ts	100
 src/lib/ai-external-tools/write-file.ts	100
 src/lib/bed-parser.ts	93.1
 src/lib/chat-orchestrator-test-utils.ts	100
-src/lib/chat-orchestrator.ts	92.91
+src/lib/chat-orchestrator.ts	92.99
 src/lib/chat-session.ts	89.47
 src/lib/format-utils.ts	100
 src/lib/histogram.ts	96.29
 src/lib/line-counter.ts	100
 src/lib/locate-data-loader.ts	100
+src/lib/log-to-html.ts	100
 src/lib/mod-filter.ts	100
 src/lib/model-listing.ts	92.42
 src/lib/monty-sandbox-helpers.ts	98.69

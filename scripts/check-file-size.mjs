@@ -49,11 +49,15 @@ const TEST_MAX = 1500;
 /** @type {Map<string, number>} */
 const EXCEPTIONS = new Map([
     // Source files above the 800-line ceiling:
-    ["src/lib/chat-orchestrator.ts", 1305], // raised from 1298: --rm-tools removedTools support
+    ["src/lib/chat-orchestrator.ts", 1322],
     ["src/renderer/ai-chat/ai-chat.ts", 1183],
     ["src/renderer/qc/qc-results.ts", 1146],
+    // log-to-html.ts is self-contained by design: inlined CSS, JS, and JSDoc
+    // account for the majority of lines; logic itself is well under the limit.
+    ["src/lib/log-to-html.ts", 816],
     // Test files above the 1500-line ceiling:
-    ["src/lib/chat-orchestrator-handle-message.test.ts", 1554], // raised from 1500: --rm-tools tests
+    // chat-orchestrator-handle-message.test.ts grew with .html file assertions.
+    ["src/lib/chat-orchestrator-handle-message.test.ts", 1573],
 ]);
 
 // --- File discovery ---

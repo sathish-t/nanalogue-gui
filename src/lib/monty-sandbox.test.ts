@@ -141,6 +141,33 @@ while True:
     expect(result.isTimeout).toBe(true);
 });
 
+it("bash abort via wall-clock timer sets isTimeout", async () => {
+    // Timer fires at 100ms; bash sleeps for 2s — abort cancels bash mid-flight.
+    const code = `bash("sleep 2")`;
+    const result = await runSandboxCode(code, allowedDir, {
+        maxDurationSecs: 0.1,
+    });
+    expect(result.success).toBe(false);
+    expect(result.isTimeout).toBe(true);
+}, 10_000);
+
+it("bash abort caught by try/except still surfaces as isTimeout", async () => {
+    // Python catches the abort error — without the success-path bashTimedOut
+    // guard this would incorrectly return success: true.
+    const code = `
+try:
+    bash("sleep 2")
+except:
+    pass
+"completed"
+`;
+    const result = await runSandboxCode(code, allowedDir, {
+        maxDurationSecs: 0.1,
+    });
+    expect(result.success).toBe(false);
+    expect(result.isTimeout).toBe(true);
+}, 10_000);
+
 it("LLM-style processing produces summary dict", async () => {
     const code = `
 info = peek("${bamName}")
