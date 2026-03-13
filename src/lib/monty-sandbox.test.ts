@@ -569,7 +569,10 @@ it("wrapForMonty converts a non-Error throw to SandboxError", async () => {
 });
 
 it("returns GenericError when sandbox setup throws a non-Monty error", async () => {
-    const result = await runSandboxCode("1+1", "/nonexistent/path/xyz");
+    // Use /dev/null/xyz so mkdirSync fails with ENOTDIR on both macOS and
+    // Linux — even when the process runs as root (as in Linux CI containers),
+    // /dev/null is a character device and cannot be entered as a directory.
+    const result = await runSandboxCode("1+1", "/dev/null/xyz");
     expect(result.success).toBe(false);
     expect(result.errorType).toBe("GenericError");
 });

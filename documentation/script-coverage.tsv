@@ -24,7 +24,7 @@ src/lib/locate-data-loader.ts	100
 src/lib/log-to-html.ts	100
 src/lib/mod-filter.ts	100
 src/lib/model-listing.ts	92.42
-src/lib/monty-sandbox-helpers.ts	98.69
+src/lib/monty-sandbox-helpers.ts	99.33
 src/lib/monty-sandbox.ts	100
 src/lib/qc-data-loader.ts	93.14
 src/lib/region-parser.ts	95.65
