@@ -1,7 +1,13 @@
 {
     "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
     "files": {
-        "includes": ["**/*.ts", "**/*.js", "**/*.mjs", "**/*.json"]
+        "includes": [
+            "**/*.ts",
+            "**/*.js",
+            "**/*.mjs",
+            "**/*.json",
+            "!**/minimap2-wasm/**"
+        ]
     },
     "formatter": {
         "enabled": true,

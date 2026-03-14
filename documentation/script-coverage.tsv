@@ -7,6 +7,7 @@ src/lib/ai-external-tools/bash.ts	100
 src/lib/ai-external-tools/continue-thinking.ts	100
 src/lib/ai-external-tools/index.ts	100
 src/lib/ai-external-tools/ls.ts	100
+src/lib/ai-external-tools/minimap2.ts	100
 src/lib/ai-external-tools/peek.ts	100
 src/lib/ai-external-tools/read-file.ts	100
 src/lib/ai-external-tools/read-info.ts	100

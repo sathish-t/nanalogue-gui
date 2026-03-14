@@ -98,7 +98,7 @@ You have access to Python builtins (len, range, sorted, sum, min, max etc.) and 
 external functions listed below. No classes, no stdlib, no third-party libraries.
 No imports of any kind are available.
 External functions (peek, read_info,
-bam_mods, window_reads, seq_table, ls, read_file, write_file, bash, continue_thinking) call
+bam_mods, window_reads, seq_table, ls, read_file, write_file, bash, minimap2, continue_thinking) call
 into the host application. You do not have Python classes.
 You do not have network access, and have read/write file access only to a specified folder
 and its subfolders.
@@ -265,14 +265,79 @@ Returns a dict:
 find, tr, paste, jq, and standard bash builtins (echo, printf, pipes,
 redirects, variables, loops, etc.).
 
-**Not available:** samtools, bedtools, minimap2, bwa, bgzip, tabix,
+**Not available:** samtools, bedtools, bwa, bgzip, tabix,
 python, R, perl, or any other bioinformatics or language runtimes. Use
-external functions provided in the prompt for BAM/CRAM data.
+external functions provided in the prompt for BAM/CRAM data. Use
+minimap2() (listed below) for sequence alignment.
 
 **Output warning:** stdout and stderr are each capped at ${maxOutputKB} KB.
 Dumping raw file contents (cat, unfiltered awk, unfiltered find) will
 flood your context window. Prefer targeted commands (wc -l, head, grep)
 and compute summaries rather than returning raw data.
+
+### minimap2(reference_path: str, query_path: str, preset: str = None) -> dict
+
+- reference_path: path to the reference FASTA/FASTQ file, relative to the allowed directory.
+- query_path: path to the query FASTA/FASTQ file, relative to the allowed directory.
+- preset: optional minimap2 preset string. Valid values: map-pb, map-ont, map-hifi,
+  map-ccs, ava-pb, ava-ont, asm5, asm10, asm20, splice, splice:hq, sr.
+  Omit to use minimap2's built-in defaults.
+- Returns a dict with two keys:
+  - paf: the full PAF output as a string (one alignment per line, tab-separated).
+    Empty string if no sequences were placed (all unmapped).
+  - stderr: minimap2 progress and log messages (useful for diagnosing mapping issues).
+
+PAF column layout (0-based index):
+
+| Index | Field | Description |
+|-------|-------|-------------|
+| 0 | query name | Query sequence name |
+| 1 | query length | Query sequence length |
+| 2 | query start | Alignment start on query (0-based) |
+| 3 | query end | Alignment end on query |
+| 4 | strand | + (forward) or - (reverse complement) |
+| 5 | target name | Target (reference) sequence name |
+| 6 | target length | Target sequence length |
+| 7 | target start | Alignment start on target (0-based) |
+| 8 | target end | Alignment end on target |
+| 9 | matches | Number of matching bases |
+| 10 | block length | Total alignment block length |
+| 11 | mapq | Mapping quality (0-255; 255 = missing) |
+| 12+ | tags | Optional SAM-style tags (tp:, cm:, s1:, etc.) |
+
+Alignment is the process of making best-guess
+placements for where each query sequence belongs on a reference genome.
+Alignment may succeed and produce one or more placements, or it
+may fail and leave the sequence unmapped. Unmapped sequences produce no PAF
+output lines — PAF only contains records for sequences that were placed.
+
+**FASTA format:** Both input files must be in FASTA (or FASTQ) format.
+FASTA is a plain-text format where each sequence is preceded by a header
+line starting with ">", for example (this is text, not code):
+
+\`\`\`
+>my_sequence
+ATCGATCGATCG
+\`\`\`
+
+If the user supplies a raw sequence string rather than a file, use
+write_file() to save it as FASTA first, then pass that path to minimap2().
+
+Sample code to align and process the resulting PAF information below:
+
+\`\`\`python
+result = minimap2("contigs.fa", "reads.fa", preset="map-ont")
+# result == {"paf": "...", "stderr": "..."}
+
+# Parse PAF lines
+for line in result["paf"].splitlines():
+    if not line:
+        continue
+    cols = line.split("\\t")
+    query_name, query_len, query_start, query_end = cols[0], int(cols[1]), int(cols[2]), int(cols[3])
+    strand, target_name = cols[4], cols[5]
+    target_start, target_end, mapq = int(cols[7]), int(cols[8]), int(cols[11])
+\`\`\`
 
 ### peek(bam_path: str) -> dict
 

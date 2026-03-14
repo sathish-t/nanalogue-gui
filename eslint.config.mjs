@@ -6,6 +6,11 @@ import tseslint from "typescript-eslint";
 import jsdoc from "eslint-plugin-jsdoc";
 
 export default tseslint.config(
+    // Exclude vendor/generated files from all linting.
+    // minimap2-wasm/ contains the pre-built biowasm Emscripten bundle which
+    // is not authored here and does not follow this project's style rules.
+    { ignores: ["src/**/minimap2-wasm/**"] },
+
     eslint.configs.recommended,
     ...tseslint.configs.recommended,
     jsdoc.configs["flat/recommended-typescript-error"],

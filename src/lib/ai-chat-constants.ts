@@ -92,6 +92,27 @@ export const /** Best-effort glob patterns (relative to allowedDir) for files re
             "**/*.gpg", // GPG-encrypted data
         ] as const;
 
+// --- minimap2 tool constants ---
+
+export const /** Hard cap on minimap2 input file size in bytes (20 MB). Not user-configurable. */ MINIMAP2_MAX_INPUT_BYTES =
+        20 * 1024 * 1024;
+
+export const /** Exhaustive list of valid minimap2 preset names, sourced from minimap2 --help. */ MINIMAP2_PRESETS =
+        [
+            "map-pb",
+            "map-ont",
+            "map-hifi",
+            "map-ccs",
+            "ava-pb",
+            "ava-ont",
+            "asm5",
+            "asm10",
+            "asm20",
+            "splice",
+            "splice:hq",
+            "sr",
+        ] as const;
+
 // --- External function registry ---
 
 export const /** All external function names registered with Monty. */ EXTERNAL_FUNCTIONS =
@@ -105,5 +126,6 @@ export const /** All external function names registered with Monty. */ EXTERNAL_
             "read_file",
             "write_file",
             "bash",
+            "minimap2",
             "continue_thinking",
         ] as const;

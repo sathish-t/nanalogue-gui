@@ -24,11 +24,18 @@ const EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
  */
 const EMPTY_JSDOC = /\/\*\*[\s*]*\*\//g;
 
+/**
+ * Directory names that are excluded from scanning.
+ * node_modules is third-party code; minimap2-wasm is the pre-built biowasm
+ * Emscripten bundle which is not authored here.
+ */
+const SKIP_DIRS = new Set(["node_modules", "minimap2-wasm"]);
+
 /** Recursively collect all files with a relevant extension under a directory. */
 function collectFiles(dir) {
     const results = [];
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        if (entry.name === "node_modules") continue;
+        if (SKIP_DIRS.has(entry.name)) continue;
         const full = join(dir, entry.name);
         if (entry.isDirectory()) {
             results.push(...collectFiles(full));
