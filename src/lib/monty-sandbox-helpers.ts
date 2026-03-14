@@ -141,6 +141,12 @@ export async function resolvePath(
     allowedDir: string,
     filePath: string,
 ): Promise<string> {
+    if (filePath.includes("://")) {
+        throw new SandboxError(
+            "ValueError",
+            `Path "${filePath}" looks like a URL — only local file paths are permitted`,
+        );
+    }
     const errorMessage = `Path "${filePath}" is outside the allowed directory`;
     const resolved = resolve(allowedDir, filePath);
     assertInside(allowedDir, resolved, errorMessage);

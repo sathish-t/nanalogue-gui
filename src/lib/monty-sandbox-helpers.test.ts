@@ -69,6 +69,33 @@ describe("resolvePath", () => {
             /outside the allowed directory/,
         );
     });
+
+    it("rejects http:// URL", async () => {
+        await expect(
+            resolvePath(tmpDir, "http://evil.com/ref.fa"),
+        ).rejects.toMatchObject({
+            name: "ValueError",
+            message: expect.stringContaining("looks like a URL"),
+        });
+    });
+
+    it("rejects https:// URL", async () => {
+        await expect(
+            resolvePath(tmpDir, "https://evil.com/ref.fa"),
+        ).rejects.toMatchObject({
+            name: "ValueError",
+            message: expect.stringContaining("looks like a URL"),
+        });
+    });
+
+    it("rejects file:// URL", async () => {
+        await expect(
+            resolvePath(tmpDir, "file:///etc/passwd"),
+        ).rejects.toMatchObject({
+            name: "ValueError",
+            message: expect.stringContaining("looks like a URL"),
+        });
+    });
 });
 
 describe("toReadOptions", () => {
