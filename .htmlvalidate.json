@@ -1,10 +1,10 @@
 {
-    "extends": [
-        "html-validate:recommended",
-        "html-validate:document"
-    ],
+    "extends": ["html-validate:recommended", "html-validate:document"],
     "rules": {
-        "attr-case": ["error", { "style": "lowercase", "ignoreForeign": false }],
+        "attr-case": [
+            "error",
+            { "style": "lowercase", "ignoreForeign": false }
+        ],
         "attr-delimiter": "error",
         "attr-quotes": ["error", { "style": "double", "unquoted": false }],
         "attr-spacing": "error",
@@ -34,10 +34,13 @@
         "empty-heading": "error",
         "empty-title": "error",
         "form-dup-name": "error",
-        "heading-level": ["error", {
-            "allowMultipleH1": false,
-            "minInitialRank": "h1"
-        }],
+        "heading-level": [
+            "error",
+            {
+                "allowMultipleH1": false,
+                "minInitialRank": "h1"
+            }
+        ],
         "hidden-focusable": "error",
         "id-pattern": ["error", { "pattern": "kebabcase" }],
         "input-attributes": "error",
@@ -68,7 +71,17 @@
         "no-self-closing": ["error", { "ignoreForeign": false }],
         "no-style-tag": ["error", { "allowTemplate": false }],
         "no-trailing-whitespace": "error",
-        "no-unknown-elements": ["error", { "exclude": ["bam-resource-input", "mod-filter-input", "output-file-input", "window-size-input"] }],
+        "no-unknown-elements": [
+            "error",
+            {
+                "exclude": [
+                    "bam-resource-input",
+                    "mod-filter-input",
+                    "output-file-input",
+                    "window-size-input"
+                ]
+            }
+        ],
         "no-unused-disable": "error",
         "no-utf8-bom": "error",
         "prefer-button": "error",

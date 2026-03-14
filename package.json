@@ -1,105 +1,106 @@
 {
-  "name": "@nanalogue/gui",
-  "version": "0.2.6",
-  "description": "GUI tools for nanopore data analysis",
-  "main": "dist/main.js",
-  "bin": {
-    "nanalogue-chat": "./dist/cli.mjs",
-    "nanalogue-sandbox-exec": "./dist/execute-cli.mjs"
-  },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "npm run build:main && npm run build:renderer && npm run build:cli && npm run build:execute-cli && npm run copy-assets",
-    "build:cli": "esbuild src/cli.ts --bundle --outfile=dist/cli.mjs --format=esm --platform=node --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd --banner:js='#!/usr/bin/env node'",
-    "build:execute-cli": "esbuild src/execute-cli.ts --bundle --outfile=dist/execute-cli.mjs --format=esm --platform=node --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd --banner:js='#!/usr/bin/env node'",
-    "build:main": "esbuild src/main.ts src/preload.ts src/exit-watchdog.ts --bundle --platform=node --format=cjs --outdir=dist --external:electron --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd",
-    "build:renderer": "npm run build:landing && npm run build:swipe && npm run build:qc && npm run build:locate && npm run build:ai-chat",
-    "build:landing": "esbuild src/renderer/landing/landing.ts --bundle --outfile=dist/renderer/landing/landing.js --format=iife --platform=browser",
-    "build:swipe": "esbuild src/renderer/swipe/swipe.ts src/renderer/swipe/swipe-config.ts --bundle --outdir=dist/renderer/swipe --format=iife --platform=browser",
-    "build:qc": "esbuild src/renderer/qc/qc-config.ts src/renderer/qc/qc-results.ts --bundle --outdir=dist/renderer/qc --format=iife --platform=browser",
-    "build:locate": "esbuild src/renderer/locate/locate-config.ts --bundle --outdir=dist/renderer/locate --format=iife --platform=browser",
-    "build:ai-chat": "esbuild src/renderer/ai-chat/ai-chat.ts --bundle --outdir=dist/renderer/ai-chat --format=iife --platform=browser",
-    "copy-assets": "npm run copy:shared && npm run copy:landing && npm run copy:swipe && npm run copy:qc && npm run copy:locate && npm run copy:ai-chat && npm run copy:minimap2",
-    "copy:minimap2": "mkdir -p dist/minimap2-wasm && cp src/lib/ai-external-tools/minimap2-wasm/minimap2.js src/lib/ai-external-tools/minimap2-wasm/minimap2.wasm src/lib/ai-external-tools/minimap2-wasm/minimap2.data dist/minimap2-wasm/",
-    "copy:shared": "mkdir -p dist/renderer/shared && cp src/renderer/shared/styles.css node_modules/chart.js/dist/chart.umd.js node_modules/chartjs-plugin-annotation/dist/chartjs-plugin-annotation.min.js dist/renderer/shared/",
-    "copy:landing": "mkdir -p dist/renderer/landing && cp src/renderer/landing/landing.html src/renderer/landing/landing.css dist/renderer/landing/",
-    "copy:swipe": "mkdir -p dist/renderer/swipe && cp src/renderer/swipe/swipe.html src/renderer/swipe/swipe-config.html src/renderer/swipe/swipe-config.css dist/renderer/swipe/",
-    "copy:qc": "mkdir -p dist/renderer/qc && cp src/renderer/qc/*.html src/renderer/qc/*.css dist/renderer/qc/ 2>/dev/null || true",
-    "copy:locate": "mkdir -p dist/renderer/locate && cp src/renderer/locate/*.html src/renderer/locate/*.css dist/renderer/locate/ 2>/dev/null || true",
-    "copy:ai-chat": "mkdir -p dist/renderer/ai-chat && cp src/renderer/ai-chat/*.html src/renderer/ai-chat/*.css dist/renderer/ai-chat/ 2>/dev/null || true",
-    "start": "npm run build && electron dist/main.js",
-    "dev": "npm run build && electron dist/main.js",
-    "lint": "biome check src/ scripts/ demo/ && eslint src/ && stylelint \"src/**/*.css\" && html-validate \"src/**/*.html\" && node scripts/check-empty-jsdoc.mjs",
-    "lint:fix": "biome check --write src/ scripts/ demo/ && eslint --fix src/ && stylelint --fix \"src/**/*.css\"",
-    "lint:docs": "eslint src/",
-    "lint:css": "stylelint \"src/**/*.css\"",
-    "lint:css:fix": "stylelint --fix \"src/**/*.css\"",
-    "lint:html": "html-validate \"src/**/*.html\"",
-    "dist": "electron-builder",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "prepare": "git config core.hooksPath .githooks || true"
-  },
-  "dependencies": {
-    "@nanalogue/node": "^0.1.4",
-    "@pydantic/monty": "^0.0.8",
-    "chart.js": "^4.4.0",
-    "chartjs-plugin-annotation": "^3.1.0",
-    "highlight.js": "^11.11.1",
-    "just-bash": "^2.13.0",
-    "marked": "^17.0.4",
-    "picomatch": "^4.0.3"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.4.6",
-    "@electron/windows-sign": "^2.0.2",
-    "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.58.2",
-    "@stylistic/stylelint-plugin": "^5.0.1",
-    "@types/node": "^22.0.0",
-    "@types/picomatch": "^4.0.2",
-    "@vitest/coverage-v8": "^4.1.0",
-    "electron": "^41.0.2",
-    "electron-builder": "^26.8.1",
-    "esbuild": "^0.27.4",
-    "eslint": "^10.0.3",
-    "eslint-plugin-jsdoc": "^62.8.0",
-    "html-validate": "^10.11.1",
-    "jsdom": "^28.0.0",
-    "playwright": "^1.58.2",
-    "seedrandom": "^3.0.5",
-    "stylelint": "^17.4.0",
-    "stylelint-config-standard": "^40.0.0",
-    "stylelint-order": "^7.0.1",
-    "typescript": "^5.4.0",
-    "typescript-eslint": "^8.57.0",
-    "vitest": "^4.0.18"
-  },
-  "engines": {
-    "node": "^22.13.0 || >=24"
-  },
-  "author": "Sathish Thiyagarajan",
-  "license": "MIT",
-  "build": {
-    "appId": "com.nanalogue.gui",
-    "productName": "nanalogue-gui",
-    "directories": {
-      "output": "out"
+    "name": "@nanalogue/gui",
+    "version": "0.2.6",
+    "description": "GUI tools for nanopore data analysis",
+    "main": "dist/main.js",
+    "bin": {
+        "nanalogue-chat": "./dist/cli.mjs",
+        "nanalogue-sandbox-exec": "./dist/execute-cli.mjs"
     },
     "files": [
-      "dist/**/*",
-      "node_modules/**/*",
-      "package.json"
+        "dist"
     ],
-    "mac": {
-      "target": "dmg",
-      "category": "public.app-category.education"
+    "scripts": {
+        "build": "npm run build:main && npm run build:renderer && npm run build:cli && npm run build:execute-cli && npm run copy-assets",
+        "build:cli": "esbuild src/cli.ts --bundle --outfile=dist/cli.mjs --format=esm --platform=node --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd --banner:js='#!/usr/bin/env node'",
+        "build:execute-cli": "esbuild src/execute-cli.ts --bundle --outfile=dist/execute-cli.mjs --format=esm --platform=node --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd --banner:js='#!/usr/bin/env node'",
+        "build:main": "esbuild src/main.ts src/preload.ts src/exit-watchdog.ts --bundle --platform=node --format=cjs --outdir=dist --external:electron --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd",
+        "build:renderer": "npm run build:landing && npm run build:swipe && npm run build:qc && npm run build:locate && npm run build:ai-chat",
+        "build:landing": "esbuild src/renderer/landing/landing.ts --bundle --outfile=dist/renderer/landing/landing.js --format=iife --platform=browser",
+        "build:swipe": "esbuild src/renderer/swipe/swipe.ts src/renderer/swipe/swipe-config.ts --bundle --outdir=dist/renderer/swipe --format=iife --platform=browser",
+        "build:qc": "esbuild src/renderer/qc/qc-config.ts src/renderer/qc/qc-results.ts --bundle --outdir=dist/renderer/qc --format=iife --platform=browser",
+        "build:locate": "esbuild src/renderer/locate/locate-config.ts --bundle --outdir=dist/renderer/locate --format=iife --platform=browser",
+        "build:ai-chat": "esbuild src/renderer/ai-chat/ai-chat.ts --bundle --outdir=dist/renderer/ai-chat --format=iife --platform=browser",
+        "copy-assets": "npm run copy:shared && npm run copy:landing && npm run copy:swipe && npm run copy:qc && npm run copy:locate && npm run copy:ai-chat && npm run copy:minimap2",
+        "copy:minimap2": "mkdir -p dist/minimap2-wasm && cp src/lib/ai-external-tools/minimap2-wasm/minimap2.js src/lib/ai-external-tools/minimap2-wasm/minimap2.wasm src/lib/ai-external-tools/minimap2-wasm/minimap2.data dist/minimap2-wasm/",
+        "copy:shared": "mkdir -p dist/renderer/shared && cp src/renderer/shared/styles.css node_modules/chart.js/dist/chart.umd.js node_modules/chartjs-plugin-annotation/dist/chartjs-plugin-annotation.min.js dist/renderer/shared/",
+        "copy:landing": "mkdir -p dist/renderer/landing && cp src/renderer/landing/landing.html src/renderer/landing/landing.css dist/renderer/landing/",
+        "copy:swipe": "mkdir -p dist/renderer/swipe && cp src/renderer/swipe/swipe.html src/renderer/swipe/swipe-config.html src/renderer/swipe/swipe-config.css dist/renderer/swipe/",
+        "copy:qc": "mkdir -p dist/renderer/qc && cp src/renderer/qc/*.html src/renderer/qc/*.css dist/renderer/qc/ 2>/dev/null || true",
+        "copy:locate": "mkdir -p dist/renderer/locate && cp src/renderer/locate/*.html src/renderer/locate/*.css dist/renderer/locate/ 2>/dev/null || true",
+        "copy:ai-chat": "mkdir -p dist/renderer/ai-chat && cp src/renderer/ai-chat/*.html src/renderer/ai-chat/*.css dist/renderer/ai-chat/ 2>/dev/null || true",
+        "start": "npm run build && electron dist/main.js",
+        "dev": "npm run build && electron dist/main.js",
+        "lint": "biome check src/ scripts/ demo/ && eslint src/ && stylelint \"src/**/*.css\" && html-validate \"src/**/*.html\" && node scripts/check-empty-jsdoc.mjs",
+        "lint:fix": "biome check --write src/ scripts/ demo/ && eslint --fix src/ && stylelint --fix \"src/**/*.css\"",
+        "lint:docs": "eslint src/",
+        "lint:css": "stylelint \"src/**/*.css\"",
+        "lint:css:fix": "stylelint --fix \"src/**/*.css\"",
+        "lint:html": "html-validate \"src/**/*.html\"",
+        "dist": "electron-builder",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "prepare": "git config core.hooksPath .githooks || true"
     },
-    "linux": {
-      "target": "AppImage",
-      "category": "Science"
+    "dependencies": {
+        "@nanalogue/node": "^0.1.4",
+        "@pydantic/monty": "^0.0.8",
+        "chart.js": "^4.4.0",
+        "chartjs-plugin-annotation": "^3.1.0",
+        "highlight.js": "^11.11.1",
+        "just-bash": "^2.13.0",
+        "marked": "^17.0.4",
+        "picomatch": "^4.0.3"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.4.6",
+        "@electron/windows-sign": "^2.0.2",
+        "@eslint/compat": "^2.0.3",
+        "@eslint/js": "^10.0.1",
+        "@playwright/test": "^1.58.2",
+        "@stylistic/stylelint-plugin": "^5.0.1",
+        "@types/node": "^22.0.0",
+        "@types/picomatch": "^4.0.2",
+        "@vitest/coverage-v8": "^4.1.0",
+        "electron": "^41.0.2",
+        "electron-builder": "^26.8.1",
+        "esbuild": "^0.27.4",
+        "eslint": "^10.0.3",
+        "eslint-plugin-jsdoc": "^62.8.0",
+        "html-validate": "^10.11.1",
+        "jsdom": "^28.0.0",
+        "playwright": "^1.58.2",
+        "seedrandom": "^3.0.5",
+        "stylelint": "^17.4.0",
+        "stylelint-config-standard": "^40.0.0",
+        "stylelint-order": "^7.0.1",
+        "typescript": "^5.4.0",
+        "typescript-eslint": "^8.57.0",
+        "vitest": "^4.0.18"
+    },
+    "engines": {
+        "node": "^22.13.0 || >=24"
+    },
+    "author": "Sathish Thiyagarajan",
+    "license": "MIT",
+    "build": {
+        "appId": "com.nanalogue.gui",
+        "productName": "nanalogue-gui",
+        "directories": {
+            "output": "out"
+        },
+        "files": [
+            "dist/**/*",
+            "node_modules/**/*",
+            "package.json"
+        ],
+        "mac": {
+            "target": "dmg",
+            "category": "public.app-category.education"
+        },
+        "linux": {
+            "target": "AppImage",
+            "category": "Science"
+        }
     }
-  }
 }

@@ -1,11 +1,19 @@
 // ESLint flat config enforcing strict JSDoc documentation on all TypeScript code.
 // Mirrors the missing_docs = "deny" and missing_docs_in_private_items = "deny" from Rust/Clippy.
 
+import { includeIgnoreFile } from "@eslint/compat";
 import eslint from "@eslint/js";
-import tseslint from "typescript-eslint";
 import jsdoc from "eslint-plugin-jsdoc";
+import { resolve } from "node:path";
+import tseslint from "typescript-eslint";
+
+// Resolve .gitignore relative to this config file so ESLint respects the same
+// exclusions as git (dist/, coverage/, node_modules/, etc.) automatically.
+const gitignorePath = resolve(import.meta.dirname, ".gitignore");
 
 export default tseslint.config(
+    // Honour .gitignore: dist/, coverage/, node_modules/ etc. are excluded.
+    includeIgnoreFile(gitignorePath),
     // Exclude vendor/generated files from all linting.
     // minimap2-wasm/ contains the pre-built biowasm Emscripten bundle which
     // is not authored here and does not follow this project's style rules.
@@ -71,18 +79,66 @@ export default tseslint.config(
                         },
                     ],
                     paths: [
-                        { name: "fs", message: "renderer/ must not use Node.js built-ins." },
-                        { name: "path", message: "renderer/ must not use Node.js built-ins." },
-                        { name: "os", message: "renderer/ must not use Node.js built-ins." },
-                        { name: "crypto", message: "renderer/ must not use Node.js built-ins." },
-                        { name: "child_process", message: "renderer/ must not use Node.js built-ins." },
-                        { name: "readline", message: "renderer/ must not use Node.js built-ins." },
-                        { name: "util", message: "renderer/ must not use Node.js built-ins." },
-                        { name: "http", message: "renderer/ must not use Node.js built-ins." },
-                        { name: "https", message: "renderer/ must not use Node.js built-ins." },
-                        { name: "stream", message: "renderer/ must not use Node.js built-ins." },
-                        { name: "buffer", message: "renderer/ must not use Node.js built-ins." },
-                        { name: "events", message: "renderer/ must not use Node.js built-ins." },
+                        {
+                            name: "fs",
+                            message:
+                                "renderer/ must not use Node.js built-ins.",
+                        },
+                        {
+                            name: "path",
+                            message:
+                                "renderer/ must not use Node.js built-ins.",
+                        },
+                        {
+                            name: "os",
+                            message:
+                                "renderer/ must not use Node.js built-ins.",
+                        },
+                        {
+                            name: "crypto",
+                            message:
+                                "renderer/ must not use Node.js built-ins.",
+                        },
+                        {
+                            name: "child_process",
+                            message:
+                                "renderer/ must not use Node.js built-ins.",
+                        },
+                        {
+                            name: "readline",
+                            message:
+                                "renderer/ must not use Node.js built-ins.",
+                        },
+                        {
+                            name: "util",
+                            message:
+                                "renderer/ must not use Node.js built-ins.",
+                        },
+                        {
+                            name: "http",
+                            message:
+                                "renderer/ must not use Node.js built-ins.",
+                        },
+                        {
+                            name: "https",
+                            message:
+                                "renderer/ must not use Node.js built-ins.",
+                        },
+                        {
+                            name: "stream",
+                            message:
+                                "renderer/ must not use Node.js built-ins.",
+                        },
+                        {
+                            name: "buffer",
+                            message:
+                                "renderer/ must not use Node.js built-ins.",
+                        },
+                        {
+                            name: "events",
+                            message:
+                                "renderer/ must not use Node.js built-ins.",
+                        },
                     ],
                 },
             ],
@@ -136,27 +192,30 @@ export default tseslint.config(
             // --- Documentation presence (equivalent to missing_docs = "deny") ---
 
             // Require JSDoc on all declarations: functions, classes, methods, arrows, etc.
-            "jsdoc/require-jsdoc": ["error", {
-                require: {
-                    FunctionDeclaration: true,
-                    MethodDefinition: true,
-                    ClassDeclaration: true,
-                    ArrowFunctionExpression: true,
-                    FunctionExpression: true,
+            "jsdoc/require-jsdoc": [
+                "error",
+                {
+                    require: {
+                        FunctionDeclaration: true,
+                        MethodDefinition: true,
+                        ClassDeclaration: true,
+                        ArrowFunctionExpression: true,
+                        FunctionExpression: true,
+                    },
+                    contexts: [
+                        "TSInterfaceDeclaration",
+                        "TSTypeAliasDeclaration",
+                        "TSEnumDeclaration",
+                        "TSEnumMember",
+                        "TSPropertySignature",
+                        "PropertyDefinition",
+                        "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator",
+                    ],
+                    checkConstructors: true,
+                    checkGetters: true,
+                    checkSetters: true,
                 },
-                contexts: [
-                    "TSInterfaceDeclaration",
-                    "TSTypeAliasDeclaration",
-                    "TSEnumDeclaration",
-                    "TSEnumMember",
-                    "TSPropertySignature",
-                    "PropertyDefinition",
-                    "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator",
-                ],
-                checkConstructors: true,
-                checkGetters: true,
-                checkSetters: true,
-            }],
+            ],
 
             // --- Documentation quality ---
 

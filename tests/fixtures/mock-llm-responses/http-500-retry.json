@@ -1,17 +1,22 @@
 {
     "mockResponses": [
-        {"_statusCode": 500, "choices": []},
+        { "_statusCode": 500, "choices": [] },
         {
-            "choices": [{
-                "message": {"role": "assistant", "content": "print('ok')"},
-                "finish_reason": "stop"
-            }]
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "print('ok')"
+                    },
+                    "finish_reason": "stop"
+                }
+            ]
         }
     ],
     "expected": {
         "text": "ok\n",
         "stepCount": 1,
-        "steps": [{"success": true}],
+        "steps": [{ "success": true }],
         "minRequestCount": 2
     }
 }

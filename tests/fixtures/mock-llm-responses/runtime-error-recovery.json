@@ -1,21 +1,31 @@
 {
     "mockResponses": [
         {
-            "choices": [{
-                "message": {"role": "assistant", "content": "x = undefined_var"},
-                "finish_reason": "stop"
-            }]
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "x = undefined_var"
+                    },
+                    "finish_reason": "stop"
+                }
+            ]
         },
         {
-            "choices": [{
-                "message": {"role": "assistant", "content": "print('recovered')"},
-                "finish_reason": "stop"
-            }]
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "print('recovered')"
+                    },
+                    "finish_reason": "stop"
+                }
+            ]
         }
     ],
     "expected": {
         "text": "recovered\n",
         "stepCount": 2,
-        "steps": [{"success": false}, {"success": true}]
+        "steps": [{ "success": false }, { "success": true }]
     }
 }

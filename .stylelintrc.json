@@ -1,9 +1,6 @@
 {
     "extends": ["stylelint-config-standard"],
-    "plugins": [
-        "stylelint-order",
-        "@stylistic/stylelint-plugin"
-    ],
+    "plugins": ["stylelint-order", "@stylistic/stylelint-plugin"],
     "rules": {
         "alpha-value-notation": "percentage",
         "annotation-no-unknown": true,
@@ -12,7 +9,10 @@
         "at-rule-empty-line-before": [
             "always",
             {
-                "except": ["blockless-after-same-name-blockless", "first-nested"],
+                "except": [
+                    "blockless-after-same-name-blockless",
+                    "first-nested"
+                ],
                 "ignore": ["after-comment"]
             }
         ],
@@ -38,7 +38,12 @@
         "comment-no-empty": true,
         "comment-pattern": "^([A-Z]|stylelint-)",
         "comment-whitespace-inside": "always",
-        "comment-word-disallowed-list": ["/^TODO/i", "/^FIXME/i", "/^HACK/i", "/^XXX/i"],
+        "comment-word-disallowed-list": [
+            "/^TODO/i",
+            "/^FIXME/i",
+            "/^HACK/i",
+            "/^XXX/i"
+        ],
         "container-name-pattern": "^[a-z][a-z0-9-]*$",
         "custom-media-pattern": "^[a-z][a-z0-9-]*$",
         "custom-property-empty-line-before": [

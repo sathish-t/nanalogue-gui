@@ -1,10 +1,12 @@
 {
     "mockResponses": [
         {
-            "choices": [{
-                "message": {"role": "assistant", "content": null},
-                "finish_reason": "stop"
-            }]
+            "choices": [
+                {
+                    "message": { "role": "assistant", "content": null },
+                    "finish_reason": "stop"
+                }
+            ]
         }
     ],
     "expected": {
