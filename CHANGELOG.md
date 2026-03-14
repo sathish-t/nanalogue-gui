@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `minimap2(reference_path, query_path, preset=None)` external tool in the AI Chat sandbox: runs sequence alignment via a biowasm WebAssembly build of minimap2 v2.22, entirely in-process with no native binary; always returns PAF format; preset validated against a 12-entry allowlist; both inputs checked against `allowedDir` and the sensitive-file deny list; 20 MB hard cap per file; sandbox prompt documents alignment concepts, PAF columns, FASTA format, and the `write_file()` pattern for bare sequence strings ([`0873a1e`](https://github.com/sathish-t/nanalogue-gui/commit/0873a1e718471416748af0355987af3efb65d19c))
+
+### Fixed
+
+- `resolvePath()` now explicitly rejects URL-like strings (`://`) with a clear `ValueError` before attempting path resolution; previously they were silently treated as relative paths and failed with an opaque ENOENT ([`d6a8354`](https://github.com/sathish-t/nanalogue-gui/commit/d6a8354c6e854347c165f7aad81ac1b13ea97dad))
+
+### Infrastructure
+
+- Biome and ESLint now read `.gitignore` directly (`vcs.useIgnoreFile` and `@eslint/compat` `includeIgnoreFile`) so gitignored directories such as `dist/` and `coverage/` are excluded automatically without manual entries in lint configs ([`52475cc`](https://github.com/sathish-t/nanalogue-gui/commit/52475cc0e6ff2c075899f153cf8114be7665877e))
+
 ## [0.2.6] - 2026-03-13
 
 ### Added
