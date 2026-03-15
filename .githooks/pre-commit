@@ -7,6 +7,23 @@ if [ ! -L AGENTS.md ] || [ "$(readlink AGENTS.md)" != "CLAUDE.md" ]; then
   exit 1
 fi
 
+# Ensure brainstorming/ is covered by .gitignore so local notes never reach
+# GitHub. Tests with a sentinel path rather than grepping for a literal string,
+# so the check holds regardless of the exact pattern used in .gitignore.
+if ! git check-ignore -q brainstorming/sentinel 2>/dev/null; then
+  echo "pre-commit: brainstorming/ is not covered by .gitignore" >&2
+  echo "  Add 'brainstorming*' (or equivalent) to .gitignore." >&2
+  exit 1
+fi
+
+# Belt-and-suspenders: block any file under brainstorming/ that has been
+# staged despite the .gitignore entry (e.g. via git add --force).
+if git diff --cached --name-only | grep -q '^brainstorming/'; then
+  echo "pre-commit: staged files found under brainstorming/ — this directory must stay local" >&2
+  git diff --cached --name-only | grep '^brainstorming/' | sed 's/^/  /' >&2
+  exit 1
+fi
+
 # Keeps package-lock.json in sync with package.json so that
 # npm ci in CI does not fail on optional-dependency mismatches.
 
