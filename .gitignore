@@ -72,6 +72,8 @@ Desktop.ini
 # ===================
 # Sandbox temp files created by bash() inside the allowed directory
 ai_chat_temp_files/
+# SVG/file outputs written by plot_histogram and other sandbox tools
+ai_chat_output/
 # Claude AI assistant files
 .claude/
 docs/
