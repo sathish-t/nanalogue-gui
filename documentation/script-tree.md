@@ -38,6 +38,7 @@ src/
     swipe-data-loader.ts             # Swipe data loader using nanalogue-node
     system-append.ts                 # Loads the optional SYSTEM_APPEND.md file from an analysis directory.
     types.ts                         # Type definitions shared across nanalogue-gui modes
+    xy-renderer.ts                   # XY series SVG renderer backed by Vega-Lite.
     ai-external-tools/
       bam-mods.ts           # External tool: bam_mods
       bash.ts               # External tool: bash
@@ -47,6 +48,7 @@ src/
       minimap2.ts           # External tool: minimap2
       peek.ts               # External tool: peek
       plot-histogram.ts     # External tool: plot_histogram
+      plot-series.ts        # External tool: plot_series
       read-file.ts          # External tool: read_file
       read-info.ts          # External tool: read_info
       seq-table.ts          # External tool: seq_table

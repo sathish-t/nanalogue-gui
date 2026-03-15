@@ -126,6 +126,7 @@ export const /** All external function names registered with Monty. */ EXTERNAL_
             "read_file",
             "write_file",
             "plot_histogram",
+            "plot_series",
             "bash",
             "minimap2",
             "continue_thinking",

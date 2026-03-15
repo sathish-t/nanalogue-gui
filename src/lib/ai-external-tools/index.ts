@@ -9,6 +9,7 @@ export { makeLs } from "./ls";
 export { makeRunMinimap2 } from "./minimap2";
 export { makePeek } from "./peek";
 export { makePlotHistogram } from "./plot-histogram";
+export { makePlotSeries } from "./plot-series";
 export { makeReadFile } from "./read-file";
 export { makeReadInfo } from "./read-info";
 export { makeSeqTable } from "./seq-table";

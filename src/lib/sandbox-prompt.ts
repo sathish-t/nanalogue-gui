@@ -102,7 +102,7 @@ You have access to Python builtins (len, range, sorted, sum, min, max etc.) and 
 external functions listed below. No classes, no stdlib, no third-party libraries.
 No imports of any kind are available.
 External functions (peek, read_info,
-bam_mods, window_reads, seq_table, ls, read_file, write_file, plot_histogram, bash, minimap2, continue_thinking) call
+bam_mods, window_reads, seq_table, ls, read_file, write_file, plot_histogram, plot_series, bash, minimap2, continue_thinking) call
 into the host application. You do not have Python classes.
 You do not have network access, and have read/write file access only to a specified folder
 and its subfolders.
@@ -269,6 +269,37 @@ result = plot_histogram(bins, output_path="lengths.svg",
   bin_start/bin_end/count dicts before calling this function.
 - Non-uniform bin widths are supported.
 
+### plot_series(points, **kwargs) -> dict
+
+Renders x/y point data as a line or scatter SVG file.
+
+\`\`\`python
+points = [{"x": 1, "y": 10}, {"x": 2, "y": 20}, {"x": 3, "y": 15}]
+result = plot_series(points, kind="line", output_path="trend.svg",
+                     xlabel="Read index", ylabel="Length (bp)",
+                     title="Read length trend")
+# result == {"path": "trend.svg", "points_plotted": 3, "note": "..."}
+\`\`\`
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| points | list[dict] | required | Each dict must have \`x\` and \`y\` keys, both finite numbers |
+| kind | str | "line" | \`"line"\` for a connected line plot, \`"scatter"\` for individual points |
+| output_path | str or None | auto | Relative path for the SVG file; must end in .svg. Omit or pass None for an auto-generated name in ${AI_CHAT_OUTPUT_DIR}/ |
+| xlabel | str | "x" | X-axis label |
+| ylabel | str | "y" | Y-axis label |
+| title | str or None | None | Optional chart title |
+| xlim | [float, float] | None | X-axis limits [min, max] |
+| ylim | [float, float] | None | Y-axis limits [min, max] |
+
+- Output is an SVG file. SVG files **cannot** be read back with read_file() —
+  they are write-only visual output. Report the returned path to the user
+  so they can open it in a browser or image viewer.
+- Both \`x\` and \`y\` must be finite numbers. Strings and categorical values
+  are not supported.
+- Single series only. For multiple series, call plot_series() once per series
+  with different output paths.
+
 ### bash(command: str) -> dict
 
 Runs a shell command in an in-process bash interpreter. Shell state
@@ -424,6 +455,10 @@ Returns a list of dicts, one per BAM record:
   mods were detected: 5 methylations 'm' of cytosines 'C' on the basecalled strand '+',
   and 40 '7200' mods of thymidines 'T' on the opposite strand (the 7200 is probably
   just for an example, it is unlikely there is an actual mod corresponding to this ChEBI code).
+- alignment_type can be one of primary_forward,primary_reverse,secondary_forward,secondary_reverse,
+  supplementary_forward,supplementary_reverse,unmapped.
+- if alignment_type is unmapped, then fields like contig, reference_start, reference_end,
+  alignment_length do not exist.
 
 ### bam_mods(bam_path: str, **kwargs) -> list[dict]
 

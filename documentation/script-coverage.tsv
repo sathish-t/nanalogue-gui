@@ -10,6 +10,7 @@ src/lib/ai-external-tools/ls.ts	100
 src/lib/ai-external-tools/minimap2.ts	100
 src/lib/ai-external-tools/peek.ts	100
 src/lib/ai-external-tools/plot-histogram.ts	100
+src/lib/ai-external-tools/plot-series.ts	100
 src/lib/ai-external-tools/read-file.ts	100
 src/lib/ai-external-tools/read-info.ts	100
 src/lib/ai-external-tools/seq-table.ts	100
@@ -36,6 +37,7 @@ src/lib/sandbox-prompt.ts	100
 src/lib/stats.ts	98.33
 src/lib/swipe-data-loader.ts	100
 src/lib/system-append.ts	100
+src/lib/xy-renderer.ts	100
 src/modes/ai-chat.ts	96.96
 src/modes/qc.ts	100
 src/modes/swipe.ts	98.82

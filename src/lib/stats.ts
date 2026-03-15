@@ -129,6 +129,17 @@ function computeN50(sorted: number[]): number {
 }
 
 /**
+ * A single x/y data point for line or scatter plots.
+ */
+export interface XYPoint {
+    /** The x-axis value (must be a finite number). */
+    x: number;
+
+    /** The y-axis value (must be a finite number). */
+    y: number;
+}
+
+/**
  * A single bin in a histogram representing a count of values within a range.
  */
 export interface HistogramBin {

@@ -104,10 +104,6 @@ rm -rf ./demo/ai_chat_temp_files && node ./dist/execute-cli.mjs --dir ./demo /tm
 
 ## Unmapped sequences
 
-When no alignment is found, `paf` is an empty string — PAF only contains records for sequences that were placed. This happens when the preset's sensitivity is too low for the sequences involved. Running the same files without any preset produces no alignments for these short synthetic sequences.
-
-## Unmapped sequences
-
 When no alignment is found, `paf` is an empty string — PAF only contains records for sequences that were placed. Here we construct a poly-T query with no similarity to any contig to demonstrate this.
 
 ```bash
