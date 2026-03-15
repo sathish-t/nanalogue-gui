@@ -2,7 +2,11 @@
 // the full system message sent to the LLM on every turn.
 // All numeric limits are derived from code constants, not hardcoded in prose.
 
-import { MAX_FILENAME_LENGTH, MAX_LS_ENTRIES } from "./ai-chat-constants";
+import {
+    AI_CHAT_OUTPUT_DIR,
+    MAX_FILENAME_LENGTH,
+    MAX_LS_ENTRIES,
+} from "./ai-chat-constants";
 import type { Fact } from "./chat-types";
 
 /** Options for building the sandbox prompt. */
@@ -98,7 +102,7 @@ You have access to Python builtins (len, range, sorted, sum, min, max etc.) and 
 external functions listed below. No classes, no stdlib, no third-party libraries.
 No imports of any kind are available.
 External functions (peek, read_info,
-bam_mods, window_reads, seq_table, ls, read_file, write_file, bash, minimap2, continue_thinking) call
+bam_mods, window_reads, seq_table, ls, read_file, write_file, plot_histogram, bash, minimap2, continue_thinking) call
 into the host application. You do not have Python classes.
 You do not have network access, and have read/write file access only to a specified folder
 and its subfolders.
@@ -232,6 +236,38 @@ result = write_file("chr1/filtered_reads.tsv", tsv_content)
   cannot import files, so you must copy the code into each call.)
   The user can also find these files in the allowed directory after the
   session and adapt them for real Python.
+
+### plot_histogram(bins, **kwargs) -> dict
+
+Renders pre-binned histogram data as an SVG file. You must compute the
+bins yourself in Python before calling this function.
+
+\`\`\`python
+# Each bin is a dict with bin_start, bin_end, count.
+bins = [{"bin_start": 0, "bin_end": 10, "count": 5},
+        {"bin_start": 10, "bin_end": 20, "count": 3}]
+result = plot_histogram(bins, output_path="lengths.svg",
+                        xlabel="Read length (bp)", ylabel="Count",
+                        title="Read length distribution")
+# result == {"path": "lengths.svg", "bins_plotted": 2, "note": "..."}
+\`\`\`
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| bins | list[dict] | required | Each dict must have bin_start, bin_end (numbers, bin_end > bin_start), and count (>= 0) |
+| output_path | str or None | auto | Relative path for the SVG file; must end in .svg. Omit or pass None for an auto-generated name in ${AI_CHAT_OUTPUT_DIR}/ |
+| xlabel | str | "x" | X-axis label |
+| ylabel | str | "Count" | Y-axis label |
+| title | str or None | None | Optional chart title |
+| xlim | [float, float] | None | X-axis limits [min, max] |
+| ylim | [float, float] | None | Y-axis limits [min, max] |
+
+- Output is an SVG file. SVG files **cannot** be read back with read_file() —
+  they are write-only visual output. Report the returned path to the user
+  so they can open it in a browser or image viewer.
+- You must do the binning yourself. Use Python to group values into
+  bin_start/bin_end/count dicts before calling this function.
+- Non-uniform bin widths are supported.
 
 ### bash(command: str) -> dict
 

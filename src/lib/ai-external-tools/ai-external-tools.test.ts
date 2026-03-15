@@ -3,7 +3,14 @@
 // BAM files generated with simulateModBam, following the same pattern as
 // monty-sandbox.test.ts.
 
-import { mkdir, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
+import {
+    mkdir,
+    mkdtemp,
+    readFile,
+    realpath,
+    rm,
+    writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { simulateModBam } from "@nanalogue/node";
@@ -11,6 +18,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { MAX_FILENAME_LENGTH } from "../ai-chat-constants";
 import { SandboxError } from "../monty-sandbox-helpers";
 import { makeLs } from "./ls";
+import { makeReadFile } from "./read-file";
 import { makeWindowReads } from "./window-reads";
 import { makeWriteFile } from "./write-file";
 
@@ -110,4 +118,26 @@ it("makeWriteFile throws SandboxError (not plain Error) for all guard failures",
         err = e;
     }
     expect(err).toBeInstanceOf(SandboxError);
+});
+
+// --- makeReadFile ---
+
+it("makeReadFile rejects .svg files with ValueError", async () => {
+    // Write a dummy SVG so the path exists; the extension check fires before
+    // any filesystem access, but we want to ensure it is not bypassed for
+    // existing files either.
+    await writeFile(join(allowedDir, "plot.svg"), "<svg/>");
+    const fn = makeReadFile(allowedDir, 1024 * 1024);
+    await expect(fn("plot.svg")).rejects.toMatchObject({
+        name: "ValueError",
+        message: expect.stringMatching(/Cannot read SVG files/),
+    });
+});
+
+it("makeReadFile rejects .SVG (uppercase) with ValueError", async () => {
+    await writeFile(join(allowedDir, "CHART.SVG"), "<svg/>");
+    const fn = makeReadFile(allowedDir, 1024 * 1024);
+    await expect(fn("CHART.SVG")).rejects.toMatchObject({
+        name: "ValueError",
+    });
 });

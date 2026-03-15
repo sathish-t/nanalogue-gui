@@ -26,6 +26,7 @@ import {
     makeContinueThinking,
     makeLs,
     makePeek,
+    makePlotHistogram,
     makeReadFile,
     makeReadInfo,
     makeRunMinimap2,
@@ -208,6 +209,10 @@ export async function runSandboxCode(
                         ls: makeLs(allowedDir),
                         read_file: makeReadFile(allowedDir, maxReadBytes),
                         write_file: makeWriteFile(allowedDir, maxWriteBytes),
+                        plot_histogram: makePlotHistogram(
+                            allowedDir,
+                            maxWriteBytes,
+                        ),
                         minimap2: makeRunMinimap2(allowedDir),
                     }).filter(([name]) => !removedTools?.has(name)),
                 ) as Record<string, (...args: never[]) => unknown>,

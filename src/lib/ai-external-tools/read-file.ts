@@ -36,6 +36,16 @@ export function makeReadFile(
         filePath: string,
         opts?: Record<string, unknown>,
     ): Promise<unknown> => {
+        // Block SVG files: they are write-only visual output produced by
+        // plotting tools and contain raw XML, not meaningful text data.
+        if (filePath.toLowerCase().endsWith(".svg")) {
+            throw new SandboxError(
+                "ValueError",
+                "Cannot read SVG files — they are visual output only. " +
+                    "Report the path to the user so they can open it in a browser.",
+            );
+        }
+
         const resolved = await resolvePath(allowedDir, filePath);
         const allowedDirReal = await realpath(allowedDir);
         const relResolved = toForwardSlashes(

@@ -8,6 +8,7 @@ export { makeContinueThinking } from "./continue-thinking";
 export { makeLs } from "./ls";
 export { makeRunMinimap2 } from "./minimap2";
 export { makePeek } from "./peek";
+export { makePlotHistogram } from "./plot-histogram";
 export { makeReadFile } from "./read-file";
 export { makeReadInfo } from "./read-info";
 export { makeSeqTable } from "./seq-table";
