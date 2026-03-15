@@ -209,6 +209,8 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Verify Showboat documents
+        env:
+          NODE_OPTIONS: --no-deprecation
         run: |
           for doc in demo/showboat-notes/*.md; do
             echo "=== verifying $doc ==="
