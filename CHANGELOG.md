@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `plot_histogram(bins, **kwargs)` external tool in the AI Chat sandbox: renders pre-binned histogram data as an SVG file using Vega-Lite (server-side, no DOM); accepts `bin_start`/`bin_end`/`count` dicts, optional `xlabel`, `ylabel`, `title`, `xlim`, `ylim`; auto-generates output path in `ai_chat_output/` when none supplied; all path safety delegated to `write_file`; `read_file()` blocks `.svg` reads with a clear error; sandbox prompt documents the function and instructs the LLM to bin data itself in Python ([`19cca4b`](https://github.com/sathish-t/nanalogue-gui/commit/19cca4b5529bc483c85f2b2c4f9bcc823c590bad))
 - `minimap2(reference_path, query_path, preset=None)` external tool in the AI Chat sandbox: runs sequence alignment via a biowasm WebAssembly build of minimap2 v2.22, entirely in-process with no native binary; always returns PAF format; preset validated against a 12-entry allowlist; both inputs checked against `allowedDir` and the sensitive-file deny list; 20 MB hard cap per file; sandbox prompt documents alignment concepts, PAF columns, FASTA format, and the `write_file()` pattern for bare sequence strings ([`0873a1e`](https://github.com/sathish-t/nanalogue-gui/commit/0873a1e718471416748af0355987af3efb65d19c))
 
 ### Fixed
