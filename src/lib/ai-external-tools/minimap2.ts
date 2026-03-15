@@ -34,7 +34,7 @@ interface Minimap2Module {
      * May throw an Emscripten ExitStatus object (with a numeric `status`
      * property) when the program calls exit() — even on exit code 0.
      */
-    callMain(args: string[]): number | void;
+    callMain(args: string[]): number | undefined;
 }
 
 /**

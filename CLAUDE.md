@@ -81,7 +81,6 @@ echo "== coderabbit review =="
 cat "$CR_OUT"
 echo "== codex review =="
 cat "$CODEX_OUT"
-rm "$CR_OUT" "$CODEX_OUT"
 ```
 
 Incorporate any suggestions that are worth doing, then repeat the cycle
@@ -89,6 +88,10 @@ until neither tool raises new issues (or the remaining issues are not
 worth addressing). Do not run multiple `codex review` instances in
 parallel — deal with its previous output first.
 
+Remove files only after you are sure you have read them fully.
+```
+rm "$CR_OUT" "$CODEX_OUT"
+```
 ---
 
 ## Testing

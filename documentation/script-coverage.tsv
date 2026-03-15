@@ -9,6 +9,7 @@ src/lib/ai-external-tools/index.ts	100
 src/lib/ai-external-tools/ls.ts	100
 src/lib/ai-external-tools/minimap2.ts	100
 src/lib/ai-external-tools/peek.ts	100
+src/lib/ai-external-tools/plot-histogram.ts	100
 src/lib/ai-external-tools/read-file.ts	100
 src/lib/ai-external-tools/read-info.ts	100
 src/lib/ai-external-tools/seq-table.ts	100
@@ -19,6 +20,7 @@ src/lib/chat-orchestrator-test-utils.ts	100
 src/lib/chat-orchestrator.ts	92.99
 src/lib/chat-session.ts	89.47
 src/lib/format-utils.ts	100
+src/lib/histogram-renderer.ts	100
 src/lib/histogram.ts	96.29
 src/lib/line-counter.ts	100
 src/lib/locate-data-loader.ts	100

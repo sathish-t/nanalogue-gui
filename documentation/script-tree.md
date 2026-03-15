@@ -21,6 +21,7 @@ src/
     chat-session.ts                  # Reusable chat session state for the AI Chat feature.
     chat-types.ts                    # Shared types for the AI Chat feature.
     format-utils.ts                  # Pure formatting and trimming utilities shared across renderer pages.
+    histogram-renderer.ts            # Histogram SVG renderer backed by Vega-Lite.
     histogram.ts                     # Streaming histogram accumulator for binning data without storing raw arrays
     line-counter.ts                  # Streaming utilities for counting lines in text and BED files
     locate-data-loader.ts            # Locate-reads data loader for parsing read ID files and generating BED output
@@ -45,6 +46,7 @@ src/
       ls.ts                 # External tool: ls
       minimap2.ts           # External tool: minimap2
       peek.ts               # External tool: peek
+      plot-histogram.ts     # External tool: plot_histogram
       read-file.ts          # External tool: read_file
       read-info.ts          # External tool: read_info
       seq-table.ts          # External tool: seq_table

@@ -717,7 +717,7 @@ function renderAssistantMessage(content: string, renderer: Renderer): string {
     /* If the whole response is bare Python (no markdown fences), wrap it in
        a synthetic code fence so it gets proper syntax highlighting. */
     const hasFence = /^```/m.test(content);
-    const mdSource = hasFence ? content : "```python\n" + content + "\n```";
+    const mdSource = hasFence ? content : `\`\`\`python\n${content}\n\`\`\``;
     const bodyHtml = marked(mdSource, { renderer }) as string;
     return `<div class="message message-assistant">
   <!-- assistant (LLM) response -->
@@ -778,8 +778,7 @@ export function generateChatHtml(
         })
         .join("\n\n");
 
-    const date =
-        new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
+    const date = `${new Date().toISOString().replace("T", " ").slice(0, 19)} UTC`;
     const msgCount = messages.length;
 
     /* Assemble the full self-contained HTML document. */
