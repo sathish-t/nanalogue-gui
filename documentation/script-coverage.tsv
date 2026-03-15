@@ -11,6 +11,7 @@ src/lib/ai-external-tools/minimap2.ts	100
 src/lib/ai-external-tools/peek.ts	100
 src/lib/ai-external-tools/plot-histogram.ts	100
 src/lib/ai-external-tools/plot-series.ts	100
+src/lib/ai-external-tools/plot-utils.ts	100
 src/lib/ai-external-tools/read-file.ts	100
 src/lib/ai-external-tools/read-info.ts	100
 src/lib/ai-external-tools/seq-table.ts	100

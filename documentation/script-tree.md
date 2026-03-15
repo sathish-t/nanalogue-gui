@@ -49,6 +49,7 @@ src/
       peek.ts               # External tool: peek
       plot-histogram.ts     # External tool: plot_histogram
       plot-series.ts        # External tool: plot_series
+      plot-utils.ts         # Shared utilities for SVG plotting tools (plot_histogram, plot_series, etc.).
       read-file.ts          # External tool: read_file
       read-info.ts          # External tool: read_info
       seq-table.ts          # External tool: seq_table

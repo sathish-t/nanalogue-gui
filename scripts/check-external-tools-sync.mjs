@@ -132,7 +132,10 @@ function extractConstantNames() {
  */
 function extractFolderNames() {
     const files = listToolFiles().filter(
-        (f) => f !== "index.ts" && !f.endsWith(".test.ts"),
+        (f) =>
+            f !== "index.ts" &&
+            f !== "plot-utils.ts" &&
+            !f.endsWith(".test.ts"),
     );
     if (files.length === 0) {
         throw new Error(
