@@ -47,6 +47,8 @@ export interface SandboxOptions {
     maxReadBytes?: number;
     /** Maximum bytes per write_file call. */
     maxWriteBytes?: number;
+    /** Maximum entries returned by ls(). */
+    maxLsEntries?: number;
     /** Maximum bytes of print() output to capture. Defaults to MAX_PRINT_CAPTURE_BYTES (1 MB). */
     maxPrintBytes?: number;
     /** Tool names to omit from the sandbox. When absent, all tools are registered. */

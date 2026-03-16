@@ -68,7 +68,7 @@ export const /** Maximum bytes for a single path component. */ MAX_FILENAME_LENG
 
 // --- Listing and directory constants ---
 
-export const /** Hard cap on ls() results to prevent host blowup. */ MAX_LS_ENTRIES = 500;
+export const /** Hard cap on ls() results. Sized for large cohort studies (thousands of per-sample files); not user-configurable as no sandbox setting maps naturally to file count. */ MAX_LS_ENTRIES = 10_000;
 export const /** Dedicated subdirectory for write_file output. */ AI_CHAT_OUTPUT_DIR =
         "ai_chat_output";
 

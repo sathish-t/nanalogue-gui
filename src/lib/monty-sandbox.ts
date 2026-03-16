@@ -18,6 +18,7 @@ import {
     DEFAULT_MAX_RECORDS_SEQ_TABLE,
     DEFAULT_MAX_RECORDS_WINDOW_READS,
     DEFAULT_MAX_WRITE_BYTES,
+    MAX_LS_ENTRIES,
     MAX_PRINT_CAPTURE_BYTES,
 } from "./ai-chat-constants";
 import {
@@ -130,6 +131,7 @@ export async function runSandboxCode(
         maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
         maxReadBytes = DEFAULT_MAX_READ_BYTES,
         maxWriteBytes = DEFAULT_MAX_WRITE_BYTES,
+        maxLsEntries = MAX_LS_ENTRIES,
         maxPrintBytes = MAX_PRINT_CAPTURE_BYTES,
         removedTools,
     } = options;
@@ -204,7 +206,7 @@ export async function runSandboxCode(
                             maxRecordsWindowReads,
                         ),
                         seq_table: makeSeqTable(allowedDir, maxRecordsSeqTable),
-                        ls: makeLs(allowedDir),
+                        ls: makeLs(allowedDir, maxLsEntries),
                         read_file: makeReadFile(allowedDir, maxReadBytes),
                         write_file: makeWriteFile(allowedDir, maxWriteBytes),
                         plot_histogram: makePlotHistogram(

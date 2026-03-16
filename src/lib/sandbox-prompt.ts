@@ -125,7 +125,7 @@ results before producing a final answer.
 
 Without continue_thinking(), your output goes directly to the user.
 
-### ls(pattern: str = None) -> list[str] | dict
+### ls(pattern: str = None) -> list[str]
 
 Returns a list of file paths under the allowed directory,
 recursively. Paths are relative to the allowed directory (e.g.
@@ -142,16 +142,8 @@ sub_bam = ls("sample_001/**/*.bam")      # BAM files under sample_001/ only
 nested = ls("run_A/alignments/*.bam")    # BAM files in a specific subfolder
 \`\`\`
 
-Results are hard-capped at ${MAX_LS_ENTRIES} entries. If the cap is hit, the return
-value is a dict with "files" (the capped list) and "_truncated"
-(metadata with a message). Use a glob pattern to narrow results when
-this happens:
-
-\`\`\`python
-result = ls()
-# If result is a dict with "_truncated", narrow with a pattern:
-# result["_truncated"]["message"] tells you to use a glob
-\`\`\`
+Results are hard-capped at ${MAX_LS_ENTRIES} entries. If the cap is hit, a
+ValueError is raised — use a glob pattern to narrow results.
 
 ### read_file(file_path: str, **kwargs) -> dict
 

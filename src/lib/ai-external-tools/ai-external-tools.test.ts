@@ -57,23 +57,28 @@ it("makeWindowReads returns an array of records for a real BAM file", async () =
 
 // --- makeLs ---
 
-it("makeLs returns truncated result when file count exceeds MAX_LS_ENTRIES", async () => {
-    // Create enough files to exceed the 500-entry cap.
+it("makeLs returns a plain array when under the cap", async () => {
+    const fn = makeLs(allowedDir, 10);
+    const result = await fn();
+    expect(Array.isArray(result)).toBe(true);
+});
+
+it("makeLs throws SandboxError when file count exceeds maxEntries", async () => {
+    // Use a small cap so we don't need to create thousands of files.
     const capDir = join(allowedDir, "cap_test");
     await mkdir(capDir, { recursive: true });
     await Promise.all(
-        Array.from({ length: 501 }, (_, i) =>
-            // Use writeFile from the already-imported fs/promises via top-level import.
+        Array.from({ length: 4 }, (_, i) =>
             import("node:fs/promises").then((fs) =>
                 fs.writeFile(join(capDir, `f${i}.txt`), ""),
             ),
         ),
     );
-    const fn = makeLs(allowedDir);
-    const result = await fn();
-    const truncated = result as Record<string, unknown>;
-    expect(truncated._truncated).toMatchObject({ cap: 500 });
-    expect((truncated.files as unknown[]).length).toBe(500);
+    const fn = makeLs(allowedDir, 3);
+    await expect(fn()).rejects.toMatchObject({
+        name: "ValueError",
+        message: /capped at 3 entries/,
+    });
 });
 
 // --- makeWriteFile ---
