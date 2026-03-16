@@ -7,7 +7,10 @@ import { parseArgs } from "node:util";
 import { version } from "../package.json";
 import { EXTERNAL_FUNCTIONS } from "./lib/ai-chat-constants";
 import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
-import { dumpLlmInstructions, getLastSentMessages } from "./lib/chat-orchestrator";
+import {
+    dumpLlmInstructions,
+    getLastSentMessages,
+} from "./lib/chat-orchestrator";
 import { ChatSession } from "./lib/chat-session";
 import type {
     AiChatConfig,

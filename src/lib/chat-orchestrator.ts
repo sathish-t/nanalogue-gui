@@ -97,7 +97,6 @@ export async function dumpLlmInstructions(
     allowedDir: string,
     messages: LlmMessage[],
 ): Promise<DumpLlmInstructionsResult | null> {
-
     const outputDir = join(allowedDir, "ai_chat_output");
     await mkdir(outputDir, { recursive: true });
     const safeDir = await resolvePath(allowedDir, "ai_chat_output");

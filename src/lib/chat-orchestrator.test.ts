@@ -717,8 +717,7 @@ describe("adversarial/edge-case tests", () => {
                     {
                         message: {
                             role: "assistant",
-                            content:
-                                "```python\nprint('extracted')\n```",
+                            content: "```python\nprint('extracted')\n```",
                         },
                         finish_reason: "stop",
                     },
@@ -919,7 +918,8 @@ describe("adversarial/edge-case tests", () => {
                     {
                         message: {
                             role: "assistant",
-                            content: 'print("before error")\nraise ValueError("boom")',
+                            content:
+                                'print("before error")\nraise ValueError("boom")',
                         },
                         finish_reason: "stop",
                     },
@@ -954,7 +954,7 @@ describe("adversarial/edge-case tests", () => {
         );
         expect(feedbackMsg).toBeDefined();
         const parsed = JSON.parse(
-            feedbackMsg!.content.replace("Code execution result: ", ""),
+            feedbackMsg?.content.replace("Code execution result: ", ""),
         ) as Record<string, unknown>;
         expect(parsed.success).toBe(false);
         expect(parsed.prints).toBe("before error\n");
