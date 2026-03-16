@@ -47,7 +47,7 @@ in the `.d.ts`; it does not extend `ReadOptions`, though the filter fields
 largely overlap.
 
 **`seqTable`** — per-read sequence table with modification highlighting.
-Returns a JSON string. Used in the QC Sequences tab.
+Returns a TSV string. Used in the QC Sequences tab.
 
 **`simulateModBam`** — generates a synthetic Mod-BAM from a JSON config and
 a FASTA reference. Only used in tests; never exposed to users.
