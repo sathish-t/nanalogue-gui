@@ -9,8 +9,8 @@ import {
     CONFIG_FIELD_SPECS,
     CONTEXT_BUDGET_FRACTION,
     DEFAULT_MAX_CODE_ROUNDS,
+    DEFAULT_MAX_CUMULATIVE_SANDBOX_MS,
     FEEDBACK_OUTPUT_MAX_BYTES,
-    MAX_CUMULATIVE_SANDBOX_MS,
     MAX_FACTS_BYTES,
     TERMINAL_OUTPUT_OVERFLOW_BYTES,
 } from "./ai-chat-constants";
@@ -84,23 +84,19 @@ export interface DumpLlmInstructionsResult {
 }
 
 /**
- * Writes the last LLM request payload to a dated log file and a sibling HTML
- * file in ai_chat_output/ inside the given directory. Used by both the
+ * Writes an LLM message array to a dated log file and a sibling HTML file in
+ * ai_chat_output/ inside the given directory. Used by both the
  * /dump_llm_instructions slash command and the --dump-llm-instructions CLI
  * flag.
  *
  * @param allowedDir - The analysis directory (must be the sandbox root).
- * @returns Paths to both output files relative to allowedDir, or null if no
- *   LLM call has been made yet.
+ * @param messages - The messages to dump.
+ * @returns Paths to both output files relative to allowedDir.
  */
 export async function dumpLlmInstructions(
     allowedDir: string,
+    messages: LlmMessage[],
 ): Promise<DumpLlmInstructionsResult | null> {
-    if (!lastSentMessages) return null;
-    /* Snapshot the messages immediately, before any await, so that both the
-       .log and .html outputs always describe the same conversation even if
-       another chat turn updates lastSentMessages while we are writing. */
-    const messages = lastSentMessages;
 
     const outputDir = join(allowedDir, "ai_chat_output");
     await mkdir(outputDir, { recursive: true });
@@ -892,7 +888,9 @@ export async function handleUserMessage(
         history.pop();
         emitEvent({ type: "turn_start" });
 
-        const dump = await dumpLlmInstructions(allowedDir);
+        const dump = lastSentMessages
+            ? await dumpLlmInstructions(allowedDir, lastSentMessages)
+            : null;
         const text = dump
             ? `LLM instructions dumped to ${dump.log}\n` +
               `HTML view: ${dump.html}\n` +
@@ -1019,6 +1017,14 @@ export async function handleUserMessage(
     const timeoutSignal = AbortSignal.timeout(timeoutMs);
     const combinedSignal = AbortSignal.any([signal, timeoutSignal]);
 
+    // Effective cumulative sandbox budget: at least as large as one full
+    // single-execution timeout so the invariant cumulativeBudgetMs >=
+    // maxDurationSecs * 1000 always holds regardless of user config.
+    const cumulativeBudgetMs = Math.max(
+        DEFAULT_MAX_CUMULATIVE_SANDBOX_MS,
+        config.maxDurationSecs * 1000,
+    );
+
     emitEvent({ type: "turn_start" });
 
     let finalText = "";
@@ -1027,7 +1033,7 @@ export async function handleUserMessage(
     for (; round < maxRounds; round++) {
         // Short-circuit before calling the LLM when sandbox budget is exhausted.
         // The post-loop forced-final path sends a nudge and does one final LLM call.
-        if (cumulativeSandboxMs >= MAX_CUMULATIVE_SANDBOX_MS) break;
+        if (cumulativeSandboxMs >= cumulativeBudgetMs) break;
 
         // Prepare context
         const prepared = transformContext(history, {
@@ -1201,7 +1207,7 @@ export async function handleUserMessage(
     }
 
     // If maxRounds or sandbox budget exhausted without terminal response, do one final nudged round
-    const budgetExhausted = cumulativeSandboxMs >= MAX_CUMULATIVE_SANDBOX_MS;
+    const budgetExhausted = cumulativeSandboxMs >= cumulativeBudgetMs;
     if (!finalText && (round >= maxRounds || budgetExhausted)) {
         const exhaustedMsg = budgetExhausted
             ? "Maximum cumulative sandbox runtime exceeded. Please provide your final answer now (do not call continue_thinking())."
@@ -1253,7 +1259,7 @@ export async function handleUserMessage(
             history.push({ role: "assistant", content: rawFinal });
         } else if (
             rawFinal.trim() &&
-            cumulativeSandboxMs >= MAX_CUMULATIVE_SANDBOX_MS
+            cumulativeSandboxMs >= cumulativeBudgetMs
         ) {
             // Sandbox budget exhausted — push raw response without executing
             finalText =

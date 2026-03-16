@@ -49,7 +49,7 @@ const TEST_MAX = 1500;
 /** @type {Map<string, number>} */
 const EXCEPTIONS = new Map([
     // Source files above the 800-line ceiling:
-    ["src/lib/chat-orchestrator.ts", 1322],
+    ["src/lib/chat-orchestrator.ts", 1328],
     ["src/renderer/ai-chat/ai-chat.ts", 1183],
     ["src/renderer/qc/qc-results.ts", 1146],
     // log-to-html.ts is self-contained by design: inlined CSS, JS, and JSDoc

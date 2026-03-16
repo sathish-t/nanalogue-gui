@@ -7,7 +7,7 @@ import { parseArgs } from "node:util";
 import { version } from "../package.json";
 import { EXTERNAL_FUNCTIONS } from "./lib/ai-chat-constants";
 import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
-import { dumpLlmInstructions } from "./lib/chat-orchestrator";
+import { dumpLlmInstructions, getLastSentMessages } from "./lib/chat-orchestrator";
 import { ChatSession } from "./lib/chat-session";
 import type {
     AiChatConfig,
@@ -511,7 +511,10 @@ async function main(): Promise<void> {
         // been printed, so a dump failure should not crash the process.
         if (values["dump-llm-instructions"]) {
             try {
-                const dump = await dumpLlmInstructions(allowedDir);
+                const lastSentMessages = getLastSentMessages();
+                const dump = lastSentMessages
+                    ? await dumpLlmInstructions(allowedDir, lastSentMessages)
+                    : null;
                 if (dump) {
                     console.error(`LLM instructions dumped to ${dump.log}`);
                     console.error(`HTML view: ${dump.html}`);

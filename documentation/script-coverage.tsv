@@ -19,7 +19,7 @@ src/lib/ai-external-tools/window-reads.ts	100
 src/lib/ai-external-tools/write-file.ts	100
 src/lib/bed-parser.ts	93.1
 src/lib/chat-orchestrator-test-utils.ts	100
-src/lib/chat-orchestrator.ts	92.99
+src/lib/chat-orchestrator.ts	94.66
 src/lib/chat-session.ts	89.47
 src/lib/format-utils.ts	100
 src/lib/histogram-renderer.ts	100

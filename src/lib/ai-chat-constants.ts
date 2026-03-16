@@ -17,7 +17,7 @@ export const /** Timeout in milliseconds for the model-list fetch request. */ MO
 
 // --- Orchestrator budget constants ---
 
-export const /** Maximum cumulative sandbox runtime per turn in milliseconds (30 minutes). */ MAX_CUMULATIVE_SANDBOX_MS =
+export const /** Default maximum cumulative sandbox runtime per turn in milliseconds (30 minutes). */ DEFAULT_MAX_CUMULATIVE_SANDBOX_MS =
         30 * 60 * 1000;
 export const /** Maximum serialized size for the facts array in bytes. */ MAX_FACTS_BYTES = 2048;
 export const /** Default maximum code execution rounds per user message. */ DEFAULT_MAX_CODE_ROUNDS = 10;

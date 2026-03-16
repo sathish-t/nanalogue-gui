@@ -658,6 +658,83 @@ describe("adversarial/edge-case tests", () => {
         expect(result.text).toContain("forced");
     });
 
+    it("forced-final with finish_reason length pushes rawFinal to history", async () => {
+        const responses: MockCompletion[] = [
+            // Round 1: continue_thinking (exhausts maxRounds=1)
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "continue_thinking()\n42",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            // Forced-final: truncated by token limit
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('truncated",
+                        },
+                        finish_reason: "length",
+                    },
+                ],
+            },
+        ];
+        mockServer = await startMockServer(responses);
+
+        const { history } = await callOrchestrator(mockServer.url, {
+            config: { maxCodeRounds: 1 },
+        });
+
+        // The truncated raw response should have been pushed to history
+        const last = history[history.length - 1];
+        expect(last.role).toBe("assistant");
+        expect(last.content).toBe("print('truncated");
+    });
+
+    it("forced-final fence-extraction retry on SyntaxError", async () => {
+        const responses: MockCompletion[] = [
+            // Round 1: continue_thinking (exhausts maxRounds=1)
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "continue_thinking()\n42",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            // Forced-final: code wrapped in markdown fences (causes SyntaxError if run raw)
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content:
+                                "```python\nprint('extracted')\n```",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ];
+        mockServer = await startMockServer(responses);
+
+        const { result } = await callOrchestrator(mockServer.url, {
+            config: { maxCodeRounds: 1 },
+        });
+
+        // The extracted code should have run and produced output
+        expect(result.text).toContain("extracted");
+    });
+
     it("valid Python with backtick strings executes directly", async () => {
         // Code that contains backtick-like strings but is valid Python
         const code = 'x = "```python\\nhello\\n```"\nprint(x)';
@@ -827,6 +904,55 @@ describe("adversarial/edge-case tests", () => {
             feedbackMsg?.content.replace("Code execution result: ", "") ?? "",
         ) as Record<string, unknown>;
         expect(parsed.truncated).toBe(true);
+    });
+
+    it("error feedback includes print output when code fails after printing", async () => {
+        const responses: MockCompletion[] = [
+            // Round 1: prints something then raises an error
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: 'print("before error")\nraise ValueError("boom")',
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            // Round 2: final answer after seeing the error feedback
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: 'print("done")',
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ];
+        mockServer = await startMockServer(responses);
+
+        const { history } = await callOrchestrator(mockServer.url, {
+            config: { maxCodeRounds: 2 },
+        });
+
+        // Find the error feedback message sent back to the LLM
+        const feedbackMsg = history.find(
+            (m) =>
+                m.role === "user" &&
+                "isExecutionResult" in m &&
+                m.isExecutionResult &&
+                m.content.includes("before error"),
+        );
+        expect(feedbackMsg).toBeDefined();
+        const parsed = JSON.parse(
+            feedbackMsg!.content.replace("Code execution result: ", ""),
+        ) as Record<string, unknown>;
+        expect(parsed.success).toBe(false);
+        expect(parsed.prints).toBe("before error\n");
     });
 
     it("includes temperature in request body when set", async () => {
