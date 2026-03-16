@@ -610,10 +610,10 @@ describe("cross-endpoint compatibility", () => {
         expect("max_tokens" in bodies[0]).toBe(false);
     });
 
-    it("truncates feedback prints exceeding 4096 bytes", async () => {
+    it("truncates feedback prints exceeding 10240 bytes", async () => {
         // First round: print a huge string + continue_thinking
         // Second round: print the answer
-        const bigPrint = "x".repeat(5000);
+        const bigPrint = "x".repeat(12000);
         const responses: MockCompletion[] = [
             {
                 choices: [
@@ -800,7 +800,7 @@ describe("cross-endpoint compatibility", () => {
     it("truncates large expression value in feedback", async () => {
         // First round: builds a large dict and ends with it as expression + continue_thinking
         // The expression value should be truncated in the feedback message
-        const bigValue = "x".repeat(5000);
+        const bigValue = "x".repeat(12000);
         const responses: MockCompletion[] = [
             {
                 choices: [
@@ -861,7 +861,7 @@ describe("cross-endpoint compatibility", () => {
             feedbackMsg?.content ?? "",
             "utf-8",
         );
-        expect(feedbackBytes).toBeLessThanOrEqual(4096 + 200);
+        expect(feedbackBytes).toBeLessThanOrEqual(10_240 + 200);
     });
 
     it("writes terminal output to file when exceeding 10KB", async () => {
@@ -932,9 +932,9 @@ describe("cross-endpoint compatibility", () => {
     });
 
     it("truncates feedback prints without splitting multi-byte UTF-8 characters", async () => {
-        // Euro sign '€' is 3 bytes in UTF-8; 2000 chars = 6000 bytes, exceeds 4096 limit.
-        // 4096 / 3 = 1365.33 — the cut falls mid-character, producing \uFFFD without the fix.
-        const bigPrint = "\u20AC".repeat(2000);
+        // Euro sign '€' is 3 bytes in UTF-8; 4000 chars = 12000 bytes, exceeds 10240 limit.
+        // 10240 / 3 = 3413.33 — the cut falls mid-character, producing \uFFFD without the fix.
+        const bigPrint = "\u20AC".repeat(4000);
         const responses: MockCompletion[] = [
             {
                 choices: [

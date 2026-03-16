@@ -786,7 +786,7 @@ describe("adversarial/edge-case tests", () => {
     it("feedback prints exceeding FEEDBACK_OUTPUT_MAX_BYTES are truncated", async () => {
         // First round: huge print + continue_thinking
         // Second round: final answer
-        const bigPrint = "x".repeat(5000);
+        const bigPrint = "x".repeat(12000);
         const responses: MockCompletion[] = [
             {
                 choices: [

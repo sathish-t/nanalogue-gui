@@ -25,8 +25,6 @@ interface BashResult {
     exit_code: number;
 }
 
-const MAX_OUTPUT_BYTES = 1024 * 1024;
-
 let allowedDir: string;
 let bash: (command: string) => Promise<unknown>;
 
@@ -50,7 +48,7 @@ beforeEach(async () => {
     await writeFile(join(allowedDir, "subdir", ".env"), "NESTED_SECRET=abc");
     await writeFile(join(allowedDir, "subdir", "data.tsv"), "col1\tcol2\n");
 
-    bash = makeBash(allowedDir, MAX_OUTPUT_BYTES);
+    bash = makeBash(allowedDir);
 });
 
 afterEach(async () => {
@@ -198,13 +196,6 @@ describe("basic functionality", () => {
         expect(r.stdout).toContain("aGVsbG8gd29ybGQ");
     });
 
-    it("truncates stdout when it exceeds maxOutputBytes", async () => {
-        const tinyBash = makeBash(allowedDir, 5);
-        // "hello\n" is 6 bytes, exceeds the 5-byte cap.
-        const r = (await tinyBash("echo hello")) as BashResult;
-        expect(r.stdout).toContain("[output truncated]");
-    });
-
     it("throws TypeError for non-string command", async () => {
         await expect(bash(42 as unknown as string)).rejects.toMatchObject({
             name: "TypeError",
@@ -277,7 +268,7 @@ describe("read-write filesystem", () => {
 
         // makeBash must detect the symlink and throw rather than mount a
         // ReadWriteFs that would write outside the sandbox boundary.
-        expect(() => makeBash(allowedDir, MAX_OUTPUT_BYTES)).toThrow(/symlink/);
+        expect(() => makeBash(allowedDir)).toThrow(/symlink/);
 
         await rm(outsideDir, { recursive: true });
     });

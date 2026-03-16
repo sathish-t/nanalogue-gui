@@ -47,7 +47,7 @@ export const /** Maximum output bytes ceiling. */ MAX_OUTPUT_BYTES = 80 * 1024;
 // --- Orchestrator output limits ---
 
 export const /** Maximum terminal output before writing to a file instead of showing inline. */ TERMINAL_OUTPUT_OVERFLOW_BYTES = 10_240;
-export const /** Maximum bytes for execution feedback sent back to the LLM. */ FEEDBACK_OUTPUT_MAX_BYTES = 4096;
+export const /** Maximum bytes for execution feedback sent back to the LLM. */ FEEDBACK_OUTPUT_MAX_BYTES = 10_240;
 
 // --- Message size limits ---
 

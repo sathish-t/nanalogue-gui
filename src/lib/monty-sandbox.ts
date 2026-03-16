@@ -192,8 +192,9 @@ export async function runSandboxCode(
                         }),
                         bash: makeBash(
                             allowedDir,
-                            maxOutputBytes,
                             bashAbortController.signal,
+                            maxMemory,
+                            maxAllocations,
                         ),
                         peek: makePeek(allowedDir),
                         read_info: makeReadInfo(allowedDir, maxRecordsReadInfo),
@@ -202,11 +203,7 @@ export async function runSandboxCode(
                             allowedDir,
                             maxRecordsWindowReads,
                         ),
-                        seq_table: makeSeqTable(
-                            allowedDir,
-                            maxRecordsSeqTable,
-                            maxOutputBytes,
-                        ),
+                        seq_table: makeSeqTable(allowedDir, maxRecordsSeqTable),
                         ls: makeLs(allowedDir),
                         read_file: makeReadFile(allowedDir, maxReadBytes),
                         write_file: makeWriteFile(allowedDir, maxWriteBytes),

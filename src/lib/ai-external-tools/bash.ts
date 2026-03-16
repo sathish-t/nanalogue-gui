@@ -9,7 +9,6 @@ import { Bash, MountableFs, OverlayFs, ReadWriteFs } from "just-bash";
 import {
     isDeniedPath,
     SandboxError,
-    safeUtf8Slice,
     toForwardSlashes,
 } from "../monty-sandbox-helpers";
 
@@ -136,20 +135,6 @@ function withDenyList<T extends object>(fs: T, mountPoint: string): T {
 }
 
 /**
- * Truncates a UTF-8 string to at most maxBytes bytes and appends a notice
- * when trimmed. The slice is delegated to safeUtf8Slice so the result is
- * always valid UTF-8.
- *
- * @param s - The string to truncate.
- * @param maxBytes - Maximum byte length.
- * @returns The (possibly truncated) string.
- */
-function truncateOutput(s: string, maxBytes: number): string {
-    const sliced = safeUtf8Slice(s, maxBytes);
-    return sliced === s ? s : `${sliced}\n[output truncated]`;
-}
-
-/**
  * Returns the bash tool implementation bound to the given context.
  *
  * Sets up a MountableFs composition:
@@ -165,14 +150,20 @@ function truncateOutput(s: string, maxBytes: number): string {
  * persist between calls; use compound commands for multi-step pipelines.
  *
  * @param allowedDir - The sandboxed root directory (also used as mount point).
- * @param maxOutputBytes - Maximum bytes for stdout/stderr before truncation.
  * @param signal - Optional abort signal; when fired, cancels the in-flight bash command.
+ * @param maxMemory - Sandbox memory cap in bytes (from SandboxOptions). Used to
+ *   derive memory-related bash limits (maxOutputSize, maxStringLength, maxHeredocSize)
+ *   so that bash behaves consistently with the user-visible sandbox memory setting.
+ * @param maxAllocations - Sandbox allocation cap (from SandboxOptions). Used to
+ *   derive iteration-related bash limits (maxCommandCount, maxLoopIterations, etc.)
+ *   so that bash behaves consistently with the user-visible sandbox allocation setting.
  * @returns An async function callable from Python that runs shell commands.
  */
 export function makeBash(
     allowedDir: string,
-    maxOutputBytes: number,
     signal?: AbortSignal,
+    maxMemory = 512 * 1024 * 1024,
+    maxAllocations = 100_000,
 ): (command: string) => Promise<unknown> {
     // ai_chat_temp_files must exist on disk before ReadWriteFs is constructed
     // because ReadWriteFs calls realpathSync(root) in its constructor.
@@ -202,18 +193,29 @@ export function makeBash(
     const shell = new Bash({
         fs: withDenyList(mountable, allowedDir),
         cwd: allowedDir,
-        // Execution limits: the six values below are the just-bash defaults,
-        // restated here explicitly so their values are visible and intentional.
-        // just-bash has several additional limits (output size caps, string
-        // length, array elements, etc.) that are also active but not listed
-        // here — they are left at their defaults.
+        // Execution limits derived from the sandbox-level memory and allocation
+        // caps so that bash behaves consistently with the user-visible sandbox
+        // settings. A user who raises maxMemoryMB or maxAllocations expects
+        // those limits to apply to bash as well, not just the Python layer.
         executionLimits: {
+            // Fixed: stack depth guard against infinite recursion, not a
+            // throughput limit.
             maxCallDepth: 100,
-            maxCommandCount: 10_000,
-            maxLoopIterations: 10_000,
-            maxAwkIterations: 10_000,
-            maxSedIterations: 10_000,
-            maxJqIterations: 10_000,
+            // Allocation-derived: scale iteration limits at 1:10 relative to
+            // maxAllocations (default 100 000 → 10 000, matching the previous
+            // hardcoded values).
+            maxCommandCount: Math.max(1, Math.floor(maxAllocations / 10)),
+            maxLoopIterations: Math.max(1, Math.floor(maxAllocations / 10)),
+            maxAwkIterations: Math.max(1, Math.floor(maxAllocations / 10)),
+            maxSedIterations: Math.max(1, Math.floor(maxAllocations / 10)),
+            maxJqIterations: Math.max(1, Math.floor(maxAllocations / 10)),
+            maxArrayElements: maxAllocations,
+            // Memory-derived: allow bash output and strings up to 50% of the
+            // sandbox memory cap so large intermediate data (e.g. a column
+            // extracted from a 1 GB CSV) can be passed back to Python.
+            maxOutputSize: Math.max(1, Math.floor(maxMemory * 0.5)),
+            maxStringLength: Math.max(1, Math.floor(maxMemory * 0.5)),
+            maxHeredocSize: Math.max(1, Math.floor(maxMemory * 0.5)),
         },
     });
 
@@ -241,8 +243,8 @@ export function makeBash(
         );
 
         return {
-            stdout: truncateOutput(result.stdout, maxOutputBytes),
-            stderr: truncateOutput(result.stderr, maxOutputBytes),
+            stdout: result.stdout,
+            stderr: result.stderr,
             exit_code: result.exitCode,
         };
     };
