@@ -779,9 +779,14 @@ describe("adversarial/edge-case tests", () => {
         expect(stored).not.toBeNull();
         // First message is the system prompt
         expect(stored?.[0].role).toBe("system");
-        // Last message is the assistant's response
+        // Second-to-last is the exec result feedback (user message)
+        expect(stored?.[stored.length - 2].role).toBe("user");
+        expect(stored?.[stored.length - 2].content).toContain(
+            "Code execution result:",
+        );
+        // Last message is the user-facing final answer
         expect(stored?.[stored.length - 1].role).toBe("assistant");
-        expect(stored?.[stored.length - 1].content).toBe("print('ok')");
+        expect(stored?.[stored.length - 1].content).toBe("ok\n");
     });
 
     it("lastSentMessages includes assistant response from forced-final path", async () => {

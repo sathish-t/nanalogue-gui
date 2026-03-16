@@ -1173,12 +1173,13 @@ export async function handleUserMessage(
                         allowedDir,
                     );
                     // Persist execution feedback so follow-up turns have structured context
+                    const terminalFeedback = buildExecutionFeedback(
+                        sandboxResult,
+                        maxRounds - (round + 1),
+                    );
                     history.push({
                         role: "user",
-                        content: buildExecutionFeedback(
-                            sandboxResult,
-                            maxRounds - (round + 1),
-                        ),
+                        content: terminalFeedback,
                         isExecutionResult: true,
                         executionStatus: "ok",
                     });
@@ -1188,6 +1189,13 @@ export async function handleUserMessage(
                         role: "assistant",
                         content: finalText,
                     });
+                    // Mirror both entries into lastSentMessages so the dump
+                    // transcript includes the exec result and final answer.
+                    lastSentMessages = [
+                        ...(lastSentMessages ?? []),
+                        { role: "user", content: terminalFeedback },
+                        { role: "assistant", content: finalText },
+                    ];
                     break;
                 }
             }
