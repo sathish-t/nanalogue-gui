@@ -96,7 +96,11 @@ echo "exit code: $?"
 ```
 
 ```output
-RuntimeError: ZeroDivisionError: division by zero
+RuntimeError: Traceback (most recent call last):
+  File "main.py", line 1, in <module>
+    x = 1 / 0
+        ~~~~~
+ZeroDivisionError: division by zero
 exit code: 1
 ```
 
