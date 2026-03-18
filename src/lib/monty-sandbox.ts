@@ -253,7 +253,7 @@ export async function runSandboxCode(
             return {
                 success: false,
                 errorType: "RuntimeError",
-                message: error.message,
+                message: error.display("traceback"),
                 isTimeout: bashTimedOut || error.message.includes("time limit"),
                 prints,
                 printsTruncated,

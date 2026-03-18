@@ -45,7 +45,10 @@ function withDenyList<T extends object>(fs: T, mountPoint: string): T {
         if (!path.startsWith(mountPrefix)) return;
         const rel = toForwardSlashes(path.slice(mountPrefix.length));
         if (rel && isDeniedPath(rel)) {
-            throw new Error(`EACCES: permission denied, open '${path}'`);
+            throw new SandboxError(
+                "OSError",
+                `EACCES: permission denied, open '${path}'`,
+            );
         }
     };
 
@@ -174,7 +177,10 @@ export function makeBash(
     // so a symlink pointing outside allowedDir would allow bash writes to
     // escape the sandbox boundary.
     if (lstatSync(outputDir).isSymbolicLink()) {
-        throw new Error("ai_chat_temp_files must not be a symlink");
+        throw new SandboxError(
+            "OSError",
+            "ai_chat_temp_files must not be a symlink",
+        );
     }
 
     const overlayFs = new OverlayFs({

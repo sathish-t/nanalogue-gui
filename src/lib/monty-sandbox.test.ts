@@ -808,3 +808,33 @@ it("printCallback backs off to a UTF-8 boundary when cap splits a multi-byte cha
     const total = Buffer.byteLength(result.prints?.join("") ?? "", "utf-8");
     expect(total).toBeLessThanOrEqual(3);
 });
+
+// RuntimeError message includes a full Python-style traceback so the LLM can
+// see exactly which line failed and what the source looked like.
+it("runtime error message includes traceback with line number and source preview", async () => {
+    // Line 1 succeeds; line 2 raises TypeError (int + str).
+    const code = "x = 1\ny = x + 'oops'";
+    const result = await runSandboxCode(code, allowedDir);
+    expect(result.success).toBe(false);
+    expect(result.errorType).toBe("RuntimeError");
+    // Full traceback header and the failing line number must be present.
+    expect(result.message).toContain("Traceback (most recent call last):");
+    expect(result.message).toContain("line 2");
+    // The source preview of the failing expression must appear.
+    expect(result.message).toContain("x + 'oops'");
+});
+
+// When an external function raises, the traceback should include the Python
+// call site (the line in the LLM-generated script that invoked the function),
+// not just a bare error message.
+it("external function error message includes the Python call site in the traceback", async () => {
+    // Line 1 is harmless; line 2 calls peek() with a nonexistent file so the
+    // external function throws, and Monty should attach line 2 as the frame.
+    const code = "x = 1\npeek('nonexistent.bam')";
+    const result = await runSandboxCode(code, allowedDir);
+    expect(result.success).toBe(false);
+    expect(result.errorType).toBe("RuntimeError");
+    expect(result.message).toContain("Traceback (most recent call last):");
+    expect(result.message).toContain("line 2");
+    expect(result.message).toContain("peek");
+});
