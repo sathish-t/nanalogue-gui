@@ -265,6 +265,7 @@ for (const provider of AI_PROVIDERS) {
                             document
                                 .getElementById("btn-send")
                                 ?.classList.contains("hidden"),
+                        undefined,
                         { timeout: 10_000 },
                     );
                 } catch {
@@ -280,6 +281,7 @@ for (const provider of AI_PROVIDERS) {
                     !document
                         .getElementById("btn-send")
                         ?.classList.contains("hidden"),
+                undefined,
                 { timeout: 120_000 },
             );
 
