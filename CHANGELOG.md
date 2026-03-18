@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Infrastructure
 
+- `check-external-tools-sync` extended with a fourth check: every tool in `EXTERNAL_FUNCTIONS` must have a `### tool_name(` section heading in `sandbox-prompt.ts`; pre-commit hook trigger updated to also fire when `sandbox-prompt.ts` is staged ([`96a699c`](https://github.com/sathish-t/nanalogue-gui/commit/96a699ccd4754facd11d3b4d474ed30575fec3ed))
 - Biome and ESLint now read `.gitignore` directly (`vcs.useIgnoreFile` and `@eslint/compat` `includeIgnoreFile`) so gitignored directories such as `dist/` and `coverage/` are excluded automatically without manual entries in lint configs ([`52475cc`](https://github.com/sathish-t/nanalogue-gui/commit/52475cc0e6ff2c075899f153cf8114be7665877e))
 - `dumpLlmInstructions` refactored to accept `messages` explicitly instead of reading the global `lastSentMessages`; `MAX_CUMULATIVE_SANDBOX_MS` renamed to `DEFAULT_MAX_CUMULATIVE_SANDBOX_MS`; cumulative sandbox budget clamped to at least `maxDurationSecs * 1000` so the per-execution timeout never exceeds the total budget ([`675495a`](https://github.com/sathish-t/nanalogue-gui/commit/675495a14058cc3b29d3dacfc57c0472e912ea4c))
 
