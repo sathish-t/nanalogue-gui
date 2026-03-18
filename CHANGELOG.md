@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-03-18
+
 ### Added
 
 - `plot_histogram(bins, **kwargs)` external tool in the AI Chat sandbox: renders pre-binned histogram data as an SVG file using Vega-Lite (server-side, no DOM); accepts `bin_start`/`bin_end`/`count` dicts, optional `xlabel`, `ylabel`, `title`, `xlim`, `ylim`; auto-generates output path in `ai_chat_output/` when none supplied; all path safety delegated to `write_file`; `read_file()` blocks `.svg` reads with a clear error; sandbox prompt documents the function and instructs the LLM to bin data itself in Python ([`19cca4b`](https://github.com/sathish-t/nanalogue-gui/commit/19cca4b5529bc483c85f2b2c4f9bcc823c590bad))
