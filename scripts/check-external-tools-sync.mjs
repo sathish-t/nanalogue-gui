@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 
-// Verifies that the three declarations of external AI tool names are in sync:
+// Verifies that the four declarations of external AI tool names are in sync:
 //
 //   1. EXTERNAL_FUNCTIONS constant in src/lib/ai-chat-constants.ts
 //   2. Source files in src/lib/ai-external-tools/ (excluding index.ts and *.test.ts)
 //   3. Top-level keys of the registration object inside Object.fromEntries(Object.entries({…}))
 //      in src/lib/monty-sandbox.ts
+//   4. "### tool_name(" section headings in src/lib/sandbox-prompt.ts
 //
 // Each location independently declares the set of external tools.  When a new
-// tool is added or an old one is removed, all three must be updated together.
+// tool is added or an old one is removed, all four must be updated together.
 // This script fails the commit if any pair is out of step with the others.
 //
 // Tool names are derived automatically from each source — no list of names is
@@ -17,12 +18,15 @@
 //   - From the folder   : filenames with kebab-to-snake conversion and .ts stripped.
 //   - From the sandbox  : top-level object keys parsed with a depth-tracking scan
 //                         so that nested braces inside values are not confused with keys.
+//   - From the prompt   : "### tool_name(" headings; checked against the canonical
+//                         set rather than extracted as an independent set (the prompt
+//                         is free-form prose and has no standalone name list).
 //
 // Modes:
-//   default  — reads all three sources from the git index (staged snapshot) via
+//   default  — reads all four sources from the git index (staged snapshot) via
 //              `git show :path` / `git ls-files --cached`.  Used by the pre-commit
 //              hook; unstaged working-tree edits are invisible and cannot skew the result.
-//   --all    — reads all three sources from disk.  Used by CI where nothing is staged.
+//   --all    — reads all four sources from disk.  Used by CI where nothing is staged.
 //
 // Run: node scripts/check-external-tools-sync.mjs          (pre-commit / manual)
 //      node scripts/check-external-tools-sync.mjs --all    (CI)
@@ -307,25 +311,49 @@ function reportPair(a, labelA, b, labelB) {
 const LABEL_CONSTANT = "EXTERNAL_FUNCTIONS (ai-chat-constants.ts)";
 const LABEL_FOLDER = "ai-external-tools/ files";
 const LABEL_SANDBOX = "registration object (monty-sandbox.ts)";
+const LABEL_PROMPT = "sandbox-prompt.ts (### tool_name( headings)";
 
 reportPair(constantNames, LABEL_CONSTANT, folderNames, LABEL_FOLDER);
 reportPair(constantNames, LABEL_CONSTANT, sandboxNames, LABEL_SANDBOX);
 reportPair(folderNames, LABEL_FOLDER, sandboxNames, LABEL_SANDBOX);
 
+/**
+ * Checks that every tool in `canonicalNames` has a "### tool_name(" section
+ * heading in src/lib/sandbox-prompt.ts. Uses the canonical set rather than
+ * extracting an independent set because the prompt is free-form prose.
+ *
+ * @param {Set<string>} canonicalNames - The authoritative set of tool names.
+ */
+function checkPromptMentions(canonicalNames) {
+    const relPath = "src/lib/sandbox-prompt.ts";
+    const source = readSource(relPath);
+    const missing = [...canonicalNames]
+        .filter((name) => !source.includes(`### ${name}(`))
+        .sort();
+    if (missing.length === 0) return;
+    errors.push(`  ✗ ${LABEL_PROMPT} — missing headings:`);
+    for (const n of missing) {
+        errors.push(`      "${n}" — add "### ${n}(..." heading to ${relPath}`);
+    }
+}
+
+checkPromptMentions(constantNames);
+
 if (errors.length > 0) {
     console.error("check-external-tools-sync FAILED:\n");
     for (const line of errors) console.error(line);
     console.error(
-        "\nAll three locations must declare the same set of tool names.\n" +
+        "\nAll four locations must declare the same set of tool names.\n" +
             "When adding or removing a tool, update all of:\n" +
             "  1. EXTERNAL_FUNCTIONS in src/lib/ai-chat-constants.ts\n" +
             "  2. The tool file in src/lib/ai-external-tools/\n" +
-            "  3. The registration object in src/lib/monty-sandbox.ts",
+            "  3. The registration object in src/lib/monty-sandbox.ts\n" +
+            "  4. A ### tool_name(... heading in src/lib/sandbox-prompt.ts",
     );
     process.exit(1);
 }
 
 const total = constantNames.size;
 console.log(
-    `check-external-tools-sync PASSED — ${total} tool(s) consistent across all three locations.`,
+    `check-external-tools-sync PASSED — ${total} tool(s) consistent across all four locations.`,
 );
