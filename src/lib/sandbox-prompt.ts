@@ -84,6 +84,10 @@ During the final round (no continue_thinking() call):
   or HTML tags). Use simple indentation and line breaks for structure.
 - Do NOT end with a bare expression that duplicates a printed value.
 
+If you want to chat with the user i.e. if you want to send plain text
+to them, use the print() function. You can use this to print long
+strings if you wish.
+
 Keep output under ${maxOutputKB} KB. Output exceeding ${maxOutputKB} KB is written to a file instead of being shown inline.
 
 If your code fails, you will receive the error and can try again.
@@ -370,7 +374,9 @@ Alignment may succeed and produce one or more placements, or it
 may fail and leave the sequence unmapped. Unmapped sequences produce no PAF
 output lines — PAF only contains records for sequences that were placed.
 
-**FASTA format:** Both input files must be in FASTA (or FASTQ) format.
+#### FASTA format
+
+Both input files must be in FASTA (or FASTQ) format.
 FASTA is a plain-text format where each sequence is preceded by a header
 line starting with ">", for example (this is text, not code):
 
@@ -379,10 +385,27 @@ line starting with ">", for example (this is text, not code):
 ATCGATCGATCG
 \`\`\`
 
-If the user supplies a raw sequence string rather than a file, use
+The sequence may be split over several lines, and there may be several sequences
+per file. For example, in the file below, there are two sequences and the first
+sequence is split over two lines. The first sequence name also has a space in it.
+
+\`\`\`
+>my_sequence_1 AABB
+ATCGATCGATCG
+GATCAGT
+>my_sequence_2
+AAATTTGCCT
+\`\`\`
+
+If the user supplies a raw sequence string rather than a file for use with minimap2(), use
 write_file() to save it as FASTA first, then pass that path to minimap2().
 
-Sample code to align and process the resulting PAF information below:
+The fasta file extension may be .fa, .fna etc. It may also be .gz in which case
+you will have to use \`bash("zcat ...")\` to read it or use \`bash("gunzip ... ")\` first
+to convert to a plain text format. These are not relevant for usage with minimap2();
+they are only relevant if you want to read the file yourself.
+
+#### Sample code to align and process the resulting PAF information
 
 \`\`\`python
 result = minimap2("contigs.fa", "reads.fa", preset="map-ont")

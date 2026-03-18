@@ -750,7 +750,12 @@ function buildExecutionFeedback(
     // learns the expected format.
     if (result.errorType === "SyntaxError") {
         errorPayload.hint =
-            "Your response was not valid Python. You must respond with Python code only — no markdown, no prose, no explanation. Use # comments for thinking.";
+            "Your response was not valid Python. You must respond with Python code only — " +
+            "no markdown, no prose, no explanation. " +
+            "Use # comments for thinking. " +
+            'If you want to talk directly to the user, use print("") — ' +
+            "you can use arbitrarily long strings. " +
+            "Use print() for this, not continue_thinking() and not print(continue_thinking(...)) etc.";
     }
     return `Code execution result: ${JSON.stringify(errorPayload)}`;
 }
