@@ -9,6 +9,7 @@ import {
     CONFIG_FIELD_SPECS,
     CONTEXT_BUDGET_FRACTION,
     DEFAULT_MAX_CODE_ROUNDS,
+    DEFAULT_MAX_COMPLETION_TOKENS,
     DEFAULT_MAX_CUMULATIVE_SANDBOX_MS,
     FEEDBACK_OUTPUT_MAX_BYTES,
     MAX_FACTS_BYTES,
@@ -529,7 +530,7 @@ async function fetchChatCompletion(
             : "max_completion_tokens";
     const payload: Record<string, unknown> = {
         model,
-        [maxTokensField]: 4096,
+        [maxTokensField]: DEFAULT_MAX_COMPLETION_TOKENS,
         messages: [{ role: "system", content: systemPrompt }, ...messages],
     };
     // Only include temperature when explicitly set — omitting lets the

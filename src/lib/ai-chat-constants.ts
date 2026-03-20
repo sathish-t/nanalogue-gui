@@ -49,6 +49,10 @@ export const /** Maximum output bytes ceiling. */ MAX_OUTPUT_BYTES = 80 * 1024;
 export const /** Maximum terminal output before writing to a file instead of showing inline. */ TERMINAL_OUTPUT_OVERFLOW_BYTES = 10_240;
 export const /** Maximum bytes for execution feedback sent back to the LLM. */ FEEDBACK_OUTPUT_MAX_BYTES = 10_240;
 
+// --- LLM request parameters ---
+
+export const /** Maximum completion tokens sent to the LLM per request. */ DEFAULT_MAX_COMPLETION_TOKENS = 4096;
+
 // --- Message size limits ---
 
 export const /** Maximum bytes for a single user message (100 KB). */ MAX_MESSAGE_BYTES =
