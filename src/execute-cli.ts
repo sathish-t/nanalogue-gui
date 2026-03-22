@@ -78,8 +78,8 @@ Sandbox limits:
   --max-duration-secs <n>  Best-effort sandbox time limit in seconds (bash cancelled at limit; native reads in progress may finish) (default: ${600})
   --max-memory-mb <n>      Max sandbox memory in MB (default: ${512})
   --max-allocations <n>    Max sandbox VM allocations (default: ${100_000})
-  --max-read-mb <n>        Max read_file size in MB (default: ${1})
-  --max-write-mb <n>       Max write_file size in MB (default: ${50})
+  --max-read-mb <n>        Max read_file text size in MB (BAM access is not affected) (default: ${1})
+  --max-write-mb <n>       Max write_file text size in MB (BAM access is not affected) (default: ${50})
 
 Other:
   -v, --version            Print version and exit

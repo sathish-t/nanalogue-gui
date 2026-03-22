@@ -90,14 +90,14 @@ export const /** Validation specs for each integer AiChatConfig field (temperatu
             min: 1,
             max: 100,
             fallback: 1,
-            label: "max read_file size (MB)",
+            label: "max read_file text size (MB)",
         },
         /** Per write_file call limit; 1 MB floor, 100 MB ceiling (V8 string length constraint). */
         maxWriteMB: {
             min: 1,
             max: 100,
             fallback: 50,
-            label: "max write_file size (MB)",
+            label: "max write_file text size (MB)",
         },
     };
 

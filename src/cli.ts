@@ -105,8 +105,8 @@ ${BOLD}Advanced options:${RESET}
   --max-duration-secs <n>  Best-effort sandbox time limit in seconds (bash cancelled at limit; native reads in progress may finish) (default: ${CONFIG_FIELD_SPECS.maxDurationSecs.fallback})
   --max-memory-mb <n>      Max sandbox memory in MB (default: ${CONFIG_FIELD_SPECS.maxMemoryMB.fallback})
   --max-allocations <n>    Max sandbox VM allocations (default: ${CONFIG_FIELD_SPECS.maxAllocations.fallback})
-  --max-read-mb <n>        Max read_file size in MB (default: ${CONFIG_FIELD_SPECS.maxReadMB.fallback})
-  --max-write-mb <n>       Max write_file size in MB (default: ${CONFIG_FIELD_SPECS.maxWriteMB.fallback})
+  --max-read-mb <n>        Max read_file text size in MB (BAM access is not affected) (default: ${CONFIG_FIELD_SPECS.maxReadMB.fallback})
+  --max-write-mb <n>       Max write_file text size in MB (BAM access is not affected) (default: ${CONFIG_FIELD_SPECS.maxWriteMB.fallback})
   --temperature <n>        LLM sampling temperature 0-2 (default: provider default)
 
 ${BOLD}Other:${RESET}
