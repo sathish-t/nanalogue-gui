@@ -9,10 +9,10 @@ These rules are conventions enforced by code review.
 ## Layer diagram
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  renderer/  (browser context — no Node.js)          │
-│  e.g. landing, swipe, qc, ai-chat, shared, ...      │
-└────────────────────┬────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  renderer/  (browser context — no Node.js)           │
+│  e.g. landing, swipe, qc, locate, ai-chat, shared, … │
+└────────────────────┬─────────────────────────────────┘
                      │ window.electronAPI (contextBridge)
 ┌────────────────────▼────────────────────────────────┐
 │  preload.ts  (IPC bridge only — no business logic)  │

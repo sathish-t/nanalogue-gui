@@ -24,7 +24,8 @@ handleUserMessage (src/lib/chat-orchestrator.ts)
      ├──► runSandboxGuarded → Monty sandbox (src/lib/monty-sandbox.ts)
      │         executes code, captures print() output and expression value
      │         external functions: peek, read_info, bam_mods, window_reads,
-     │         seq_table, ls, read_file, write_file, continue_thinking
+     │         seq_table, ls, read_file, write_file, plot_histogram,
+     │         plot_series, bash, minimap2, continue_thinking
      └──► result fed back to LLM or shown to user
 ```
 
@@ -78,7 +79,7 @@ renderer and by `pruneFailedRounds()`.
 The sandbox is an embedded Python interpreter (`@pydantic/monty`) running
 in the Node.js main process. It has no filesystem, network, or import
 access — the only way code can interact with the outside world is through
-the nine registered external functions.
+the thirteen registered external functions.
 
 ### External functions
 
@@ -95,6 +96,10 @@ are user-configurable. See [advanced-options.md](advanced-options.md).
 | `ls(glob?)` | Lists files under the allowed directory, up to 500 entries |
 | `read_file(path, ...)` | Reads a text file, up to 1 MB per call |
 | `write_file(path, content)` | Writes to `{allowedDir}/ai_chat_output/` only |
+| `plot_histogram(data, ...)` | Renders a histogram as an SVG file in `ai_chat_output/` |
+| `plot_series(data, ...)` | Renders an XY series plot as an SVG file in `ai_chat_output/` |
+| `bash(command)` | Runs a shell command with restricted access |
+| `minimap2(query, target, ...)` | Runs minimap2 alignment via WebAssembly |
 | `continue_thinking()` | Signals the orchestrator to feed this round's output back to the LLM instead of showing it to the user |
 
 All path arguments go through `resolvePath()`, which calls `realpath` and

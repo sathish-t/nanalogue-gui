@@ -1,4 +1,4 @@
-/* Shared styles for the swipe mode renderer page. */
+/* Shared styles for all renderer pages. */
 
 /* Root font size: 14px for medium (the default). Overridden by the font-small
    and font-large classes applied by applyFontSize() on each page load.

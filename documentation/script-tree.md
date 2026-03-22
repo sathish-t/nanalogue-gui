@@ -88,7 +88,7 @@ src/
       chart-font-size.ts     # Reads the font-size CSS class applied to <html> by applyFontSize() and
       mod-filter-input.ts    # Reusable custom element for modification filter input with validation.
       output-file-input.ts   # Reusable custom element for output file selection with overwrite confirmation.
-      styles.css             # Shared styles for the swipe mode renderer page.
+      styles.css             # Shared styles for all renderer pages.
       window-size-input.ts   # Reusable custom element for window size input with inline validation.
     swipe/
       swipe-config.css      # Styles for the swipe configuration page.

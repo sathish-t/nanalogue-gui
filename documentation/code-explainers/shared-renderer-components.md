@@ -49,5 +49,5 @@ Call after `applyFontSize()` in any renderer that creates charts.
 
 **`styles.css`** — Base stylesheet linked by every HTML page. Provides
 the font-size preset rules, global reset, body defaults, the `#app` flex
-container, and shared swipe-viewer chrome (flash overlay, progress bar,
-overlays, etc.).
+container, and swipe-viewer chrome (flash overlay, progress bar,
+overlays, etc.) used by the swipe renderer.

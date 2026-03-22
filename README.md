@@ -446,7 +446,7 @@ sandbox capabilities.
 | `/exec <file.py>` | Run a Python file directly in the sandbox without sending it to the LLM |
 | `/dump_llm_instructions` | Dump the full LLM request payload from the last round to a `.log` file and a self-contained `.html` viewer in `ai_chat_output/` |
 | `/dump_system_prompt` | Dump the static system prompt to a log file in `ai_chat_output/` |
-| `/quit` | Exit the CLI |
+| `/quit` or `/exit` | Exit the CLI |
 | Ctrl+C during a request | Cancel the current request |
 | Ctrl+C at the prompt | Exit |
 

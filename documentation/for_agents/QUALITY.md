@@ -29,18 +29,43 @@ are created.
 | `qc-data-loader.ts` | `qc-data-loader.test.ts`, `qc-data-loader-async.test.ts` | A | Pure helpers + async functions (`peekBam`, `generateQCData`, paginators, `fetchSeqTable`) covered via mocked `@nanalogue/node`; 93% statement coverage |
 | `swipe-data-loader.ts` | `swipe-data-loader.test.ts`, `swipe-data-loader-async.test.ts` | A | Pure helpers + async functions (`loadContigSizes`, `loadPlotData`) covered via mocked `@nanalogue/node`; 100% statement coverage |
 | `locate-data-loader.ts` | `locate-data-loader.test.ts` | A | |
-| `chat-orchestrator.ts` | `chat-orchestrator.test.ts` | A | Mocked LLM responses in `tests/fixtures/` |
+| `chat-orchestrator.ts` | `chat-orchestrator.test.ts`, `chat-orchestrator-handle-message.test.ts`, `cross-endpoint.test.ts` | A | Mocked LLM responses in `tests/fixtures/`; handle-message and cross-endpoint suites add coverage for multi-round and provider-specific paths |
 | `chat-session.ts` | `chat-session.test.ts` | A | Includes error paths: generic errors, TimeoutError by name and message, non-Error rejections |
 | `monty-sandbox.ts` | `monty-sandbox.test.ts`, `monty-sandbox-helpers.test.ts`, `monty-sandbox-deny-list.test.ts` | A | Three test files; deny-list coverage is thorough |
 | `model-listing.ts` | `model-listing.test.ts` (+ integration) | A | Integration test skipped unless live keys present |
 | `ai-chat-constants.ts` | `ai-chat-constants.test.ts` | A | |
 | `ai-chat-ipc-validation.ts` | `ai-chat-ipc-validation.test.ts` | A | |
 | `system-append.ts` | `system-append.test.ts` | A | |
-| `sandbox-prompt.ts` | via `chat-orchestrator.test.ts` | A | Tested indirectly; 100% coverage |
+| `sandbox-prompt.ts` | `sandbox-prompt.test.ts`, also via `chat-orchestrator.test.ts` | A | Dedicated test file + indirect coverage; 100% coverage |
 | `chat-types.ts` | n/a | A | Types-only, no tests needed |
 | `types.ts` | n/a | A | Types-only |
+| `histogram-renderer.ts` | `histogram-renderer.test.ts` | A | 100% statement coverage |
+| `xy-renderer.ts` | `xy-renderer.test.ts` | A | 100% statement coverage |
+| `log-to-html.ts` | `log-to-html.test.ts` | A | 100% statement coverage |
 | `ai-chat-shared-constants.ts` | via `ai-chat-constants.test.ts` | B | Constants tested indirectly |
 | `sandbox-cli-args.ts` | via `cli.test.ts` | B | Tested indirectly through CLI |
+
+---
+
+## `src/lib/ai-external-tools/` — Sandbox external functions
+
+| Module | Tests | Grade | Notes |
+|---|---|---|---|
+| `index.ts` | via `ai-external-tools.test.ts` | A | 100% statement coverage |
+| `bam-mods.ts` | via `monty-sandbox.test.ts` | A | 100% statement coverage |
+| `bash.ts` | `bash.test.ts` | A | 100% statement coverage |
+| `continue-thinking.ts` | via `monty-sandbox.test.ts` | A | 100% statement coverage |
+| `ls.ts` | via `monty-sandbox.test.ts` | A | 100% statement coverage |
+| `minimap2.ts` | `minimap2.test.ts` | A | 100% statement coverage |
+| `peek.ts` | via `monty-sandbox.test.ts` | A | 100% statement coverage |
+| `plot-histogram.ts` | `plot-histogram.test.ts` | A | 100% statement coverage |
+| `plot-series.ts` | `plot-series.test.ts` | A | 100% statement coverage |
+| `plot-utils.ts` | via `plot-histogram.test.ts`, `plot-series.test.ts` | A | 100% statement coverage |
+| `read-file.ts` | via `monty-sandbox.test.ts` | A | 100% statement coverage |
+| `read-info.ts` | via `monty-sandbox.test.ts` | A | 100% statement coverage |
+| `seq-table.ts` | via `monty-sandbox.test.ts` | A | 100% statement coverage |
+| `window-reads.ts` | via `monty-sandbox.test.ts` | A | 100% statement coverage |
+| `write-file.ts` | via `monty-sandbox.test.ts` | A | 100% statement coverage |
 
 ---
 
@@ -59,7 +84,7 @@ are created.
 | Module | Tests | Grade | Notes |
 |---|---|---|---|
 | `landing/landing.ts` | `landing.test.ts` | B | ~72% statement coverage |
-| `ai-chat/ai-chat.ts` | `ai-chat/ai-chat.test.ts` | B | ~72% statement coverage |
+| `ai-chat/ai-chat.ts` | `ai-chat/ai-chat.test.ts` | B | ~75% statement coverage |
 | `qc/qc-config.ts` | `qc-config.test.ts` | B | State, filters, async loading |
 | `qc/qc-results.ts` | `qc-results.test.ts` | B | Chart rendering, tab switching |
 | `swipe/swipe-config.ts` | `swipe-config.test.ts` | B | Config form state, validation |
@@ -70,7 +95,7 @@ are created.
 | `shared/chart-font-size.ts` | `chart-font-size.test.ts` | A | 100% statement coverage |
 | `shared/output-file-input.ts` | `output-file-input.test.ts` | B | DOM structure, state, events, overwrite flow; 99% statement coverage |
 | `locate/locate-config.ts` | `locate-config.test.ts` | B | HTML template structure and default state; 100% statement coverage |
-| `shared/apply-font-size.ts` | none | C | Simple DOM mutation; low risk |
+| `shared/apply-font-size.ts` | covered indirectly | B | 100% statement coverage; no dedicated test file but fully covered via other renderer tests |
 
 ---
 
