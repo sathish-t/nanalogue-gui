@@ -14,6 +14,18 @@ import * as aiChatModule from "./modes/ai-chat";
 import * as qcModule from "./modes/qc";
 import * as swipeModule from "./modes/swipe";
 
+// Disable GPU acceleration on WSL — the virtual GPU often fails to set up a
+// compositing surface, leaving the window visible in the taskbar but unable to
+// render.  Software compositing is sufficient for this app (2-D canvas charts,
+// CSS animations, DOM updates — no WebGL or 3-D).
+try {
+    if (/microsoft/i.test(readFileSync("/proc/version", "utf8"))) {
+        app.disableHardwareAcceleration();
+    }
+} catch {
+    // Not on Linux / WSL — nothing to do.
+}
+
 /**
  * The application mode representing the current screen of the GUI.
  */
