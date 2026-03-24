@@ -55,7 +55,7 @@ contextBridge.exposeInMainWorld("api", {
      *
      * @returns A promise that resolves with the selected file path, or null if cancelled.
      */
-    swipePickBam: () => ipcRenderer.invoke("swipe-pick-bam"),
+    swipePickBam: () => ipcRenderer.invoke("pick-bam"),
 
     /**
      * Open a native file dialog for selecting a BED annotations file for swipe mode.
@@ -69,7 +69,7 @@ contextBridge.exposeInMainWorld("api", {
      *
      * @returns A promise that resolves with the selected file path, or null if cancelled.
      */
-    swipePickOutput: () => ipcRenderer.invoke("swipe-pick-output"),
+    swipePickOutput: () => ipcRenderer.invoke("pick-output-bed"),
 
     /**
      * Count the number of non-empty lines in a BED file.
@@ -87,7 +87,7 @@ contextBridge.exposeInMainWorld("api", {
      * @returns A promise that resolves with true if the file exists.
      */
     swipeCheckFileExists: (filePath: string) =>
-        ipcRenderer.invoke("swipe-check-file-exists", filePath),
+        ipcRenderer.invoke("check-file-exists", filePath),
 
     /**
      * Initialize swipe mode and navigate to the swipe review interface.
@@ -252,7 +252,7 @@ contextBridge.exposeInMainWorld("api", {
      *
      * @returns A promise that resolves with the selected file path, or null if cancelled.
      */
-    locatePickBam: () => ipcRenderer.invoke("locate-pick-bam"),
+    locatePickBam: () => ipcRenderer.invoke("pick-bam"),
 
     /**
      * Open a native file dialog for selecting a read ID text file.
@@ -266,7 +266,7 @@ contextBridge.exposeInMainWorld("api", {
      *
      * @returns A promise that resolves with the selected file path, or null if cancelled.
      */
-    locatePickOutput: () => ipcRenderer.invoke("locate-pick-output"),
+    locatePickOutput: () => ipcRenderer.invoke("pick-output-bed"),
 
     /**
      * Check whether a file exists at the given path.
@@ -275,7 +275,7 @@ contextBridge.exposeInMainWorld("api", {
      * @returns A promise that resolves with true if the file exists.
      */
     locateCheckFileExists: (filePath: string) =>
-        ipcRenderer.invoke("locate-check-file-exists", filePath),
+        ipcRenderer.invoke("check-file-exists", filePath),
 
     /**
      * Count the number of non-empty lines in a read ID file.

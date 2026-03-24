@@ -308,10 +308,10 @@ ipcMain.handle(
     },
 );
 
-// Swipe config page IPC handlers
+// Shared file-picker IPC handlers (used by swipe, locate, and QC modes)
 
 ipcMain.handle(
-    "swipe-pick-bam",
+    "pick-bam",
     /**
      * Opens a native file dialog for selecting a BAM or CRAM file.
      *
@@ -335,6 +335,40 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
+    "pick-output-bed",
+    /**
+     * Opens a native save dialog for selecting the output BED file path.
+     *
+     * @returns The selected file path, or null if cancelled.
+     */
+    async () => {
+        if (!mainWindow) return null;
+        const result = await dialog.showSaveDialog(mainWindow, {
+            title: "Select output BED file",
+            filters: [{ name: "BED files", extensions: ["bed"] }],
+        });
+        if (result.canceled || !result.filePath) return null;
+        return result.filePath;
+    },
+);
+
+ipcMain.handle(
+    "check-file-exists",
+    /**
+     * Checks whether a file exists at the given path.
+     *
+     * @param _event - The IPC event (unused).
+     * @param filePath - The path to check.
+     * @returns True if the file exists, false otherwise.
+     */
+    (_event, filePath: string) => {
+        return existsSync(filePath);
+    },
+);
+
+// Swipe config page IPC handlers
+
+ipcMain.handle(
     "swipe-pick-bed",
     /**
      * Opens a native file dialog for selecting a BED annotations file.
@@ -354,25 +388,6 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-    "swipe-pick-output",
-    /**
-     * Opens a native save dialog for selecting the output BED file path.
-     *
-     * @returns The selected file path, or null if cancelled.
-     */
-    async () => {
-        if (!mainWindow) return null;
-        const result = await dialog.showSaveDialog(mainWindow, {
-            title: "Select output BED file",
-            filters: [{ name: "BED files", extensions: ["bed"] }],
-            defaultPath: "accepted_annotations.bed",
-        });
-        if (result.canceled || !result.filePath) return null;
-        return result.filePath;
-    },
-);
-
-ipcMain.handle(
     "swipe-count-bed-lines",
     /**
      * Counts BED data lines, skipping header and comment lines.
@@ -383,20 +398,6 @@ ipcMain.handle(
      */
     async (_event, filePath: string) => {
         return countBedDataLines(filePath);
-    },
-);
-
-ipcMain.handle(
-    "swipe-check-file-exists",
-    /**
-     * Checks whether a file exists at the given path.
-     *
-     * @param _event - The IPC event (unused).
-     * @param filePath - The path to check.
-     * @returns True if the file exists, false otherwise.
-     */
-    (_event, filePath: string) => {
-        return existsSync(filePath);
     },
 );
 
@@ -548,30 +549,6 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-    "locate-pick-bam",
-    /**
-     * Opens a native file dialog for selecting a BAM or CRAM file in locate mode.
-     *
-     * @returns The selected file path, or null if cancelled.
-     */
-    async () => {
-        if (!mainWindow) return null;
-        const result = await dialog.showOpenDialog(mainWindow, {
-            title: "Select BAM/CRAM file",
-            filters: [
-                {
-                    name: "Alignment files",
-                    extensions: ["bam", "BAM", "cram", "CRAM"],
-                },
-            ],
-            properties: ["openFile"],
-        });
-        if (result.canceled || result.filePaths.length === 0) return null;
-        return result.filePaths[0];
-    },
-);
-
-ipcMain.handle(
     "locate-pick-read-ids",
     /**
      * Opens a native file dialog for selecting a read ID text file.
@@ -590,39 +567,6 @@ ipcMain.handle(
         });
         if (result.canceled || result.filePaths.length === 0) return null;
         return result.filePaths[0];
-    },
-);
-
-ipcMain.handle(
-    "locate-pick-output",
-    /**
-     * Opens a native save dialog for selecting the output BED file path.
-     *
-     * @returns The selected file path, or null if cancelled.
-     */
-    async () => {
-        if (!mainWindow) return null;
-        const result = await dialog.showSaveDialog(mainWindow, {
-            title: "Select output BED file",
-            filters: [{ name: "BED files", extensions: ["bed"] }],
-            defaultPath: "located_reads.bed",
-        });
-        if (result.canceled || !result.filePath) return null;
-        return result.filePath;
-    },
-);
-
-ipcMain.handle(
-    "locate-check-file-exists",
-    /**
-     * Checks whether a file exists at the given path.
-     *
-     * @param _event - The IPC event (unused).
-     * @param filePath - The path to check.
-     * @returns True if the file exists, false otherwise.
-     */
-    (_event, filePath: string) => {
-        return existsSync(filePath);
     },
 );
 

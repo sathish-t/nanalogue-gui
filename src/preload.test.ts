@@ -254,9 +254,9 @@ describe("invoke routing", () => {
     // -----------------------------------------------------------------------
 
     it.each([
-        ["swipePickBam", "swipe-pick-bam"],
+        ["swipePickBam", "pick-bam"],
         ["swipePickBed", "swipe-pick-bed"],
-        ["swipePickOutput", "swipe-pick-output"],
+        ["swipePickOutput", "pick-output-bed"],
         ["swipeGoBack", "swipe-go-back"],
     ] as const)("%s forwards to %s", (method, channel) => {
         (exposedApi[method] as () => void)();
@@ -271,12 +271,12 @@ describe("invoke routing", () => {
         );
     });
 
-    it("swipeCheckFileExists forwards to swipe-check-file-exists with filePath", () => {
+    it("swipeCheckFileExists forwards to check-file-exists with filePath", () => {
         (exposedApi.swipeCheckFileExists as (p: string) => void)(
             "/data/out.bed",
         );
         expect(ipcRenderer.invoke).toHaveBeenCalledWith(
-            "swipe-check-file-exists",
+            "check-file-exists",
             "/data/out.bed",
         );
     });
@@ -404,19 +404,19 @@ describe("invoke routing", () => {
     // -----------------------------------------------------------------------
 
     it.each([
-        ["locatePickBam", "locate-pick-bam"],
+        ["locatePickBam", "pick-bam"],
         ["locatePickReadIds", "locate-pick-read-ids"],
-        ["locatePickOutput", "locate-pick-output"],
+        ["locatePickOutput", "pick-output-bed"],
         ["locateGoBack", "locate-go-back"],
     ] as const)("%s forwards to %s", (method, channel) => {
         (exposedApi[method] as () => void)();
         expect(ipcRenderer.invoke).toHaveBeenCalledWith(channel);
     });
 
-    it("locateCheckFileExists forwards to locate-check-file-exists with filePath", () => {
+    it("locateCheckFileExists forwards to check-file-exists with filePath", () => {
         (exposedApi.locateCheckFileExists as (p: string) => void)("/ids.txt");
         expect(ipcRenderer.invoke).toHaveBeenCalledWith(
-            "locate-check-file-exists",
+            "check-file-exists",
             "/ids.txt",
         );
     });
