@@ -82,6 +82,7 @@ src/
       qc-results.html
       qc-results.ts         # QC results page renderer
       qc.css                # Styles for QC configuration and results pages.
+      seq-mini-charts.ts    # Mini sparkline histograms for the QC Sequences tab.
     shared/
       apply-font-size.ts     # Reads the fontSize URL query parameter and applies the matching CSS class
       bam-resource-input.ts  # Reusable custom element for BAM file/URL source selection

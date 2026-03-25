@@ -26,6 +26,15 @@ const MEDIUM: ChartFontSizes = { tick: 12, title: 13, legend: 12 };
 /** Pixel sizes used for the large font-size preset (18 px root). */
 const LARGE: ChartFontSizes = { tick: 15, title: 17, legend: 16 };
 
+/** Mini chart pixel sizes for the small font-size preset. */
+const MINI_SMALL: ChartFontSizes = { tick: 7, title: 8, legend: 8 };
+
+/** Mini chart pixel sizes for the medium font-size preset. */
+const MINI_MEDIUM: ChartFontSizes = { tick: 8, title: 9, legend: 9 };
+
+/** Mini chart pixel sizes for the large font-size preset. */
+const MINI_LARGE: ChartFontSizes = { tick: 10, title: 12, legend: 11 };
+
 /**
  * Returns Chart.js font sizes scaled to match the active font-size preset.
  *
@@ -40,4 +49,19 @@ export function getChartFontSizes(): ChartFontSizes {
     if (classes.contains("font-small")) return SMALL;
     if (classes.contains("font-large")) return LARGE;
     return MEDIUM;
+}
+
+/**
+ * Returns reduced Chart.js font sizes for compact mini charts.
+ *
+ * Uses the same font-size preset detection as {@link getChartFontSizes} but
+ * returns smaller values suitable for sparkline-sized histogram cards.
+ *
+ * @returns The {@link ChartFontSizes} scaled down for mini charts.
+ */
+export function getMiniChartFontSizes(): ChartFontSizes {
+    const classes = document.documentElement.classList;
+    if (classes.contains("font-small")) return MINI_SMALL;
+    if (classes.contains("font-large")) return MINI_LARGE;
+    return MINI_MEDIUM;
 }

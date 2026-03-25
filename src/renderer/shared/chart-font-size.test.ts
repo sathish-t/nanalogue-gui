@@ -4,7 +4,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it } from "vitest";
-import { getChartFontSizes } from "./chart-font-size";
+import { getChartFontSizes, getMiniChartFontSizes } from "./chart-font-size";
 
 /**
  * Removes all font-size classes from the document root element.
@@ -72,5 +72,58 @@ describe("getChartFontSizes", () => {
         expect(large.tick).toBeGreaterThan(medium.tick);
         expect(large.title).toBeGreaterThan(medium.title);
         expect(large.legend).toBeGreaterThan(medium.legend);
+    });
+});
+
+describe("getMiniChartFontSizes", () => {
+    it("returns mini medium sizes when no font class is set", () => {
+        clearFontClasses();
+        const sizes = getMiniChartFontSizes();
+        expect(sizes.tick).toBe(8);
+        expect(sizes.title).toBe(9);
+        expect(sizes.legend).toBe(9);
+    });
+
+    it("returns mini small sizes when font-small class is set", () => {
+        document.documentElement.classList.add("font-small");
+        const sizes = getMiniChartFontSizes();
+        expect(sizes.tick).toBe(7);
+        expect(sizes.title).toBe(8);
+        expect(sizes.legend).toBe(8);
+    });
+
+    it("returns mini large sizes when font-large class is set", () => {
+        document.documentElement.classList.add("font-large");
+        const sizes = getMiniChartFontSizes();
+        expect(sizes.tick).toBe(10);
+        expect(sizes.title).toBe(12);
+        expect(sizes.legend).toBe(11);
+    });
+
+    it("mini sizes are strictly less than regular sizes for each preset", () => {
+        clearFontClasses();
+        expect(getMiniChartFontSizes().tick).toBeLessThan(
+            getChartFontSizes().tick,
+        );
+        expect(getMiniChartFontSizes().title).toBeLessThan(
+            getChartFontSizes().title,
+        );
+
+        document.documentElement.classList.add("font-small");
+        expect(getMiniChartFontSizes().tick).toBeLessThan(
+            getChartFontSizes().tick,
+        );
+        expect(getMiniChartFontSizes().title).toBeLessThan(
+            getChartFontSizes().title,
+        );
+
+        clearFontClasses();
+        document.documentElement.classList.add("font-large");
+        expect(getMiniChartFontSizes().tick).toBeLessThan(
+            getChartFontSizes().tick,
+        );
+        expect(getMiniChartFontSizes().title).toBeLessThan(
+            getChartFontSizes().title,
+        );
     });
 });

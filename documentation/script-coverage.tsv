@@ -44,6 +44,7 @@ src/modes/qc.ts	100
 src/modes/swipe.ts	98.82
 src/preload.ts	100
 src/renderer/ai-chat/ai-chat.ts	75.27
+src/renderer/qc/seq-mini-charts.ts	100
 src/renderer/shared/apply-font-size.ts	100
 src/renderer/shared/bam-resource-input.ts	100
 src/renderer/shared/chart-font-size.ts	100

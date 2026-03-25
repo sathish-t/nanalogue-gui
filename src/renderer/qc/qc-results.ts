@@ -13,6 +13,7 @@ import {
 import type { HistogramBin, Stats, YieldBin } from "../../lib/stats";
 import type { SeqTableRow } from "../../lib/types";
 import { getChartFontSizes } from "../shared/chart-font-size";
+import { renderSeqMiniCharts } from "./seq-mini-charts";
 
 /**
  * Chart.js constructor declared as an ambient global.
@@ -1095,6 +1096,15 @@ async function initialize(): Promise<void> {
             data.seqTableSkipReason,
             data.seqTableAmbiguousReadIds,
         );
+
+        // Mini sparkline histograms for insertion rate, deletion rate, and quality
+        if (data.seqTableRows && data.seqTableRows.length > 0) {
+            renderSeqMiniCharts(
+                "seq-table-container",
+                data.seqTableRows,
+                charts,
+            );
+        }
 
         setupTabs();
     } catch (error) {

@@ -51,7 +51,7 @@ const EXCEPTIONS = new Map([
     // Source files above the 800-line ceiling:
     ["src/lib/chat-orchestrator.ts", 1341],
     ["src/renderer/ai-chat/ai-chat.ts", 1183],
-    ["src/renderer/qc/qc-results.ts", 1146],
+    ["src/renderer/qc/qc-results.ts", 1156], // +10 for mini-chart integration
     // log-to-html.ts is self-contained by design: inlined CSS, JS, and JSDoc
     // account for the majority of lines; logic itself is well under the limit.
     ["src/lib/log-to-html.ts", 816],

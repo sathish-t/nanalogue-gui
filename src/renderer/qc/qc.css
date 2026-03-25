@@ -531,6 +531,47 @@ input[type="number"]:focus {
     display: none;
 }
 
+/* Horizontal row of mini sparkline histograms above the sequence table. */
+.mini-charts-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+/* Individual mini chart card with fixed compact dimensions. */
+.mini-chart-card {
+    background: #f8f8f8;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    flex: 1;
+    max-width: 280px;
+    padding: 10px 12px 8px;
+}
+
+/* Heading above each mini chart. */
+.mini-chart-card h3 {
+    color: #666;
+    font-size: 0.786rem;
+    font-weight: 600;
+    margin: 0 0 6px;
+    text-transform: uppercase;
+}
+
+/* Compact canvas container for mini charts. */
+.mini-chart-container {
+    height: 120px;
+    position: relative;
+    width: 100%;
+}
+
+/* Median label beneath each mini chart. */
+.mini-chart-median {
+    color: #888;
+    font-size: 0.714rem;
+    margin-top: 4px;
+    text-align: center;
+}
+
 /* Button to open the full BAM details dialog. */
 #btn-more-info {
     margin-top: 10px;
