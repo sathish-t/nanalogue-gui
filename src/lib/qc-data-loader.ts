@@ -297,7 +297,7 @@ export function computeAvgQuality(qualities: number[]): number | null {
             sum += 10 ** (-0.1 * (q - qMin));
         }
     }
-    return qMin + Math.round(-10 * Math.log10(sum / count));
+    return qMin + Math.round(-100 * Math.log10(sum / count)) / 10;
 }
 
 /**

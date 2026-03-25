@@ -334,8 +334,8 @@ describe("matchBaseByLength", () => {
 describe("computeAvgQuality", () => {
     /** Verifies probability-based average excluding 255 values. */
     it("computes probability-based average excluding 255 values", () => {
-        // [10, 20, 30]: min=10, sum=10^0+10^-1+10^-2=1.11, 10+round(-10*log10(1.11/3))=14
-        expect(computeAvgQuality([10, 20, 255, 30])).toBe(14);
+        // [10, 20, 30]: min=10, sum=10^0+10^-1+10^-2=1.11, 10+round(-100*log10(1.11/3))/10=14.3
+        expect(computeAvgQuality([10, 20, 255, 30])).toBe(14.3);
     });
 
     /** Verifies null is returned when all values are 255. */

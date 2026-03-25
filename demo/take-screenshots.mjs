@@ -171,7 +171,7 @@ const AI_PROVIDERS = [
         name: "google",
         endpoint: "https://generativelanguage.googleapis.com/v1beta",
         keyEnv: "GOOGLE_API_KEY",
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-pro",
     },
     {
         name: "anthropic",

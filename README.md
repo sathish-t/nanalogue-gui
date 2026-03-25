@@ -149,13 +149,19 @@ QC result tabs:
 
 **Read length distribution:**
 
+Please note that this is from a simulated BAM file with artificial data.
+
 ![Read Lengths](demo/screenshot-qc-read-lengths.png)
 
 **Yield:**
 
+Please note that this is from a simulated BAM file with artificial data.
+
 ![Yield Curve](demo/screenshot-qc-yield.png)
 
 **Analogue density histogram:**
+
+Please note that this is from a simulated BAM file with artificial data.
 
 ![Analogue Density](demo/screenshot-qc-density.png)
 
@@ -166,6 +172,8 @@ Please note that this is from a simulated BAM file with artificial data.
 ![Raw Probability](demo/screenshot-qc-probability.png)
 
 **Per-read modification sequences:**
+
+Please note that this is from a simulated BAM file with artificial data.
 
 ![Sequences](demo/screenshot-qc-sequences.png)
 
@@ -191,6 +199,7 @@ Controls:
 
 **Reviewing an annotation:**
 
+Please note that this is from a simulated BAM file with artificial data.
 The grey points below are modification probabilities per genomic coordinate
 for which such information is available. The black line is windowed modification
 density i.e. we threshold the modification probability and then ask what fraction
@@ -200,6 +209,7 @@ of bases are modified within each window.
 
 **Reviewing another annotation:**
 
+Please note that this is from a simulated BAM file with artificial data.
 The grey and black annotations mean the same as above.
 
 ![Swipe review (another annotation)](demo/screenshot-swipe-review-2.png)
