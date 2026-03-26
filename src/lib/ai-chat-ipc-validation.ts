@@ -136,6 +136,60 @@ function validateNumber(
 }
 
 /**
+ * Validates a raw config object against CONFIG_FIELD_SPECS and TEMPERATURE_SPEC.
+ *
+ * Iterates over all integer field specs, falling back to defaults for missing
+ * or non-numeric values. Temperature is handled separately as an optional
+ * float (no rounding, no fallback). Returns a typed AiChatConfig on success
+ * or an error string collecting all violations.
+ *
+ * @param raw - The raw config record (treated as untrusted input).
+ * @returns A validated AiChatConfig or a semicolon-separated error string.
+ */
+function validateConfig(raw: Record<string, unknown>): AiChatConfig | string {
+    const configErrors: string[] = [];
+    const configValues = {} as Record<string, number>;
+    for (const [key, spec] of Object.entries(CONFIG_FIELD_SPECS)) {
+        const result = validateNumber(raw[key], spec);
+        if (typeof result === "string") {
+            configErrors.push(result);
+        } else {
+            configValues[key] = result;
+        }
+    }
+
+    // Temperature is optional and float-valued — handled separately from
+    // the integer CONFIG_FIELD_SPECS loop (no Math.round, no fallback).
+    let temperature: number | undefined;
+    if (raw.temperature !== undefined && raw.temperature !== null) {
+        if (
+            typeof raw.temperature !== "number" ||
+            !Number.isFinite(raw.temperature)
+        ) {
+            temperature = undefined;
+        } else if (
+            raw.temperature < TEMPERATURE_SPEC.min ||
+            raw.temperature > TEMPERATURE_SPEC.max
+        ) {
+            configErrors.push(
+                `${TEMPERATURE_SPEC.label} must be between ${TEMPERATURE_SPEC.min} and ${TEMPERATURE_SPEC.max} (got ${raw.temperature})`,
+            );
+        } else {
+            temperature = raw.temperature;
+        }
+    }
+
+    if (configErrors.length > 0) {
+        return configErrors.join("; ");
+    }
+
+    return {
+        ...configValues,
+        temperature,
+    } as unknown as AiChatConfig;
+}
+
+/**
  * Validates the payload for the ai-chat-get-system-prompt IPC channel.
  *
  * The config field is optional — any missing or non-numeric field falls back
@@ -158,46 +212,10 @@ export function validateGetSystemPrompt(
             ? (p.config as Record<string, unknown>)
             : {};
 
-    const configErrors: string[] = [];
-    const configValues = {} as Record<string, number>;
-    for (const [key, spec] of Object.entries(CONFIG_FIELD_SPECS)) {
-        const result = validateNumber(rawConfig[key], spec);
-        if (typeof result === "string") {
-            configErrors.push(result);
-        } else {
-            configValues[key] = result;
-        }
+    const configResult = validateConfig(rawConfig);
+    if (typeof configResult === "string") {
+        return { valid: false, error: configResult };
     }
-
-    // Temperature is optional and float-valued — handled separately from
-    // the integer CONFIG_FIELD_SPECS loop (no Math.round, no fallback).
-    let temperature: number | undefined;
-    if (rawConfig.temperature !== undefined && rawConfig.temperature !== null) {
-        if (
-            typeof rawConfig.temperature !== "number" ||
-            !Number.isFinite(rawConfig.temperature)
-        ) {
-            temperature = undefined;
-        } else if (
-            rawConfig.temperature < TEMPERATURE_SPEC.min ||
-            rawConfig.temperature > TEMPERATURE_SPEC.max
-        ) {
-            configErrors.push(
-                `${TEMPERATURE_SPEC.label} must be between ${TEMPERATURE_SPEC.min} and ${TEMPERATURE_SPEC.max} (got ${rawConfig.temperature})`,
-            );
-        } else {
-            temperature = rawConfig.temperature;
-        }
-    }
-
-    if (configErrors.length > 0) {
-        return { valid: false, error: configErrors.join("; ") };
-    }
-
-    const config = {
-        ...configValues,
-        temperature,
-    } as unknown as AiChatConfig;
 
     // allowedDir is optional — accept a non-empty absolute path only,
     // matching the same constraint enforced by ai-chat-send-message.
@@ -208,7 +226,7 @@ export function validateGetSystemPrompt(
             ? p.allowedDir
             : undefined;
 
-    return { valid: true, data: { config, allowedDir } };
+    return { valid: true, data: { config: configResult, allowedDir } };
 }
 
 /**
@@ -284,44 +302,10 @@ export function validateSendMessage(
             ? (p.config as Record<string, unknown>)
             : {};
 
-    const configErrors: string[] = [];
-    const configValues = {} as Record<string, number>;
-    for (const [key, spec] of Object.entries(CONFIG_FIELD_SPECS)) {
-        const result = validateNumber(rawConfig[key], spec);
-        if (typeof result === "string") {
-            configErrors.push(result);
-        } else {
-            configValues[key] = result;
-        }
+    const configResult = validateConfig(rawConfig);
+    if (typeof configResult === "string") {
+        return { valid: false, error: configResult };
     }
-    // Temperature is optional and float-valued — handled separately from
-    // the integer CONFIG_FIELD_SPECS loop (no Math.round, no fallback).
-    let temperature: number | undefined;
-    if (rawConfig.temperature !== undefined && rawConfig.temperature !== null) {
-        if (
-            typeof rawConfig.temperature !== "number" ||
-            !Number.isFinite(rawConfig.temperature)
-        ) {
-            temperature = undefined;
-        } else if (
-            rawConfig.temperature < TEMPERATURE_SPEC.min ||
-            rawConfig.temperature > TEMPERATURE_SPEC.max
-        ) {
-            configErrors.push(
-                `${TEMPERATURE_SPEC.label} must be between ${TEMPERATURE_SPEC.min} and ${TEMPERATURE_SPEC.max} (got ${rawConfig.temperature})`,
-            );
-        } else {
-            temperature = rawConfig.temperature;
-        }
-    }
-
-    if (configErrors.length > 0) {
-        return { valid: false, error: configErrors.join("; ") };
-    }
-    const config = {
-        ...configValues,
-        temperature,
-    } as unknown as AiChatConfig;
 
     return {
         valid: true,
@@ -331,7 +315,7 @@ export function validateSendMessage(
             model: p.model,
             message: p.message,
             allowedDir: p.allowedDir,
-            config,
+            config: configResult,
         },
     };
 }

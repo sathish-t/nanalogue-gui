@@ -282,6 +282,31 @@ const optMaxWriteMB = document.getElementById(
     "opt-max-write-mb",
 ) as HTMLInputElement;
 
+/**
+ * Maps each advanced-option input element to its CONFIG_FIELD_SPECS key.
+ *
+ * Used by getConfig, lockSessionConfig, unlockSessionConfig,
+ * applyConfigBounds, and resetDefaults to avoid repeating the same
+ * element list in five places.
+ */
+const ADVANCED_OPTION_FIELDS: ReadonlyArray<
+    readonly [HTMLInputElement, keyof typeof CONFIG_FIELD_SPECS]
+> = [
+    [optContextWindow, "contextWindowTokens"],
+    [optMaxRetries, "maxRetries"],
+    [optTimeout, "timeoutSeconds"],
+    [optMaxReadInfo, "maxRecordsReadInfo"],
+    [optMaxBamMods, "maxRecordsBamMods"],
+    [optMaxWindowReads, "maxRecordsWindowReads"],
+    [optMaxSeqTable, "maxRecordsSeqTable"],
+    [optMaxCodeRounds, "maxCodeRounds"],
+    [optMaxDuration, "maxDurationSecs"],
+    [optMaxMemory, "maxMemoryMB"],
+    [optMaxAllocations, "maxAllocations"],
+    [optMaxReadMB, "maxReadMB"],
+    [optMaxWriteMB, "maxWriteMB"],
+] as const;
+
 /** Stored code steps for the code panel pagination. */
 let codeSteps: Array<{
     /** The Python code that was executed. */
@@ -506,64 +531,16 @@ function getConfig(): Record<string, unknown> {
         const v = Number(raw);
         return Number.isFinite(v) ? v : fallback;
     };
-    return {
-        contextWindowTokens: parse(
-            optContextWindow.value,
-            CONFIG_FIELD_SPECS.contextWindowTokens.fallback,
-        ),
-        maxRetries: parse(
-            optMaxRetries.value,
-            CONFIG_FIELD_SPECS.maxRetries.fallback,
-        ),
-        timeoutSeconds: parse(
-            optTimeout.value,
-            CONFIG_FIELD_SPECS.timeoutSeconds.fallback,
-        ),
-        maxRecordsReadInfo: parse(
-            optMaxReadInfo.value,
-            CONFIG_FIELD_SPECS.maxRecordsReadInfo.fallback,
-        ),
-        maxRecordsBamMods: parse(
-            optMaxBamMods.value,
-            CONFIG_FIELD_SPECS.maxRecordsBamMods.fallback,
-        ),
-        maxRecordsWindowReads: parse(
-            optMaxWindowReads.value,
-            CONFIG_FIELD_SPECS.maxRecordsWindowReads.fallback,
-        ),
-        maxRecordsSeqTable: parse(
-            optMaxSeqTable.value,
-            CONFIG_FIELD_SPECS.maxRecordsSeqTable.fallback,
-        ),
-        maxCodeRounds: parse(
-            optMaxCodeRounds.value,
-            CONFIG_FIELD_SPECS.maxCodeRounds.fallback,
-        ),
-        maxDurationSecs: parse(
-            optMaxDuration.value,
-            CONFIG_FIELD_SPECS.maxDurationSecs.fallback,
-        ),
-        maxMemoryMB: parse(
-            optMaxMemory.value,
-            CONFIG_FIELD_SPECS.maxMemoryMB.fallback,
-        ),
-        maxAllocations: parse(
-            optMaxAllocations.value,
-            CONFIG_FIELD_SPECS.maxAllocations.fallback,
-        ),
-        maxReadMB: parse(
-            optMaxReadMB.value,
-            CONFIG_FIELD_SPECS.maxReadMB.fallback,
-        ),
-        maxWriteMB: parse(
-            optMaxWriteMB.value,
-            CONFIG_FIELD_SPECS.maxWriteMB.fallback,
-        ),
-        // Temperature is optional — empty string means undefined (omit from request)
-        temperature: optTemperature.value.trim()
-            ? Number.parseFloat(optTemperature.value)
-            : undefined,
-    };
+
+    const config: Record<string, unknown> = {};
+    for (const [input, key] of ADVANCED_OPTION_FIELDS) {
+        config[key] = parse(input.value, CONFIG_FIELD_SPECS[key].fallback);
+    }
+    // Temperature is optional — empty string means undefined (omit from request)
+    config.temperature = optTemperature.value.trim()
+        ? Number.parseFloat(optTemperature.value)
+        : undefined;
+    return config;
 }
 
 /**
@@ -583,19 +560,9 @@ function lockSessionConfig(): void {
     btnFetchModels.disabled = true;
     hideModelDropdown();
     // Disable advanced options
-    optContextWindow.disabled = true;
-    optMaxRetries.disabled = true;
-    optTimeout.disabled = true;
-    optMaxReadInfo.disabled = true;
-    optMaxBamMods.disabled = true;
-    optMaxWindowReads.disabled = true;
-    optMaxSeqTable.disabled = true;
-    optMaxCodeRounds.disabled = true;
-    optMaxDuration.disabled = true;
-    optMaxMemory.disabled = true;
-    optMaxAllocations.disabled = true;
-    optMaxReadMB.disabled = true;
-    optMaxWriteMB.disabled = true;
+    for (const [input] of ADVANCED_OPTION_FIELDS) {
+        input.disabled = true;
+    }
     optTemperature.disabled = true;
 }
 
@@ -614,19 +581,9 @@ function unlockSessionConfig(): void {
     inputModel.disabled = false;
     btnFetchModels.disabled = false;
     // Re-enable advanced options
-    optContextWindow.disabled = false;
-    optMaxRetries.disabled = false;
-    optTimeout.disabled = false;
-    optMaxReadInfo.disabled = false;
-    optMaxBamMods.disabled = false;
-    optMaxWindowReads.disabled = false;
-    optMaxSeqTable.disabled = false;
-    optMaxCodeRounds.disabled = false;
-    optMaxDuration.disabled = false;
-    optMaxMemory.disabled = false;
-    optMaxAllocations.disabled = false;
-    optMaxReadMB.disabled = false;
-    optMaxWriteMB.disabled = false;
+    for (const [input] of ADVANCED_OPTION_FIELDS) {
+        input.disabled = false;
+    }
     optTemperature.disabled = false;
 }
 
@@ -635,22 +592,8 @@ function unlockSessionConfig(): void {
  * Called once at page load so the HTML attributes are never the source of truth.
  */
 function applyConfigBounds(): void {
-    const entries = [
-        [optContextWindow, CONFIG_FIELD_SPECS.contextWindowTokens],
-        [optMaxRetries, CONFIG_FIELD_SPECS.maxRetries],
-        [optTimeout, CONFIG_FIELD_SPECS.timeoutSeconds],
-        [optMaxReadInfo, CONFIG_FIELD_SPECS.maxRecordsReadInfo],
-        [optMaxBamMods, CONFIG_FIELD_SPECS.maxRecordsBamMods],
-        [optMaxWindowReads, CONFIG_FIELD_SPECS.maxRecordsWindowReads],
-        [optMaxSeqTable, CONFIG_FIELD_SPECS.maxRecordsSeqTable],
-        [optMaxCodeRounds, CONFIG_FIELD_SPECS.maxCodeRounds],
-        [optMaxDuration, CONFIG_FIELD_SPECS.maxDurationSecs],
-        [optMaxMemory, CONFIG_FIELD_SPECS.maxMemoryMB],
-        [optMaxAllocations, CONFIG_FIELD_SPECS.maxAllocations],
-        [optMaxReadMB, CONFIG_FIELD_SPECS.maxReadMB],
-        [optMaxWriteMB, CONFIG_FIELD_SPECS.maxWriteMB],
-    ];
-    for (const [input, spec] of entries) {
+    for (const [input, key] of ADVANCED_OPTION_FIELDS) {
+        const spec = CONFIG_FIELD_SPECS[key];
         input.min = String(spec.min);
         input.max = String(spec.max);
     }
@@ -660,29 +603,9 @@ function applyConfigBounds(): void {
  * Resets the advanced options to default values.
  */
 function resetDefaults(): void {
-    optContextWindow.value = String(
-        CONFIG_FIELD_SPECS.contextWindowTokens.fallback,
-    );
-    optMaxRetries.value = String(CONFIG_FIELD_SPECS.maxRetries.fallback);
-    optTimeout.value = String(CONFIG_FIELD_SPECS.timeoutSeconds.fallback);
-    optMaxReadInfo.value = String(
-        CONFIG_FIELD_SPECS.maxRecordsReadInfo.fallback,
-    );
-    optMaxBamMods.value = String(CONFIG_FIELD_SPECS.maxRecordsBamMods.fallback);
-    optMaxWindowReads.value = String(
-        CONFIG_FIELD_SPECS.maxRecordsWindowReads.fallback,
-    );
-    optMaxSeqTable.value = String(
-        CONFIG_FIELD_SPECS.maxRecordsSeqTable.fallback,
-    );
-    optMaxCodeRounds.value = String(CONFIG_FIELD_SPECS.maxCodeRounds.fallback);
-    optMaxDuration.value = String(CONFIG_FIELD_SPECS.maxDurationSecs.fallback);
-    optMaxMemory.value = String(CONFIG_FIELD_SPECS.maxMemoryMB.fallback);
-    optMaxAllocations.value = String(
-        CONFIG_FIELD_SPECS.maxAllocations.fallback,
-    );
-    optMaxReadMB.value = String(CONFIG_FIELD_SPECS.maxReadMB.fallback);
-    optMaxWriteMB.value = String(CONFIG_FIELD_SPECS.maxWriteMB.fallback);
+    for (const [input, key] of ADVANCED_OPTION_FIELDS) {
+        input.value = String(CONFIG_FIELD_SPECS[key].fallback);
+    }
     optTemperature.value = "";
 }
 

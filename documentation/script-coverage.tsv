@@ -1,6 +1,6 @@
 filename	%lines
 src/lib/ai-chat-constants.ts	100
-src/lib/ai-chat-ipc-validation.ts	89.41
+src/lib/ai-chat-ipc-validation.ts	96
 src/lib/ai-chat-shared-constants.ts	77.77
 src/lib/ai-external-tools/bam-mods.ts	100
 src/lib/ai-external-tools/bash.ts	100
@@ -43,7 +43,7 @@ src/modes/ai-chat.ts	96.96
 src/modes/qc.ts	100
 src/modes/swipe.ts	98.82
 src/preload.ts	100
-src/renderer/ai-chat/ai-chat.ts	75.27
+src/renderer/ai-chat/ai-chat.ts	73.63
 src/renderer/qc/seq-mini-charts.ts	100
 src/renderer/shared/apply-font-size.ts	100
 src/renderer/shared/bam-resource-input.ts	100
