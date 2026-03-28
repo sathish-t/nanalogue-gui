@@ -1,0 +1,3 @@
+The sandbox-exec module runs Python scripts in the Monty sandbox.
+It reuses the same external functions available in chat (read_info, bam_mods, etc).
+The CLI args for resource limits are shared with nanalogue-chat via sandbox-cli-args.ts.
