@@ -1,0 +1,213 @@
+---
+hashed-string: seq-table
+topic: QC
+paths:
+  - src/lib/qc-data-loader.ts
+  - src/renderer/qc/qc-results.ts
+  - src/renderer/qc/seq-mini-charts.ts
+  - src/renderer/qc/qc-results.html
+description: Design for Sequences tab in QC results: dual seqTable calls, modification highlighting, quality tooltips, mini sparkline histograms.
+date: 2026-03-28
+---
+# Sequence Table Tab — Design Document
+
+## Overview
+
+Add a "Sequences" tab to the QC results page that displays per-read
+sequences, modification highlights, and quality scores. The data comes
+from the `seqTable` function in `@nanalogue/node`.
+
+**Status: Implemented.**
+
+## Scope
+
+- New "Sequences" tab in QC results (5th tab)
+- Dual `seqTable` calls to detect modified bases
+- Zero-size region validation (general QC guard, in `region-parser.ts`: `start >= end` check)
+- 4th progress line during QC loading
+- Mini sparkline histograms (insertion rate, deletion rate, average quality) — added during implementation
+- Ambiguous read ID handling (reads excluded when multiple alignments have same sequence length) — added during implementation
+- Multi-alignment visual grouping (tinted rows for read IDs with multiple alignments) — added during implementation
+
+## Data Layer
+
+### New types (`types.ts`)
+
+```typescript
+interface SeqTableRow {
+  readId: string;
+  sequence: string;        // with user's tag (Z for modified bases)
+  baseSequence: string;    // with tag="1" (no modifications)
+  qualities: number[];     // parsed from period-delimited string
+  avgQuality: number | null; // average excluding 255s, null if all 255
+}
+```
+
+`QCData` gains three optional fields:
+
+- `seqTableRows?: SeqTableRow[]` — undefined when region > 500 bp or
+  not set
+- `seqTableSkipReason?: string` — human-readable reason sequences were
+  skipped (e.g. "region > 500 bp", "no region selected")
+- `seqTableAmbiguousReadIds?: string[]` — read IDs excluded because
+  multiple alignments had the same sequence length, making it impossible
+  to match tagged vs base sequences unambiguously
+
+### Data fetching (`qc-data-loader.ts`)
+
+A new `fetchSeqTable` function:
+
+1. Checks if region is set and ≤ 500 bp. If not, returns early with a
+   skip reason.
+2. Calls `seqTable` twice in parallel:
+   - Once with the user's tag (shows Z/z for modifications)
+   - Once with tag `"1"` (no modifications, all normal bases)
+3. Parses both TSV outputs and joins rows by read ID.
+4. Computes `avgQuality` per row: parses the period-delimited quality
+   string, excludes values equal to 255 (missing), averages the rest.
+   If all values are 255, sets `avgQuality` to `null`.
+5. Returns `SeqTableRow[]` in original BAM order.
+
+Both `seqTable` calls share all QC options from the config except:
+- `region` and `modRegion` are set to the same value (the user's
+  region)
+- `fullRegion` is always `true`
+
+A disclaimer in the UI explains this constraint, along with notes about
+deletions (shown as `.`), insertions (shown as lowercase), quality
+tooltips, and how averages are computed (Q→error probability→average→Q).
+
+### Integration with `generateQCData`
+
+`fetchSeqTable` runs inside the existing `Promise.all` alongside the
+three pagination loops. Progress reports use source `"sequences"`.
+
+### seqTable options
+
+All QC options are wired through to `seqTable`, and in the
+region-related options only `region` is wired in — `fullRegion` and
+`modRegion` are ignored:
+
+- `seqTable` does not allow region to differ from mod region
+- `seqTable` always sets `fullRegion` to `true`
+
+These constraints are documented in a disclaimer on the Sequences tab.
+
+## Zero-Size Region Validation
+
+Independent of the sequences feature. In `qc-config.ts`, when the user
+clicks "Generate QC":
+
+- If a region is provided, parse it to verify that start < end (size
+  ≥ 1 bp)
+- If zero-size (e.g. `chr1:100-100`), show a validation error near the
+  region input and prevent generation
+- Applies to QC as a whole, not just the sequence tab
+
+## IPC & Progress
+
+No new IPC channels. The existing `generate-qc` / `get-qc-data` flow
+carries the new data.
+
+### Loading overlay
+
+A 4th progress line in the QC config loading overlay:
+
+- Region ≤ 500 bp: `"Loading reads for sequences: 42"`
+- Region > 500 bp: `"Loading reads for sequences: (region > 500 bp)"`
+- No region: `"Loading reads for sequences: (no region selected)"`
+
+The skip-reason text is shown immediately without waiting.
+
+## Renderer — Sequences Tab
+
+### Tab structure
+
+5th tab button labelled "Sequences" in `qc-results.html`.
+
+Tab content:
+
+1. Disclaimer text explaining seqTable constraints, deletion/insertion
+   display conventions, quality tooltips, and averaging method
+2. If `seqTableSkipReason` is set: message like "Sequences not
+   available: region > 500 bp"
+3. If ambiguous read IDs exist: warning appended to disclaimer listing
+   excluded reads
+4. Mini sparkline histograms (insertion rate, deletion rate, average
+   quality) rendered by `seq-mini-charts.ts`
+5. The sequence table
+
+### Table layout
+
+| Read ID | Avg Quality | Sequence |
+|---------|-------------|----------|
+| `0.dc09...` | 20.0 | `ACGTACGTAC` |
+
+- **Read ID**: clickable to copy to clipboard with brief "Copied!"
+  tooltip feedback
+- **Avg Quality**: numeric, right-aligned. "N/A" when all qualities
+  are 255
+- **Sequence**: monospace font, default text colour for normal bases,
+  **red** for modified positions. Modified bases display the underlying
+  base letter (from `baseSequence`) rather than the tag character (Z/z).
+- **Multi-alignment rows**: visually grouped with a tinted background
+  when a read ID appears multiple times
+- **Read count**: shown above the table (e.g. "42 reads")
+
+### Modification detection
+
+Modified positions are detected by comparing `sequence` (with user's
+tag) against `baseSequence` (with tag `"1"`). Any position where the
+characters differ is a modified base and rendered in red with the
+underlying base letter shown.
+
+### Quality tooltips
+
+Each base is wrapped in a `<span>` with a `title` attribute showing
+"Quality: N" for that position.
+
+### Sequence truncation
+
+Sequences longer than 500 characters are truncated with a
+`" ... (N more)"` suffix. Modification colouring and quality tooltips
+apply to the visible 500-character portion only.
+
+### Horizontal scrolling
+
+The table uses frozen left columns (Read ID + Avg Quality) via CSS
+`position: sticky`. Only the Sequence column scrolls horizontally.
+With truncation at 500 chars, the scrollbar stays manageable.
+
+### Row selection and copy
+
+- Click a row to select it (highlighted background)
+- Shift-click to select a range of rows
+- "Copy selected read IDs" button above the table (disabled when
+  nothing selected) copies deduplicated read IDs to clipboard,
+  newline-separated. Button text updates to show count.
+- "Clear selection" button to deselect all rows
+
+### Vertical scrolling
+
+Table body scrolls vertically with a sticky header row. Regions up to
+500 bp may yield a few hundred reads.
+
+## Approach
+
+Dual `seqTable` calls run in the existing `generateQCData` pipeline's
+`Promise.all`. No new IPC channels, no lazy loading, no pagination.
+The 500 bp region cap keeps data small enough to hold in memory.
+
+## Implementation files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/types.ts` | `SeqTableRow`, `QCData.seqTableRows/seqTableSkipReason/seqTableAmbiguousReadIds` |
+| `src/lib/qc-data-loader.ts` | `fetchSeqTable()`, `parseSeqTableTsv()`, ambiguous read ID detection |
+| `src/renderer/qc/qc-results.html` | Sequences tab HTML, disclaimer, `seq-table-container` |
+| `src/renderer/qc/qc-results.ts` | `renderSeqTable()` with modification highlighting, tooltips, row selection |
+| `src/renderer/qc/seq-mini-charts.ts` | Mini sparkline histograms (insertion rate, deletion rate, quality) |
+| `src/renderer/qc/qc.css` | Frozen column styles, multi-alignment tinting, selection styles |
+| `src/renderer/qc/qc-config.html` | 4th progress line (`progress-sequences`) |
+| `src/renderer/qc/qc-config.ts` | Region size check for sequence tab availability |
+| `src/lib/region-parser.ts` | Zero-size region validation (`start >= end`) |
