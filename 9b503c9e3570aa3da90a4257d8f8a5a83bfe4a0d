@@ -1,0 +1,40 @@
+---
+hashed-string: user-message-upon-code-execution
+topic: AI chat execution feedback
+paths:
+  - src/lib/chat-orchestrator.ts
+  - src/lib/chat-types.ts
+description: How execution results are fed back to the LLM as user messages
+date: 2026-03-28
+---
+The execution result fed back to the LLM is actually a user message
+(not an assistant message), with isExecutionResult: true. Its content
+is a string of the form "Code execution result: <JSON>".
+
+The JSON dictionary varies by outcome:
+
+Success (with output):
+  { success: true, prints, truncated, value, value_truncated, rounds_remaining }
+
+Success (no output — treated as soft error):
+  { success: true, no_output: true, hint: "Use print()...", rounds_remaining }
+
+Error:
+  { success: false, error_type, message, is_timeout, timeout_note, prints,
+    truncated, hint (SyntaxError only), rounds_remaining }
+
+Truncated LLM response (finish_reason === "length"):
+  { success: false, error_type: "TruncatedResponse", message, rounds_remaining }
+  Note: this is NOT a code execution response. The LLM's output was cut off
+  mid-generation. The truncated code is not executed. The "Code execution
+  result:" prefix in the feedback string is misleading here.
+
+Key details:
+- Built by buildExecutionFeedback() in src/lib/chat-orchestrator.ts (~line 412)
+- TypeScript type is UserMessage from src/lib/chat-types.ts
+  (role: "user", content: string, isExecutionResult: true,
+   executionStatus: "ok" | "error")
+- isExecutionResult and executionStatus are stripped before sending to the LLM
+  by convertToLlmMessages() — the LLM only sees role and content
+- On terminal success (no continue_thinking()), a second assistant message is
+  also pushed containing user-visible text from collectTerminalOutput()
