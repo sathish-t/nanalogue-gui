@@ -1,0 +1,124 @@
+---
+hashed-string: qc-advanced-options
+topic: QC
+paths:
+  - src/renderer/qc/qc-config.html
+  - src/renderer/qc/qc-config.ts
+  - src/lib/qc-data-loader.ts
+  - src/modes/qc.ts
+  - src/lib/types.ts
+description: Design for Advanced Options dialog in QC config: mapping filters, length filters, read ID filters, mod filters, sampling seed.
+date: 2026-03-28
+---
+# QC Advanced Options Dialog Design
+
+## Goal
+
+Add an "Advanced Options" collapsible section to the QC configuration page,
+exposing 8 filtering options that are already supported by `@nanalogue/node`
+but not yet wired through the GUI.
+
+**Status: Implemented.**
+
+## Options
+
+All options default to off/empty (no filtering unless explicitly set).
+
+### Group 1: Mapping Filters
+
+| Option                  | API field             | HTML control              | Notes                                    |
+|-------------------------|-----------------------|---------------------------|------------------------------------------|
+| MAPQ Filter             | `mapqFilter`          | Number input (0–255)      | Minimum mapping quality                  |
+| Exclude MAPQ Unavailable| `excludeMapqUnavail`  | Checkbox                  | Exclude reads with unavailable MAPQ      |
+| Read Filter             | `readFilter`          | 7 alignment-type checkboxes | primary_forward, primary_reverse, secondary_forward, secondary_reverse, supplementary_forward, supplementary_reverse, unmapped |
+
+### Group 2: Length Filters
+
+| Option             | API field      | HTML control         | Notes                    |
+|--------------------|----------------|----------------------|--------------------------|
+| Min Sequence Length | `minSeqLen`   | Number input (≥ 0)   | Minimum sequence length  |
+| Min Alignment Length| `minAlignLen` | Number input (≥ 0)   | Minimum alignment length |
+
+### Group 3: Read ID Filters
+
+| Option        | API field    | HTML control                  | Notes                              |
+|---------------|-------------|-------------------------------|------------------------------------|
+| Read ID List  | `readIdSet` | File picker + count display + clear button | Reuses locate IPC handlers         |
+
+### Group 4: Modification Filters
+
+| Option                   | API field                      | HTML control                          | Notes                                      |
+|--------------------------|--------------------------------|---------------------------------------|--------------------------------------------|
+| Base Quality Filter (Mod)| `baseQualFilterMod`            | Number input (0–93)                   | Base quality threshold for mod calls       |
+| Trim Read Ends (Mod)     | `trimReadEndsMod`              | Number input (≥ 0)                    | Trim mod info from read ends (bp)          |
+| Mod Probability Filter   | `rejectModQualNonInclusive`    | Two number inputs (0–255) with "(both exclusive)" label | Reject calls where low < probability < high |
+
+### Group 5: Sampling (added during implementation)
+
+| Option      | API field    | HTML control              | Notes                                    |
+|-------------|-------------|---------------------------|------------------------------------------|
+| Sample seed | `sampleSeed` | Number input (0–4294967295) | For reproducible subsampling; only used when sample fraction < 100%. Random default generated on page load. |
+
+## HTML Layout
+
+A `<details><summary>Advanced Options</summary>` collapsible section placed
+just before the "Generate QC" button in `qc-config.html`. The four groups
+above appear as labeled sub-sections inside.
+
+## Data Flow
+
+1. **Renderer (`qc-config.ts`)** — collects form values. For the read ID
+   file, stores the file path (not the IDs themselves). Passes everything
+   in the config object to `api.generateQC(config)`.
+
+2. **IPC handler (`src/modes/qc.ts`)** — if `readIdFilePath` is present,
+   reads the file using `parseReadIds()` from `src/lib/locate-data-loader.ts`
+   (already exists) and injects the resulting `ids` array into the config as
+   `readIdSet`. Then passes the config to `generateQCData()`.
+
+3. **QCConfig type (`src/lib/types.ts`)** — add 8 optional fields:
+   `mapqFilter?`, `excludeMapqUnavail?`, `readFilter?`, `minSeqLen?`,
+   `minAlignLen?`, `readIdSet?`, `baseQualFilterMod?`, `trimReadEndsMod?`,
+   `rejectModQualNonInclusive?`. Plus `readIdFilePath?` for the renderer-
+   to-main handoff.
+
+4. **generateQCData (`src/lib/qc-data-loader.ts`)** — spread the new fields
+   from `QCConfig` into `baseOptions` (the `ReadOptions` / `WindowOptions`
+   passed to all three `@nanalogue/node` functions: `readInfo`, `bamMods`,
+   `windowReads`).
+
+5. **Preload / IPC bridge** — no new handlers needed. Reuse existing
+   `locate-pick-read-ids` and `locate-count-read-ids` handlers for the
+   file picker and count display.
+
+## Read ID File Picker (Reuse)
+
+The locate reads feature already provides:
+
+- `locate-pick-read-ids` IPC handler — opens native file dialog for `.txt`
+- `locate-count-read-ids` IPC handler — streams file, counts non-empty lines
+- `parseReadIds()` in `locate-data-loader.ts` — deduplicates, trims, caps at 200k
+
+The QC renderer calls `locate-pick-read-ids` to pick the file, then
+`locate-count-read-ids` to show the count immediately (e.g. "reads.txt
+(42 read IDs)"). The file path is passed in the config; the main process
+reads and parses it at generation time.
+
+## Mod Probability Filter
+
+Two number inputs (0–255 range) with an ndash separator and a
+"(both exclusive)" label. The values are passed as
+`rejectModQualNonInclusive: [low, high]`.
+
+The live-text display described in the original design ("Reject **a** < x < **b**")
+was replaced by a simpler static label during implementation.
+
+## Files Modified
+
+- `src/lib/types.ts` — `QCConfig` extended with all optional fields including `readIdFilePath` for renderer-to-main handoff
+- `src/lib/qc-data-loader.ts` — new fields spread into `baseOptions` for `readInfo`, `bamMods`, `windowReads`, and `seqTable`
+- `src/renderer/qc/qc-config.html` — `<details>` section with all five groups inside `<fieldset>`s
+- `src/renderer/qc/qc-config.ts` — collects advanced options, wires file picker + clear button, seed generation
+- `src/renderer/qc/qc.css` — styles for advanced options layout
+- `src/modes/qc.ts` — read ID file loading via `parseReadIds()` at generation time
+- `src/preload.ts` — `locate-pick-read-ids` and `locate-count-read-ids` exposed to QC config API
