@@ -61,10 +61,10 @@ rebuild_key_blobs() {
   done
 }
 
-# Extract frontmatter from note content (everything between --- lines).
+# Extract frontmatter from note content (first --- to second --- only).
 extract_frontmatter() {
   local content="$1"
-  echo "$content" | sed -n '/^---$/,/^---$/p'
+  echo "$content" | awk '/^---$/ { count++; print; if (count == 2) exit; next } count == 1 { print }'
 }
 
 # Extract body from note content (everything after the second ---).
