@@ -1,0 +1,11 @@
+---
+hashed-string: sandbox-cleanup-race
+topic: sandbox execution
+paths:
+  - src/lib/sandbox-exec.ts
+description: Race condition in resource cleanup
+date: 2026-03-28
+---
+When the sandbox process exits, cleanup runs asynchronously.
+If a second execution starts before cleanup finishes, the temp
+directory may be partially cleaned. Not critical but worth knowing.
