@@ -1,0 +1,14 @@
+---
+hashed-string: sandbox-execution
+topic: sandbox execution
+paths:
+  - src/lib/sandbox-exec.ts
+  - src/lib/sandbox-cli-args.ts
+description: How the Monty sandbox runs Python scripts
+date: 2026-03-28
+---
+The sandbox-exec module runs Python scripts in the Monty sandbox —
+the same environment as /exec in nanalogue-chat — with no LLM involved.
+
+Resource limits (max-records, max-duration, max-memory, etc.) are shared
+with nanalogue-chat through sandbox-cli-args.ts so they stay in sync.
