@@ -1,0 +1,964 @@
+---
+hashed-string: ai-framework-brainstorming
+topic: AI Chat
+paths:
+  - brainstorming/2026-02-12-ai-framework-brainstorming.md
+description: Framework evaluation for AI Chat: evaluated Vercel AI SDK, LangChain, Mastra, Pi Agent Core, others. Recommended build-it-yourself. Retrospective confirms zero framework dependencies shipped.
+date: 2026-03-28
+---
+# AI Chat Feature — Framework Evaluation Notes
+
+Date: 2026-02-12
+
+## Context
+
+The AI chat feature design (2026-02-10) plans a custom Chat Orchestrator
+that manages conversation history, builds LLM prompts, routes between the
+LLM and the Monty sandbox, handles tool calls, context management,
+cancellation, and lifecycle. This document evaluates whether external
+frameworks can replace some or all of that plumbing.
+
+The design targets an OpenAI-compatible HTTP endpoint (not Anthropic-specific),
+non-streaming responses for v1, and an in-process Monty sandbox with custom
+external functions.
+
+## Frameworks evaluated
+
+### Vercel AI SDK v6 (`ai` + `@ai-sdk/openai-compatible`)
+
+**Version:** 6.0.81 (Feb 2026)
+
+**What it handles:**
+- HTTP client with streaming (`streamText()`) and non-streaming (`generateText()`)
+- AbortSignal-based cancellation baked into every call
+- Tool-call loop via agent class — handles the "LLM emits tool call → execute
+  → feed result back → LLM responds again" cycle with configurable step limits
+- Multi-provider support — works with any OpenAI-compatible endpoint, which is
+  exactly what the design specifies
+- Retries built into the provider layer
+- Clean TypeScript `Message` types for the conversation array
+
+**What it does NOT handle:**
+- Conversation persistence (save/load) — you manage storage
+- Session IDs / multi-conversation management — you manage routing
+- Context window truncation — no automatic trimming of conversation history
+- Token counting — no built-in tokenizer (too large for bundling)
+
+**Electron compatibility:** Excellent. The Core layer (`generateText`,
+`streamText`) is plain async functions — no React, no Next.js required.
+Works directly in Electron's main process.
+
+**Maturity:** High. 17k+ GitHub stars, backed by Vercel, multiple releases
+per week. v6 is stable with documented migration path from v5.
+
+### Anthropic SDK (`@anthropic-ai/sdk`)
+
+**Version:** 0.74.0 (Feb 2026)
+
+Raw API wrapper for Anthropic's API. Handles streaming, cancellation
+(`stream.controller.abort()`), tool calling, and retries. Does NOT handle
+conversation management, context trimming, session IDs, or persistence.
+Anthropic-only by design.
+
+Not a good fit because the design targets OpenAI-compatible endpoints
+(Ollama, vLLM, lab servers, cloud APIs), not Anthropic-specific.
+
+**Side note — Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk` v0.2.39):
+Has session management (session IDs, resume, fork), lifecycle hooks, and
+automatic context compaction. But it's designed for autonomous agents
+(Claude Code-style), not a chat feature. Heavyweight and opinionated.
+Overkill for this use case.
+
+### LangChain.js (`langchain` / `@langchain/core` / LangGraph)
+
+**Versions:** `langchain` 1.2.21, `@langchain/core` 1.1.22 (Feb 2026)
+
+**What it handles:**
+- Conversation memory — multiple strategies:
+  - `ConversationBufferMemory` (full history)
+  - `ConversationBufferWindowMemory` (last K messages)
+  - `ConversationSummaryMemory` (LLM-generated running summary)
+- LangGraph adds checkpointed memory with thread IDs — resume by thread ID
+- Streaming via LCEL `.stream()` method
+- Tool calling via agent abstraction (Monty sandbox → `DynamicStructuredTool`)
+- Multi-provider support
+
+**What it does NOT handle well:**
+- **Cancellation** — AbortSignal support exists but multiple open GitHub
+  issues report buggy behavior in LangGraph.js as of early 2026
+- **Simplicity** — large abstraction surface (chains, runnables, LCEL,
+  agents, memory classes, checkpointers, graphs) for what is fundamentally
+  a simple orchestrator loop
+- **Lightweight operation** — heavy dependency tree, assumes server-side
+  deployment model
+
+**Electron compatibility:** Works in Node.js but awkward. Large dependency
+tree, many features assume server environment.
+
+**Maturity:** Actively maintained (daily releases), large community. But
+the JS version is less mature than Python, and the API surface has had
+multiple breaking changes (v0.1 → v0.2 → v1.x).
+
+### Mastra (`@mastra/core`)
+
+**Version:** 1.2.0 (Feb 2026)
+
+**What it handles:**
+- "Observational Memory" — compresses conversations 5-40x by extracting
+  structured observations, supports automatic reflection (summary of
+  summaries)
+- Thread-scoped and resource-scoped memory
+- Streaming (built on Vercel AI SDK primitives)
+- Session/thread management built in
+- Tool calling with dependency injection
+- Multi-provider (via Vercel AI SDK provider layer)
+- Has an official Electron integration guide
+
+**What it does NOT handle:**
+- **In-process operation** — the Electron guide runs Mastra as a separate
+  local HTTP server alongside the Electron app. This is a sidecar
+  architecture, not in-process. Adds a second process, IPC over HTTP,
+  and an extra port to bind.
+- **Simplicity** — full framework with agents, workflows, human-in-the-loop,
+  MCP, skills. A lot of machinery for a chat feature.
+
+**Maturity:** v1.0 released January 2026. YC-backed, from the Gatsby team.
+One month old. Growing quickly but expect some churn.
+
+### TanStack AI (`@tanstack/ai`)
+
+**Released:** January 2026
+
+Framework-agnostic core with streaming, tool calling, and multi-provider
+adapters. Does NOT handle conversation persistence, memory, or session
+management. Too new for production use (released weeks ago). Strong
+pedigree (TanStack team) but insufficient track record.
+
+### Pi Agent Core (`@mariozechner/pi-agent-core`)
+
+**Version:** 0.52.10 (Feb 2026)
+**Repository:** https://github.com/badlogic/pi-mono (monorepo)
+**Author:** Mario Zechner (known for libGDX)
+**License:** MIT
+
+Stateful AI agent runtime from the Pi monorepo. Pi's flagship product
+is a coding agent CLI (`@mariozechner/pi-coding-agent`, marketed at
+`shittycodingagent.ai`). The agent package is the reusable core that
+the coding agent, a Slack bot, and a web UI are built upon.
+
+**Architecture:** Tiny and focused — 5 source files, ~800 lines of
+TypeScript total:
+
+| File | Purpose |
+|------|---------|
+| `types.ts` | All type definitions (AgentMessage, AgentEvent, AgentTool, AgentState) |
+| `agent-loop.ts` | Core agentic loop as async generators (`agentLoop`, `agentLoopContinue`) |
+| `agent.ts` | Stateful `Agent` class wrapping the loop |
+| `proxy.ts` | Proxy streaming for browser-to-server setups |
+| `index.ts` | Barrel re-export |
+
+**What it handles:**
+- Stateful `Agent` class wrapping model, system prompt, messages, tools,
+  thinking level, and streaming state into a single `AgentState` object
+- Tool-call loop via async generator — sequential execution (not parallel),
+  with TypeBox schemas (`@sinclair/typebox`) for parameter validation
+- Fine-grained event streaming: `agent_start`, `turn_start`,
+  `message_start`, `message_update`, `message_end`,
+  `tool_execution_start`, `tool_execution_update`,
+  `tool_execution_end`, `turn_end`, `agent_end`
+- Steering and follow-up queues — unique feature allowing users to
+  interrupt the agent mid-tool-execution or queue follow-up prompts.
+  Supports "one-at-a-time" and "all" modes. After each tool execution,
+  the system checks for steering messages; if a user interrupts,
+  remaining tool calls are skipped with error results
+- Two-phase context transformation pipeline:
+  1. `transformContext(messages, signal)` — operates on `AgentMessage[]`
+     before every LLM call. Use for token-based pruning, context window
+     management, injecting external context
+  2. `convertToLlm(messages)` — converts `AgentMessage[]` to LLM-compatible
+     `Message[]`. Custom message types are filtered out or transformed here
+- Custom message types via TypeScript declaration merging — apps can
+  extend `AgentMessage` with custom roles (notifications, artifacts, etc.)
+- AbortSignal-based cancellation via `agent.abort()` + `waitForIdle()`
+- Dynamic API key resolution via `getApiKey` callback (for expiring
+  OAuth tokens, e.g. GitHub Copilot)
+- Configurable thinking/reasoning levels: "off", "minimal", "low",
+  "medium", "high", "xhigh" with custom token budgets
+- Low-level API: `agentLoop()` and `agentLoopContinue()` exported as
+  standalone async generator functions for users who don't want the
+  `Agent` class
+
+**Tool system details:**
+- Tools defined via `AgentTool` interface extending base `Tool` from `pi-ai`
+- TypeBox schemas provide both runtime validation and compile-time type
+  inference
+- Tools can stream partial results via `onUpdate()` callback (emitted
+  as `tool_execution_update` events)
+- Error convention: tools throw on failure, caught and forwarded to the
+  LLM as `isError: true` tool results
+- Tool results support text and image content blocks plus arbitrary
+  `details` for UI display
+
+**Provider support (via `@mariozechner/pi-ai`):** 20+ providers through
+9 registered API backends:
+
+| API Backend | Providers |
+|-------------|-----------|
+| `anthropic-messages` | Anthropic, Kimi for Coding |
+| `openai-completions` | OpenAI, Groq, Cerebras, xAI, OpenRouter, Vercel AI Gateway, Mistral, MiniMax, Huggingface, any OpenAI-compatible (Ollama, vLLM, LM Studio) |
+| `openai-responses` | OpenAI (Responses API) |
+| `azure-openai-responses` | Azure OpenAI |
+| `openai-codex-responses` | OpenAI Codex (ChatGPT Plus/Pro) |
+| `google-generative-ai` | Google (Gemini) |
+| `google-gemini-cli` | Google Gemini CLI (OAuth) |
+| `google-vertex` | Google Vertex AI |
+| `bedrock-converse-stream` | Amazon Bedrock |
+
+Additionally supports OAuth flows for GitHub Copilot, Google Antigravity,
+OpenAI Codex, and Google Gemini CLI. Only includes models that support
+tool calling (required for agentic workflows).
+
+**What it does NOT handle:**
+- Conversation persistence (save/load) — state is in-memory
+- Session/thread IDs — single agent instance = single conversation
+- Output size gating
+- Context window truncation (but `transformContext` gives you the hook
+  to implement it)
+
+**Electron compatibility:** The agent package itself is plain TypeScript
+with no server or React dependencies — works in Electron's main process.
+However, the `pi-ai` dependency pulls in every provider SDK (see
+dependencies below), which is heavy for a desktop app.
+
+**Dependencies:**
+- Direct: `@mariozechner/pi-ai` (^0.52.10) — the only runtime dependency
+- Transitive via `pi-ai`:
+  - `@anthropic-ai/sdk` (^0.73.0)
+  - `@aws-sdk/client-bedrock-runtime` (^3.983.0)
+  - `@google/genai` (^1.40.0)
+  - `@mistralai/mistralai` (1.10.0)
+  - `@sinclair/typebox` (^0.34.41) — TypeBox for tool schemas
+  - `ajv` / `ajv-formats` — JSON Schema validation
+  - `openai` (6.10.0)
+  - `partial-json` (^0.1.7) — streaming JSON for tool call arguments
+  - `proxy-agent` (^6.5.0)
+  - `undici` (^7.19.1)
+  - `zod-to-json-schema` (^3.24.6)
+
+The dependency tree is heavy because `pi-ai` bundles SDKs for every
+supported provider. The agent package itself has exactly one dependency.
+
+**Maturity:**
+
+| Metric | Value |
+|--------|-------|
+| Stars | 11,418 |
+| Forks | 1,144 |
+| Contributors | ~30 |
+| Total commits | 2,000+ |
+| Created | August 9, 2025 |
+| Last pushed | February 12, 2026 |
+| Release frequency | Multiple per week |
+| Current version | 0.52.10 (pre-1.0) |
+
+Rapidly evolving, actively maintained project with strong community
+traction (11k+ stars in ~6 months). The pre-1.0 version and frequent
+releases (sometimes multiple per day) suggest the API is still
+stabilizing. Documentation quality is notably high, with detailed event
+flow diagrams and thorough API coverage. However, Mario Zechner is
+clearly the primary driver — while there are ~30 contributors, the bus
+factor is a concern.
+
+## Coverage comparison
+
+What each framework covers of the orchestrator's responsibilities:
+
+| Responsibility | Vercel AI SDK | LangChain.js | Mastra | Pi Agent Core |
+|---|---|---|---|---|
+| HTTP transport | Yes | Yes | Yes | Yes (via pi-ai) |
+| Tool-call loop | Yes (agent class) | Yes (agent graph) | Yes | Yes (async generator) |
+| Cancellation | Yes (AbortSignal) | Buggy | Via AI SDK | Yes (abort + waitForIdle) |
+| Context management | No | Yes (multiple strategies) | Yes (observational) | Partial (transformContext hook) |
+| Conversation persistence | No | Yes (checkpointer) | Yes (pluggable storage) | No |
+| Session/thread IDs | No | Yes (LangGraph) | Yes | No |
+| Output size gating | No | No | No | No |
+| Monty sandbox integration | No | No | No | No |
+| Per-turn budgets | Partial (step limits) | Partial | Partial | Partial (loop control) |
+| Lifecycle (requestId, stale guards) | Partial (AbortSignal) | Partial | Partial | Partial (isStreaming + AbortSignal) |
+| Event streaming for UI | No | Callbacks | Via AI SDK | Yes (fine-grained event taxonomy) |
+| Mid-execution steering | No | No | No | Yes (unique feature) |
+
+## Key analysis
+
+### The "what percentage of the orchestrator does a framework replace" question
+
+The orchestrator does three things:
+
+1. **HTTP transport + tool-call protocol** (~30% of orchestrator code).
+   Every framework handles this well. Vercel AI SDK is the lightest option.
+
+2. **Domain logic** — sliding window, facts array, output gating, sandbox
+   integration, per-turn budgets (~60%). No framework touches this. The
+   heavier frameworks (LangChain, Mastra) cover context management IF
+   we switch from deterministic sliding window to LLM-based compression.
+   That changes the split to roughly 40% framework-covered, 40% still
+   custom.
+
+3. **Lifecycle glue** — requestId, abort, stale response guards (~10%).
+   Partially covered by AbortSignal in any SDK.
+
+### If we drop the deterministic sliding window
+
+The design chose deterministic sliding window + facts array specifically
+because LLM summarization is lossy for scientific data (exact coordinates,
+filter values, region strings). If we're OK with LLM compression:
+
+- LangChain's `ConversationSummaryMemory` works — calls the LLM to
+  compress older messages into a running summary, keeps recent messages
+  verbatim
+- Mastra's Observational Memory is more sophisticated — extracts structured
+  observations, compresses 5-40x, automatic reflection
+
+Framework coverage rises from ~30% to ~50-60% of the orchestrator.
+
+### But the cost-benefit still doesn't clearly favor the heavy frameworks
+
+**LangChain.js downsides:**
+- Enormous transitive dependency tree for an Electron app
+- Three abstraction layers between "LLM said run this code" and "run it
+  in Monty" (wrap sandbox as DynamicStructuredTool → build LangGraph agent
+  graph → configure memory checkpointer)
+- The current design's orchestrator is a simple while-loop (lines 1716-1753
+  of the design doc) — direct and debuggable. LangChain replaces this with
+  a graph execution engine.
+- Multiple breaking API changes in the JS version's history
+- Cancellation bugs in LangGraph.js
+
+**Mastra downsides:**
+- Sidecar server architecture — goes against the in-process design
+- One month old (v1.0 January 2026) — risky for a desktop app shipping
+  to scientists
+- Opinionated — Monty sandbox with its custom external functions, output
+  gating, and per-turn budgets would need to fit into Mastra's tool
+  abstraction
+
+**The core orchestrator is not that much code.** The while-loop from the
+design doc, plus conversation history as an array, an AbortController, a
+requestId counter, and (if we want LLM compression) one extra LLM call
+when messages get long — that's maybe 300-500 lines of TypeScript total.
+The heavy frameworks save 150-200 of those lines but add thousands of
+lines of dependency, a learning curve, and constraints on sandbox
+integration.
+
+### Where Pi Agent Core fits
+
+Pi Agent Core occupies an interesting middle ground — more opinionated
+than Vercel AI SDK but far thinner than LangChain or Mastra. Coverage
+is roughly 35-40% of the orchestrator, comparable to Vercel AI SDK's
+~30%, but with a few structural advantages.
+
+**Where it's genuinely better than Vercel AI SDK for this use case:**
+
+1. **The two-phase context pipeline is a real fit.** The design has
+   domain-specific context management (sliding window, facts array,
+   output gating). Pi's `transformContext(messages, signal)` hook runs
+   before every LLM call and operates on the full message array — the
+   sliding window would go there. The second phase `convertToLlm()`
+   filters out app-specific message types. This separation is exactly
+   the kind of thing we'd end up building ourselves on top of Vercel AI
+   SDK anyway.
+
+2. **Steering / interruption is unique.** If a user sends "stop, go back
+   to the other BAM file" while the sandbox is running a long
+   `window_reads()` call, Pi handles this natively. No other framework
+   does. For v1 non-streaming this matters less, but it's forward-looking.
+
+3. **Event streaming is well-designed.** The `agent_start → turn_start →
+   message_update → tool_execution_start → tool_execution_update →
+   tool_execution_end → turn_end → agent_end` event taxonomy maps cleanly
+   to the "code execution indicator" UI element in the design. The
+   sandbox-is-running spinner would come for free.
+
+4. **The agent loop is visible and debuggable.** Unlike LangChain's graph
+   engine, `agentLoop()` is an async generator you can step through.
+   ~800 lines total. You can read the entire framework in 30 minutes.
+
+**Where it's worse:**
+
+1. **Dependency bloat is severe.** `pi-ai` pulls in `@anthropic-ai/sdk`,
+   `openai`, `@google/genai`, `@aws-sdk/client-bedrock-runtime`,
+   `@mistralai/mistralai` — every provider SDK. The design targets
+   OpenAI-compatible endpoints only. Vercel AI SDK's
+   `@ai-sdk/openai-compatible` is surgical by comparison. For an Electron
+   app shipping to scientists, this matters.
+
+2. **Pre-1.0 with high churn.** 52 minor versions in 6 months. Vercel AI
+   SDK v6 is stable. For a desktop app we'll ship and maintain, API
+   stability matters more than for a web service redeployed daily.
+
+3. **Single-author risk.** Mario Zechner is talented (libGDX was great),
+   but this is substantially his project. Vercel AI SDK has a company
+   behind it. If Mario moves on, the bus factor is low.
+
+4. **The monorepo is tightly coupled.** The agent package depends on
+   `pi-ai`, which is designed to be the universal provider layer for the
+   Pi ecosystem. You can't swap in `@ai-sdk/openai-compatible` — you
+   take pi-ai or nothing.
+
+**Comparison to Vercel AI SDK, LangChain, and Mastra:**
+
+| Feature | Pi Agent Core | Vercel AI SDK | LangChain | Mastra |
+|---------|--------------|---------------|-----------|--------|
+| Philosophy | Minimal, opinionated agent runtime | Provider-agnostic streaming toolkit | Comprehensive framework | Full agent platform |
+| Size | ~800 lines (agent) + ~5k lines (ai) | Moderate | Very large | Large |
+| Abstraction level | Low — you see the loop | Medium | High — chains, agents, memory, retrievers | High — agents, workflows, MCP |
+| Provider support | 20+ providers via pi-ai | 15+ providers | 50+ via integrations | Via Vercel AI SDK |
+| Tool calling | TypeBox schemas, sequential with steering | Zod schemas, parallel by default | Various schema formats | Dependency injection |
+| Streaming | Custom EventStream, push-based | ReadableStream | Callbacks / streaming handlers | Via AI SDK |
+| State management | Built-in stateful Agent class | Bring your own | Chain state, memory modules | Thread-scoped memory |
+| Context management | Two-phase transform pipeline | Manual | ConversationBufferMemory, etc. | Observational Memory |
+| Steering/interruption | First-class | Not built-in | Not built-in | Not built-in |
+| Custom message types | Declaration merging | Not supported | Custom message classes | Not supported |
+| Thinking/reasoning config | Unified across providers | Per-provider | Per-provider | Per-provider |
+| Maturity | Pre-1.0, 6 months, 11k stars | Stable, well-established | Very mature, widely adopted | v1.0, 1 month old |
+
+### Armin Ronacher's "Agents Are Hard" (Nov 2025)
+
+Source: https://lucumr.pocoo.org/2025/11/21/agents-are-hard/
+
+Armin Ronacher (creator of Flask, Jinja2, Ruff; now at Earendil) wrote
+about his team's experience building a coding agent. The post directly
+complicates the framework evaluation in several ways.
+
+**1. "We abandoned Vercel AI SDK"**
+
+Armin's team dropped Vercel AI SDK because provider differences were
+significant enough to need a custom abstraction. Provider-specific
+features (Anthropic's cache control, web search tool) don't fit into a
+generic framework.
+
+*Relevance to this design:* This is a real warning against the current
+recommendation. However, the AI chat design deliberately targets a
+single protocol (OpenAI-compatible). We're not trying to abstract across
+Anthropic vs. OpenAI vs. Google — we're targeting one wire format that
+Ollama, vLLM, and cloud APIs all speak. The provider-difference problem
+Armin hit is less acute here. If we later add direct Anthropic or Google
+support, this becomes more relevant.
+
+**2. "Reinforcement within loops"**
+
+Armin found that injecting contextual reminders and status updates
+*between tool calls* dramatically improves agent behavior. Rather than
+relying solely on initial instructions, injecting task status,
+environmental changes, and contextual nudges between tool calls kept the
+agent on track.
+
+*Relevance:* This maps directly to the orchestrator's responsibility to
+maintain context. Pi's `transformContext` hook running before every LLM
+call is exactly where this would go. With Vercel AI SDK, we'd build this
+ourselves — but it's straightforward (modify the messages array before
+each `generateText` call).
+
+**3. "Explicit cache management"**
+
+Armin reversed his initial skepticism about Anthropic's manual caching.
+Explicit cache management enables parallel conversation branches and
+context editing that are much harder with opaque caching. This is a
+strong argument against frameworks that hide caching behind abstractions.
+
+*Relevance:* Less relevant for v1 (no branching conversations, no
+Anthropic-specific API). But it reinforces the principle that framework
+abstractions over provider-specific features can become obstacles.
+
+**4. "Failure isolation via sub-agents"**
+
+Running iterative subtasks within sub-agents shields the main loop from
+accumulated failure context while preserving lessons learned.
+
+*Relevance:* Less relevant for v1 (single `execute_sandbox_code` tool,
+deterministic sandbox). More relevant if the chat feature grows to
+support multi-step analysis workflows.
+
+**5. "Evaluation is the hardest problem"**
+
+Armin identifies evaluation as the hardest problem in agent development.
+Agent complexity makes external testing insufficient — observability and
+instrumentation of actual runs are necessary but lack satisfactory
+solutions.
+
+*Relevance:* A general warning about agent complexity. The AI chat
+feature's single-tool design is simpler than a coding agent, but this
+is worth keeping in mind for testing strategy.
+
+**6. The meta-lesson: premature abstraction hurts**
+
+Armin's core argument is that premature abstraction layers create more
+problems than they solve. The agent domain is too immature for stable
+abstractions. This reinforces the "build the rest yourself"
+recommendation — but it also applies to Pi Agent Core. Adopting someone
+else's loop abstraction when the loop is only ~300 lines is itself a
+form of premature abstraction.
+
+**7. "Shared state via virtual filesystem"**
+
+Tools should share access to a common filesystem layer, preventing
+"dead ends" where outputs from one tool can't feed into others.
+
+*Relevance:* The design already addresses this — the Monty sandbox has
+`read_file()` and `write_file()` functions with a shared
+`ai_chat_output/` directory, plus the BAM analysis functions all
+operate on the same `allowed_dir`. This pattern is already in place.
+
+## Recommendation
+
+**Use Vercel AI SDK v6 (`ai` + `@ai-sdk/openai-compatible`) for the
+transport layer.** It handles HTTP calls, tool-call loops, cancellation,
+retries, and multi-provider support with a small footprint and no
+framework baggage. Works cleanly in Electron's main process.
+
+**Build the rest yourself.** The orchestrator loop, context management
+(whether deterministic or LLM-based), sandbox integration, per-turn
+budgets, and lifecycle are straightforward TypeScript that's easier to
+debug and maintain than framework abstractions.
+
+If LLM-based context compression is desired instead of the deterministic
+sliding window, implement it as a utility function:
+- When `messages.length > threshold`, call the LLM with a "summarize
+  the conversation so far" prompt
+- Replace old messages with the summary
+- ~30 lines of code, no framework needed
+
+### Pi Agent Core verdict
+
+**Pi Agent Core is interesting but not the right choice here.** Here's why:
+
+1. **The dependency cost is prohibitive.** You'd pull in every provider
+   SDK to use one protocol. Vercel AI SDK's `@ai-sdk/openai-compatible`
+   is the right-sized tool.
+
+2. **The two-phase context pipeline is the one idea worth stealing.**
+   Structure your custom orchestrator with a `transformContext()` call
+   before each LLM invocation. This is ~20 lines of architecture, not a
+   framework dependency.
+
+3. **The event taxonomy is also worth stealing.** Define your own event
+   types for the renderer (turn_start, tool_execution_start, etc.)
+   modeled on Pi's approach. Again, this is a type definition, not a
+   framework dependency.
+
+4. **Armin's warning strengthens the "thin layer" approach.** Use Vercel
+   AI SDK for transport (the one thing it does well), build your
+   orchestrator loop yourself (it's ~300-500 lines), and steal structural
+   ideas from Pi Agent Core without taking the dependency.
+
+The framework evaluation's recommendation stands: **Vercel AI SDK for
+transport, build the rest yourself**. But Pi Agent Core's
+`transformContext` pipeline and event streaming design are worth studying
+as architectural patterns to adopt in your custom code.
+
+If we wanted to reconsider, the one scenario where Pi Agent Core would
+make sense is if we **drop the OpenAI-compatible-only constraint** and
+want to support Anthropic, Google, etc. natively. Then Pi's
+multi-provider layer becomes an asset rather than bloat. But the design
+explicitly chose a single protocol for good reasons.
+
+### Open question: deterministic vs LLM compression
+
+The deterministic sliding window + facts array was chosen to preserve
+exact scientific values. If we switch to LLM compression:
+
+**Gains:**
+- Simpler code (no facts array extraction, no manual window sizing)
+- Better at preserving semantic context across long conversations
+- Framework-compatible if we ever want to adopt one
+
+**Losses:**
+- Exact numerical values (coordinates, quality scores, filter thresholds)
+  may be paraphrased or dropped by the summarizer
+- Extra LLM call per compression step (cost + latency)
+- Non-deterministic — same conversation compressed twice may produce
+  different summaries
+
+This is a domain question, not a framework question. The answer depends
+on how important exact value preservation is for the target users.
+
+## Justification and exploration of the decision to only support OpenAI endpoint in v1
+
+### What "OpenAI-compatible endpoint" actually means
+
+The term is misleading — it describes a **wire protocol**, not a vendor
+dependency. Specifically:
+
+1. An HTTP POST to `/v1/chat/completions`
+2. A JSON body with a `messages` array using `system`/`user`/`assistant`/`tool`
+   roles, a `model` string, and optionally a `tools` array
+3. A JSON response with `choices[0].message` containing text or `tool_calls`
+
+OpenAI defined this format first (2023). Everyone else adopted it because
+it was already what all the tooling spoke. It became a de facto standard
+through network effects — the S3 API of LLM inference.
+
+**Who speaks this protocol today:**
+
+| Server | Type |
+|--------|------|
+| Ollama | Local, open-source |
+| vLLM | Local/server, open-source |
+| LM Studio | Local, desktop app |
+| llama.cpp server | Local, C++ |
+| OpenAI | Cloud |
+| Groq, Together AI, Fireworks AI | Cloud |
+| OpenRouter | Cloud aggregator |
+| Mistral, xAI, DeepSeek | Cloud |
+| Lab GPU servers running vLLM | Self-hosted |
+
+**Anthropic** and **Google** both have their own native wire formats,
+but both also offer OpenAI-compatible endpoints:
+
+- **Google** provides production-grade OpenAI-compatible endpoints for
+  Gemini through both the Gemini API
+  (`generativelanguage.googleapis.com/v1beta/openai/`) and Vertex AI.
+  This is fully supported and actively maintained — Google is
+  effectively not an exception. A scientist with a Gemini API key can
+  point nanalogue-gui at Google's OpenAI-compatible URL and it works.
+
+- **Anthropic** added an [OpenAI SDK compatibility layer](https://docs.anthropic.com/en/api/openai-sdk)
+  at `api.anthropic.com/v1/`. However, their own docs describe it as a
+  testing/comparison tool, not a production solution. Critically, it
+  does **not** support prompt caching, extended thinking, PDF
+  processing, or citations — exactly the provider-specific features
+  discussed below. Anthropic recommends their native API for the full
+  feature set.
+
+Proxies like LiteLLM can also place any provider behind the
+OpenAI-compatible interface, with the same caveat that
+provider-specific features are lost in translation.
+
+**⚠ LiteLLM supply-chain compromise (2026):** A threat actor exploited
+a faulty GitHub Action in LiteLLM's CI pipeline to inject malicious
+code that ran before every `pip install litellm`. The payload
+exfiltrated environment secrets (API keys, credentials) to an
+attacker-controlled server — meaning anyone who installed or upgraded
+LiteLLM during the compromised window silently leaked their secrets.
+This is a supply-chain attack on a package that, by design, holds
+every LLM provider key in one place. We advocate against LiteLLM for
+this project. Scientists installing Python packages on lab machines
+with cloud API keys in their environment are exactly the profile this
+attack targeted. Direct `/v1/chat/completions` calls to the actual
+provider (Ollama, vLLM, cloud API) eliminate LiteLLM as a dependency
+entirely.
+
+### Provider-specific features that this protocol cannot express
+
+Armin Ronacher's "Agents Are Hard" post (referenced above) describes
+abandoning Vercel AI SDK because provider differences were significant
+enough to need a custom abstraction. The features he needed that the
+generic format cannot express:
+
+| Feature | Provider | What it does | Generic equivalent |
+|---------|----------|--------------|--------------------|
+| Cache control | Anthropic | Explicitly mark conversation prefix for server-side caching — avoids re-processing stable content on every turn | None. Every turn re-sends the full conversation. |
+| Extended thinking | Anthropic, OpenAI (different APIs) | Dedicated reasoning step with configurable token budget before generating a response | Some models expose this via OpenAI-compatible params, but behavior varies |
+| Provider-specific tool calling quirks | All | Parallel vs sequential defaults, error reporting shape, interleaved text and tool calls | The generic format papers over these differences |
+| Context window pricing tiers | Cloud providers | Cached vs uncached token pricing, prompt caching policies | Invisible through the generic format |
+
+### Why these features matter more than initially assumed
+
+The initial assessment framed the AI chat as "answering questions about
+BAM data" — short sessions, simple queries, any model works. This
+underestimates what the Monty sandbox enables.
+
+With an in-process Python sandbox, the LLM is not just answering
+questions — it is **writing and iterating on analytical code**. A
+realistic session looks like:
+
+1. "Compare modification densities between these two regions"
+2. LLM writes Python: stats functions, normalization, filtering
+3. "Apply a sliding window and find where the difference is significant"
+4. LLM writes a statistical test with window iteration
+5. "The p-values look off — try a different correction method"
+6. LLM debugs and rewrites the stats pipeline
+7. "Now do this across all chromosomes"
+8. LLM refactors into a function, loops over chromosomes
+
+This is **iterative code development in a scientific domain** — closer to
+a coding agent than a chatbot. The demands on the model are high: write
+correct statistical code, iterate on errors, maintain context across a
+long session.
+
+In this context:
+
+- **Extended thinking** helps write correct statistical code on the
+  first try instead of needing multiple error-retry cycles. A model
+  that reasons carefully before writing a Bonferroni correction or a
+  sliding window KS-test produces fewer bugs.
+- **Cache control** matters because by turn 8, the conversation is
+  large. The system prompt, sandbox function signatures, prior code
+  and results — all resent every turn. Caching the stable prefix saves
+  real latency against a cloud API.
+- **Larger/better context handling** matters because complex analyses
+  produce big outputs (arrays, tables, statistics). The conversation
+  fills up fast. Better context handling means the LLM does not forget
+  what it computed 5 turns ago.
+- **Model quality generally** — the difference between a 7B local model
+  and a frontier model writing a novel statistical pipeline is enormous.
+  Users with access to better models should get a better experience.
+
+### Why OpenAI-compatible is still correct for v1
+
+The features above would help — but **help whom?**
+
+**Scientist A** has Ollama on their laptop with Qwen 7B. Cache control,
+extended thinking, and provider-specific features do not exist for them.
+The OpenAI-compatible endpoint is all they have. For this user, the
+current design is exactly right.
+
+**Scientist B** has a lab OpenAI key with GPT-4.1 access. Most of
+OpenAI's features are available through their OpenAI-compatible format
+already. They lose little.
+
+**Scientist C** has an Anthropic key with Claude access. They *can* use
+Claude through Anthropic's OpenAI-compatible endpoint — and they get
+Claude's intelligence for writing analytical code. But cache control
+and extended thinking are only available through Anthropic's native
+API. The compatibility layer is explicitly a testing tool, not a
+production solution. The features that would justify adding native
+Anthropic support in v2 are precisely the ones the compatibility
+layer does not expose.
+
+For v1, Scientist C's gap is acceptable — they still get Claude, just
+not the full feature set. The primary audience is scientists running
+local models or lab servers. Supporting one protocol keeps the
+codebase simple and shippable.
+
+### Architectural implications for v2
+
+The analysis above means the design should not permanently foreclose
+native provider support. Three principles:
+
+1. **Do not bake in the assumption that there is only one protocol
+   forever.** The provider interface should be designed so a second
+   provider (Anthropic-native) can slot in alongside the
+   OpenAI-compatible one without rewriting the orchestrator.
+
+2. **The orchestrator should be protocol-agnostic internally.** The
+   conversation history, sandbox integration, and context management
+   should work with an internal message format. Translation to wire
+   format (OpenAI-compatible, Anthropic-native, etc.) happens at the
+   edge.
+
+3. **This is a v2 concern, not a v1 blocker.** Ship v1 with
+   OpenAI-compatible. It works for everyone. When users start doing
+   15-turn analysis sessions against Claude and burning through
+   cache-miss tokens, that is the signal to add native provider
+   support.
+
+## Packages referenced
+
+| Package | npm | Version (Feb 2026) | Role |
+|---|---|---|---|
+| `ai` | `ai` | 6.0.81 | Vercel AI SDK core |
+| `@ai-sdk/openai-compatible` | `@ai-sdk/openai-compatible` | (latest) | OpenAI-compatible provider |
+| `@anthropic-ai/sdk` | `@anthropic-ai/sdk` | 0.74.0 | Anthropic raw SDK |
+| `@anthropic-ai/claude-agent-sdk` | `@anthropic-ai/claude-agent-sdk` | 0.2.39 | Claude Agent SDK |
+| `langchain` | `langchain` | 1.2.21 | LangChain.js |
+| `@langchain/core` | `@langchain/core` | 1.1.22 | LangChain core |
+| `@langchain/langgraph` | `@langchain/langgraph` | (latest) | LangGraph state machine |
+| `@mastra/core` | `@mastra/core` | 1.2.0 | Mastra framework |
+| `@tanstack/ai` | `@tanstack/ai-client` | (latest) | TanStack AI |
+| `@mariozechner/pi-agent-core` | `@mariozechner/pi-agent-core` | 0.52.10 | Pi Agent Core (agent runtime) |
+| `@mariozechner/pi-ai` | `@mariozechner/pi-ai` | 0.52.10 | Pi AI (multi-provider layer) |
+
+## External references
+
+| Source | URL | Relevance |
+|--------|-----|-----------|
+| Armin Ronacher, "Agents Are Hard" (Nov 2025) | https://lucumr.pocoo.org/2025/11/21/agents-are-hard/ | Real-world experience abandoning Vercel AI SDK, patterns for agent loops |
+| Pi monorepo | https://github.com/badlogic/pi-mono | Source for Pi Agent Core evaluation |
+
+---
+
+## Retrospective: what was actually built (as of March 2026)
+
+*Added 2026-03-28 based on the implemented code.*
+
+### Decision outcome
+
+The recommendation was **"Vercel AI SDK for transport, build the rest
+yourself."** What shipped was **"build everything yourself, no framework
+at all."** Not even Vercel AI SDK was adopted. The project has **zero
+third-party AI/LLM dependencies** — the only AI-adjacent dependency is
+`@pydantic/monty` for the Python sandbox.
+
+### What replaced Vercel AI SDK's transport layer
+
+A single `fetchChatCompletion()` function in `chat-orchestrator.ts`
+(~80 lines) handles the HTTP transport directly using Node.js's built-in
+`fetch()`. It:
+
+- POSTs to `/chat/completions` with the standard OpenAI message format
+- Implements exponential backoff with jitter for retryable status codes
+  (429, 500, 502, 503, 504), with `Retry-After` header support for 429s
+- Handles `AbortSignal`-based cancellation throughout (abortable sleeps
+  during retry delays)
+- Sends `max_completion_tokens` for most providers, falling back to the
+  older `max_tokens` for Mistral and Chutes (detected by endpoint URL —
+  same approach as pi-mono's `openai-completions` provider)
+- Only includes `temperature` when explicitly set by the user
+
+This is less code than importing and configuring `@ai-sdk/openai-compatible`
+would have been, with no dependency tree, no version churn, and full
+control over the wire format.
+
+### The two-phase context pipeline was built exactly as recommended
+
+The brainstorming doc recommended stealing Pi Agent Core's two-phase
+context pipeline as an architectural pattern. The implementation follows
+this precisely:
+
+1. **`transformContext(history, config)`** — Phase 1. Runs `pruneFailedRounds()`
+   (removes old error round pairs, keeping only the most recent one for
+   context) then `applySlidingWindow()` (keeps most recent messages within
+   ~80% of the token budget). Operates on the internal `HistoryEntry[]`
+   type which carries metadata (`isExecutionResult`, `executionStatus`)
+   that the LLM never sees.
+
+2. **`convertToLlmMessages(history)`** — Phase 2. Strips internal metadata
+   and produces clean `{role, content}` objects for the API. Internal
+   fields used for pruning decisions and renderer display are not sent.
+
+Both functions are pure, exported, and independently testable. The
+orchestrator calls them in sequence before every LLM request —
+identically to how Pi Agent Core's `transformContext` and `convertToLlm`
+hooks run before every call.
+
+### The event taxonomy was also adopted as recommended
+
+The brainstorming doc recommended stealing Pi Agent Core's event
+streaming design. The implementation defines an `AiChatEvent` union type
+in `chat-types.ts` with these discriminated variants:
+
+| Event | Corresponds to Pi Agent Core |
+|-------|------------------------------|
+| `turn_start` | `turn_start` |
+| `llm_request_start` | `message_start` |
+| `code_execution_start` | `tool_execution_start` |
+| `code_execution_end` | `tool_execution_end` |
+| `llm_request_end` | `message_end` |
+| `turn_end` | `turn_end` |
+| `turn_error` | (no direct equivalent) |
+| `turn_cancelled` | (no direct equivalent) |
+
+The renderer listens on a single IPC channel and switches on
+`event.type` — exactly the pattern the brainstorming doc described as
+"the sandbox-is-running spinner would come for free."
+
+### The facts system was built as designed
+
+The deterministic sliding window + facts array approach was chosen over
+LLM-based compression, exactly as the design proposed. Facts are
+extracted by regex pattern matching, not LLM summarization:
+
+- **File facts:** extracted from `peek()`, `read_info()`, `bam_mods()`,
+  `window_reads()`, `seq_table()` calls via regex
+- **Filter facts:** extracted from `region=`, `sample_fraction=`,
+  `mapq_filter=` kwargs via regex
+- **Output facts:** extracted from `write_file()` return values
+
+Facts use replace-by-key deduplication (`addFact()`) and oldest-first
+eviction when the array exceeds 2 KB (`evictFacts()`). The facts block
+is rendered into the system prompt via `renderFactsBlock()` and
+`buildSystemPrompt()`, providing persistent context that survives sliding
+window eviction.
+
+### The orchestrator loop is exactly the simple while-loop predicted
+
+The brainstorming doc said the core orchestrator would be "a simple
+while-loop ... maybe 300-500 lines." The actual `handleUserMessage()`
+function is the main loop, and the full `chat-orchestrator.ts` is 1,341
+lines — larger than predicted, but the overshoot is from:
+
+- Slash command handlers (`/exec`, `/dump_llm_instructions`,
+  `/dump_system_prompt`) — ~120 lines
+- Terminal overflow handling — ~30 lines
+- The `runSandboxGuarded()` orphan execution cap — ~30 lines
+- Markdown fence extraction for model responses — ~15 lines
+- The `dumpLlmInstructions()` HTML + log export — ~40 lines
+- Detailed JSDoc on every function and interface
+
+The core loop logic (LLM call → extract code → execute in sandbox →
+check continue_thinking vs terminal → feed result back) is approximately
+300 lines, matching the prediction.
+
+### Multi-provider support went further than planned
+
+The original recommendation was OpenAI-compatible only for v1. The
+implementation added **native model listing** for three provider types
+in `model-listing.ts`:
+
+| Provider | Detection | Model listing |
+|----------|-----------|---------------|
+| OpenAI-compatible | Fallback (any URL) | `GET /models` with Bearer auth |
+| Anthropic | `api.anthropic.com` hostname | `GET /models` with `x-api-key` + `anthropic-version` headers |
+| Google Gemini | `generativelanguage.googleapis.com` hostname | `GET /models?key=` with query param auth |
+
+This means the settings UI auto-populates model dropdowns for all three
+providers. However, the actual chat completion calls still go through
+the single `fetchChatCompletion()` function using the OpenAI-compatible
+`/chat/completions` format — native Anthropic Messages API and Google
+`generateContent` are not yet used for inference. The v2 architectural
+implication ("do not bake in the assumption that there is only one
+protocol forever") has been partially addressed by the `detectProvider()`
+abstraction, which makes adding native inference straightforward.
+
+### What was not built
+
+- **Streaming** — still non-streaming (`fetch` + `response.json()`), as
+  the design specified for v1
+- **Mid-execution steering** — Pi Agent Core's unique feature was noted
+  as forward-looking; it was not implemented
+- **LLM-based context compression** — the deterministic approach was
+  chosen and has not been revisited
+- **Native Anthropic/Google inference** — model listing is multi-provider
+  but inference is still OpenAI-compatible only
+
+### Size of the AI chat implementation
+
+| Layer | Files | Lines (non-test) |
+|-------|-------|-----------------|
+| Orchestrator + session + types + constants | 7 | ~3,200 |
+| Sandbox (Monty wrapper + helpers) | 2 | ~870 |
+| External tools (13 Monty functions) | 16 | ~3,200 |
+| System prompt builder | 1 | ~780 |
+| Model listing | 1 | ~300 |
+| IPC validation + mode handler | 2 | ~690 |
+| CLI entry point | 1 | ~660 |
+| Log export (HTML + text) | 1 | ~815 |
+| Renderer (HTML + CSS + TS) | 3 | ~2,020 |
+| System append loader | 1 | ~47 |
+| **Total** | **35** | **~11,600** |
+
+Tests add another ~10,800 lines across 15 test files (including
+cross-endpoint compatibility tests).
+
+### Was the recommendation correct?
+
+**Yes, strongly.** The "build the rest yourself" recommendation
+underestimated how little even the transport layer needed a framework.
+The custom `fetchChatCompletion()` is simpler, more debuggable, and more
+maintainable than any SDK wrapper would have been. The total AI chat
+implementation is ~11,600 lines with zero third-party AI dependencies —
+compared to the thousands of lines of transitive dependencies that even
+Vercel AI SDK would have introduced.
+
+The specific patterns worth stealing (two-phase context pipeline, event
+taxonomy) were adopted successfully as lightweight architectural
+decisions rather than framework dependencies. The brainstorming doc's
+conclusion — "this is a type definition, not a framework dependency" —
+proved exactly right.
+
+The one thing the brainstorming doc got wrong was recommending Vercel AI
+SDK for transport. The transport layer turned out to be the easiest part
+to build yourself — an HTTP POST with retry logic is less code than
+learning and configuring a third-party SDK that abstracts the same
+thing.
