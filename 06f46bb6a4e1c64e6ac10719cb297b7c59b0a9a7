@@ -1,0 +1,3 @@
+This is the core AI chat loop. The LLM generates Python code,
+the sandbox executes it, results feed back to the LLM. See documentation/ai-chat.md
+for the full design.
