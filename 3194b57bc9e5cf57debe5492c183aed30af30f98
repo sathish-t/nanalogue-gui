@@ -2,7 +2,10 @@
 hashed-string: ai-framework-brainstorming
 topic: AI Chat
 paths:
-  - brainstorming/2026-02-12-ai-framework-brainstorming.md
+  - src/lib/chat-orchestrator.ts
+  - src/lib/chat-session.ts
+  - src/lib/chat-types.ts
+  - src/lib/model-listing.ts
 description: Framework evaluation for AI Chat: evaluated Vercel AI SDK, LangChain, Mastra, Pi Agent Core, others. Recommended build-it-yourself. Retrospective confirms zero framework dependencies shipped.
 date: 2026-03-28
 ---
