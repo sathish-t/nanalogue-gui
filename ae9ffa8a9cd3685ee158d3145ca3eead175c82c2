@@ -1,0 +1,144 @@
+---
+hashed-string: nanalogue-swipe
+topic: Swipe
+paths:
+  - src/lib/swipe-data-loader.ts
+  - src/modes/swipe.ts
+  - src/renderer/swipe/swipe.ts
+  - src/renderer/swipe/swipe-config.ts
+  - src/lib/bed-parser.ts
+description: Design doc for swipe mode: manual curation of genomic annotations with accept/reject workflow over signal plots.
+date: 2026-03-28
+---
+# nanalogue-swipe Design Document
+
+## Overview
+
+Swipe is a mode within nanalogue-gui for manual curation of genomic annotations. Users configure a session via a GUI config page, then review signal plots one at a time, accepting or rejecting each annotation using keyboard arrows or mouse clicks.
+
+## Data Flow
+
+### Startup Sequence
+
+1. User fills in the config page (BAM source, BED file, output file, mod filter, window size, flanking region, annotation highlight toggle)
+2. Call `peek()` to get contig sizes for overflow protection
+3. Parse entire BED file into memory (capped at 10,000 annotations)
+4. If the output file already exists, prompt to overwrite or cancel
+5. Navigate to the swipe review window and render the first annotation
+
+### Per-Annotation Processing
+
+```
+BED line: Chr1  25567  29859  4e6b0e79-...  ...
+
+1. Expand region by ±flanking (default 10,000 bp):
+   - expandedStart: max(0, 25567 - 10000) = 15567
+   - expandedEnd: min(contig_size, 29859 + 10000) = 39859
+
+2. Call windowReads and bamMods in parallel:
+
+   windowReads({
+     bamPath,
+     treatAsUrl,               // optional, for remote BAM URLs
+     region: "Chr1:25567-29859",
+     modRegion: "Chr1:15567-39859",
+     fullRegion: true,
+     readIdSet: ["4e6b0e79-..."],
+     win: windowSize,
+     step: windowSize,
+     tag, modStrand,           // optional, from mod filter
+   })
+
+   bamMods({
+     bamPath,
+     treatAsUrl,               // optional, for remote BAM URLs
+     region: "Chr1:25567-29859",
+     modRegion: "Chr1:15567-39859",
+     fullRegion: true,
+     readIdSet: ["4e6b0e79-..."],
+     tag, modStrand,           // optional, from mod filter
+   })
+
+3. windowReads JSON → windowed step-line overlay
+   - Parse JSON (WindowReadsRecord[]), skip unmapped reads and entries with no alignment
+   - Drop rows with invalid window bounds (zero-width, negative start, non-finite values)
+
+4. bamMods → raw scatter points
+   - For each mod_table entry: X = refPos, Y = probability / 255
+   - Filter to expanded region bounds
+
+5. Plot:
+   - Scatter: raw per-position modification probabilities (grey dots)
+   - Step line: windowed aggregation (black line)
+   - Optional green box highlighting the annotation region (via chartjs-plugin-annotation, toggled by config checkbox)
+   - X axis: genomic position (bp), Y axis: modification level (0–1)
+```
+
+### Accept/Reject Flow
+
+- **Right arrow or click ACCEPT**: Green flash overlay, append BED line to output file, advance
+- **Left arrow or click REJECT**: Red flash overlay, advance (no write)
+- **Window close**: Graceful exit, output file contains accepted annotations so far
+- **Completion screen**: Shows accept/reject counts, output file path, and "Close the window to exit" prompt
+
+## UI Layout
+
+### Config Page (`swipe-config.html`)
+
+Config sections: BAM source (file/URL via `<bam-resource-input>`), BED
+file (file picker), output file (via `<output-file-input>`), mod filter
+(via `<mod-filter-input>`), window size (via `<window-size-input>`),
+flanking region (number input, default 1000 bp), annotation highlight
+toggle (checkbox), and a summary panel.
+
+### Review Page (`swipe.html`)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  flash-overlay (full-screen green/red flash on accept/reject)       │
+├─────────────────────────────────────────────────────────────────────┤
+│  title-bar: annotation filename / region                            │
+│  clamp-warning: (hidden unless annotation clamped to contig bounds) │
+│  bed-extra-info: (hidden unless BED has >4 columns)                 │
+├─────────────────────────────────────────────────────────────────────┤
+│   ┌─────────────────────────────────────────────────────────────┐   │
+│   │                                                             │   │
+│   │                  Chart.js scatter plot                      │   │
+│   │                  X: Genomic Position (bp)                   │   │
+│   │                  Y: Modification level                      │   │
+│   │  loading-overlay / no-data-message / done-message overlays  │   │
+│   │                                                             │   │
+│   └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│   ← REJECT          [████████░░░░] 142 / 7353          ACCEPT →     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## Error Handling
+
+| Scenario | Behavior |
+|----------|----------|
+| Missing/invalid BAM file | Error shown on config page |
+| Missing/invalid BED file | Error shown on config page |
+| Output path same as input BED | Error on initialization (prevents data loss) |
+| Output file exists | Overwrite confirmation dialog |
+| BED file exceeds 10,000 annotations | Error on initialization (capped) |
+| Contig not found in BAM | Error thrown with contig name |
+| Expanded region start >= end (annotation outside contig bounds) | Error thrown with details |
+| windowReads/bamMods failure | Log error, return null plot data, allow accept/reject |
+| Empty data after filtering | Show "No data" message with hint, allow accept/reject |
+| Annotation end exceeds contig size | Clamp to contig size, show warning banner |
+
+## Implementation Files
+
+| File | Purpose |
+|------|---------|
+| `src/renderer/swipe/swipe-config.html` | Config page HTML |
+| `src/renderer/swipe/swipe-config.ts` | Config page logic (file pickers, validation, launch) |
+| `src/renderer/swipe/swipe-config.css` | Config page styles |
+| `src/renderer/swipe/swipe.html` | Review page HTML |
+| `src/renderer/swipe/swipe.ts` | Review page logic (chart rendering, keyboard/click handling) |
+| `src/lib/swipe-data-loader.ts` | Data layer (`loadContigSizes`, `loadPlotData`, `parseWindowReadsJson`) |
+| `src/lib/bed-parser.ts` | BED file parser with 10,000-annotation cap |
+| `src/modes/swipe.ts` | IPC handlers (init, getState, getPlotData, accept, reject) |
+| `src/lib/types.ts` | Shared types (`BedAnnotation`, `PlotData`, `PlotDataPoint`, etc.) |
