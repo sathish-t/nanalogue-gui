@@ -4,11 +4,11 @@ topic: sandbox execution
 paths:
   - src/lib/sandbox-exec.ts
   - src/lib/sandbox-cli-args.ts
-description: How the Monty sandbox runs Python scripts
+  - src/modes/sandbox-mode.ts
+description: How the Monty sandbox runs Python scripts (updated)
 date: 2026-03-28
 ---
-The sandbox-exec module runs Python scripts in the Monty sandbox —
-the same environment as /exec in nanalogue-chat — with no LLM involved.
+Updated body with more detail.
 
-Resource limits (max-records, max-duration, max-memory, etc.) are shared
-with nanalogue-chat through sandbox-cli-args.ts so they stay in sync.
+The sandbox-exec module runs Python scripts in the Monty sandbox.
+The IPC handler lives in src/modes/sandbox-mode.ts.
