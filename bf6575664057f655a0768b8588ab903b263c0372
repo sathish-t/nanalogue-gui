@@ -1,0 +1,42 @@
+---
+hashed-string: monty-allocation-limit-error
+topic: AI Chat
+paths:
+  - src/lib/monty-sandbox.ts
+  - src/lib/chat-orchestrator.ts
+description: What error the LLM sees when Monty's maxAllocations limit is exceeded
+date: 2026-03-29
+---
+When the Monty sandbox exceeds its maxAllocations limit, Monty throws a
+MontyRuntimeError with a MemoryError. The error message format is:
+
+    MemoryError: allocation limit exceeded: <attempted> > <limit>
+
+e.g. "MemoryError: allocation limit exceeded: 4 > 3"
+
+The full traceback (via error.display("traceback")) looks like:
+
+    Traceback (most recent call last):
+      File "main.py", line N, in <module>
+        <offending line>
+        <underline>
+    MemoryError: allocation limit exceeded: <attempted> > <limit>
+
+In runSandboxCode (monty-sandbox.ts), this is caught as MontyRuntimeError
+and returned as a SandboxResult with errorType "RuntimeError" and
+isTimeout false (the message does not contain "time limit").
+
+In buildFeedbackMessage (chat-orchestrator.ts), this becomes a JSON
+payload sent back to the LLM as a user-role message:
+
+    Code execution result: {"success":false,"error_type":"RuntimeError",
+      "message":"Traceback (most recent call last):\n  ...\n
+      MemoryError: allocation limit exceeded: 4 > 3",
+      "is_timeout":false,"rounds_remaining":N}
+
+Unlike time-limit errors, there is no special timeout_note hint. The LLM
+only sees the raw MemoryError inside the traceback.
+
+Note: the exact error wording was determined empirically by running Monty
+at the version installed in this repo (not from reading Monty source).
+It could change in a future @pydantic/monty release.
