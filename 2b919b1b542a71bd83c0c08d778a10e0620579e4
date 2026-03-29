@@ -1,0 +1,30 @@
+---
+hashed-string: no-pdf-docx-support
+topic: feature-decisions
+paths:
+  - src/lib/ai-external-tools
+description: PDF and DOCX conversion will not be added to the AI agent
+date: 2026-03-29
+---
+We will not add PDF or DOCX file reading to the AI chat agent. The agent
+operates as a text-only Python REPL — it generates code, executes it, and
+feeds text results back to the LLM. This works well for structured data
+formats (TSV, CSV, XLSX) where the content is tabular and can be
+manipulated programmatically.
+
+PDF and DOCX files, however, routinely contain images (figures, diagrams,
+gel images, microscopy). A user who loads a paper will inevitably ask the
+LLM to interpret a figure, and the agent has no vision capability — it
+cannot render pages to images or pass them to a multimodal model. The
+feature would appear to work for text-heavy documents but break in a
+confusing way the moment an image matters, which in scientific papers is
+most of the time.
+
+The text extraction itself is also a heavy dependency burden (mupdf WASM
+at ~30MB for PDF, mammoth for DOCX) for a feature that would be
+fundamentally limited. If vision-capable agentic loops are added in the
+future this decision could be revisited, but for the current text-only
+sandbox architecture it is not worth pursuing.
+
+XLSX support (structured tabular data, no images) is a separate feature
+that is appropriate and planned — see brainstorming/xl_file_feature.md.
