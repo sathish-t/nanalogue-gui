@@ -63,7 +63,13 @@ jobs:
             | grep -vw $$ \
             > "$KILL_PIDS" || true
           if [ -s "$KILL_PIDS" ]; then
-            xargs sudo kill -9 < "$KILL_PIDS"
+            xargs sudo kill -9 < "$KILL_PIDS" 2>/dev/null || true
+            # Verify no targeted processes survived
+            SURVIVED=$(comm -12 <(sort "$KILL_PIDS") <(ps -u $USER -o pid= | sort) | wc -l)
+            if [ "$SURVIVED" -gt 0 ]; then
+              echo "ERROR: some processes survived kill" >&2
+              exit 1
+            fi
           fi
 
       - name: Lock down network egress
@@ -117,7 +123,13 @@ jobs:
             | grep -vw $$ \
             > "$KILL_PIDS" || true
           if [ -s "$KILL_PIDS" ]; then
-            xargs sudo kill -9 < "$KILL_PIDS"
+            xargs sudo kill -9 < "$KILL_PIDS" 2>/dev/null || true
+            # Verify no targeted processes survived
+            SURVIVED=$(comm -12 <(sort "$KILL_PIDS") <(ps -u $USER -o pid= | sort) | wc -l)
+            if [ "$SURVIVED" -gt 0 ]; then
+              echo "ERROR: some processes survived kill" >&2
+              exit 1
+            fi
           fi
 
       - name: Restore network access
