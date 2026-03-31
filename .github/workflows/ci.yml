@@ -135,12 +135,15 @@ jobs:
         run: npm run build
 
       - name: Lock down network egress
+        if: runner.os == 'Linux'
         run: |
           # Resolve whitelisted API domains while DNS is still open
           HOSTS="api.anthropic.com generativelanguage.googleapis.com api.openai.com"
-          declare -A RESOLVED
+          RESOLVED=""
           for host in $HOSTS; do
-            RESOLVED[$host]=$(dig +short "$host" | grep -E '^[0-9]')
+            for ip in $(dig +short "$host" | grep -E '^[0-9]'); do
+              RESOLVED="$RESOLVED $host:$ip"
+            done
           done
           # Block all outbound traffic by default
           sudo iptables -F OUTPUT
@@ -149,19 +152,24 @@ jobs:
           sudo iptables -A OUTPUT -o lo -j ACCEPT
           sudo iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
           # Whitelist resolved API IPs and pin them in /etc/hosts
-          for host in $HOSTS; do
-            for ip in ${RESOLVED[$host]}; do
-              echo "$ip $host" | sudo tee -a /etc/hosts
-              sudo iptables -A OUTPUT -d "$ip" -p tcp --dport 443 -j ACCEPT
-            done
+          for entry in $RESOLVED; do
+            host="${entry%%:*}"
+            ip="${entry##*:}"
+            echo "$ip $host" | sudo tee -a /etc/hosts
+            sudo iptables -A OUTPUT -d "$ip" -p tcp --dport 443 -j ACCEPT
           done
 
-      - name: Run tests
+      - name: Run tests (Linux, with API keys)
+        if: runner.os == 'Linux'
         run: npm test
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Run tests (macOS, no API keys)
+        if: runner.os == 'macOS'
+        run: npm test
 
   # Verify that no tracked src/*.ts file exceeds its line-count ceiling.
   # Source files: max 800 lines. Test files: max 1500 lines.
