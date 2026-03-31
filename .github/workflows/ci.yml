@@ -142,6 +142,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           comm -13 /tmp/pre-install-pids.txt <(ps -u $USER -o pid= | sort) \
+            | grep -vw $$ \
             | xargs -r sudo kill -9 2>/dev/null || true
 
       - name: Lock down network egress
@@ -189,6 +190,7 @@ jobs:
         if: runner.os == 'Linux' && always()
         run: |
           comm -13 /tmp/pre-test-pids.txt <(ps -u $USER -o pid= | sort) \
+            | grep -vw $$ \
             | xargs -r sudo kill -9 2>/dev/null || true
 
       - name: Restore network access
