@@ -30,6 +30,9 @@ jobs:
       - name: Upgrade npm
         run: npm install -g npm@11.10.0
 
+      - name: Snapshot running processes
+        run: ps -u $USER -o pid= | sort > /tmp/pre-install-pids.txt
+
       - name: Install npm dependencies
         run: |
           npm ci --ignore-scripts
@@ -46,6 +49,11 @@ jobs:
 
       - name: Generate demo data
         run: node demo/generate-demo-bam.mjs
+
+      - name: Kill processes spawned during install
+        run: |
+          comm -13 /tmp/pre-install-pids.txt <(ps -u $USER -o pid= | sort) \
+            | xargs -r sudo kill -9 2>/dev/null || true
 
       - name: Lock down network egress
         run: |
@@ -71,6 +79,9 @@ jobs:
             sudo iptables -A OUTPUT -d "$ip" -p tcp --dport 443 -j ACCEPT
           done
 
+      - name: Snapshot processes before screenshots
+        run: ps -u $USER -o pid= | sort > /tmp/pre-test-pids.txt
+
       - name: Take screenshots
         run: >-
           xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24"
@@ -81,12 +92,15 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
+      - name: Kill processes spawned during screenshots
+        if: always()
+        run: |
+          comm -13 /tmp/pre-test-pids.txt <(ps -u $USER -o pid= | sort) \
+            | xargs -r sudo kill -9 2>/dev/null || true
+
       - name: Restore network access
         if: always()
         run: |
-          # Kill any lingering node/electron processes that may hold secrets
-          sudo pkill -9 -f node || true
-          sudo pkill -9 -f electron || true
           sudo iptables -F OUTPUT
           sudo iptables -P OUTPUT ACCEPT
 

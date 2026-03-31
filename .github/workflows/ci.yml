@@ -126,6 +126,10 @@ jobs:
       - name: Upgrade npm
         run: npm install -g npm@11.10.0
 
+      - name: Snapshot running processes
+        if: runner.os == 'Linux'
+        run: ps -u $USER -o pid= | sort > /tmp/pre-install-pids.txt
+
       - name: Install npm dependencies
         run: |
           npm ci --ignore-scripts
@@ -133,6 +137,12 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Kill processes spawned during install
+        if: runner.os == 'Linux'
+        run: |
+          comm -13 /tmp/pre-install-pids.txt <(ps -u $USER -o pid= | sort) \
+            | xargs -r sudo kill -9 2>/dev/null || true
 
       - name: Lock down network egress
         if: runner.os == 'Linux'
@@ -159,6 +169,10 @@ jobs:
             sudo iptables -A OUTPUT -d "$ip" -p tcp --dport 443 -j ACCEPT
           done
 
+      - name: Snapshot processes before tests
+        if: runner.os == 'Linux'
+        run: ps -u $USER -o pid= | sort > /tmp/pre-test-pids.txt
+
       - name: Run tests (Linux, with API keys)
         if: runner.os == 'Linux'
         run: npm test
@@ -171,11 +185,15 @@ jobs:
         if: runner.os == 'macOS'
         run: npm test
 
+      - name: Kill processes spawned during tests
+        if: runner.os == 'Linux' && always()
+        run: |
+          comm -13 /tmp/pre-test-pids.txt <(ps -u $USER -o pid= | sort) \
+            | xargs -r sudo kill -9 2>/dev/null || true
+
       - name: Restore network access
         if: runner.os == 'Linux' && always()
         run: |
-          # Kill any lingering node processes that may hold secrets
-          sudo pkill -9 -f node || true
           sudo iptables -F OUTPUT
           sudo iptables -P OUTPUT ACCEPT
 
