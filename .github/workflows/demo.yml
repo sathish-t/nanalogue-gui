@@ -47,6 +47,28 @@ jobs:
       - name: Generate demo data
         run: node demo/generate-demo-bam.mjs
 
+      - name: Lock down network egress
+        run: |
+          # Resolve whitelisted API domains while DNS is still open
+          HOSTS="api.anthropic.com generativelanguage.googleapis.com api.openai.com"
+          declare -A RESOLVED
+          for host in $HOSTS; do
+            RESOLVED[$host]=$(dig +short "$host" | grep -E '^[0-9]')
+          done
+          # Block all outbound traffic by default
+          sudo iptables -F OUTPUT
+          sudo iptables -P OUTPUT DROP
+          # Allow loopback and existing connections
+          sudo iptables -A OUTPUT -o lo -j ACCEPT
+          sudo iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+          # Whitelist resolved API IPs and pin them in /etc/hosts
+          for host in $HOSTS; do
+            for ip in ${RESOLVED[$host]}; do
+              echo "$ip $host" | sudo tee -a /etc/hosts
+              sudo iptables -A OUTPUT -d "$ip" -p tcp --dport 443 -j ACCEPT
+            done
+          done
+
       - name: Take screenshots
         run: >-
           xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24"
