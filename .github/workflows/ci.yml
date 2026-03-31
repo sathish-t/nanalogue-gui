@@ -78,7 +78,9 @@ jobs:
         run: npm install -g npm@11.10.0
 
       - name: Install npm dependencies
-        run: npm ci
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild electron esbuild electron-winstaller
 
       - name: Lint (Biome, ESLint, Stylelint, html-validate, empty JSDoc)
         run: npm run lint
@@ -125,7 +127,9 @@ jobs:
         run: npm install -g npm@11.10.0
 
       - name: Install npm dependencies
-        run: npm ci
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild electron esbuild electron-winstaller
 
       - name: Build
         run: npm run build
@@ -183,7 +187,9 @@ jobs:
         run: npm install -g npm@11.10.0
 
       - name: Install npm dependencies
-        run: npm ci
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild electron esbuild electron-winstaller
 
       - name: Build
         run: npm run build
@@ -212,7 +218,9 @@ jobs:
         run: npm install -g npm@11.10.0
 
       - name: Install npm dependencies
-        run: npm ci
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild electron esbuild electron-winstaller
 
       - name: Build
         run: npm run build
@@ -249,7 +257,9 @@ jobs:
         run: npm install -g npm@11.10.0
 
       - name: Install npm dependencies
-        run: npm ci
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild electron esbuild electron-winstaller
 
       - name: Build
         run: npm run build

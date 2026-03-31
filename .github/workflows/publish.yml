@@ -76,7 +76,9 @@ jobs:
 
       - name: Install npm dependencies
         if: ${{ !matrix.use_docker }}
-        run: npm ci
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild electron esbuild electron-winstaller
 
       - name: Build
         if: ${{ !matrix.use_docker }}
@@ -120,7 +122,8 @@ jobs:
               npm install -g npm@11.10.0
 
               # Install npm dependencies, build, and test
-              npm ci
+              npm ci --ignore-scripts
+              npm rebuild electron esbuild electron-winstaller
 
               # @pydantic/monty has no native linux-arm64 package;
               # install the WASM fallback so tests pass on aarch64
