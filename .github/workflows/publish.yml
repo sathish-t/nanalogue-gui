@@ -71,6 +71,9 @@ jobs:
           node-version: "22"
           cache: "npm"
 
+      - name: Upgrade npm
+        run: npm install -g npm@11.10.0
+
       - name: Install npm dependencies
         if: ${{ !matrix.use_docker }}
         run: npm ci
@@ -112,6 +115,9 @@ jobs:
               # Print Node.js version for debugging
               echo "Node.js version: $(node --version)"
               echo "npm version: $(npm --version)"
+
+              # Upgrade npm for min-release-age support
+              npm install -g npm@11.10.0
 
               # Install npm dependencies, build, and test
               npm ci

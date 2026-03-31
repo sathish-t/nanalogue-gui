@@ -61,6 +61,14 @@ You can always build from source to avoid such warnings.
 To build from source, please use the command below.
 You would first need to install utilities like `npm` and `git`.
 
+> **npm version requirement:** This project requires **npm ≥ 11.10.0**.
+> We enforce a 7-day minimum release age on all dependencies as a supply-chain
+> security measure (via `min-release-age` in `.npmrc`), and older npm versions
+> do not support this setting. If your npm is too old, `npm install` will fail
+> with an "Unsupported engine" error.
+> Upgrade with `npm install -g npm@<version>`, where `<version>` is
+> any release ≥ 11.10.0 that is at least a few days old.
+
 ```bash
 git clone https://github.com/sathish-t/nanalogue-gui.git
 cd nanalogue-gui
