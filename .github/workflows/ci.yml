@@ -128,7 +128,11 @@ jobs:
 
       - name: Snapshot running processes
         if: runner.os == 'Linux'
-        run: ps -u $USER -o pid= | sort > /tmp/pre-install-pids.txt
+        id: snap-install
+        run: |
+          PIDFILE=$(mktemp)
+          ps -u $USER -o pid= | sort > "$PIDFILE"
+          echo "pidfile=$PIDFILE" >> "$GITHUB_OUTPUT"
 
       - name: Install npm dependencies
         run: |
@@ -140,10 +144,16 @@ jobs:
 
       - name: Kill processes spawned during install
         if: runner.os == 'Linux'
+        env:
+          PRE_INSTALL_PIDS: ${{ steps.snap-install.outputs.pidfile }}
         run: |
-          comm -13 /tmp/pre-install-pids.txt <(ps -u $USER -o pid= | sort) \
+          KILL_PIDS=$(mktemp)
+          comm -13 "$PRE_INSTALL_PIDS" <(ps -u $USER -o pid= | sort) \
             | grep -vw $$ \
-            | xargs -r sudo kill -9 2>/dev/null || true
+            > "$KILL_PIDS" || true
+          if [ -s "$KILL_PIDS" ]; then
+            xargs sudo kill -9 < "$KILL_PIDS"
+          fi
 
       - name: Lock down network egress
         if: runner.os == 'Linux'
@@ -172,7 +182,11 @@ jobs:
 
       - name: Snapshot processes before tests
         if: runner.os == 'Linux'
-        run: ps -u $USER -o pid= | sort > /tmp/pre-test-pids.txt
+        id: snap-test
+        run: |
+          PIDFILE=$(mktemp)
+          ps -u $USER -o pid= | sort > "$PIDFILE"
+          echo "pidfile=$PIDFILE" >> "$GITHUB_OUTPUT"
 
       - name: Run tests (Linux, with API keys)
         if: runner.os == 'Linux'
@@ -188,10 +202,16 @@ jobs:
 
       - name: Kill processes spawned during tests
         if: runner.os == 'Linux' && always()
+        env:
+          PRE_TEST_PIDS: ${{ steps.snap-test.outputs.pidfile }}
         run: |
-          comm -13 /tmp/pre-test-pids.txt <(ps -u $USER -o pid= | sort) \
+          KILL_PIDS=$(mktemp)
+          comm -13 "$PRE_TEST_PIDS" <(ps -u $USER -o pid= | sort) \
             | grep -vw $$ \
-            | xargs -r sudo kill -9 2>/dev/null || true
+            > "$KILL_PIDS" || true
+          if [ -s "$KILL_PIDS" ]; then
+            xargs sudo kill -9 < "$KILL_PIDS"
+          fi
 
       - name: Restore network access
         if: runner.os == 'Linux' && always()

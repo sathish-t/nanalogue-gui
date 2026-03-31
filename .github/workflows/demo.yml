@@ -31,7 +31,11 @@ jobs:
         run: npm install -g npm@11.10.0
 
       - name: Snapshot running processes
-        run: ps -u $USER -o pid= | sort > /tmp/pre-install-pids.txt
+        id: snap-install
+        run: |
+          PIDFILE=$(mktemp)
+          ps -u $USER -o pid= | sort > "$PIDFILE"
+          echo "pidfile=$PIDFILE" >> "$GITHUB_OUTPUT"
 
       - name: Install npm dependencies
         run: |
@@ -51,10 +55,16 @@ jobs:
         run: node demo/generate-demo-bam.mjs
 
       - name: Kill processes spawned during install
+        env:
+          PRE_INSTALL_PIDS: ${{ steps.snap-install.outputs.pidfile }}
         run: |
-          comm -13 /tmp/pre-install-pids.txt <(ps -u $USER -o pid= | sort) \
+          KILL_PIDS=$(mktemp)
+          comm -13 "$PRE_INSTALL_PIDS" <(ps -u $USER -o pid= | sort) \
             | grep -vw $$ \
-            | xargs -r sudo kill -9 2>/dev/null || true
+            > "$KILL_PIDS" || true
+          if [ -s "$KILL_PIDS" ]; then
+            xargs sudo kill -9 < "$KILL_PIDS"
+          fi
 
       - name: Lock down network egress
         run: |
@@ -81,7 +91,11 @@ jobs:
           done
 
       - name: Snapshot processes before screenshots
-        run: ps -u $USER -o pid= | sort > /tmp/pre-test-pids.txt
+        id: snap-test
+        run: |
+          PIDFILE=$(mktemp)
+          ps -u $USER -o pid= | sort > "$PIDFILE"
+          echo "pidfile=$PIDFILE" >> "$GITHUB_OUTPUT"
 
       - name: Take screenshots
         run: >-
@@ -95,10 +109,16 @@ jobs:
 
       - name: Kill processes spawned during screenshots
         if: always()
+        env:
+          PRE_TEST_PIDS: ${{ steps.snap-test.outputs.pidfile }}
         run: |
-          comm -13 /tmp/pre-test-pids.txt <(ps -u $USER -o pid= | sort) \
+          KILL_PIDS=$(mktemp)
+          comm -13 "$PRE_TEST_PIDS" <(ps -u $USER -o pid= | sort) \
             | grep -vw $$ \
-            | xargs -r sudo kill -9 2>/dev/null || true
+            > "$KILL_PIDS" || true
+          if [ -s "$KILL_PIDS" ]; then
+            xargs sudo kill -9 < "$KILL_PIDS"
+          fi
 
       - name: Restore network access
         if: always()
