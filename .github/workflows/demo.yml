@@ -81,6 +81,15 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
+      - name: Restore network access
+        if: always()
+        run: |
+          # Kill any lingering node/electron processes that may hold secrets
+          sudo pkill -9 -f node || true
+          sudo pkill -9 -f electron || true
+          sudo iptables -F OUTPUT
+          sudo iptables -P OUTPUT ACCEPT
+
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0

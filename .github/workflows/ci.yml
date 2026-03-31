@@ -171,6 +171,14 @@ jobs:
         if: runner.os == 'macOS'
         run: npm test
 
+      - name: Restore network access
+        if: runner.os == 'Linux' && always()
+        run: |
+          # Kill any lingering node processes that may hold secrets
+          sudo pkill -9 -f node || true
+          sudo iptables -F OUTPUT
+          sudo iptables -P OUTPUT ACCEPT
+
   # Verify that no tracked src/*.ts file exceeds its line-count ceiling.
   # Source files: max 800 lines. Test files: max 1500 lines.
   # Grandfathered files must not grow beyond their individual ceiling.
