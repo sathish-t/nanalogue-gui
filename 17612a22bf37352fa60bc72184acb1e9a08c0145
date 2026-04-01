@@ -1,0 +1,37 @@
+---
+hashed-string: todo-gate-downstream-workflows
+topic: CI/CD security
+paths:
+  - .github/workflows/ci.yml
+  - .github/workflows/codecov.yml
+  - .github/workflows/demo.yml
+  - .github/workflows/rodney.yml
+  - .github/workflows/smoke.yml
+description: Make CI workflows gate downstream workflows
+date: 2026-04-01
+---
+TODO: Make CI workflows gate downstream workflows
+
+Current state:
+- CI (ci.yml) is the main checker — lint, typecheck, tests, coverage, etc.
+- No other workflow waits for CI to pass. They all trigger independently.
+- Only existing dependencies: Release calls Package, Nightly CI calls CI.
+
+Workflows to gate behind CI:
+- Codecov — triggers on push only (not PRs), so workflow_run would work
+- Demo screenshots — triggers on push and PRs
+- Rodney demo — triggers on push and PRs
+- Smoke tests — triggers on push and PRs
+- Package — already gated (only called from Release or manual dispatch)
+
+Options for gating:
+1. workflow_run: only works on default branch, not on PRs
+2. Move jobs into ci.yml with needs: — works on PRs but makes ci.yml bigger
+3. For push-only workflows (Codecov), workflow_run is fine
+
+Key context on secrets and PRs:
+- PRs from the same repo (collaborators) get secrets
+- PRs from forks do not get secrets
+- workflow_run limitation is unrelated to secrets — it's a GitHub design choice
+
+Next step: decide per-workflow whether to use workflow_run or merge into ci.yml.
