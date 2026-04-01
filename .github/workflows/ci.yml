@@ -82,6 +82,14 @@ jobs:
           npm ci --ignore-scripts
           npm rebuild electron esbuild electron-winstaller
 
+      - name: Verify no non-registry resolved URLs
+        run: |
+          if grep '"resolved"' package-lock.json | grep -qv 'registry.npmjs.org'; then
+            echo "package-lock.json contains non-registry resolved URLs" >&2
+            grep '"resolved"' package-lock.json | grep -v 'registry.npmjs.org' >&2
+            exit 1
+          fi
+
       - name: Lint (Biome, ESLint, Stylelint, html-validate, empty JSDoc)
         run: npm run lint
 

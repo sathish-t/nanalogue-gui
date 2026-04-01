@@ -52,6 +52,14 @@ if git diff --cached --name-only | grep -q '^package\(-lock\)\?\.json$'; then
   mv package.json.bak package.json
   trap - EXIT INT TERM
   git add package-lock.json
+
+  # Verify all resolved URLs point to the npm registry.
+  # Blocks tarball URL dependencies that bypass min-release-age.
+  if grep '"resolved"' package-lock.json | grep -qv 'registry.npmjs.org'; then
+    echo "pre-commit: package-lock.json contains non-registry resolved URLs" >&2
+    grep '"resolved"' package-lock.json | grep -v 'registry.npmjs.org' | head -5 >&2
+    exit 1
+  fi
 fi
 
 # Check markdown links whenever any .md file is staged.
