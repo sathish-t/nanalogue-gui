@@ -1,0 +1,118 @@
+---
+hashed-string: monty-mount-filesystem-analysis
+topic: ai-chat
+paths:
+  - src/lib/monty-sandbox.ts
+  - src/lib/ai-external-tools/ls.ts
+  - src/lib/ai-external-tools/read-file.ts
+  - src/lib/ai-external-tools/write-file.ts
+  - src/lib/monty-sandbox-helpers.ts
+description: Analysis of monty mounting-filesystems commit and implications for AI chat sandbox
+date: 2026-04-02
+---
+
+## Context
+
+Monty commit 3ed7fb5 ("Mounting filesystems #305", 2026-04-02) adds a virtual
+filesystem mounting system. Python code inside the sandbox can use natural
+pathlib operations (Path.read_text(), Path.write_text(), Path.iterdir(), etc.)
+against mounted host directories, with access control handled entirely in Rust.
+
+## What the monty commit adds
+
+New JS API: `MountDirectory` class + `mount` parameter on run()/start()/feed()/runMontyAsync().
+
+```typescript
+const mount = new MountDirectory("/data", hostDir, { mode, writeBytesLimit });
+await runMontyAsync(monty, { mount, externalFunctions, ... });
+```
+
+Three modes:
+- `read-only`  — reads from host, writes raise PermissionError
+- `read-write` — full access to real host files
+- `overlay`    — reads fall through to host, writes captured in memory (COW)
+
+Overlay state persists across multiple run()/feed() calls on the same
+MountDirectory instance — important for multi-round chat sessions.
+
+Supported pathlib operations: exists, is_file, is_dir, is_symlink, read_text,
+read_bytes, write_text, write_bytes, mkdir, unlink, rmdir, iterdir, stat,
+rename, resolve, absolute.
+
+Security is in Rust (path_security.rs): path canonicalization, symlink escape
+detection, boundary checks. Significantly more robust than our JS-side
+resolvePath()/assertInside() approach.
+
+NOT supported: Python's built-in open() — only pathlib.Path methods are
+intercepted via the OsFunction enum.
+
+## Overlap with our external functions
+
+| Our function       | Mount equivalent                        | Gaps in mount version                    |
+|--------------------|-----------------------------------------|------------------------------------------|
+| read_file(p, off?) | Path("/data/p").read_text()             | No offset/pagination, no total_size      |
+|                    |                                         | metadata, no SVG blocking, no size cap   |
+| write_file(p, c)   | Path("/out/p").write_text(c)            | No overwrite prevention, no filename     |
+|                    |                                         | validation, no per-call size limit       |
+| ls(glob?)          | Path("/data").iterdir()                 | Non-recursive, no glob, no entry cap,    |
+|                    |                                         | no deny-list                             |
+
+## What could be simplified
+
+1. Simple file reads become natural Python:
+   `Path("/data/file.bed").read_text()` instead of
+   `read_file("file.bed")["content"]`.
+
+2. Path security shifts to Rust. Our JS resolvePath(), assertInside(),
+   assertExistingAncestorInside(), listFilesRecursive() in
+   monty-sandbox-helpers.ts become redundant for mount-routed operations.
+
+3. Access policy becomes declarative mount config instead of per-function
+   JS guards:
+     dataMount = MountDirectory("/data", allowedDir, { mode: "read-only" })
+     outputMount = MountDirectory("/output", outputDir, { mode: "read-write" })
+
+4. Overlay mode is ideal for LLM scratch files (helper scripts, temp data) —
+   in-memory, no host disk mutations, persists across rounds.
+
+## What must NOT be replaced
+
+1. read_file pagination: Path.read_text() reads the whole file. No open()
+   support in mounts. read_file's offset/max_bytes is essential for large
+   BED/TSV files. The system prompt teaches pagination.
+
+2. write_file safety guards: No-overwrite rule prevents LLM from destroying
+   input data or prior outputs. Filename validation (length, control chars)
+   is unique to our layer. Native write_text() has none of this.
+
+3. ls recursive glob: iterdir() is single-level only. Our ls("**/*.bam")
+   does recursive glob with a 500-entry cap and deny-list. LLM would need
+   to write its own recursive walk.
+
+4. Output size gating: gateOutputSize() caps external function results to
+   fit context window. Native pathlib reads have no interception point for
+   truncation — LLM could read a 100MB file into a variable.
+
+5. All BAM tools: peek, read_info, bam_mods, window_reads, seq_table call
+   @nanalogue/node with real host paths. Mounts don't help here.
+
+## The BAM path problem
+
+If allowedDir is mounted at /data, the LLM sees files as /data/sample.bam.
+But @nanalogue/node needs real host paths. External functions for BAM tools
+would need virtual-to-host path translation, or remain string-based with
+their own resolution — partially defeating the mount simplification.
+
+## Recommended approach
+
+Use BOTH mounts and external functions:
+- Mount allowedDir as read-only at /data for natural pathlib access
+- Mount output dir as read-write at /output (with writeBytesLimit)
+- Keep read_file for pagination of large files
+- Keep write_file for overwrite protection and filename validation
+- Keep ls for recursive glob + cap
+- Keep all BAM tools as external functions
+- Update system prompt to explain when to use pathlib vs external functions
+
+The biggest risk is LLM confusion about two ways to read/write files.
+The prompt must be clear about when to use which.
