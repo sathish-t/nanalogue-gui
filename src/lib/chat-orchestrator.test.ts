@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     addFact,
     applySlidingWindow,
+    deriveHistoryBudgetTokens,
     evictFacts,
     extractCodeFromFences,
     extractFacts,
@@ -175,6 +176,42 @@ describe("applySlidingWindow", () => {
         expect(result.length).toBeGreaterThan(0);
         // Should keep the latest messages
         expect(result[result.length - 1].content).toContain("Message 99");
+    });
+
+    it("uses smaller bytes-per-token estimates to keep fewer messages", () => {
+        // Each message here is ~210 UTF-8 bytes, so with a 1000-token window
+        // about 18 messages fit at 4 bytes/token, while only about 9 fit at
+        // 2 bytes/token.
+        const history: HistoryEntry[] = Array.from({ length: 20 }, (_, i) => ({
+            role: "user" as const,
+            content: `Message ${i} ${"x".repeat(200)}`,
+        }));
+        const uncalibrated = applySlidingWindow(history, 1000, 4);
+        const calibrated = applySlidingWindow(history, 1000, 2);
+        expect(uncalibrated.length).toBeGreaterThan(1);
+        expect(uncalibrated[0].content).toContain("Message 2");
+        expect(uncalibrated[uncalibrated.length - 1].content).toContain(
+            "Message 19",
+        );
+        expect(calibrated.length).toBeLessThan(uncalibrated.length);
+        expect(calibrated[0].content).toContain("Message 11");
+        expect(calibrated[calibrated.length - 1].content).toContain(
+            "Message 19",
+        );
+    });
+});
+
+describe("deriveHistoryBudgetTokens", () => {
+    it("reserves tokens for the system prompt and completion", () => {
+        const systemPrompt = "x".repeat(4000);
+        expect(deriveHistoryBudgetTokens(10000, systemPrompt, 4096, 4)).toBe(
+            4904,
+        );
+    });
+
+    it("never returns less than one token", () => {
+        const systemPrompt = "x".repeat(100000);
+        expect(deriveHistoryBudgetTokens(1000, systemPrompt, 4096, 4)).toBe(1);
     });
 });
 

@@ -5,9 +5,9 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import {
-    BYTES_PER_TOKEN,
+    NOMINAL_BYTES_PER_TOKEN,
     CONFIG_FIELD_SPECS,
-    CONTEXT_BUDGET_FRACTION,
+    MAX_INPUT_CONTEXT_FRACTION,
     DEFAULT_MAX_CODE_ROUNDS,
     DEFAULT_MAX_COMPLETION_TOKENS,
     DEFAULT_MAX_CUMULATIVE_SANDBOX_MS,
@@ -162,40 +162,52 @@ export function pruneFailedRounds(history: HistoryEntry[]): HistoryEntry[] {
 }
 
 /**
- * Estimates token count from a history entry using a rough 4 bytes per token heuristic.
+ * Estimates token count from plain text using a bytes-per-token heuristic.
  *
- * @param entry - The history entry to estimate.
+ * @param text - The text to estimate.
+ * @param bytesPerToken - Estimated bytes per token for this provider/model.
  * @returns Approximate token count.
  */
-function estimateTokens(entry: HistoryEntry): number {
-    return Math.ceil(
-        Buffer.byteLength(entry.content, "utf-8") / BYTES_PER_TOKEN,
+function estimateTokens(
+    text: string,
+    bytesPerToken = NOMINAL_BYTES_PER_TOKEN,
+): number {
+    return Math.max(
+        1,
+        Math.ceil(Buffer.byteLength(text, "utf-8") / bytesPerToken),
     );
 }
 
 /**
- * Applies a sliding window to keep messages within ~80% of the context budget.
+ * Applies a sliding window to keep messages within the given token budget.
  * Keeps the most recent messages, dropping older ones first.
  *
  * @param history - The pruned history to window.
- * @param budgetTokens - The total context budget in tokens.
+ * @param budgetTokens - The available history budget in tokens.
+ * @param bytesPerToken - Estimated bytes per token for this provider/model.
  * @returns A windowed history array.
  */
 export function applySlidingWindow(
     history: HistoryEntry[],
     budgetTokens: number,
+    bytesPerToken = NOMINAL_BYTES_PER_TOKEN,
 ): HistoryEntry[] {
-    const budget = Math.floor(budgetTokens * CONTEXT_BUDGET_FRACTION);
+    if (budgetTokens <= 0) {
+        return history.length > 0 ? [history[history.length - 1]] : [];
+    }
     if (history.length === 0) return [];
 
     // Always retain the newest message so the LLM always sees the latest user prompt,
     // even if a single oversized message exceeds the budget on its own.
-    let totalTokens = estimateTokens(history[history.length - 1]);
+    let totalTokens = estimateTokens(
+        history[history.length - 1].content,
+        bytesPerToken,
+    );
     const result: HistoryEntry[] = [history[history.length - 1]];
 
     for (let i = history.length - 2; i >= 0; i--) {
-        const tokens = estimateTokens(history[i]);
-        if (totalTokens + tokens > budget) break;
+        const tokens = estimateTokens(history[i].content, bytesPerToken);
+        if (totalTokens + tokens > budgetTokens) break;
         totalTokens += tokens;
         result.unshift(history[i]);
     }
@@ -208,7 +220,8 @@ export function applySlidingWindow(
  *
  * @param history - The full conversation history.
  * @param config - Context configuration with budget.
- * @param config.contextBudgetTokens - The total context budget in tokens.
+ * @param config.contextBudgetTokens - The available history budget in tokens.
+ * @param config.bytesPerToken - Estimated bytes per token for this provider/model.
  * @returns Transformed history ready for phase 2.
  */
 export function transformContext(
@@ -216,10 +229,70 @@ export function transformContext(
     config: {
         /** The total context budget in tokens. */
         contextBudgetTokens: number;
+        /** Estimated bytes per token for this provider/model. */
+        bytesPerToken?: number;
     },
 ): HistoryEntry[] {
     const pruned = pruneFailedRounds(history);
-    return applySlidingWindow(pruned, config.contextBudgetTokens);
+    return applySlidingWindow(
+        pruned,
+        config.contextBudgetTokens,
+        config.bytesPerToken,
+    );
+}
+
+/**
+ * Derives the history-only token budget after reserving space for the system
+ * prompt and the model's completion.
+ *
+ * @param contextWindowTokens - The model context window in tokens.
+ * @param systemPrompt - The system prompt sent with every request.
+ * @param completionTokens - Tokens reserved for the model's completion.
+ * @param bytesPerToken - Estimated bytes per token for this provider/model.
+ * @returns Remaining token budget available for conversation history.
+ */
+export function deriveHistoryBudgetTokens(
+    contextWindowTokens: number,
+    systemPrompt: string,
+    completionTokens: number,
+    bytesPerToken = NOMINAL_BYTES_PER_TOKEN,
+): number {
+    return Math.max(
+        1,
+        contextWindowTokens -
+            estimateTokens(systemPrompt, bytesPerToken) -
+            completionTokens,
+    );
+}
+
+/**
+ * Derives a calibrated bytes-per-token estimate from a real API prompt token count.
+ *
+ * @param systemPrompt - The system prompt sent with the request.
+ * @param messages - The non-system messages sent with the request.
+ * @param promptTokens - The real prompt token count reported by the provider.
+ * @returns A calibrated bytes-per-token estimate, or null if unavailable.
+ */
+function deriveEstimatedBytesPerToken(
+    systemPrompt: string,
+    messages: Array<{
+        /** The message role. */
+        role: string;
+        /** The message content. */
+        content: string;
+    }>,
+    promptTokens: number | undefined,
+): number | null {
+    if (promptTokens === undefined || promptTokens <= 0) return null;
+    const totalPromptBytes =
+        Buffer.byteLength(systemPrompt, "utf-8") +
+        messages.reduce(
+            (total, message) =>
+                total + Buffer.byteLength(message.content, "utf-8"),
+            0,
+        );
+    if (totalPromptBytes <= 0) return null;
+    return totalPromptBytes / promptTokens;
 }
 
 /**
@@ -454,6 +527,15 @@ interface ChatCompletionResponse {
         /** The reason generation stopped. */
         finish_reason: string;
     }>;
+    /** Optional usage block returned by many OpenAI-compatible providers. */
+    usage?: {
+        /** Tokens counted in the prompt. */
+        prompt_tokens?: number;
+        /** Tokens counted in the completion. */
+        completion_tokens?: number;
+        /** Total tokens counted for the request. */
+        total_tokens?: number;
+    };
 }
 
 /** Retryable HTTP status codes. */
@@ -962,12 +1044,10 @@ export async function handleUserMessage(
     // (SYSTEM_APPEND.md) and the dynamic facts block still stack on top of
     // whichever base is active, in the usual order.
     //
-    // Note: the context-window budget (maxOutputBytes) is derived from
-    // contextWindowTokens without subtracting the system prompt size — this
-    // is a pre-existing approximation that also applies to the large sandbox
-    // prompt itself. SYSTEM_APPEND.md is intended for small domain context
-    // (a few paragraphs); very large files will reduce usable context just
-    // as any enlarged system prompt would.
+    // Note: maxOutputBytes is still derived from contextWindowTokens as an
+    // output-size heuristic for sandbox prompt construction. The separate LLM
+    // history window below reserves tokens for the full system prompt and for
+    // the model's completion before applying the sliding window.
     const basePrompt =
         replaceSystemPrompt ??
         buildSandboxPrompt({
@@ -1033,6 +1113,7 @@ export async function handleUserMessage(
     emitEvent({ type: "turn_start" });
 
     let finalText = "";
+    let estimatedBytesPerToken = NOMINAL_BYTES_PER_TOKEN;
 
     let round = 0;
     for (; round < maxRounds; round++) {
@@ -1041,8 +1122,18 @@ export async function handleUserMessage(
         if (cumulativeSandboxMs >= cumulativeBudgetMs) break;
 
         // Prepare context
+        const maxInputContextTokens = Math.floor(
+            config.contextWindowTokens * MAX_INPUT_CONTEXT_FRACTION,
+        );
+        const historyBudgetTokens = deriveHistoryBudgetTokens(
+            maxInputContextTokens,
+            systemPrompt,
+            DEFAULT_MAX_COMPLETION_TOKENS,
+            estimatedBytesPerToken,
+        );
         const prepared = transformContext(history, {
-            contextBudgetTokens: config.contextWindowTokens,
+            contextBudgetTokens: historyBudgetTokens,
+            bytesPerToken: estimatedBytesPerToken,
         });
         const llmMessages = convertToLlmMessages(prepared);
 
@@ -1066,6 +1157,13 @@ export async function handleUserMessage(
             config.temperature,
         );
         emitEvent({ type: "llm_request_end" });
+
+        estimatedBytesPerToken =
+            deriveEstimatedBytesPerToken(
+                systemPrompt,
+                llmMessages,
+                completion.usage?.prompt_tokens,
+            ) ?? estimatedBytesPerToken;
 
         const rawCode = completion.choices?.[0]?.message?.content ?? "";
 
@@ -1232,8 +1330,18 @@ export async function handleUserMessage(
             executionStatus: "error",
         });
 
+        const maxInputContextTokens = Math.floor(
+            config.contextWindowTokens * MAX_INPUT_CONTEXT_FRACTION,
+        );
+        const historyBudgetTokens = deriveHistoryBudgetTokens(
+            maxInputContextTokens,
+            systemPrompt,
+            DEFAULT_MAX_COMPLETION_TOKENS,
+            estimatedBytesPerToken,
+        );
         const prepared = transformContext(history, {
-            contextBudgetTokens: config.contextWindowTokens,
+            contextBudgetTokens: historyBudgetTokens,
+            bytesPerToken: estimatedBytesPerToken,
         });
         const llmMessages = convertToLlmMessages(prepared);
 

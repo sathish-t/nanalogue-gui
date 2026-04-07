@@ -8,8 +8,8 @@ export {
 
 // --- Token estimation ---
 
-export const /** Approximate bytes per token for context window estimation. */ BYTES_PER_TOKEN = 4;
-export const /** Fraction of context budget used by the sliding window (reserve rest for system prompt). */ CONTEXT_BUDGET_FRACTION = 0.8;
+export const /** Nominal bytes per token for context window estimation. */ NOMINAL_BYTES_PER_TOKEN = 4;
+export const /** Maximum fraction of the model context window used for input tokens, leaving the rest for completion and safety margin. */ MAX_INPUT_CONTEXT_FRACTION = 0.8;
 
 // --- Network timeouts ---
 

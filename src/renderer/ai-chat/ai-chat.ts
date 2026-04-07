@@ -1,6 +1,7 @@
 // AI Chat renderer script for nanalogue-gui.
 // Handles the chat UI, configuration panel, code panel, and IPC communication.
 
+import { NOMINAL_BYTES_PER_TOKEN } from "../../lib/ai-chat-constants";
 import { CONFIG_FIELD_SPECS } from "../../lib/ai-chat-shared-constants";
 import { applyFontSize } from "../shared/apply-font-size";
 
@@ -1002,12 +1003,14 @@ btnViewSystemPrompt.addEventListener("click", async () => {
     if (generation !== systemPromptGeneration) return;
     if (result.success) {
         systemPromptPre.textContent = result.prompt;
-        // Rough token estimate: 1 token ≈ 4 bytes of UTF-8 text on average.
-        // This is a well-known rule of thumb and is intentionally approximate —
-        // the UI label already says "(rough)". A proper tokenizer is not worth
-        // the dependency cost for a display hint.
+        // Rough token estimate: 1 token ≈ NOMINAL_BYTES_PER_TOKEN bytes of
+        // on average. This is a well-known rule of thumb and is intentionally
+        // approximate — the UI label already says "(rough)". A proper tokenizer
+        // is not worth the dependency cost for a display hint.
         const byteLength = new TextEncoder().encode(result.prompt).byteLength;
-        const roughTokens = Math.round(byteLength / 4);
+        const roughTokens = Math.round(
+            byteLength / NOMINAL_BYTES_PER_TOKEN,
+        );
         systemPromptTokenEstimate.textContent = `~${roughTokens.toLocaleString()} tokens (rough)`;
     } else {
         systemPromptPre.textContent = `Error: ${result.error}`;

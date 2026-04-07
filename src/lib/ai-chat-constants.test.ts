@@ -3,9 +3,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
-    BYTES_PER_TOKEN,
+    NOMINAL_BYTES_PER_TOKEN,
     CONFIG_FIELD_SPECS,
-    CONTEXT_BUDGET_FRACTION,
+    MAX_INPUT_CONTEXT_FRACTION,
     MAX_MESSAGE_BYTES,
     MODEL_LIST_TIMEOUT_MS,
 } from "./ai-chat-constants";
@@ -54,14 +54,14 @@ describe("ai-chat-constants", () => {
 });
 
 describe("ai-chat-constants scalar exports", () => {
-    it("has BYTES_PER_TOKEN as a positive integer", () => {
-        expect(BYTES_PER_TOKEN).toBeGreaterThan(0);
-        expect(Number.isInteger(BYTES_PER_TOKEN)).toBe(true);
+    it("has NOMINAL_BYTES_PER_TOKEN as a positive integer", () => {
+        expect(NOMINAL_BYTES_PER_TOKEN).toBeGreaterThan(0);
+        expect(Number.isInteger(NOMINAL_BYTES_PER_TOKEN)).toBe(true);
     });
 
-    it("has CONTEXT_BUDGET_FRACTION between 0 and 1", () => {
-        expect(CONTEXT_BUDGET_FRACTION).toBeGreaterThan(0);
-        expect(CONTEXT_BUDGET_FRACTION).toBeLessThan(1);
+    it("has MAX_INPUT_CONTEXT_FRACTION between 0 and 1", () => {
+        expect(MAX_INPUT_CONTEXT_FRACTION).toBeGreaterThan(0);
+        expect(MAX_INPUT_CONTEXT_FRACTION).toBeLessThan(1);
     });
 
     it("has MAX_MESSAGE_BYTES as a positive integer", () => {
