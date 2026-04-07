@@ -1008,9 +1008,7 @@ btnViewSystemPrompt.addEventListener("click", async () => {
         // approximate — the UI label already says "(rough)". A proper tokenizer
         // is not worth the dependency cost for a display hint.
         const byteLength = new TextEncoder().encode(result.prompt).byteLength;
-        const roughTokens = Math.round(
-            byteLength / NOMINAL_BYTES_PER_TOKEN,
-        );
+        const roughTokens = Math.round(byteLength / NOMINAL_BYTES_PER_TOKEN);
         systemPromptTokenEstimate.textContent = `~${roughTokens.toLocaleString()} tokens (rough)`;
     } else {
         systemPromptPre.textContent = `Error: ${result.error}`;

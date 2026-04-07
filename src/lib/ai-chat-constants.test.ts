@@ -3,11 +3,11 @@
 
 import { describe, expect, it } from "vitest";
 import {
-    NOMINAL_BYTES_PER_TOKEN,
     CONFIG_FIELD_SPECS,
     MAX_INPUT_CONTEXT_FRACTION,
     MAX_MESSAGE_BYTES,
     MODEL_LIST_TIMEOUT_MS,
+    NOMINAL_BYTES_PER_TOKEN,
 } from "./ai-chat-constants";
 
 describe("ai-chat-constants", () => {
