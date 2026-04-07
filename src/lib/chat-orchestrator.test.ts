@@ -389,6 +389,34 @@ describe("evictFacts", () => {
         const outputFact = facts.find((f) => f.type === "output");
         expect(outputFact).toBeDefined();
     });
+
+    it("evicts filter facts before file facts when both are present", () => {
+        const facts: Fact[] = [];
+        for (let i = 0; i < 30; i++) {
+            facts.push({
+                type: "file",
+                filename: `file_${i}_${"x".repeat(80)}.bam`,
+                roundId: `file-round-${i}`,
+                timestamp: i,
+            });
+            facts.push({
+                type: "filter",
+                description: `filter_${i}_${"x".repeat(80)}`,
+                roundId: `filter-round-${i}`,
+                timestamp: i,
+            });
+        }
+
+        evictFacts(facts);
+
+        expect(facts.some((fact) => fact.type === "file")).toBe(true);
+        const remainingFilterTimestamps = facts
+            .filter((fact) => fact.type === "filter")
+            .map((fact) => fact.timestamp);
+        if (remainingFilterTimestamps.length > 0) {
+            expect(Math.min(...remainingFilterTimestamps)).toBeGreaterThan(0);
+        }
+    });
 });
 
 describe("renderFactsBlock", () => {

@@ -34,9 +34,8 @@ import {
     safeUtf8Slice,
 } from "./monty-sandbox-helpers";
 import {
-    buildSandboxPrompt,
-    buildSystemPrompt,
-    renderFactsBlock,
+    buildSystemPromptParts,
+    joinSystemPromptParts,
 } from "./sandbox-prompt";
 
 /** A single message in the LLM request payload (system, user, or assistant). */
@@ -979,32 +978,16 @@ export async function handleUserMessage(
     // Build system prompt
     const maxOutputBytes = deriveMaxOutputBytes(config.contextWindowTokens);
     const maxOutputKB = Math.round(maxOutputBytes / 1024);
-    // When --system-prompt (replaceSystemPrompt) is active, use it as the
-    // base instead of the built-in sandbox prompt. appendSystemPrompt
-    // (SYSTEM_APPEND.md) and the dynamic facts block still stack on top of
-    // whichever base is active, in the usual order.
-    //
-    // Note: maxOutputBytes is still derived from contextWindowTokens as an
-    // output-size heuristic for sandbox prompt construction. The separate LLM
-    // history window below reserves tokens for the full system prompt and for
-    // the model's completion before applying the sliding window.
-    const basePrompt =
-        replaceSystemPrompt ??
-        buildSandboxPrompt({
-            maxOutputKB,
-            maxRecordsReadInfo: config.maxRecordsReadInfo,
-            maxRecordsBamMods: config.maxRecordsBamMods,
-            maxRecordsWindowReads: config.maxRecordsWindowReads,
-            maxRecordsSeqTable: config.maxRecordsSeqTable,
-            maxReadMB: config.maxReadMB,
-            maxWriteMB: config.maxWriteMB,
-            maxDurationSecs: config.maxDurationSecs,
-        });
-    const effectiveSandboxPrompt = appendSystemPrompt
-        ? `${basePrompt}\n\n${appendSystemPrompt}`
-        : basePrompt;
-    const factsBlock = renderFactsBlock(facts);
-    const systemPrompt = buildSystemPrompt(effectiveSandboxPrompt, factsBlock);
+    // Reuse the same derived output ceiling for both sandbox limits and the
+    // default sandbox prompt so those two views of the runtime stay in sync.
+    const systemPromptParts = buildSystemPromptParts({
+        config,
+        maxOutputKB,
+        facts,
+        appendSystemPrompt,
+        replaceSystemPrompt,
+    });
+    const systemPrompt = joinSystemPromptParts(systemPromptParts);
 
     // Sandbox options
     const sandboxOptions: SandboxOptions = {

@@ -1,13 +1,14 @@
-// Tests for buildSandboxPrompt, renderFactsBlock, and buildSystemPrompt.
+// Tests for buildSandboxPrompt, renderFactsBlock, and system prompt assembly.
 // Verifies that all external function docs, dynamic limits, facts JSON,
 // and SYSTEM_APPEND assembly are correctly reflected in the system prompt.
 
 import { describe, expect, it } from "vitest";
 import { EXTERNAL_FUNCTIONS } from "./ai-chat-constants";
-import type { Fact } from "./chat-types";
+import type { AiChatConfig, Fact } from "./chat-types";
 import {
     buildSandboxPrompt,
-    buildSystemPrompt,
+    buildSystemPromptParts,
+    joinSystemPromptParts,
     renderFactsBlock,
     type SandboxPromptOptions,
 } from "./sandbox-prompt";
@@ -234,38 +235,78 @@ describe("renderFactsBlock", () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildSystemPrompt — SYSTEM_APPEND assembly and factsBlock handling
+// System prompt assembly — base/append/facts block handling
 // ---------------------------------------------------------------------------
 
-describe("buildSystemPrompt", () => {
-    /** Representative static sandbox prompt used across tests. */
-    const sandboxPrompt = "## System\nDo genomics analysis.";
+describe("system prompt assembly", () => {
+    /** Minimal config for buildSystemPromptParts tests. */
+    const config: AiChatConfig = {
+        contextWindowTokens: 8192,
+        maxRetries: 1,
+        timeoutSeconds: 30,
+        maxRecordsReadInfo: BASE_OPTIONS.maxRecordsReadInfo,
+        maxRecordsBamMods: BASE_OPTIONS.maxRecordsBamMods,
+        maxRecordsWindowReads: BASE_OPTIONS.maxRecordsWindowReads,
+        maxRecordsSeqTable: BASE_OPTIONS.maxRecordsSeqTable,
+        maxCodeRounds: 1,
+        maxDurationSecs: BASE_OPTIONS.maxDurationSecs,
+        maxMemoryMB: 512,
+        maxAllocations: 100_000,
+        maxReadMB: BASE_OPTIONS.maxReadMB,
+        maxWriteMB: BASE_OPTIONS.maxWriteMB,
+    };
 
-    it("returns the sandbox prompt unchanged when factsBlock is empty string", () => {
-        expect(buildSystemPrompt(sandboxPrompt, "")).toBe(sandboxPrompt);
+    it("returns non-overlapping base, append, and facts parts", () => {
+        const parts = buildSystemPromptParts({
+            config,
+            facts: [
+                {
+                    type: "file",
+                    filename: "reads.bam",
+                    roundId: "r1",
+                    timestamp: 1,
+                },
+            ],
+            appendSystemPrompt:
+                "## Domain context\nFocus on CpG methylation only.",
+            replaceSystemPrompt: "## Replacement base\nCustom instructions.",
+        });
+
+        expect(parts.base).toBe("## Replacement base\nCustom instructions.");
+        expect(parts.append).toBe(
+            "## Domain context\nFocus on CpG methylation only.",
+        );
+        expect(parts.facts).toContain("Conversation facts");
+        expect(parts.facts).toContain("reads.bam");
     });
 
-    it("appends factsBlock with exactly two newlines as separator", () => {
-        const factsBlock = "## Facts\n```json\n[]\n```";
-        const result = buildSystemPrompt(sandboxPrompt, factsBlock);
-        expect(result).toBe(`${sandboxPrompt}\n\n${factsBlock}`);
+    it("builds the default sandbox prompt in the base part when no replacement is provided", () => {
+        const parts = buildSystemPromptParts({
+            config,
+            facts: [],
+        });
+
+        expect(parts.base).toContain(
+            "You are a Python REPL for bioinformatics analysis.",
+        );
+        expect(parts.append).toBe("");
+        expect(parts.facts).toBe("");
     });
 
-    it("SYSTEM_APPEND content is faithfully preserved in the combined prompt", () => {
-        // The orchestrator concatenates SYSTEM_APPEND.md onto the sandbox prompt
-        // before calling buildSystemPrompt.  This test simulates that step to
-        // verify the final system message contains the append verbatim.
-        const appendContent =
-            "## Domain context\nFocus on CpG methylation only.";
-        const promptWithAppend = `${sandboxPrompt}\n\n${appendContent}`;
-        const result = buildSystemPrompt(promptWithAppend, "");
-        expect(result).toContain(appendContent);
+    it("joins non-empty parts with exactly two newlines", () => {
+        const result = joinSystemPromptParts({
+            base: "## System\nDo genomics analysis.",
+            append: "## Domain context\nFocus on CpG methylation only.",
+            facts: "## Facts\n```json\n[]\n```",
+        });
+        expect(result).toBe(
+            "## System\nDo genomics analysis.\n\n## Domain context\nFocus on CpG methylation only.\n\n## Facts\n```json\n[]\n```",
+        );
     });
 
-    it("sandboxPrompt and factsBlock both appear when factsBlock is non-empty", () => {
-        const factsBlock = '## Facts\n```json\n[{"type":"file"}]\n```';
-        const result = buildSystemPrompt(sandboxPrompt, factsBlock);
-        expect(result).toContain(sandboxPrompt);
-        expect(result).toContain(factsBlock);
+    it("skips empty parts when joining", () => {
+        expect(
+            joinSystemPromptParts({ base: "## System", facts: "## Facts" }),
+        ).toBe("## System\n\n## Facts");
     });
 });

@@ -11,7 +11,10 @@ import type {
     HistoryEntry,
 } from "./chat-types";
 import { deriveMaxOutputBytes, resolvePath } from "./monty-sandbox-helpers";
-import { buildSandboxPrompt } from "./sandbox-prompt";
+import {
+    buildStaticSystemPromptParts,
+    joinSystemPromptParts,
+} from "./sandbox-prompt";
 
 /** Serialized LLM message content that can be dumped to disk. */
 export interface DumpableLlmMessage {
@@ -104,30 +107,20 @@ export async function handleDumpCommand(
         const filename = `nanalogue-chat-${date}-${uuid}.log`;
         const outputFile = join(safeDir, filename);
 
-        const maxOutputBytesForPrompt = deriveMaxOutputBytes(
-            config.contextWindowTokens,
-        );
-        const maxOutputKBForPrompt = Math.round(maxOutputBytesForPrompt / 1024);
-        // When --system-prompt (replaceSystemPrompt) is active, use it as the
-        // base; otherwise build the default sandbox prompt. appendSystemPrompt
-        // (SYSTEM_APPEND.md) stacks on top of whichever base is active.
-        const basePromptForDump =
-            replaceSystemPrompt ??
-            buildSandboxPrompt({
-                maxOutputKB: maxOutputKBForPrompt,
-                maxRecordsReadInfo: config.maxRecordsReadInfo,
-                maxRecordsBamMods: config.maxRecordsBamMods,
-                maxRecordsWindowReads: config.maxRecordsWindowReads,
-                maxRecordsSeqTable: config.maxRecordsSeqTable,
-                maxReadMB: config.maxReadMB,
-                maxWriteMB: config.maxWriteMB,
-                maxDurationSecs: config.maxDurationSecs,
-            });
+        const maxOutputBytes = deriveMaxOutputBytes(config.contextWindowTokens);
+        const maxOutputKB = Math.round(maxOutputBytes / 1024);
         // Include SYSTEM_APPEND.md content in the dump so it accurately
-        // reflects the full system prompt that is sent to the LLM.
-        const promptContent = appendSystemPrompt
-            ? `${basePromptForDump}\n\n${appendSystemPrompt}`
-            : basePromptForDump;
+        // reflects the reusable static system prompt sent on every turn.
+        // Dynamic per-conversation facts are intentionally excluded from this
+        // dump because they vary across turns and are not part of the shared
+        // base prompt template.
+        const promptParts = buildStaticSystemPromptParts({
+            config,
+            maxOutputKB,
+            appendSystemPrompt,
+            replaceSystemPrompt,
+        });
+        const promptContent = joinSystemPromptParts(promptParts);
         await writeFile(outputFile, promptContent, "utf-8");
 
         const relPath = relative(allowedDir, outputFile);

@@ -58,6 +58,10 @@ const EXCEPTIONS = new Map([
     // log-to-html.ts is self-contained by design: inlined CSS, JS, and JSDoc
     // account for the majority of lines; logic itself is well under the limit.
     ["src/lib/log-to-html.ts", 816],
+    // sandbox-prompt.ts now owns both the long built-in sandbox prompt text
+    // and the shared system-prompt assembly helpers; keep the ceiling pinned
+    // while that prompt text remains co-located with its assembly logic.
+    ["src/lib/sandbox-prompt.ts", 875],
     // Test files above the 1500-line ceiling:
     // chat-orchestrator-handle-message.test.ts now also carries targeted
     // orchestration regression tests; keep the ceiling pinned while helper
