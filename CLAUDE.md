@@ -69,28 +69,52 @@ npm run lint           # no lint errors
 npm run lint:fix       # auto-fix what can be fixed
 ```
 
-Then run both ai reviews (redirect each to a temp file to avoid
+Then run both AI reviews (redirect each to a temp file to avoid
 interleaved output; use `mktemp` so concurrent runs never collide).
 Give each a timeout of 300s.
 
 ```bash
-CR_OUT=$(mktemp) && CODEX_OUT=$(mktemp)
-coderabbit review --prompt-only -t uncommitted > "$CR_OUT" 2>&1
-codex review --uncommitted > "$CODEX_OUT" 2>&1
+CR_OUT=$(mktemp) && CLAUDE_OUT=$(mktemp)
+REVIEW_PROMPT=$(cat <<'EOF'
+Act as a skeptical code reviewer, not an implementer.
+
+Review the following git diff and report:
+- correctness issues
+- edge cases
+- naming/abstraction problems
+- missing or weak tests
+- lint/type/build risks
+- anything confusing to future maintainers
+
+Be specific and cite file names / line areas.
+Do not praise. Do not propose large rewrites unless necessary.
+Separate:
+- Required fixes
+- Suggested improvements
+EOF
+)
+timeout 300s coderabbit review --prompt-only -t uncommitted > "$CR_OUT" 2>&1
+# Send both staged and unstaged changes so the review covers the full
+# uncommitted working tree.
+{
+  printf '%s\n\n' "$REVIEW_PROMPT"
+  git diff --cached --no-color
+  git diff --no-color
+} | timeout 300s claude -p > "$CLAUDE_OUT" 2>&1
 echo "== coderabbit review =="
 cat "$CR_OUT"
-echo "== codex review =="
-cat "$CODEX_OUT"
+echo "== claude review =="
+cat "$CLAUDE_OUT"
 ```
 
 Incorporate any suggestions that are worth doing, then repeat the cycle
 until neither tool raises new issues (or the remaining issues are not
-worth addressing). Do not run multiple `codex review` instances in
+worth addressing). Do not run multiple `claude` review instances in
 parallel — deal with its previous output first.
 
 Remove files only after you are sure you have read them fully.
 ```
-rm "$CR_OUT" "$CODEX_OUT"
+rm "$CR_OUT" "$CLAUDE_OUT"
 ```
 ---
 
