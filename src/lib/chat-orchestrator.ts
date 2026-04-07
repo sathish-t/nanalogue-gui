@@ -15,10 +15,12 @@ import {
     NOMINAL_BYTES_PER_TOKEN,
     TERMINAL_OUTPUT_OVERFLOW_BYTES,
 } from "./ai-chat-constants";
+import { handleDumpCommand } from "./chat-orchestrator-helpers";
 import type {
     AiChatConfig,
     AiChatEvent,
     Fact,
+    HandleMessageResult,
     HistoryEntry,
     SandboxOptions,
     SandboxResult,
@@ -894,17 +896,7 @@ export interface HandleMessageOptions {
  */
 export async function handleUserMessage(
     options: HandleMessageOptions,
-): Promise<{
-    /** The assistant's final text response. */
-    text: string;
-    /** The list of sandbox execution steps with code and results. */
-    steps: Array<{
-        /** The Python code that was executed. */
-        code: string;
-        /** The sandbox execution result. */
-        result: SandboxResult;
-    }>;
-}> {
+): Promise<HandleMessageResult> {
     const {
         message,
         endpointUrl,
@@ -969,71 +961,19 @@ export async function handleUserMessage(
         return { text, steps };
     }
 
-    // Handle /dump_llm_instructions — dump last LLM request payload to file.
-    const dumpMatch = message.match(/^\/dump_llm_instructions\s*$/);
-    if (dumpMatch) {
-        history.pop();
-        emitEvent({ type: "turn_start" });
-
-        const dump = lastSentMessages
-            ? await dumpLlmInstructions(allowedDir, lastSentMessages)
-            : null;
-        const text = dump
-            ? `LLM instructions dumped to ${dump.log}\n` +
-              `HTML view: ${dump.html}\n` +
-              "These files are not fed back to the LLM. Do not reference them in conversations."
-            : "No LLM call has been made yet, nothing to dump.";
-        emitEvent({ type: "turn_end", text, steps: [] });
-        return { text, steps: [] };
-    }
-
-    // Handle /dump_system_prompt — dump the static system prompt to file.
-    const dumpSysPromptMatch = message.match(/^\/dump_system_prompt\s*$/);
-    if (dumpSysPromptMatch) {
-        history.pop();
-        emitEvent({ type: "turn_start" });
-
-        const outputDir = join(allowedDir, "ai_chat_output");
-        await mkdir(outputDir, { recursive: true });
-        const safeDir = await resolvePath(allowedDir, "ai_chat_output");
-
-        const date = new Date().toISOString().slice(0, 10);
-        const uuid = randomUUID();
-        const filename = `nanalogue-chat-${date}-${uuid}.log`;
-        const outputFile = join(safeDir, filename);
-
-        const maxOutputBytesForPrompt = deriveMaxOutputBytes(
-            config.contextWindowTokens,
-        );
-        const maxOutputKBForPrompt = Math.round(maxOutputBytesForPrompt / 1024);
-        // When --system-prompt (replaceSystemPrompt) is active, use it as the
-        // base; otherwise build the default sandbox prompt. appendSystemPrompt
-        // (SYSTEM_APPEND.md) stacks on top of whichever base is active.
-        const basePromptForDump =
-            replaceSystemPrompt ??
-            buildSandboxPrompt({
-                maxOutputKB: maxOutputKBForPrompt,
-                maxRecordsReadInfo: config.maxRecordsReadInfo,
-                maxRecordsBamMods: config.maxRecordsBamMods,
-                maxRecordsWindowReads: config.maxRecordsWindowReads,
-                maxRecordsSeqTable: config.maxRecordsSeqTable,
-                maxReadMB: config.maxReadMB,
-                maxWriteMB: config.maxWriteMB,
-                maxDurationSecs: config.maxDurationSecs,
-            });
-        // Include SYSTEM_APPEND.md content in the dump so it accurately
-        // reflects the full system prompt that is sent to the LLM.
-        const promptContent = appendSystemPrompt
-            ? `${basePromptForDump}\n\n${appendSystemPrompt}`
-            : basePromptForDump;
-        await writeFile(outputFile, promptContent, "utf-8");
-
-        const relPath = relative(allowedDir, outputFile);
-        const text =
-            `System prompt dumped to ${relPath}\n` +
-            "This message is not fed back to the LLM. Do not reference this file in conversations.";
-        emitEvent({ type: "turn_end", text, steps: [] });
-        return { text, steps: [] };
+    const dumpResult = await handleDumpCommand({
+        message,
+        allowedDir,
+        config,
+        emitEvent,
+        history,
+        lastSentMessages,
+        dumpLlmInstructions,
+        appendSystemPrompt,
+        replaceSystemPrompt,
+    });
+    if (dumpResult) {
+        return dumpResult;
     }
 
     // Build system prompt

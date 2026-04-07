@@ -189,15 +189,57 @@ describe("applySlidingWindow", () => {
         const uncalibrated = applySlidingWindow(history, 1000, 4);
         const calibrated = applySlidingWindow(history, 1000, 2);
         expect(uncalibrated.length).toBeGreaterThan(1);
-        expect(uncalibrated[0].content).toContain("Message 2");
-        expect(uncalibrated[uncalibrated.length - 1].content).toContain(
+        expect(
+            uncalibrated.map(
+                (entry) => entry.content.match(/Message \d+/)?.[0],
+            ),
+        ).toEqual([
+            "Message 2",
+            "Message 3",
+            "Message 4",
+            "Message 5",
+            "Message 6",
+            "Message 7",
+            "Message 8",
+            "Message 9",
+            "Message 10",
+            "Message 11",
+            "Message 12",
+            "Message 13",
+            "Message 14",
+            "Message 15",
+            "Message 16",
+            "Message 17",
+            "Message 18",
             "Message 19",
-        );
+        ]);
         expect(calibrated.length).toBeLessThan(uncalibrated.length);
-        expect(calibrated[0].content).toContain("Message 11");
-        expect(calibrated[calibrated.length - 1].content).toContain(
+        expect(
+            calibrated.map((entry) => entry.content.match(/Message \d+/)?.[0]),
+        ).toEqual([
+            "Message 11",
+            "Message 12",
+            "Message 13",
+            "Message 14",
+            "Message 15",
+            "Message 16",
+            "Message 17",
+            "Message 18",
             "Message 19",
-        );
+        ]);
+    });
+
+    it("returns only the newest message when budget is zero", () => {
+        const history: HistoryEntry[] = [
+            { role: "user", content: "Hello" },
+            { role: "assistant", content: "Hi" },
+        ];
+        const result = applySlidingWindow(history, 0);
+        expect(result).toEqual([{ role: "assistant", content: "Hi" }]);
+    });
+
+    it("returns an empty array when budget is zero and history is empty", () => {
+        expect(applySlidingWindow([], 0)).toEqual([]);
     });
 });
 
@@ -423,6 +465,28 @@ describe("extractFacts", () => {
             facts,
         );
         expect(facts).toHaveLength(0);
+    });
+
+    it("extracts output facts from successful write_file results", () => {
+        const facts: Fact[] = [];
+        extractFacts(
+            {
+                success: true,
+                value: {
+                    path: "ai_chat_output/results.bed",
+                    bytes_written: 123,
+                },
+            },
+            { code: 'write_file("results.bed", "hello")' },
+            "round-1",
+            facts,
+        );
+        expect(facts).toContainEqual({
+            type: "output",
+            path: "ai_chat_output/results.bed",
+            roundId: "round-1",
+            timestamp: expect.any(Number),
+        });
     });
 });
 

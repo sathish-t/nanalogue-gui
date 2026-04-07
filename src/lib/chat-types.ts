@@ -172,6 +172,14 @@ export interface StepInfo {
     result: SandboxResult;
 }
 
+/** Result returned by handleUserMessage and related helper paths. */
+export interface HandleMessageResult {
+    /** The assistant's final text response. */
+    text: string;
+    /** The sandbox execution steps taken during this turn. */
+    steps: StepInfo[];
+}
+
 /** Configuration for the context transformation pipeline. */
 export interface ContextConfig {
     /** Maximum tokens for the context window budget. */

@@ -52,15 +52,17 @@ const EXCEPTIONS = new Map([
     // chat-orchestrator.ts remains oversized while AI Chat context-budgeting
     // and execution-loop logic are still co-located; keep the ceiling pinned
     // to the current size so follow-up refactors can pay this debt down.
-    ["src/lib/chat-orchestrator.ts", 1449],
+    ["src/lib/chat-orchestrator.ts", 1391],
     ["src/renderer/ai-chat/ai-chat.ts", 1183],
     ["src/renderer/qc/qc-results.ts", 1156], // +10 for mini-chart integration
     // log-to-html.ts is self-contained by design: inlined CSS, JS, and JSDoc
     // account for the majority of lines; logic itself is well under the limit.
     ["src/lib/log-to-html.ts", 816],
     // Test files above the 1500-line ceiling:
-    // chat-orchestrator-handle-message.test.ts grew with .html file assertions.
-    ["src/lib/chat-orchestrator-handle-message.test.ts", 1573],
+    // chat-orchestrator-handle-message.test.ts now also carries targeted
+    // orchestration regression tests; keep the ceiling pinned while helper
+    // extraction work continues to move cases into smaller files.
+    ["src/lib/chat-orchestrator-handle-message.test.ts", 1736],
 ]);
 
 // --- File discovery ---

@@ -16,6 +16,7 @@ src/
     ai-chat-ipc-validation.ts        # Per-channel IPC payload validation for AI Chat mode.
     ai-chat-shared-constants.ts      # Config field specs and shared constants for the AI Chat feature.
     bed-parser.ts                    # BED file parser for nanalogue-swipe
+    chat-orchestrator-helpers.ts     # Helper utilities for chat-orchestrator.
     chat-orchestrator-test-utils.ts  # Shared mock server infrastructure for chat-orchestrator tests.
     chat-orchestrator.ts             # Chat orchestrator for AI Chat mode.
     chat-session.ts                  # Reusable chat session state for the AI Chat feature.
