@@ -48,7 +48,7 @@
         "chart.js": "^4.4.0",
         "chartjs-plugin-annotation": "^3.1.0",
         "highlight.js": "^11.11.1",
-        "just-bash": "^2.13.0",
+        "just-bash": "^2.14.0",
         "marked": "^17.0.4",
         "picomatch": "^4.0.3",
         "vega": "^5.33.1",
