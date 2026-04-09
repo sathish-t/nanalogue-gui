@@ -257,6 +257,96 @@ describe("read-write filesystem", () => {
         );
     });
 
+    it("rm cannot delete a file outside ai_chat_temp_files", async () => {
+        // rm reports a command failure via exit_code/stderr rather than a
+        // thrown exception, but the underlying read-only filesystem must still
+        // prevent deletion and leave the file intact on disk.
+        const r = (await bash(`rm ${allowedDir}/data.txt`)) as BashResult;
+        expect(r.exit_code).not.toBe(0);
+        expect(r.stderr).toMatch(/EROFS|read-only/);
+        await expect(readFile(join(allowedDir, "data.txt"), "utf-8")).resolves.toBe(
+            "hello world",
+        );
+    });
+
+    it("rm deletes a file inside ai_chat_temp_files", async () => {
+        await bash(`echo scratch > ${allowedDir}/ai_chat_temp_files/temp.txt`);
+
+        const r = (await bash(
+            `rm ${allowedDir}/ai_chat_temp_files/temp.txt`,
+        )) as BashResult;
+        expect(r.exit_code).toBe(0);
+        expect(r.stderr).toBe("");
+        await expect(
+            stat(join(allowedDir, "ai_chat_temp_files", "temp.txt")),
+        ).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("rm -rf * leaves top-level entries intact because the writable subtree is a mount point", async () => {
+        // Recursive deletion may still exit successfully overall, but the
+        // read-only OverlayFs preserves base entries and MountableFs refuses
+        // to remove the ai_chat_temp_files mount point itself.
+        await bash(`echo scratch > ${allowedDir}/ai_chat_temp_files/temp.txt`);
+
+        const before = (await bash(
+            `cd ${allowedDir} && find . | sort`,
+        )) as BashResult;
+        expect(before.exit_code).toBe(0);
+
+        const r = (await bash(
+            `cd ${allowedDir} && rm -rf * .[^.]*`,
+        )) as BashResult;
+        expect(r.exit_code).toBe(0);
+
+        const after = (await bash(`cd ${allowedDir} && find . | sort`)) as BashResult;
+        expect(after.exit_code).toBe(0);
+
+        const beforeEntries = before.stdout
+            .trim()
+            .split("\n")
+            .filter(Boolean);
+        const afterEntries = after.stdout
+            .trim()
+            .split("\n")
+            .filter(Boolean);
+        const deletedEntries = beforeEntries.filter(
+            (entry) => !afterEntries.includes(entry),
+        );
+        expect(deletedEntries).toEqual([]);
+
+        await expect(readFile(join(allowedDir, "data.txt"), "utf-8")).resolves.toBe(
+            "hello world",
+        );
+        const subdirStat = await stat(join(allowedDir, "subdir"));
+        expect(subdirStat.isDirectory()).toBe(true);
+
+        // The writable mount point itself remains present after the recursive
+        // delete, and in the current just-bash mount setup the scratch file
+        // created within it also remains.
+        const tempDirStat = await stat(join(allowedDir, "ai_chat_temp_files"));
+        expect(tempDirStat.isDirectory()).toBe(true);
+        const tempFileStat = await stat(
+            join(allowedDir, "ai_chat_temp_files", "temp.txt"),
+        );
+        expect(tempFileStat.isFile()).toBe(true);
+    });
+
+    it("rm -rf ai_chat_temp_files/* removes files inside the writable mount", async () => {
+        await bash(`echo scratch > ${allowedDir}/ai_chat_temp_files/temp.txt`);
+
+        const r = (await bash(
+            `cd ${allowedDir} && rm -rf ai_chat_temp_files/*`,
+        )) as BashResult;
+        expect(r.exit_code).toBe(0);
+        expect(r.stderr).toBe("");
+
+        const tempDirStat = await stat(join(allowedDir, "ai_chat_temp_files"));
+        expect(tempDirStat.isDirectory()).toBe(true);
+        await expect(
+            stat(join(allowedDir, "ai_chat_temp_files", "temp.txt")),
+        ).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
     it("throws when ai_chat_temp_files is a pre-existing symlink", async () => {
         // Replace the real ai_chat_temp_files directory with a symlink pointing
         // outside allowedDir to simulate a pre-placed symlink escape attempt.

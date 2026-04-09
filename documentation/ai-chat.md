@@ -95,10 +95,10 @@ are user-configurable. See [advanced-options.md](advanced-options.md).
 | `seq_table(file, ...)` | Sequence table for a region |
 | `ls(glob?)` | Lists files under the allowed directory, up to 500 entries |
 | `read_file(path, ...)` | Reads a text file, up to 1 MB per call |
-| `write_file(path, content)` | Writes to `{allowedDir}/ai_chat_output/` only |
+| `write_file(path, content)` | Writes a new text file anywhere under `allowedDir` |
 | `plot_histogram(data, ...)` | Renders a histogram as an SVG file in `ai_chat_output/` |
 | `plot_series(data, ...)` | Renders an XY series plot as an SVG file in `ai_chat_output/` |
-| `bash(command)` | Runs a shell command with restricted access |
+| `bash(command)` | Runs a shell command with restricted access: `allowedDir` is read-only except for `ai_chat_temp_files/` |
 | `minimap2(query, target, ...)` | Runs minimap2 alignment via WebAssembly |
 | `continue_thinking()` | Signals the orchestrator to feed this round's output back to the LLM instead of showing it to the user |
 
