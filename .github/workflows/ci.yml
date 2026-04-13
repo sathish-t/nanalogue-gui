@@ -11,7 +11,7 @@ on:
   workflow_call: # Allow calling from ci-nightly.yml
 
 permissions:
-  read-all
+  contents: read
 
 jobs:
   check-agents-symlink:
@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Verify AGENTS.md is a symlink to CLAUDE.md
         run: |
@@ -36,6 +38,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Validate CHANGELOG.md
@@ -47,6 +50,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Validate CSS comments
         run: node scripts/validate-css-comments.mjs
@@ -57,6 +62,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Check markdown links
         run: node scripts/check-md-links.mjs
@@ -67,6 +74,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -99,8 +108,9 @@ jobs:
   # Full test matrix for regular PRs and pushes
   test:
     name: Test (Node ${{ matrix.node }}, ${{ matrix.os }})
-    if: github.actor != 'dependabot[bot]'
+    if: github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ${{ matrix.os }}
+    environment: test-with-ai-chat
     needs: lint-and-typecheck
     strategy:
       fail-fast: false
@@ -124,6 +134,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js ${{ matrix.node }}
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -248,6 +260,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Check file sizes
         run: node scripts/check-file-size.mjs --all
@@ -260,6 +274,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Check validate* prefix
         run: node scripts/check-validate-prefix.mjs --all
@@ -268,12 +284,14 @@ jobs:
   # and that any brand-new file debuts at 100%.
   check-coverage:
     name: Coverage floor check
-    if: github.actor != 'dependabot[bot]'
+    if: github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     needs: lint-and-typecheck
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -305,6 +323,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -338,12 +358,14 @@ jobs:
   # Minimal test for dependabot PRs (just verify deps work)
   test-dependabot:
     name: Test (Dependabot)
-    if: github.actor == 'dependabot[bot]'
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     needs: lint-and-typecheck
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
