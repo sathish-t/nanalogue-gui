@@ -3,8 +3,12 @@ name: Run tests and upload coverage
 on:
   push
 
+concurrency:
+  group: codecov-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  read-all
+  contents: read
 
 jobs:
   test:

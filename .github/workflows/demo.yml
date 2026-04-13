@@ -11,13 +11,21 @@ on:
 
 permissions:
   contents: read
-  actions: write
+
+concurrency:
+  group: demo-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   demo:
     name: Generate demo data & screenshots
     runs-on: ubuntu-latest
     environment: demo
+    # Permissions needed for checkout and artifact upload.
+    permissions:
+      # permissions: contents read, needed for checkout.
+      contents: read
+      actions: write # Needed for actions/upload-artifact.
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

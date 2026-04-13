@@ -15,13 +15,18 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: package-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   package:
     name: Package (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
+    # Permissions needed for checkout and artifact upload.
     permissions:
-      contents: read
-      actions: write
+      contents: read # Needed for checkout in the packaging workflow.
+      actions: write # Needed for actions/upload-artifact.
     strategy:
       fail-fast: false
       matrix:
@@ -67,9 +72,16 @@ jobs:
         run: npm run build
 
       - name: Build distributable
-        run: npx electron-builder --publish never --${{ matrix.arch }}
         env:
+          ARCH: ${{ matrix.arch }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          case "$ARCH" in
+            x64) EBUILDER_ARCH="--x64" ;;
+            arm64) EBUILDER_ARCH="--arm64" ;;
+            *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
+          esac
+          npx electron-builder --publish never "$EBUILDER_ARCH"
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -84,9 +96,10 @@ jobs:
     name: Attach binaries to release
     needs: package
     runs-on: ubuntu-latest
+    # Permissions needed for release asset handling.
     permissions:
-      contents: write
-      actions: read
+      contents: write # Needed for gh release upload.
+      actions: read # Needed for actions/download-artifact.
     steps:
       - name: Download all binary artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -112,15 +125,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
-        run: gh release upload "v${VERSION}" binaries/* --repo "${{ github.repository }}"
+          REPO: ${{ github.repository }}
+        run: gh release upload "v${VERSION}" binaries/* --repo "$REPO"
 
   smoke-test:
     name: Smoke test (${{ matrix.platform }})
     needs: attach
     runs-on: ${{ matrix.runner }}
+    # Permissions needed for screenshot upload and release asset handling.
     permissions:
-      contents: write
-      actions: write
+      contents: write # Needed for gh release upload of screenshots.
+      actions: write # Needed for actions/upload-artifact.
     continue-on-error: true
     strategy:
       fail-fast: false
@@ -220,9 +235,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
           PLATFORM_RAW: ${{ matrix.platform }}
+          REPO: ${{ github.repository }}
         run: |
           if [ -f screenshot.png ]; then
             PLATFORM=$(echo "$PLATFORM_RAW" | tr ' ' '-' | tr '[:upper:]' '[:lower:]')
             mv screenshot.png "screenshot-${PLATFORM}.png"
-            gh release upload "v${VERSION}" "screenshot-${PLATFORM}.png" --repo "${{ github.repository }}" || true
+            gh release upload "v${VERSION}" "screenshot-${PLATFORM}.png" --repo "$REPO" || true
           fi

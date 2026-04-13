@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   version-check:
     name: Verify versions match
@@ -94,11 +98,14 @@ jobs:
       # Linux: Docker container build
       - name: Build and test (Linux via Docker)
         if: ${{ matrix.use_docker }}
+        env:
+          WORKSPACE: ${{ github.workspace }}
+          CONTAINER: ${{ matrix.container }}
         run: |
           docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
+            -v "$WORKSPACE:/workspace" \
             -w /workspace \
-            ${{ matrix.container }} \
+            "$CONTAINER" \
             bash -c '
               set -e
 
@@ -132,6 +139,7 @@ jobs:
     uses: ./.github/workflows/package.yml
     with:
       version: ${{ needs.version-check.outputs.version }}
+    # Permissions needed so the reusable packaging workflow can upload release assets.
     permissions:
-      contents: write
-      actions: write
+      contents: write # Needed so the reusable packaging workflow can upload release assets.
+      actions: write # Needed so the reusable packaging workflow can manage artifacts.
