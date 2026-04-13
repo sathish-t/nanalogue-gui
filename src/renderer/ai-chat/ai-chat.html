@@ -128,7 +128,7 @@
   <dialog id="advanced-dialog">
     <h2>Advanced Options</h2>
 
-    <!-- Context window size in tokens. Min/max values from CONFIG_FIELD_SPECS in src/lib/ai-chat-constants.ts. -->
+    <!-- Context window size in tokens. Min/max values from CONFIG_FIELD_SPECS in src/lib/ai-chat-shared-constants.ts. -->
     <div class="dialog-row">
       <label for="opt-context-window">Context window (tokens):</label>
       <input type="number" id="opt-context-window" value="32000" min="8000" max="2000000">
@@ -164,43 +164,43 @@
     <!-- Maximum records from read_info. -->
     <div class="dialog-row">
       <label for="opt-max-read-info">Max read_info records:</label>
-      <input type="number" id="opt-max-read-info" value="200000" min="100" max="1000000">
+      <input type="number" id="opt-max-read-info" value="200000" min="1" max="1000000">
     </div>
 
     <!-- Maximum records from bam_mods. -->
     <div class="dialog-row">
       <label for="opt-max-bam-mods">Max bam_mods records:</label>
-      <input type="number" id="opt-max-bam-mods" value="5000" min="100" max="100000">
+      <input type="number" id="opt-max-bam-mods" value="5000" min="1" max="1000000">
     </div>
 
     <!-- Maximum records from window_reads. -->
     <div class="dialog-row">
       <label for="opt-max-window-reads">Max window_reads records:</label>
-      <input type="number" id="opt-max-window-reads" value="5000" min="100" max="100000">
+      <input type="number" id="opt-max-window-reads" value="5000" min="1" max="1000000">
     </div>
 
     <!-- Maximum records from seq_table. -->
     <div class="dialog-row">
       <label for="opt-max-seq-table">Max seq_table records:</label>
-      <input type="number" id="opt-max-seq-table" value="5000" min="100" max="100000">
+      <input type="number" id="opt-max-seq-table" value="5000" min="1" max="100000">
     </div>
 
     <!-- Best-effort sandbox execution time limit in seconds. -->
     <div class="dialog-row">
       <label for="opt-max-duration" title="Best-effort limit. Bash commands are cancelled; native data reads in progress may complete in the background.">Max execution time (s):</label>
-      <input type="number" id="opt-max-duration" value="600" min="10" max="3600">
+      <input type="number" id="opt-max-duration" value="600" min="1" max="604800">
     </div>
 
     <!-- Maximum sandbox heap memory in megabytes. -->
     <div class="dialog-row">
       <label for="opt-max-memory">Max sandbox memory (MB):</label>
-      <input type="number" id="opt-max-memory" value="512" min="64" max="4096">
+      <input type="number" id="opt-max-memory" value="512" min="1" max="65536">
     </div>
 
     <!-- Maximum Monty VM heap allocations. -->
     <div class="dialog-row">
       <label for="opt-max-allocations">Max sandbox allocations:</label>
-      <input type="number" id="opt-max-allocations" value="100000" min="10000" max="10000000">
+      <input type="number" id="opt-max-allocations" value="100000" min="1" max="100000000">
     </div>
 
     <!-- Maximum read_file text size in megabytes. -->

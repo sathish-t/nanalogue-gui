@@ -264,9 +264,9 @@ describe("read-write filesystem", () => {
         const r = (await bash(`rm ${allowedDir}/data.txt`)) as BashResult;
         expect(r.exit_code).not.toBe(0);
         expect(r.stderr).toMatch(/EROFS|read-only/);
-        await expect(readFile(join(allowedDir, "data.txt"), "utf-8")).resolves.toBe(
-            "hello world",
-        );
+        await expect(
+            readFile(join(allowedDir, "data.txt"), "utf-8"),
+        ).resolves.toBe("hello world");
     });
 
     it("rm deletes a file inside ai_chat_temp_files", async () => {
@@ -298,25 +298,21 @@ describe("read-write filesystem", () => {
         )) as BashResult;
         expect(r.exit_code).toBe(0);
 
-        const after = (await bash(`cd ${allowedDir} && find . | sort`)) as BashResult;
+        const after = (await bash(
+            `cd ${allowedDir} && find . | sort`,
+        )) as BashResult;
         expect(after.exit_code).toBe(0);
 
-        const beforeEntries = before.stdout
-            .trim()
-            .split("\n")
-            .filter(Boolean);
-        const afterEntries = after.stdout
-            .trim()
-            .split("\n")
-            .filter(Boolean);
+        const beforeEntries = before.stdout.trim().split("\n").filter(Boolean);
+        const afterEntries = after.stdout.trim().split("\n").filter(Boolean);
         const deletedEntries = beforeEntries.filter(
             (entry) => !afterEntries.includes(entry),
         );
         expect(deletedEntries).toEqual([]);
 
-        await expect(readFile(join(allowedDir, "data.txt"), "utf-8")).resolves.toBe(
-            "hello world",
-        );
+        await expect(
+            readFile(join(allowedDir, "data.txt"), "utf-8"),
+        ).resolves.toBe("hello world");
         const subdirStat = await stat(join(allowedDir, "subdir"));
         expect(subdirStat.isDirectory()).toBe(true);
 
