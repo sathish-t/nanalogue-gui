@@ -41,6 +41,12 @@ describe("buildSandboxPrompt — external function docs", () => {
         }
     });
 
+    it("documents re and json as the only allowed imports", () => {
+        const prompt = buildSandboxPrompt(BASE_OPTIONS);
+        expect(prompt).toContain("the Python stdlib modules re and json");
+        expect(prompt).toContain("Only re and json imports are available.");
+    });
+
     it("documents peek, read_info, bam_mods, window_reads, seq_table as section headings", () => {
         const prompt = buildSandboxPrompt(BASE_OPTIONS);
         const required = [

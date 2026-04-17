@@ -323,6 +323,26 @@ it("write_file rejects path traversal outside allowed dir", async () => {
     expect(result.message).toMatch(/outside the allowed directory/);
 });
 
+it("write_file rejects denied .env paths before creating files", async () => {
+    const fs = await import("node:fs/promises");
+    const code = 'write_file(".env", "SECRET=hunter2")';
+    const result = await runSandboxCode(code, allowedDir);
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/not permitted/);
+    const entries = await fs.readdir(allowedDir);
+    expect(entries).not.toContain(".env");
+});
+
+it("write_file rejects denied .env.local paths before creating files", async () => {
+    const fs = await import("node:fs/promises");
+    const code = 'write_file(".env.local", "SECRET=hunter2")';
+    const result = await runSandboxCode(code, allowedDir);
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/not permitted/);
+    const entries = await fs.readdir(allowedDir);
+    expect(entries).not.toContain(".env.local");
+});
+
 it("write_file rejects path through symlinked directory pointing outside allowed dir", async () => {
     const outsideDir = await import("node:fs/promises").then((fs) =>
         fs.mkdtemp(join(tmpdir(), "outside-write-")),

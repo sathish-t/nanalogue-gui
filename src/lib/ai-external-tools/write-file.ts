@@ -2,14 +2,16 @@
 // Writes a new text file into the sandboxed directory (no overwrites allowed).
 
 import { access, mkdir, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { MAX_FILENAME_LENGTH } from "../ai-chat-constants";
 import {
     assertExistingAncestorInside,
     assertInside,
     hasControlChars,
+    isDeniedPath,
     resolvePath,
     SandboxError,
+    toForwardSlashes,
 } from "../monty-sandbox-helpers";
 
 /**
@@ -66,6 +68,13 @@ export function makeWriteFile(
             tentative,
             `Path "${filePath}" is outside the allowed directory`,
         );
+        const relTentative = toForwardSlashes(relative(allowedDir, tentative));
+        if (isDeniedPath(relTentative)) {
+            throw new SandboxError(
+                "OSError",
+                `Writing "${filePath}" is not permitted`,
+            );
+        }
         // Check existing ancestors before mkdir to prevent following
         // pre-existing symlinks outside allowedDir.
         await assertExistingAncestorInside(

@@ -1,5 +1,5 @@
 // External tool: bash
-// Runs shell commands in a stateful in-process bash interpreter backed by
+// Runs shell commands in an in-process bash interpreter backed by
 // a MountableFs: reads from allowedDir (via a read-only OverlayFs) and
 // writes to ai_chat_temp_files/ (via a ReadWriteFs backed by real disk).
 

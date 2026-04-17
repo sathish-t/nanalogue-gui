@@ -102,9 +102,9 @@ in the analysis directory. Use ls("**/*.bam") to find BAM files specifically.
 ## Sandbox environment
 
 Your code runs in a restricted Python sandbox.
-You have access to Python builtins (len, range, sorted, sum, min, max etc.) and the
-external functions listed below. No classes, no stdlib, no third-party libraries.
-No imports of any kind are available.
+You have access to Python builtins (len, range, sorted, sum, min, max etc.), the
+external functions listed below, and the Python stdlib modules re and json.
+No classes, no other stdlib modules, and no third-party libraries. Only re and json imports are available.
 External functions (peek, read_info,
 bam_mods, window_reads, seq_table, ls, read_file, write_file, plot_histogram, plot_series, bash, minimap2, continue_thinking) call
 into the host application. You do not have Python classes.
