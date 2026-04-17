@@ -61,7 +61,7 @@
         "@eslint/js": "^10.0.1",
         "@playwright/test": "^1.58.2",
         "@stylistic/stylelint-plugin": "^5.0.1",
-        "@types/node": "^22.0.0",
+        "@types/node": "^25.5.0",
         "@types/picomatch": "^4.0.2",
         "@vitest/coverage-v8": "^4.1.0",
         "electron": "^41.0.2",
