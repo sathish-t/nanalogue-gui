@@ -59,6 +59,10 @@ test-results/
 .DS_Store
 Thumbs.db
 Desktop.ini
+# WSL / browser download metadata
+Zone.Identifier
+*.Zone.Identifier
+*:Zone.Identifier
 
 # ===================
 # Environment
