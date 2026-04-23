@@ -282,6 +282,22 @@ result
     expect(value.offset).toBe(10);
 });
 
+it("runSandboxCode threads maxReadBytes through to bash", async () => {
+    await writeFile(join(allowedDir, "oversized.txt"), "hello world");
+    const code = `
+result = bash("cat oversized.txt")
+result
+`;
+    // runSandboxCode sets cwd to allowedDir, so the relative path here is
+    // the same shape an LLM-generated script would use inside the sandbox.
+    const result = await runSandboxCode(code, allowedDir, { maxReadBytes: 4 });
+    expect(result.success).toBe(true);
+    const value = result.value as Record<string, unknown>;
+    expect(value.exit_code).not.toBe(0);
+    expect(typeof value.stderr).toBe("string");
+    expect(value.stderr).toContain("No such file or directory");
+});
+
 it("read_file rejects path traversal", async () => {
     const code = 'read_file("../../etc/passwd")';
     const result = await runSandboxCode(code, allowedDir);

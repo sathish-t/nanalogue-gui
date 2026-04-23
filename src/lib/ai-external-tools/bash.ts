@@ -7,6 +7,11 @@ import { lstatSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { Bash, MountableFs, OverlayFs, ReadWriteFs } from "just-bash";
 import {
+    DEFAULT_MAX_ALLOCATIONS,
+    DEFAULT_MAX_MEMORY,
+    DEFAULT_MAX_READ_BYTES,
+} from "../ai-chat-constants";
+import {
     isDeniedPath,
     SandboxError,
     toForwardSlashes,
@@ -137,6 +142,18 @@ function withDenyList<T extends object>(fs: T, mountPoint: string): T {
     return wrapper;
 }
 
+/** Optional configuration passed to makeBash. */
+interface BashOptions {
+    /** Optional abort signal that cancels the in-flight command. */
+    signal?: AbortSignal;
+    /** Sandbox memory cap in bytes. */
+    maxMemory?: number;
+    /** Sandbox allocation cap. */
+    maxAllocations?: number;
+    /** Maximum bytes a filesystem-backed bash read may load per file. */
+    maxReadBytes?: number;
+}
+
 /**
  * Returns the bash tool implementation bound to the given context.
  *
@@ -153,23 +170,22 @@ function withDenyList<T extends object>(fs: T, mountPoint: string): T {
  * persist between calls; use compound commands for multi-step pipelines.
  *
  * @param allowedDir - The sandboxed root directory (also used as mount point).
- * @param signal - Optional abort signal; when fired, cancels the in-flight bash command.
- * @param maxMemory - Sandbox memory cap in bytes (from SandboxOptions). Used to
- *   derive memory-related bash limits (maxOutputSize, maxStringLength, maxHeredocSize)
- *   so that bash behaves consistently with the user-visible sandbox memory setting.
- * @param maxAllocations - Sandbox allocation cap (from SandboxOptions). Used to
- *   derive iteration-related bash limits (maxCommandCount, maxLoopIterations, etc.)
- *   so that bash behaves consistently with the user-visible sandbox allocation setting.
+ * @param options - Optional bash sandbox settings.
  * @returns An async function callable from Python that runs shell commands.
  */
 export function makeBash(
     allowedDir: string,
-    signal?: AbortSignal,
-    maxMemory = 512 * 1024 * 1024,
-    maxAllocations = 100_000,
+    options: BashOptions = {},
 ): (command: string) => Promise<unknown> {
     // ai_chat_temp_files must exist on disk before ReadWriteFs is constructed
     // because ReadWriteFs calls realpathSync(root) in its constructor.
+    const {
+        signal,
+        maxMemory = DEFAULT_MAX_MEMORY,
+        maxAllocations = DEFAULT_MAX_ALLOCATIONS,
+        maxReadBytes = DEFAULT_MAX_READ_BYTES,
+    } = options;
+
     const outputDir = join(allowedDir, "ai_chat_temp_files");
     mkdirSync(outputDir, { recursive: true });
 
@@ -186,10 +202,14 @@ export function makeBash(
     const overlayFs = new OverlayFs({
         root: allowedDir,
         mountPoint: allowedDir,
+        maxFileReadSize: maxReadBytes,
         readOnly: true,
     });
 
-    const readWriteFs = new ReadWriteFs({ root: outputDir });
+    const readWriteFs = new ReadWriteFs({
+        root: outputDir,
+        maxFileReadSize: maxReadBytes,
+    });
 
     // overlayFs is the base (not a mount) to bypass MountableFs's restriction
     // against nesting a mount inside another.

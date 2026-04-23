@@ -12,6 +12,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { OverlayFs } from "just-bash";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { makeBash } from "./bash";
 
@@ -194,6 +195,66 @@ describe("basic functionality", () => {
         expect(r.exit_code).toBe(0);
         // "hello world" base64-encodes to "aGVsbG8gd29ybGQ="
         expect(r.stdout).toContain("aGVsbG8gd29ybGQ");
+    });
+
+    it("reports read limit failures through bash as No such file or directory", async () => {
+        await writeFile(join(allowedDir, "data.txt"), "hello world");
+        const limitedBash = makeBash(allowedDir, { maxReadBytes: 4 });
+        // TODO(just-bash@2.14.0): upstream currently maps oversized file reads
+        // to a shell-level ENOENT-style message even though the underlying
+        // filesystem raises EFBIG. Track the upstream issue tracker before
+        // changing this assertion.
+        const r = (await limitedBash(
+            `cat ${allowedDir}/data.txt`,
+        )) as BashResult;
+        expect(r.exit_code).not.toBe(0);
+        expect(r.stderr).toContain("No such file or directory");
+    });
+
+    it("allows reads exactly at the max read size limit", async () => {
+        await writeFile(join(allowedDir, "exact.txt"), "ABCD");
+        const limitedBash = makeBash(allowedDir, { maxReadBytes: 4 });
+        const r = (await limitedBash(
+            `cat ${allowedDir}/exact.txt`,
+        )) as BashResult;
+        expect(r.exit_code).toBe(0);
+        expect(r.stdout).toContain("ABCD");
+    });
+
+    it("reports the same bash error for oversized ai_chat_temp_files reads", async () => {
+        const limitedBash = makeBash(allowedDir, { maxReadBytes: 4 });
+        const largeOutputFile = join(
+            allowedDir,
+            "ai_chat_temp_files",
+            "large.txt",
+        );
+        await writeFile(largeOutputFile, "hello world");
+
+        // The writable mount is limited the same way as the read-only base.
+        const r = (await limitedBash(
+            `cat ${allowedDir}/ai_chat_temp_files/large.txt`,
+        )) as BashResult;
+        expect(r.exit_code).not.toBe(0);
+        expect(r.stderr).toContain("No such file or directory");
+    });
+
+    it("throws EFBIG when readFile exceeds the max read size limit", async () => {
+        await writeFile(join(allowedDir, "data.txt"), "hello world");
+        // just-bash@2.14.0 currently throws EFBIG for oversized reads; this
+        // documents the underlying contract that bash translates above.
+        // OverlayFs has no teardown API; afterEach removes the temp dir.
+        const fs = new OverlayFs({
+            root: allowedDir,
+            mountPoint: allowedDir,
+            readOnly: true,
+            maxFileReadSize: 4,
+        });
+
+        // OverlayFs is mounted at the real allowedDir root here, matching
+        // the absolute paths bash passes into just-bash's filesystem layer.
+        await expect(fs.readFile(`${allowedDir}/data.txt`)).rejects.toThrow(
+            /EFBIG: file too large, read .*\(11 bytes, max 4\)/,
+        );
     });
 
     it("throws TypeError for non-string command", async () => {

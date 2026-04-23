@@ -192,12 +192,12 @@ export async function runSandboxCode(
                         continue_thinking: makeContinueThinking(() => {
                             continueThinkingCalled = true;
                         }),
-                        bash: makeBash(
-                            allowedDir,
-                            bashAbortController.signal,
+                        bash: makeBash(allowedDir, {
+                            signal: bashAbortController.signal,
                             maxMemory,
                             maxAllocations,
-                        ),
+                            maxReadBytes,
+                        }),
                         peek: makePeek(allowedDir),
                         read_info: makeReadInfo(allowedDir, maxRecordsReadInfo),
                         bam_mods: makeBamMods(allowedDir, maxRecordsBamMods),
