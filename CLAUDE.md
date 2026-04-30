@@ -93,7 +93,10 @@ Separate:
 - Suggested improvements
 EOF
 )
-timeout 300s coderabbit review --prompt-only -t uncommitted > "$CR_OUT" 2>&1
+```
+
+```bash
+coderabbit review --prompt-only -t uncommitted > "$CR_OUT" 2>&1
 # Send both staged and unstaged changes so the review covers the full
 # uncommitted working tree.
 {
@@ -113,7 +116,7 @@ worth addressing). Do not run multiple `claude` review instances in
 parallel — deal with its previous output first.
 
 Remove files only after you are sure you have read them fully.
-```
+```bash
 rm "$CR_OUT" "$CLAUDE_OUT"
 ```
 ---
