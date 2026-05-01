@@ -3,10 +3,32 @@
 // to an SVG string using Vega's server-side (no-DOM) renderer.
 // No file I/O — pure data-in / SVG-string-out. Used by plot_histogram.
 
-import * as vega from "vega";
-import type { TopLevelSpec } from "vega-lite";
-import { compile } from "vega-lite";
+import type * as vega from "vega";
+type TopLevelSpec = Record<string, unknown>;
 import type { HistogramBin } from "./stats";
+
+type VegaModule = typeof import("vega");
+type VegaSpec = Parameters<typeof vega.parse>[0];
+
+interface VegaLiteModule {
+    compile(spec: TopLevelSpec): { spec: VegaSpec };
+}
+
+let vegaPromise: Promise<VegaModule> | null = null;
+let vegaLitePromise: Promise<VegaLiteModule> | null = null;
+
+async function loadVega(): Promise<VegaModule> {
+    vegaPromise ??= import("vega");
+    return vegaPromise;
+}
+
+async function loadVegaLite(): Promise<VegaLiteModule> {
+    // @ts-ignore - vega-lite is an external ESM dependency resolved at runtime.
+    vegaLitePromise ??= import("vega-lite").then(
+        (module) => module as unknown as VegaLiteModule,
+    );
+    return vegaLitePromise;
+}
 
 // --- Public types ---
 
@@ -92,6 +114,10 @@ export async function renderHistogramSvg(
         },
     } as TopLevelSpec;
 
+    const [vega, { compile }] = await Promise.all([
+        loadVega(),
+        loadVegaLite(),
+    ]);
     const vegaSpec = compile(spec).spec;
     const view = new vega.View(vega.parse(vegaSpec), { renderer: "none" });
     try {
