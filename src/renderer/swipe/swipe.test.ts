@@ -361,7 +361,9 @@ describe("swipe.html", () => {
                         };
                         tooltip?: {
                             callbacks?: {
-                                label?: (context: { raw: { x: number; y: number } }) => string;
+                                label?: (context: {
+                                    raw: { x: number; y: number };
+                                }) => string;
                             };
                         };
                     };
@@ -374,7 +376,9 @@ describe("swipe.html", () => {
                     };
                 };
             };
-            expect(config.options?.plugins?.annotation?.annotations).toEqual({});
+            expect(config.options?.plugins?.annotation?.annotations).toEqual(
+                {},
+            );
             expect(
                 config.options?.plugins?.tooltip?.callbacks?.label?.({
                     raw: { x: 1234.2, y: 0.56789 },
