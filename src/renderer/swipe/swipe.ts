@@ -37,6 +37,9 @@ interface SwipeApi {
 
     /** Sends a reject action for the current annotation to the main process. */
     reject: () => Promise<ActionResult>;
+
+    /** Navigates back to the landing page from swipe review. */
+    swipeGoBack: () => Promise<void>;
 }
 
 /**
@@ -164,6 +167,9 @@ let showAnnotationHighlight = true;
  * Cached references to the DOM elements used throughout the swipe UI.
  */
 const elements = {
+    /** The back button returning to the landing page. */
+    backButton: document.getElementById("btn-back") as HTMLButtonElement,
+
     /** The heading element displaying the current annotation title. */
     title: document.getElementById("plot-title") as HTMLElement,
 
@@ -577,6 +583,14 @@ document.addEventListener("keydown", (event) => {
 
 const rejectButton = document.querySelector(".control-hint.left");
 const acceptButton = document.querySelector(".control-hint.right");
+
+if (elements.backButton) {
+    elements.backButton.addEventListener("click", () => {
+        void api.swipeGoBack().catch((error) => {
+            console.error("Error navigating back to landing:", error);
+        });
+    });
+}
 
 if (rejectButton) {
     rejectButton.addEventListener("click", () => {
