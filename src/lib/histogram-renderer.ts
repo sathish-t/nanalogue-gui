@@ -4,26 +4,50 @@
 // No file I/O — pure data-in / SVG-string-out. Used by plot_histogram.
 
 import type * as vega from "vega";
-type TopLevelSpec = Record<string, unknown>;
 import type { HistogramBin } from "./stats";
 
+/** Minimal object shape for Vega-Lite top-level specs. */
+type TopLevelSpec = Record<string, unknown>;
+
+/** Lazy-loaded Vega runtime module. */
 type VegaModule = typeof import("vega");
+/** Vega runtime spec type produced by Vega-Lite compile(). */
 type VegaSpec = Parameters<typeof vega.parse>[0];
 
-interface VegaLiteModule {
-    compile(spec: TopLevelSpec): { spec: VegaSpec };
+/** Result of compiling a Vega-Lite spec. */
+interface VegaLiteCompileResult {
+    /** Compiled Vega runtime spec. */
+    spec: VegaSpec;
 }
 
+/** Subset of the Vega-Lite module API used by this renderer. */
+interface VegaLiteModule {
+    /** Compiles a Vega-Lite spec into a Vega runtime spec. */
+    compile(spec: TopLevelSpec): VegaLiteCompileResult;
+}
+
+/** Cached promise for the Vega runtime module. */
 let vegaPromise: Promise<VegaModule> | null = null;
+/** Cached promise for the Vega-Lite module. */
 let vegaLitePromise: Promise<VegaLiteModule> | null = null;
 
+/**
+ * Loads the Vega runtime once and reuses the same promise.
+ *
+ * @returns The cached Vega module promise.
+ */
 async function loadVega(): Promise<VegaModule> {
     vegaPromise ??= import("vega");
     return vegaPromise;
 }
 
+/**
+ * Loads Vega-Lite once and reuses the same promise.
+ *
+ * @returns The cached Vega-Lite module promise.
+ */
 async function loadVegaLite(): Promise<VegaLiteModule> {
-    // @ts-ignore - vega-lite is an external ESM dependency resolved at runtime.
+    // @ts-expect-error - vega-lite is an external ESM dependency resolved at runtime.
     vegaLitePromise ??= import("vega-lite").then(
         (module) => module as unknown as VegaLiteModule,
     );
@@ -114,10 +138,7 @@ export async function renderHistogramSvg(
         },
     } as TopLevelSpec;
 
-    const [vega, { compile }] = await Promise.all([
-        loadVega(),
-        loadVegaLite(),
-    ]);
+    const [vega, { compile }] = await Promise.all([loadVega(), loadVegaLite()]);
     const vegaSpec = compile(spec).spec;
     const view = new vega.View(vega.parse(vegaSpec), { renderer: "none" });
     try {

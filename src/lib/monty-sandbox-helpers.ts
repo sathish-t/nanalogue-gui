@@ -378,7 +378,7 @@ export async function listFilesRecursive(
                 } else if (stat.isFile()) {
                     if (
                         (!options.pattern || options.pattern(resolvedRel)) &&
-                        (!options.deny || !options.deny(resolvedRel))
+                        !options.deny?.(resolvedRel)
                     ) {
                         results.push(resolvedRel);
                     }
@@ -389,7 +389,7 @@ export async function listFilesRecursive(
         } else if (entry.isFile()) {
             if (
                 (!options.pattern || options.pattern(resolvedRel)) &&
-                (!options.deny || !options.deny(resolvedRel))
+                !options.deny?.(resolvedRel)
             ) {
                 results.push(resolvedRel);
             }
