@@ -21,9 +21,27 @@ function loadTemplate(): Document {
 }
 
 /**
- * Creates a mock preload API for the swipe renderer.
+ * Shape of the mocked preload API used by these renderer tests.
  */
-function createMockApi() {
+interface SwipeMockApi {
+    /** Resolves the current swipe state. */
+    getState: ReturnType<typeof vi.fn>;
+    /** Resolves the plot data for the active annotation. */
+    getPlotData: ReturnType<typeof vi.fn>;
+    /** Resolves an accept action. */
+    accept: ReturnType<typeof vi.fn>;
+    /** Resolves a reject action. */
+    reject: ReturnType<typeof vi.fn>;
+    /** Resolves a back-navigation action. */
+    swipeGoBack: ReturnType<typeof vi.fn>;
+}
+
+/**
+ * Creates a mock preload API for the swipe renderer.
+ *
+ * @returns A mock API object compatible with the swipe renderer.
+ */
+function createMockApi(): SwipeMockApi {
     return {
         getState: vi.fn().mockResolvedValue({
             currentIndex: 0,
@@ -77,8 +95,120 @@ async function waitFor(ms: number): Promise<void> {
 }
 
 /**
+ * The subset of the global window object used by these tests.
+ */
+interface SwipeTestWindow {
+    /** The preload-exposed API. */
+    api: SwipeMockApi;
+}
+
+/**
+ * Installs the mocked preload API onto the jsdom window.
+ *
+ * @param api - The mock API to expose as `window.api`.
+ */
+function setWindowApi(api: SwipeMockApi): void {
+    (window as unknown as SwipeTestWindow).api = api;
+}
+
+/**
+ * Shape of the Chart.js configuration object captured by the harness.
+ */
+interface ChartMockConfig {
+    /** Chart configuration options. */
+    options?: ChartMockOptions;
+}
+
+/**
+ * Chart.js options used by the swipe renderer tests.
+ */
+interface ChartMockOptions {
+    /** Plugin options. */
+    plugins?: ChartMockPlugins;
+    /** Axis scale options. */
+    scales?: ChartMockScales;
+}
+
+/**
+ * Chart.js plugin options used by the swipe renderer tests.
+ */
+interface ChartMockPlugins {
+    /** Annotation plugin options. */
+    annotation?: ChartMockAnnotation;
+    /** Tooltip plugin options. */
+    tooltip?: ChartMockTooltip;
+}
+
+/**
+ * Annotation plugin options used by the swipe renderer tests.
+ */
+interface ChartMockAnnotation {
+    /** Named annotations rendered on the chart. */
+    annotations?: Record<string, unknown>;
+}
+
+/**
+ * Tooltip plugin options used by the swipe renderer tests.
+ */
+interface ChartMockTooltip {
+    /** Callback hooks for tooltip rendering. */
+    callbacks?: ChartMockTooltipCallbacks;
+}
+
+/**
+ * Tooltip callback hooks used by the swipe renderer tests.
+ */
+interface ChartMockTooltipCallbacks {
+    /** Formats the tooltip label. */
+    label?: (context: ChartMockTooltipContext) => string;
+}
+
+/**
+ * Tooltip label callback context used by the swipe renderer tests.
+ */
+interface ChartMockTooltipContext {
+    /** The raw tooltip item. */
+    raw: ChartMockTooltipPoint;
+}
+
+/**
+ * Tooltip point data used by the swipe renderer tests.
+ */
+interface ChartMockTooltipPoint {
+    /** The x-value. */
+    x: number;
+    /** The y-value. */
+    y: number;
+}
+
+/**
+ * Axis scale options used by the swipe renderer tests.
+ */
+interface ChartMockScales {
+    /** X-axis options. */
+    x?: ChartMockScaleAxis;
+}
+
+/**
+ * Axis scale options for the x-axis.
+ */
+interface ChartMockScaleAxis {
+    /** Tick rendering options. */
+    ticks?: ChartMockTicks;
+}
+
+/**
+ * Tick rendering options for a chart axis.
+ */
+interface ChartMockTicks {
+    /** Formats tick labels. */
+    callback?: (value: number) => string;
+}
+
+/**
  * Installs a Chart.js test harness that records constructor calls and chart
- * destruction while avoiding a real canvas implementation.
+ * destruction.
+ * Avoids a real canvas implementation.
  *
  * @returns The spies used by the mock Chart constructor.
  */
@@ -86,14 +216,21 @@ function installChartHarness() {
     const chartCtorSpy = vi.fn();
     const chartDestroySpy = vi.fn();
 
-    const chartMock = function (
+    /**
+     * Captures Chart.js constructor calls for assertions.
+     *
+     * @param ctx - The mocked canvas context.
+     * @param config - The Chart.js configuration object.
+     * @returns A minimal chart instance with a destroy spy.
+     */
+    function chartMock(
         this: unknown,
         ctx: CanvasRenderingContext2D,
         config: Record<string, unknown>,
     ) {
         chartCtorSpy(ctx, config);
         return { destroy: chartDestroySpy };
-    };
+    }
 
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
         {} as CanvasRenderingContext2D,
@@ -143,8 +280,7 @@ describe("swipe.html", () => {
         vi.resetModules();
         loadTemplate();
         mockApi = createMockApi();
-        (window as unknown as { api: ReturnType<typeof createMockApi> }).api =
-            mockApi;
+        setWindowApi(mockApi);
     });
 
     afterEach(() => {
@@ -353,29 +489,7 @@ describe("swipe.html", () => {
                 "Additional BED fields (separated by ·): fieldA · fieldB",
             );
             expect(chartCtorSpy).toHaveBeenCalledTimes(1);
-            const config = chartCtorSpy.mock.calls[0][1] as {
-                options?: {
-                    plugins?: {
-                        annotation?: {
-                            annotations?: Record<string, unknown>;
-                        };
-                        tooltip?: {
-                            callbacks?: {
-                                label?: (context: {
-                                    raw: { x: number; y: number };
-                                }) => string;
-                            };
-                        };
-                    };
-                    scales?: {
-                        x?: {
-                            ticks?: {
-                                callback?: (value: number) => string;
-                            };
-                        };
-                    };
-                };
-            };
+            const config = chartCtorSpy.mock.calls[0][1] as ChartMockConfig;
             expect(config.options?.plugins?.annotation?.annotations).toEqual(
                 {},
             );
