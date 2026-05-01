@@ -52,3 +52,4 @@ src/renderer/shared/chart-font-size.ts	100
 src/renderer/shared/mod-filter-input.ts	100
 src/renderer/shared/output-file-input.ts	98.68
 src/renderer/shared/window-size-input.ts	100
+src/renderer/swipe/swipe.ts	100
