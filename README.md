@@ -527,7 +527,7 @@ full reference.
 ## Development
 
 ```bash
-# Build the project (produces dist/main.js, dist/preload.js, dist/exit-watchdog.js, dist/cli.mjs, dist/execute-cli.mjs, and dist/renderer/* assets)
+# Build the project (produces assets under dist/)
 npm run build
 
 # Run in development mode

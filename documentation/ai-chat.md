@@ -77,10 +77,13 @@ renderer and by `pruneFailedRounds()`.
 ## The Monty sandbox
 
 The sandbox is an embedded Python interpreter (`@pydantic/monty`) running
-in the Node.js main process. It has no filesystem or network access, and the
-only importable standard-library modules are `re` and `json` — the only way
-code can interact with the outside world is through the thirteen registered
-external functions.
+in the Node.js main process. It has no filesystem or network access through
+its built-in modules, and the only importable standard-library modules are
+`sys`, `os`, `typing`, `asyncio`, `re`, `datetime`, and `json`. In practice,
+those modules are limited to their normal in-sandbox behavior; for example,
+`os` does not grant filesystem access unless the host explicitly exposes it,
+and this application does not. The only way code can interact with the
+outside world is through the thirteen registered external functions.
 
 ### External functions
 
@@ -95,7 +98,7 @@ configurable ones are exposed in [advanced-options.md](advanced-options.md);
 | `bam_mods(file, ...)` | Per-read base-modification data, up to 5 000 records |
 | `window_reads(file, ...)` | Reads in a genomic window, up to 5 000 records |
 | `seq_table(file, ...)` | Sequence table for a region |
-| `ls(glob?)` | Lists files under the allowed directory, up to 10,000 entries (hard cap) |
+| `ls(glob?)` | Lists files under the allowed directory, up to 10,000 entries by default |
 | `read_file(path, ...)` | Reads a text file, up to 1 MB per call |
 | `write_file(path, content)` | Writes a new text file anywhere under `allowedDir` |
 | `plot_histogram(data, ...)` | Renders a histogram as an SVG file in `ai_chat_output/` |
