@@ -22,7 +22,7 @@ if (fs.existsSync(outputPath)) {
 const outputFd = fs.openSync(outputPath, "w");
 const prompt = [
     "You are auditing this repository for documentation problems.",
-    "Review README.md, CLAUDE.md, ARCHITECTURE.md, files under documentation/, code comments and doc comments in src/, and comments in .github/workflows for stale claims, broken instructions, mismatched examples, missing warnings, and inconsistencies with the code.",
+    "Review README.md, CLAUDE.md, ARCHITECTURE.md, files under documentation/, and code comments and doc comments in src/ for stale claims, broken instructions, mismatched examples, missing warnings, and inconsistencies with the code.",
     "Use the repository files as the source of truth.",
     "Make the necessary documentation edits directly in the working tree.",
     "Keep the changes minimal and do not refactor code unless required to correct documentation.",
