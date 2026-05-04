@@ -27,8 +27,9 @@ Python. `runMontyAsync` drives this loop automatically, handling both sync
 and async JS callbacks.
 
 The return value of `runMontyAsync` is the value of the last expression in
-the Python script (like a REPL). In this codebase the final expression is
-always a string or `None`.
+the Python script (like a REPL). In this codebase that value may be
+JSON-serializable data or `None`, depending on what the sandboxed code
+returns.
 
 ---
 
@@ -44,7 +45,7 @@ it.** Always use `runMontyAsync`.
 
 Three limits matter in practice:
 
-- **`timeout`** — wall-clock timeout in milliseconds. Default in this
+- **`timeout`** — wall-clock timeout in seconds. Default in this
   codebase is 10 minutes.
 - **`maxHeapBytes`** — heap memory cap in bytes.
 - **`maxAllocations`** — counts object *creations*, not bytes. A tight loop
@@ -67,7 +68,7 @@ the orchestrator can send typed error feedback to the LLM.
 ## What sandbox Python code can and cannot do
 
 The Python code the LLM writes can only interact with the outside world
-through the registered `externalFunctions`. There is no `import`, no
+through the registered `externalFunctions`. There is no arbitrary `import`,
 filesystem access, no network — only the functions explicitly registered
-in `src/lib/monty-sandbox.ts`. See [`ai-chat.md`](../ai-chat.md)
+in `src/lib/monty-sandbox.ts`. The only standard-library imports available in sandboxed code are `sys`, `os`, `typing`, `asyncio`, `re`, `datetime`, and `json`. Their capabilities are still sandbox-limited; for example, they do not provide filesystem access here unless the host explicitly exposes it, which this codebase does not. See [`ai-chat.md`](../ai-chat.md)
 for the full list of external functions and their resource limits.
