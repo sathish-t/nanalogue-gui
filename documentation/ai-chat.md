@@ -77,14 +77,16 @@ renderer and by `pruneFailedRounds()`.
 ## The Monty sandbox
 
 The sandbox is an embedded Python interpreter (`@pydantic/monty`) running
-in the Node.js main process. It has no filesystem, network, or import
-access — the only way code can interact with the outside world is through
-the thirteen registered external functions.
+in the Node.js main process. It has no filesystem or network access, and the
+only importable standard-library modules are `re` and `json` — the only way
+code can interact with the outside world is through the thirteen registered
+external functions.
 
 ### External functions
 
-The record limits and file size limits shown below are defaults — all of them
-are user-configurable. See [advanced-options.md](advanced-options.md).
+The record limits and file size limits shown below are defaults. The
+configurable ones are exposed in [advanced-options.md](advanced-options.md);
+`ls()` is a fixed safeguard.
 
 | Function | What it does |
 |---|---|
@@ -93,7 +95,7 @@ are user-configurable. See [advanced-options.md](advanced-options.md).
 | `bam_mods(file, ...)` | Per-read base-modification data, up to 5 000 records |
 | `window_reads(file, ...)` | Reads in a genomic window, up to 5 000 records |
 | `seq_table(file, ...)` | Sequence table for a region |
-| `ls(glob?)` | Lists files under the allowed directory, up to 500 entries |
+| `ls(glob?)` | Lists files under the allowed directory, up to 10,000 entries (hard cap) |
 | `read_file(path, ...)` | Reads a text file, up to 1 MB per call |
 | `write_file(path, content)` | Writes a new text file anywhere under `allowedDir` |
 | `plot_histogram(data, ...)` | Renders a histogram as an SVG file in `ai_chat_output/` |
