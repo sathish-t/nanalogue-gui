@@ -12,7 +12,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { OverlayFs } from "just-bash";
+import { Bash, OverlayFs } from "just-bash";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { makeBash } from "./bash";
 
@@ -195,6 +195,58 @@ describe("basic functionality", () => {
         expect(r.exit_code).toBe(0);
         // "hello world" base64-encodes to "aGVsbG8gd29ybGQ="
         expect(r.stdout).toContain("aGVsbG8gd29ybGQ");
+    });
+
+    it("exposes curl and blocks disallowed URLs", async () => {
+        const version = (await bash("curl --help")) as BashResult;
+        expect(version.exit_code).toBe(0);
+        expect(version.stdout.toLowerCase()).toContain("curl");
+
+        const denied = (await bash(
+            "curl -I https://example.com",
+        )) as BashResult;
+        expect(denied.exit_code).not.toBe(0);
+        expect(denied.stderr).toMatch(
+            /Network access denied|not in allow-list/i,
+        );
+    });
+
+    it("allows curl against an allow-listed domain", async () => {
+        const fetchCalls: string[] = [];
+
+        /**
+         * Records the requested URL and returns a deterministic response.
+         *
+         * @param url - The URL curl asks the sandbox to fetch.
+         * @returns A mocked HTTP 200 response.
+         */
+        async function mockFetch(url: string) {
+            fetchCalls.push(url);
+            return {
+                status: 200,
+                statusText: "OK",
+                headers: { "content-type": "text/plain" },
+                body: new TextEncoder().encode("allowed\n"),
+                url,
+            };
+        }
+
+        const networkBash = new Bash({
+            fetch: mockFetch,
+            network: {
+                allowedUrlPrefixes: ["https://api.github.com"],
+            },
+        });
+
+        const r = await networkBash.exec(
+            "curl https://api.github.com/repos/nanalogue/test",
+        );
+
+        expect(r.exitCode).toBe(0);
+        expect(r.stdout).toContain("allowed");
+        expect(fetchCalls).toEqual([
+            "https://api.github.com/repos/nanalogue/test",
+        ]);
     });
 
     it("reports read limit failures through bash as No such file or directory", async () => {

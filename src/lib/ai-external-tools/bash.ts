@@ -7,6 +7,7 @@ import { lstatSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { Bash, MountableFs, OverlayFs, ReadWriteFs } from "just-bash";
 import {
+    AI_CHAT_NETWORK_ALLOW_LIST,
     DEFAULT_MAX_ALLOCATIONS,
     DEFAULT_MAX_MEMORY,
     DEFAULT_MAX_READ_BYTES,
@@ -219,6 +220,9 @@ export function makeBash(
     const shell = new Bash({
         fs: withDenyList(mountable, allowedDir),
         cwd: allowedDir,
+        network: {
+            allowedUrlPrefixes: AI_CHAT_NETWORK_ALLOW_LIST,
+        },
         // Execution limits derived from the sandbox-level memory and allocation
         // caps so that bash behaves consistently with the user-visible sandbox
         // settings. A user who raises maxMemoryMB or maxAllocations expects

@@ -76,6 +76,29 @@ export const /** Hard cap on ls() results. Sized for large cohort studies (thous
 export const /** Dedicated subdirectory for write_file output. */ AI_CHAT_OUTPUT_DIR =
         "ai_chat_output";
 
+// --- AI chat bash network allow-list ---
+
+export const /** Hard-coded network allow-list for the AI-chat bash tool. */ AI_CHAT_NETWORK_ALLOW_LIST =
+        [
+            "https://api.github.com",
+            "https://blast.ncbi.nlm.nih.gov",
+            "https://eutils.ncbi.nlm.nih.gov",
+            "https://ftp.ebi.ac.uk",
+            "https://ftp.ncbi.nlm.nih.gov",
+            "https://github.com",
+            "https://hgdownload.soe.ucsc.edu",
+            "https://ncbi.nlm.nih.gov",
+            "https://peptidesearch.uniprot.org",
+            "https://rest.ensembl.org",
+            "https://rest.uniprot.org",
+            "https://search.rcsb.org",
+            "https://www.ebi.ac.uk",
+            "https://www.ncbi.nlm.nih.gov",
+            "https://www.uniprot.org",
+            "https://zenodo.org",
+            "https://ensembl.org",
+        ] as const;
+
 // --- Sensitive file deny-list ---
 
 export const /** Best-effort glob patterns (relative to allowedDir) for files read_file must reject and ls must exclude. */ SENSITIVE_FILE_DENY_LIST =
