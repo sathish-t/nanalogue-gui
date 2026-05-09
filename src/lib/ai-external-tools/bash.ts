@@ -221,7 +221,8 @@ export function makeBash(
         fs: withDenyList(mountable, allowedDir),
         cwd: allowedDir,
         network: {
-            allowedUrlPrefixes: AI_CHAT_NETWORK_ALLOW_LIST,
+            allowedUrlPrefixes: [...AI_CHAT_NETWORK_ALLOW_LIST],
+            allowedMethods: ["GET", "HEAD", "POST"],
         },
         // Execution limits derived from the sandbox-level memory and allocation
         // caps so that bash behaves consistently with the user-visible sandbox
