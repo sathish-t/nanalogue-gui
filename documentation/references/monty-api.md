@@ -69,6 +69,9 @@ the orchestrator can send typed error feedback to the LLM.
 
 The Python code the LLM writes can only interact with the outside world
 through the registered `externalFunctions`. There is no arbitrary `import`,
-filesystem access, no network — only the functions explicitly registered
-in `src/lib/monty-sandbox.ts`. The only standard-library imports available in sandboxed code are `sys`, `os`, `typing`, `asyncio`, `re`, `datetime`, and `json`. Their capabilities are still sandbox-limited; for example, they do not provide filesystem access here unless the host explicitly exposes it, which this codebase does not. See [`ai-chat.md`](../ai-chat.md)
+filesystem access, or network access — only the functions explicitly
+registered in `src/lib/monty-sandbox.ts`. The only standard-library imports
+available in sandboxed code are `re` and `json`; no other stdlib modules or
+third-party libraries are available, and the prompt also tells the model not
+to use classes. See [`ai-chat.md`](../ai-chat.md)
 for the full list of external functions and their resource limits.

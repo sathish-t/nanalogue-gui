@@ -73,9 +73,9 @@ The execution path is intentionally thin:
   the sandbox access root.
 - **`runSandboxCode` not `runSandboxGuarded`.** The guard exists for
   LLM-loop concurrency; it is unnecessary overhead here.
-- **No terminal-overflow redirect.** Chat's `/exec` redirects large
-  output to a file in `ai_chat_output/` to protect the LLM context.
-  Here, everything goes to stdout and the user can pipe it freely.
+- **No terminal-overflow redirect.** Chat's `/exec` stays in the chat
+  transcript. Here, everything goes to stdout and the user can pipe it
+  freely.
 - **No `(No output produced.)` placeholder.** That message exists for
   the chat UI. A silent script should produce zero bytes on stdout.
 - **Shared sandbox arg definitions.** `src/lib/sandbox-cli-args.ts`
