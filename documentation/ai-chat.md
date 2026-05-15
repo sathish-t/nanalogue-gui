@@ -79,11 +79,10 @@ renderer and by `pruneFailedRounds()`.
 The sandbox is an embedded Python interpreter (`@pydantic/monty`) running
 in the Node.js main process. It has no filesystem or network access through
 its built-in modules, and the only importable standard-library modules are
-`sys`, `os`, `typing`, `asyncio`, `re`, `datetime`, and `json`. In practice,
-those modules are limited to their normal in-sandbox behavior; for example,
-`os` does not grant filesystem access unless the host explicitly exposes it,
-and this application does not. The only way code can interact with the
-outside world is through the thirteen registered external functions.
+`re` and `json`. No other stdlib modules or third-party libraries are
+available, and the prompt also tells the model not to use classes. The only
+way code can interact with the outside world is through the thirteen
+registered external functions.
 
 ### External functions
 
@@ -125,7 +124,7 @@ Two layers of limits protect the host process:
   `@nanalogue/node` Rust layer (so large BAMs stop reading early rather
   than materialising in memory), output cap derived from the model's context
   window (15% of context budget, clamped to 4 KB–80 KB), `ls` capped at
-  500 entries, `read_file` capped at 1 MB, `write_file` capped at 50 MB.
+  10,000 entries, `read_file` capped at 1 MB, `write_file` capped at 50 MB.
 
 ---
 

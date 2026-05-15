@@ -60,7 +60,7 @@ export default tseslint.config(
                         {
                             group: ["electron", "electron/*"],
                             message:
-                                "renderer/ must not import electron — communicate via window.electronAPI (contextBridge).",
+                                "renderer/ must not import electron — communicate via window.api (contextBridge).",
                         },
                         {
                             group: ["@nanalogue/node"],

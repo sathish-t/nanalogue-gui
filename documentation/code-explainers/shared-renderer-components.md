@@ -15,7 +15,7 @@ File/URL radio toggle with a text input and Browse button. Used by
 `qc-config`, `swipe-config`, `locate-config`. Events: `bam-selected`,
 `source-type-changed`. The `selectFileFn` property must be wired by
 the parent to open the native file dialog. A `<mod-filter-input>` accompanies
-this element on all current usage pages (see below).
+this element on the QC and Swipe pages (see below).
 
 **`<mod-filter-input>`** (`mod-filter-input.ts`)  
 Text input for a modification filter string (e.g. `+T`, `-m`). Validates

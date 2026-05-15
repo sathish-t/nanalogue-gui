@@ -13,7 +13,7 @@ These rules are conventions enforced by code review.
 │  renderer/  (browser context — no Node.js)           │
 │  e.g. landing, swipe, qc, locate, ai-chat, shared, … │
 └────────────────────┬─────────────────────────────────┘
-                     │ window.electronAPI (contextBridge)
+                     │ window.api (contextBridge)
 ┌────────────────────▼────────────────────────────────┐
 │  preload.ts  (IPC bridge only — no business logic)  │
 └────────────────────┬────────────────────────────────┘
@@ -64,7 +64,7 @@ them via `contextBridge.exposeInMainWorld`.
 
 ### `src/renderer/`
 **May use:** DOM APIs, `chart.js`, `chartjs-plugin-annotation`.
-Communicates with main process only via `window.electronAPI`.
+Communicates with main process only via `window.api`.
 
 **Must NOT use:** `electron`, `@nanalogue/node`, `@pydantic/monty`, or
 Node.js built-ins (`fs`, `path`, `process`, etc.).

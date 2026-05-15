@@ -405,8 +405,6 @@ the LLM conversation.
 The same AI Chat analysis engine is available as a standalone terminal REPL,
 with no Electron or GUI needed.
 
-**End-users** (installed via `npm install -g nanalogue-gui`):
-
 ```bash
 nanalogue-chat --endpoint <url> --model <name> --dir <path>
 ```
@@ -492,8 +490,6 @@ model (access restricted to the `--dir` directory), but the script and its
 output are never sent to a language model. This makes it useful for batch
 processing, reproducible analyses, and CI pipelines where LLM involvement is
 not needed.
-
-**End-users** (installed via `npm install -g nanalogue-gui`):
 
 ```bash
 nanalogue-sandbox-exec --dir <path> <script.py>
