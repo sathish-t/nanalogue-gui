@@ -125,5 +125,4 @@ npm run lint:fix       # auto-fix what can be fixed
 Then run AI reviewers if available (optional but recommended for doc/architecture changes):
 ```bash
 coderabbit review --prompt-only -t uncommitted
-codex review --uncommitted
 ```

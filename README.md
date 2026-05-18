@@ -13,11 +13,9 @@ files, with a focus on single-molecule DNA/RNA modifications. It builds on
 interactive visualisation and curation workflows.
 
 Nanalogue-gui is part of the [Nanalogue](https://www.nanalogue.com) family of
-tools for nanopore data analysis. Sister packages include
-[nanalogue](https://github.com/DNAReplicationLab/nanalogue) (Rust CLI and
-library), [pynanalogue](https://github.com/DNAReplicationLab/pynanalogue) (Python
-wrapper), and [@nanalogue/node](https://github.com/sathish-t/nanalogue-node)
-(Node.js bindings).
+tools for nanopore data analysis. Sister packages include nanalogue (Rust CLI
+and library), pynanalogue (Python wrapper), and @nanalogue/node (Node.js
+bindings).
 
 ![Landing page](demo/screenshot-landing.png)
 
@@ -348,8 +346,9 @@ relevant for you depends on how you use the chat feature here.
 
 We use a Python sandbox to receive code from the LLM and execute it.
 Our sandbox uses the [Monty](https://github.com/pydantic/monty) package from pydantic to run Python
-code in a secure way so that it has access only to our files and to specific functions.
-This ensures our sandbox is secure, and allows us to inspect what the LLM is doing.
+code while restricting it to our files and to specific functions. This helps us
+inspect what the LLM is doing and limit accidental access outside the analysis
+directory. It is best-effort, not a hardened security boundary.
 A copy button in the code panel lets you copy the Python code to your clipboard.
 
 ![AI Chat multi-turn conversation with sandbox](demo/screenshot-ai-chat-sandbox-openai.png)
@@ -462,7 +461,7 @@ sandbox capabilities.
 | `/exec <file.py>` | Run a Python file directly in the sandbox without sending it to the LLM |
 | `/dump_llm_instructions` | Dump the full LLM request payload from the last round to a `.log` file and a self-contained `.html` viewer in `ai_chat_output/` |
 | `/dump_system_prompt` | Dump the static system prompt to a log file in `ai_chat_output/` |
-| `/quit` or `/exit` | Exit the CLI |
+| `/quit` | Exit the CLI |
 | Ctrl+C during a request | Cancel the current request |
 | Ctrl+C at the prompt | Exit |
 
@@ -485,8 +484,8 @@ full reference including GUI equivalents.
 
 `nanalogue-sandbox-exec` runs a Python script directly in the Monty sandbox
 without involving an LLM. It has access to the same BAM helper functions as
-AI Chat (e.g. `read_info`, `bam_mods`, `write_file`) and the same security
-model (access restricted to the `--dir` directory), but the script and its
+AI Chat (e.g. `read_info`, `bam_mods`, `write_file`) and the same access
+restrictions (limited to the `--dir` directory), but the script and its
 output are never sent to a language model. This makes it useful for batch
 processing, reproducible analyses, and CI pipelines where LLM involvement is
 not needed.

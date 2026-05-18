@@ -21,10 +21,8 @@ export const /** Maximum permitted size in bytes for SYSTEM_APPEND.md. */ MAX_SY
  * always proceed without a custom append.
  *
  * Case-sensitivity note: the filename "SYSTEM_APPEND.md" is matched exactly.
- * On case-sensitive filesystems (Linux, macOS) only the correct casing is
- * found; on case-insensitive filesystems (Windows NTFS) any casing would
- * match. When Windows support is added, consider doing a case-insensitive
- * directory scan here so behaviour is consistent across platforms.
+ * On case-sensitive filesystems only the correct casing is found; on
+ * case-insensitive filesystems any casing would match.
  *
  * @param allowedDir - Absolute path to the analysis directory.
  * @returns The file content, or undefined.
