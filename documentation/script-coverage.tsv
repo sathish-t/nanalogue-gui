@@ -42,7 +42,7 @@ src/lib/system-append.ts	100
 src/lib/xy-renderer.ts	100
 src/modes/ai-chat.ts	96.96
 src/modes/qc.ts	100
-src/modes/swipe.ts	98.88
+src/modes/swipe.ts	100
 src/preload.ts	100
 src/renderer/ai-chat/ai-chat.ts	73.63
 src/renderer/qc/seq-mini-charts.ts	100

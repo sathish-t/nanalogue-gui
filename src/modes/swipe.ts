@@ -245,19 +245,3 @@ export function registerIpcHandlers(): void {
         return { done: false, state: appState, plotData };
     });
 }
-
-/**
- * Prints a summary of the review session to the console, including counts of reviewed, accepted, and rejected annotations.
- */
-export function printSummary(): void {
-    console.log("");
-    console.log("Session complete:");
-    console.log(
-        `  Reviewed: ${appState.currentIndex} / ${appState.totalCount}`,
-    );
-    console.log(`  Accepted: ${appState.acceptedCount}`);
-    console.log(`  Rejected: ${appState.rejectedCount}`);
-    if (cliArgs) {
-        console.log(`  Output: ${cliArgs.outputPath}`);
-    }
-}

@@ -82,9 +82,7 @@ const { loadContigSizes, loadPlotData } = await import(
     "../lib/swipe-data-loader"
 );
 const { parseBedFile } = await import("../lib/bed-parser");
-const { initialize, registerIpcHandlers, printSummary } = await import(
-    "./swipe"
-);
+const { initialize, registerIpcHandlers } = await import("./swipe");
 
 // Register IPC handlers once; ipcHandlers is populated as a side-effect.
 registerIpcHandlers();
@@ -256,6 +254,26 @@ describe("swipe mode — initialize()", () => {
             ...BASE_ARGS,
             outputPath: "/data/same.bed",
             bedPath: "/data/same.bed",
+        };
+
+        await expect(initialize(collidingArgs, true)).rejects.toThrow(
+            "same file",
+        );
+    });
+
+    it("throws when resolved outputPath matches bedPath and output file does not yet exist", async () => {
+        vi.mocked(parseBedFile).mockReturnValue({
+            capped: false,
+            annotations: [...FAKE_ANNOTATIONS],
+        });
+        // existsSync returns false so the first guard is skipped; the second
+        // guard catches the collision via path.resolve vs realpathSync.
+        vi.mocked(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+        const collidingArgs: SwipeArgs = {
+            ...BASE_ARGS,
+            outputPath: "/data/annotations.bed",
+            bedPath: "/data/annotations.bed",
         };
 
         await expect(initialize(collidingArgs, true)).rejects.toThrow(
@@ -461,48 +479,6 @@ describe("swipe mode — IPC handlers", () => {
 
             expect(final.done).toBe(true);
         });
-    });
-});
-
-// ---------------------------------------------------------------------------
-// printSummary
-// ---------------------------------------------------------------------------
-
-describe("swipe mode — printSummary()", () => {
-    beforeEach(async () => {
-        vi.clearAllMocks();
-        vi.mocked(realpathSync as ReturnType<typeof vi.fn>).mockImplementation(
-            (p: string) => p,
-        );
-        await initializeWithFakes();
-    });
-
-    it("logs reviewed, accepted, and rejected counts to the console", () => {
-        const consoleSpy = vi
-            .spyOn(console, "log")
-            .mockImplementation(() => undefined);
-
-        printSummary();
-
-        const output = consoleSpy.mock.calls
-            .map((c) => String(c[0]))
-            .join("\n");
-        expect(output).toContain("0 / 2");
-        expect(output).toContain("Accepted: 0");
-        expect(output).toContain("Rejected: 0");
-    });
-
-    it("includes the output path in the summary", () => {
-        const consoleSpy = vi
-            .spyOn(console, "log")
-            .mockImplementation(() => undefined);
-
-        printSummary();
-
-        const output = consoleSpy.mock.calls
-            .map((c) => String(c[0]))
-            .join("\n");
-        expect(output).toContain("/data/output.bed");
     });
 });
 
