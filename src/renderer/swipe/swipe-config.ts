@@ -16,20 +16,7 @@ import type { OutputFileInput } from "../shared/output-file-input";
 import "../shared/output-file-input";
 import type { WindowSizeInput } from "../shared/window-size-input";
 import "../shared/window-size-input";
-
-/**
- * Result returned by the peek-bam IPC handler.
- */
-interface PeekResult {
-    /** Example contig names from the BAM header. */
-    contigs: string[];
-    /** The total number of contigs in the BAM header. */
-    totalContigs: number;
-    /** The modification types detected in the BAM file. */
-    modifications: string[];
-    /** Full contig-to-length mapping from the BAM header. */
-    allContigs?: Record<string, number>;
-}
+import type { PeekResult } from "../../lib/types";
 
 /**
  * Result returned by mode launch IPC handlers.

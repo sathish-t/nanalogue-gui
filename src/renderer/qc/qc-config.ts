@@ -6,29 +6,13 @@ import { applyFontSize } from "../shared/apply-font-size";
 applyFontSize();
 
 import { parseRegion, validateModRegionOverlap } from "../../lib/region-parser";
+import type { PeekResult } from "../../lib/types";
 import type { BamSelectedDetail } from "../shared/bam-resource-input";
 import "../shared/bam-resource-input";
 import type { ModFilterInput } from "../shared/mod-filter-input";
 import "../shared/mod-filter-input";
 import type { WindowSizeInput } from "../shared/window-size-input";
 import "../shared/window-size-input";
-
-/**
- * Result returned from peeking into a BAM file header and first records.
- */
-interface PeekResult {
-    /** List of contig names found in the BAM header. */
-    contigs: string[];
-
-    /** Total number of contigs present in the BAM file. */
-    totalContigs: number;
-
-    /** List of base modification types detected in the BAM records. */
-    modifications: string[];
-
-    /** Full contig-to-length mapping from the BAM header. */
-    allContigs?: Record<string, number>;
-}
 
 /**
  * API surface exposed to the QC config renderer via the preload bridge.

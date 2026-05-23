@@ -7,6 +7,7 @@ import { applyFontSize } from "../shared/apply-font-size";
 applyFontSize();
 
 import { parseRegion } from "../../lib/region-parser";
+import type { PeekResult } from "../../lib/types";
 import type {
     BamResourceInput,
     BamSelectedDetail,
@@ -14,20 +15,6 @@ import type {
 import "../shared/bam-resource-input";
 import type { OutputFileInput } from "../shared/output-file-input";
 import "../shared/output-file-input";
-
-/**
- * Result returned by the peek-bam IPC handler.
- */
-interface PeekResult {
-    /** Example contig names from the BAM header. */
-    contigs: string[];
-    /** The total number of contigs in the BAM header. */
-    totalContigs: number;
-    /** The modification types detected in the BAM file. */
-    modifications: string[];
-    /** Full contig-to-length mapping from the BAM header. */
-    allContigs?: Record<string, number>;
-}
 
 /**
  * Summary of a locate-reads BED generation run.
