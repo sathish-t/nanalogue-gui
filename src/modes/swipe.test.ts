@@ -82,9 +82,7 @@ const { loadContigSizes, loadPlotData } = await import(
     "../lib/swipe-data-loader"
 );
 const { parseBedFile } = await import("../lib/bed-parser");
-const { initialize, registerIpcHandlers, printSummary } = await import(
-    "./swipe"
-);
+const { initialize, registerIpcHandlers } = await import("./swipe");
 
 // Register IPC handlers once; ipcHandlers is populated as a side-effect.
 registerIpcHandlers();
@@ -133,6 +131,46 @@ async function initializeWithFakes(): Promise<void> {
     vi.mocked(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
     await initialize(BASE_ARGS, true);
 }
+
+// ---------------------------------------------------------------------------
+// IPC handlers before initialize() is called (cliArgs is null).
+// These tests rely on running before any test that calls initialize() —
+// they must appear first so cliArgs is still null when they execute.
+// ---------------------------------------------------------------------------
+
+describe("swipe mode — IPC handlers before initialize (cliArgs is null)", () => {
+    it("accept returns done and logs error when cliArgs is not set", async () => {
+        const consoleSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+
+        const result = (await ipcHandlers.get("accept")?.(
+            undefined,
+        )) as HandlerResult;
+
+        expect(result.done).toBe(true);
+        expect(consoleSpy).toHaveBeenCalledWith(
+            "Unknown state: accept called without cliArgs set",
+        );
+        consoleSpy.mockRestore();
+    });
+
+    it("reject returns done and logs error when cliArgs is not set", async () => {
+        const consoleSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+
+        const result = (await ipcHandlers.get("reject")?.(
+            undefined,
+        )) as HandlerResult;
+
+        expect(result.done).toBe(true);
+        expect(consoleSpy).toHaveBeenCalledWith(
+            "Unknown state: reject called without cliArgs set",
+        );
+        consoleSpy.mockRestore();
+    });
+});
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -216,6 +254,26 @@ describe("swipe mode — initialize()", () => {
             ...BASE_ARGS,
             outputPath: "/data/same.bed",
             bedPath: "/data/same.bed",
+        };
+
+        await expect(initialize(collidingArgs, true)).rejects.toThrow(
+            "same file",
+        );
+    });
+
+    it("throws when resolved outputPath matches bedPath and output file does not yet exist", async () => {
+        vi.mocked(parseBedFile).mockReturnValue({
+            capped: false,
+            annotations: [...FAKE_ANNOTATIONS],
+        });
+        // existsSync returns false so the first guard is skipped; the second
+        // guard catches the collision via path.resolve vs realpathSync.
+        vi.mocked(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+        const collidingArgs: SwipeArgs = {
+            ...BASE_ARGS,
+            outputPath: "/data/annotations.bed",
+            bedPath: "/data/annotations.bed",
         };
 
         await expect(initialize(collidingArgs, true)).rejects.toThrow(
@@ -425,48 +483,6 @@ describe("swipe mode — IPC handlers", () => {
 });
 
 // ---------------------------------------------------------------------------
-// printSummary
-// ---------------------------------------------------------------------------
-
-describe("swipe mode — printSummary()", () => {
-    beforeEach(async () => {
-        vi.clearAllMocks();
-        vi.mocked(realpathSync as ReturnType<typeof vi.fn>).mockImplementation(
-            (p: string) => p,
-        );
-        await initializeWithFakes();
-    });
-
-    it("logs reviewed, accepted, and rejected counts to the console", () => {
-        const consoleSpy = vi
-            .spyOn(console, "log")
-            .mockImplementation(() => undefined);
-
-        printSummary();
-
-        const output = consoleSpy.mock.calls
-            .map((c) => String(c[0]))
-            .join("\n");
-        expect(output).toContain("0 / 2");
-        expect(output).toContain("Accepted: 0");
-        expect(output).toContain("Rejected: 0");
-    });
-
-    it("includes the output path in the summary", () => {
-        const consoleSpy = vi
-            .spyOn(console, "log")
-            .mockImplementation(() => undefined);
-
-        printSummary();
-
-        const output = consoleSpy.mock.calls
-            .map((c) => String(c[0]))
-            .join("\n");
-        expect(output).toContain("/data/output.bed");
-    });
-});
-
-// ---------------------------------------------------------------------------
 // Overwrite dialog (skipOverwriteConfirm = false)
 // ---------------------------------------------------------------------------
 
@@ -592,6 +608,52 @@ describe("swipe mode — IPC handler edge cases", () => {
         expect(consoleSpy).toHaveBeenCalledWith(
             "Error writing annotation:",
             expect.any(Error),
+        );
+    });
+
+    it("accept logs error when called after all annotations are exhausted", async () => {
+        vi.mocked(loadPlotData).mockResolvedValue({
+            rawPoints: [],
+            windowedPoints: [],
+        } as unknown as PlotData);
+
+        // Exhaust both annotations
+        await ipcHandlers.get("accept")?.(undefined);
+        await ipcHandlers.get("accept")?.(undefined);
+
+        const consoleSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+        const result = (await ipcHandlers.get("accept")?.(
+            undefined,
+        )) as HandlerResult;
+
+        expect(result.done).toBe(true);
+        expect(consoleSpy).toHaveBeenCalledWith(
+            "Unknown state: accept called even though we've run out of annotations",
+        );
+    });
+
+    it("reject logs error when called after all annotations are exhausted", async () => {
+        vi.mocked(loadPlotData).mockResolvedValue({
+            rawPoints: [],
+            windowedPoints: [],
+        } as unknown as PlotData);
+
+        // Exhaust both annotations
+        await ipcHandlers.get("reject")?.(undefined);
+        await ipcHandlers.get("reject")?.(undefined);
+
+        const consoleSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+        const result = (await ipcHandlers.get("reject")?.(
+            undefined,
+        )) as HandlerResult;
+
+        expect(result.done).toBe(true);
+        expect(consoleSpy).toHaveBeenCalledWith(
+            "Unknown state: reject called even though we've run out of annotations",
         );
     });
 });

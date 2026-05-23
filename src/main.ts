@@ -4,12 +4,14 @@
 process.env.GSETTINGS_BACKEND ??= "memory";
 
 import { type ChildProcess, fork } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { readInfo } from "@nanalogue/node";
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import type { FontSize } from "./font-size";
 import { getFontSize, setFontSize } from "./font-size";
 import { countBedDataLines, countNonEmptyLines } from "./lib/line-counter";
+import { generateBedLines, parseReadIds } from "./lib/locate-data-loader";
 import * as aiChatModule from "./modes/ai-chat";
 import * as qcModule from "./modes/qc";
 import * as swipeModule from "./modes/swipe";
@@ -619,12 +621,6 @@ ipcMain.handle(
         region?: string,
         fullRegion?: boolean,
     ) => {
-        const { readFileSync, writeFileSync } = await import("node:fs");
-        const { parseReadIds, generateBedLines } = await import(
-            "./lib/locate-data-loader"
-        );
-        const { readInfo } = await import("@nanalogue/node");
-
         const content = readFileSync(readIdPath, "utf-8");
         const parseResult = parseReadIds(content);
         if (parseResult.capped) {

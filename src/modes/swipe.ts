@@ -172,14 +172,14 @@ async function loadCurrentPlotData(): Promise<PlotData | null> {
 }
 
 /**
- * Appends an accepted annotation to the output BED file.
+ * Appends an accepted annotation line to the output BED file.
  *
- * @param annotation - The BED annotation that was accepted by the user.
+ * @param outputPath - Path to the output BED file.
+ * @param rawLine - The raw BED line to append.
  */
-function writeAcceptedAnnotation(annotation: BedAnnotation) {
-    if (!cliArgs) return;
+function writeAcceptedAnnotation(outputPath: string, rawLine: string) {
     try {
-        appendFileSync(cliArgs.outputPath, `${annotation.rawLine}\n`, "utf-8");
+        appendFileSync(outputPath, `${rawLine}\n`, "utf-8");
     } catch (error) {
         console.error("Error writing annotation:", error);
     }
@@ -198,13 +198,20 @@ export function registerIpcHandlers(): void {
     });
 
     ipcMain.handle("accept", async () => {
-        if (!cliArgs) return { done: true, state: appState };
+        if (!cliArgs) {
+            console.error("Unknown state: accept called without cliArgs set");
+            return { done: true, state: appState };
+        }
 
         if (appState.currentIndex < annotations.length) {
             const annotation = annotations[appState.currentIndex];
-            writeAcceptedAnnotation(annotation);
+            writeAcceptedAnnotation(cliArgs.outputPath, annotation.rawLine);
             appState.acceptedCount++;
             appState.currentIndex++;
+        } else {
+            console.error(
+                "Unknown state: accept called even though we've run out of annotations",
+            );
         }
 
         if (appState.currentIndex >= annotations.length) {
@@ -216,11 +223,18 @@ export function registerIpcHandlers(): void {
     });
 
     ipcMain.handle("reject", async () => {
-        if (!cliArgs) return { done: true, state: appState };
+        if (!cliArgs) {
+            console.error("Unknown state: reject called without cliArgs set");
+            return { done: true, state: appState };
+        }
 
         if (appState.currentIndex < annotations.length) {
             appState.rejectedCount++;
             appState.currentIndex++;
+        } else {
+            console.error(
+                "Unknown state: reject called even though we've run out of annotations",
+            );
         }
 
         if (appState.currentIndex >= annotations.length) {
@@ -230,20 +244,4 @@ export function registerIpcHandlers(): void {
         const plotData = await loadCurrentPlotData();
         return { done: false, state: appState, plotData };
     });
-}
-
-/**
- * Prints a summary of the review session to the console, including counts of reviewed, accepted, and rejected annotations.
- */
-export function printSummary(): void {
-    console.log("");
-    console.log("Session complete:");
-    console.log(
-        `  Reviewed: ${appState.currentIndex} / ${appState.totalCount}`,
-    );
-    console.log(`  Accepted: ${appState.acceptedCount}`);
-    console.log(`  Rejected: ${appState.rejectedCount}`);
-    if (cliArgs) {
-        console.log(`  Output: ${cliArgs.outputPath}`);
-    }
 }
