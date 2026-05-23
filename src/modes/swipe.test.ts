@@ -135,6 +135,46 @@ async function initializeWithFakes(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// IPC handlers before initialize() is called (cliArgs is null).
+// These tests rely on running before any test that calls initialize() —
+// they must appear first so cliArgs is still null when they execute.
+// ---------------------------------------------------------------------------
+
+describe("swipe mode — IPC handlers before initialize (cliArgs is null)", () => {
+    it("accept returns done and logs error when cliArgs is not set", async () => {
+        const consoleSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+
+        const result = (await ipcHandlers.get("accept")?.(
+            undefined,
+        )) as HandlerResult;
+
+        expect(result.done).toBe(true);
+        expect(consoleSpy).toHaveBeenCalledWith(
+            "Unknown state: accept called without cliArgs set",
+        );
+        consoleSpy.mockRestore();
+    });
+
+    it("reject returns done and logs error when cliArgs is not set", async () => {
+        const consoleSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+
+        const result = (await ipcHandlers.get("reject")?.(
+            undefined,
+        )) as HandlerResult;
+
+        expect(result.done).toBe(true);
+        expect(consoleSpy).toHaveBeenCalledWith(
+            "Unknown state: reject called without cliArgs set",
+        );
+        consoleSpy.mockRestore();
+    });
+});
+
+// ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
 
@@ -592,6 +632,52 @@ describe("swipe mode — IPC handler edge cases", () => {
         expect(consoleSpy).toHaveBeenCalledWith(
             "Error writing annotation:",
             expect.any(Error),
+        );
+    });
+
+    it("accept logs error when called after all annotations are exhausted", async () => {
+        vi.mocked(loadPlotData).mockResolvedValue({
+            rawPoints: [],
+            windowedPoints: [],
+        } as unknown as PlotData);
+
+        // Exhaust both annotations
+        await ipcHandlers.get("accept")?.(undefined);
+        await ipcHandlers.get("accept")?.(undefined);
+
+        const consoleSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+        const result = (await ipcHandlers.get("accept")?.(
+            undefined,
+        )) as HandlerResult;
+
+        expect(result.done).toBe(true);
+        expect(consoleSpy).toHaveBeenCalledWith(
+            "Unknown state: accept called even though we've run out of annotations",
+        );
+    });
+
+    it("reject logs error when called after all annotations are exhausted", async () => {
+        vi.mocked(loadPlotData).mockResolvedValue({
+            rawPoints: [],
+            windowedPoints: [],
+        } as unknown as PlotData);
+
+        // Exhaust both annotations
+        await ipcHandlers.get("reject")?.(undefined);
+        await ipcHandlers.get("reject")?.(undefined);
+
+        const consoleSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+        const result = (await ipcHandlers.get("reject")?.(
+            undefined,
+        )) as HandlerResult;
+
+        expect(result.done).toBe(true);
+        expect(consoleSpy).toHaveBeenCalledWith(
+            "Unknown state: reject called even though we've run out of annotations",
         );
     });
 });
