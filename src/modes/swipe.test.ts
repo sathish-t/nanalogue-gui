@@ -268,7 +268,9 @@ describe("swipe mode — initialize()", () => {
         });
         // existsSync returns false so the first guard is skipped; the second
         // guard catches the collision via path.resolve vs realpathSync.
-        vi.mocked(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+        vi.mocked(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(
+            false,
+        );
 
         const collidingArgs: SwipeArgs = {
             ...BASE_ARGS,
