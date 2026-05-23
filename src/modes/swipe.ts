@@ -172,20 +172,14 @@ async function loadCurrentPlotData(): Promise<PlotData | null> {
 }
 
 /**
- * Appends an accepted annotation to the output BED file.
+ * Appends an accepted annotation line to the output BED file.
  *
- * @param annotation - The BED annotation that was accepted by the user.
+ * @param outputPath - Path to the output BED file.
+ * @param rawLine - The raw BED line to append.
  */
-function writeAcceptedAnnotation(annotation: BedAnnotation) {
-    /* v8 ignore next 6 */
-    if (!cliArgs) {
-        console.error(
-            "Unknown state: write annotation called without cliArgs set",
-        );
-        return;
-    }
+function writeAcceptedAnnotation(outputPath: string, rawLine: string) {
     try {
-        appendFileSync(cliArgs.outputPath, `${annotation.rawLine}\n`, "utf-8");
+        appendFileSync(outputPath, `${rawLine}\n`, "utf-8");
     } catch (error) {
         console.error("Error writing annotation:", error);
     }
@@ -211,7 +205,7 @@ export function registerIpcHandlers(): void {
 
         if (appState.currentIndex < annotations.length) {
             const annotation = annotations[appState.currentIndex];
-            writeAcceptedAnnotation(annotation);
+            writeAcceptedAnnotation(cliArgs.outputPath, annotation.rawLine);
             appState.acceptedCount++;
             appState.currentIndex++;
         } else {
