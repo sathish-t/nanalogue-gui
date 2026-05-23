@@ -65,6 +65,11 @@ vi.mock("node:fs/promises", () => ({
     readFile: vi.fn(),
 }));
 
+// Mock ipc-path-validation – filesystem calls are covered by its own test suite.
+vi.mock("../lib/ipc-path-validation", () => ({
+    validateIpcFilePath: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Mock locate-data-loader – parseReadIds is used inside generate-qc.
 vi.mock("../lib/locate-data-loader", () => ({
     parseReadIds: vi.fn(),
@@ -78,6 +83,7 @@ const { generateQCData, peekBam } = await import("../lib/qc-data-loader");
 const { dialog } = await import("electron");
 const { readFile } = await import("node:fs/promises");
 const { parseReadIds } = await import("../lib/locate-data-loader");
+const { validateIpcFilePath } = await import("../lib/ipc-path-validation");
 const { registerIpcHandlers, setMainWindow } = await import("./qc");
 
 // Register all IPC handlers once; ipcHandlers is populated as a side-effect.
@@ -166,6 +172,43 @@ describe("qc IPC handlers", () => {
             );
 
             expect(result).toEqual(mockResult);
+        });
+
+        it("validates the bam path when treatAsUrl is false", async () => {
+            vi.mocked(peekBam).mockResolvedValue({
+                contigs: [],
+                totalContigs: 0,
+                modifications: [],
+                allContigs: {},
+            });
+
+            await ipcHandlers.get("peek-bam")?.(
+                undefined,
+                "/data/sample.bam",
+                false,
+            );
+
+            expect(vi.mocked(validateIpcFilePath)).toHaveBeenCalledWith(
+                "/data/sample.bam",
+                "read",
+            );
+        });
+
+        it("skips path validation when treatAsUrl is true", async () => {
+            vi.mocked(peekBam).mockResolvedValue({
+                contigs: [],
+                totalContigs: 0,
+                modifications: [],
+                allContigs: {},
+            });
+
+            await ipcHandlers.get("peek-bam")?.(
+                undefined,
+                "https://example.com/sample.bam",
+                true,
+            );
+
+            expect(vi.mocked(validateIpcFilePath)).not.toHaveBeenCalled();
         });
     });
 
@@ -370,6 +413,50 @@ describe("qc IPC handlers", () => {
                 "read-a",
                 "read-b",
             ]);
+        });
+
+        it("validates bamPath as a local read path when treatAsUrl is false", async () => {
+            await ipcHandlers.get("generate-qc")?.(undefined, {
+                ...baseConfig,
+                treatAsUrl: false,
+            });
+
+            expect(vi.mocked(validateIpcFilePath)).toHaveBeenCalledWith(
+                "/data/sample.bam",
+                "read",
+            );
+        });
+
+        it("skips bamPath validation when treatAsUrl is true", async () => {
+            await ipcHandlers.get("generate-qc")?.(undefined, {
+                ...baseConfig,
+                bamPath: "https://example.com/sample.bam",
+                treatAsUrl: true,
+            });
+
+            const calls = vi
+                .mocked(validateIpcFilePath)
+                .mock.calls.map((c) => c[0]);
+            expect(calls).not.toContain("https://example.com/sample.bam");
+        });
+
+        it("validates readIdFilePath", async () => {
+            vi.mocked(readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+                "read-a\n",
+            );
+            vi.mocked(parseReadIds as ReturnType<typeof vi.fn>).mockReturnValue(
+                { capped: false, ids: ["read-a"], count: 1 },
+            );
+
+            await ipcHandlers.get("generate-qc")?.(undefined, {
+                ...baseConfig,
+                readIdFilePath: "/data/read-ids.txt",
+            });
+
+            expect(vi.mocked(validateIpcFilePath)).toHaveBeenCalledWith(
+                "/data/read-ids.txt",
+                "read",
+            );
         });
 
         it("throws when the read ID file exceeds the 200 000-ID limit", async () => {
