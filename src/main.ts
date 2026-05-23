@@ -10,6 +10,7 @@ import { readInfo } from "@nanalogue/node";
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import type { FontSize } from "./font-size";
 import { getFontSize, setFontSize } from "./font-size";
+import { validateIpcFilePath } from "./lib/ipc-path-validation";
 import { countBedDataLines, countNonEmptyLines } from "./lib/line-counter";
 import { generateBedLines, parseReadIds } from "./lib/locate-data-loader";
 import * as aiChatModule from "./modes/ai-chat";
@@ -411,6 +412,7 @@ ipcMain.handle(
      * @returns The number of data lines.
      */
     async (_event, filePath: string) => {
+        await validateIpcFilePath(filePath, "read");
         return countBedDataLines(filePath);
     },
 );
@@ -444,6 +446,10 @@ ipcMain.handle(
         showAnnotationHighlight?: boolean,
         treatAsUrl?: boolean,
     ) => {
+        if (!treatAsUrl) await validateIpcFilePath(bamPath, "read");
+        await validateIpcFilePath(bedPath, "read");
+        await validateIpcFilePath(outputPath, "write");
+
         const swipeArgs: swipeModule.SwipeArgs = {
             bamPath,
             bedPath,
@@ -594,6 +600,7 @@ ipcMain.handle(
      * @returns The number of non-empty lines.
      */
     async (_event, filePath: string) => {
+        await validateIpcFilePath(filePath, "read");
         return countNonEmptyLines(filePath);
     },
 );
@@ -621,6 +628,9 @@ ipcMain.handle(
         region?: string,
         fullRegion?: boolean,
     ) => {
+        if (!treatAsUrl) await validateIpcFilePath(bamPath, "read");
+        await validateIpcFilePath(readIdPath, "read");
+        await validateIpcFilePath(outputPath, "write");
         const content = readFileSync(readIdPath, "utf-8");
         const parseResult = parseReadIds(content);
         if (parseResult.capped) {

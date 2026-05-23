@@ -3,6 +3,7 @@
 import { resolve } from "node:path";
 import { type BrowserWindow, dialog, ipcMain } from "electron";
 import { getFontSize } from "../font-size";
+import { validateIpcFilePath } from "../lib/ipc-path-validation";
 import { generateQCData, peekBam } from "../lib/qc-data-loader";
 import type { QCConfig, QCData } from "../lib/types";
 
@@ -25,6 +26,7 @@ export function registerIpcHandlers() {
     ipcMain.handle(
         "peek-bam",
         async (_event, bamPath: string, treatAsUrl: boolean) => {
+            if (!treatAsUrl) await validateIpcFilePath(bamPath, "read");
             return await peekBam(bamPath, treatAsUrl);
         },
     );
@@ -56,10 +58,14 @@ export function registerIpcHandlers() {
             sampleFraction: config.sampleFraction / 100,
         });
 
+        if (!config.treatAsUrl)
+            await validateIpcFilePath(config.bamPath, "read");
+
         // Resolve read ID file path to an array of IDs
         if (config.readIdFilePath) {
             const { readFile } = await import("node:fs/promises");
             const { parseReadIds } = await import("../lib/locate-data-loader");
+            await validateIpcFilePath(config.readIdFilePath, "read");
             const content = await readFile(config.readIdFilePath, "utf-8");
             const parseResult = parseReadIds(content);
             if (parseResult.capped) {
