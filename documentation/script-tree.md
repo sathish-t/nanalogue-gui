@@ -24,6 +24,7 @@ src/
     format-utils.ts                  # Pure formatting and trimming utilities shared across renderer pages.
     histogram-renderer.ts            # Histogram SVG renderer backed by Vega-Lite.
     histogram.ts                     # Streaming histogram accumulator for binning data without storing raw arrays
+    ipc-path-validation.ts           # IPC path validation: guards file-path arguments in main-process IPC handlers
     line-counter.ts                  # Streaming utilities for counting lines in text and BED files
     locate-data-loader.ts            # Locate-reads data loader for parsing read ID files and generating BED output
     log-to-html.ts                   # Converts LLM message arrays into self-contained HTML files for session review.

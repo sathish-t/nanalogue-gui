@@ -25,6 +25,7 @@ src/lib/chat-session.ts	89.47
 src/lib/format-utils.ts	100
 src/lib/histogram-renderer.ts	100
 src/lib/histogram.ts	96.29
+src/lib/ipc-path-validation.ts	100
 src/lib/line-counter.ts	100
 src/lib/locate-data-loader.ts	100
 src/lib/log-to-html.ts	100
