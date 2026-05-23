@@ -1,7 +1,7 @@
 // Tests for validateIpcFilePath: verifies absolute-path, control-char, and
 // realpath checks for both read and write purposes.
 
-import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -9,6 +9,7 @@ import { validateIpcFilePath } from "./ipc-path-validation";
 
 let tmpDir: string;
 let existingFile: string;
+let symlinkToFile: string;
 
 beforeAll(async () => {
     const raw = await mkdtemp(join(tmpdir(), "ipc-path-validation-test-"));
@@ -16,6 +17,8 @@ beforeAll(async () => {
     tmpDir = await realpath(raw);
     existingFile = join(tmpDir, "sample.txt");
     await writeFile(existingFile, "data");
+    symlinkToFile = join(tmpDir, "link-to-sample.txt");
+    await symlink(existingFile, symlinkToFile);
 });
 
 afterAll(async () => {
@@ -75,12 +78,20 @@ describe("validateIpcFilePath – write", () => {
 
     it("accepts a path whose parent directory exists (file need not exist yet)", async () => {
         const newFile = join(tmpDir, "output.bed");
-        await expect(validateIpcFilePath(newFile, "write")).resolves.toBeUndefined();
+        await expect(
+            validateIpcFilePath(newFile, "write"),
+        ).resolves.toBeUndefined();
     });
 
     it("accepts an absolute path targeting an existing file for overwrite", async () => {
         await expect(
             validateIpcFilePath(existingFile, "write"),
         ).resolves.toBeUndefined();
+    });
+
+    it("rejects an existing symlink as the write target", async () => {
+        await expect(
+            validateIpcFilePath(symlinkToFile, "write"),
+        ).rejects.toThrow("symlink");
     });
 });

@@ -446,6 +446,7 @@ ipcMain.handle(
         showAnnotationHighlight?: boolean,
         treatAsUrl?: boolean,
     ) => {
+        if (!treatAsUrl) await validateIpcFilePath(bamPath, "read");
         await validateIpcFilePath(bedPath, "read");
         await validateIpcFilePath(outputPath, "write");
 
@@ -627,6 +628,7 @@ ipcMain.handle(
         region?: string,
         fullRegion?: boolean,
     ) => {
+        if (!treatAsUrl) await validateIpcFilePath(bamPath, "read");
         await validateIpcFilePath(readIdPath, "read");
         await validateIpcFilePath(outputPath, "write");
         const content = readFileSync(readIdPath, "utf-8");

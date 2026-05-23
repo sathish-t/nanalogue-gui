@@ -1,7 +1,7 @@
 // IPC path validation: guards file-path arguments in main-process IPC handlers
 // against relative traversal, control characters, and missing filesystem targets.
 
-import { realpath } from "node:fs/promises";
+import { lstat, realpath } from "node:fs/promises";
 import { dirname, isAbsolute } from "node:path";
 import { hasControlChars } from "./monty-sandbox-helpers";
 
@@ -14,8 +14,9 @@ import { hasControlChars } from "./monty-sandbox-helpers";
  *  2. The path contains no ASCII control characters (rules out null-byte tricks).
  *  3. For "read": the file exists and realpath resolves cleanly (symlinks are
  *     followed; if the target does not exist an ENOENT error is thrown).
- *     For "write": the parent directory exists and realpath resolves cleanly
- *     (the output file itself need not exist yet).
+ *     For "write": the parent directory exists; the target itself must not be
+ *     an existing symlink (prevents writes from following a link to an
+ *     unintended location).
  *
  * @param filePath - The path received from the renderer.
  * @param purpose - Whether the path is intended for reading or writing.
@@ -35,5 +36,16 @@ export async function validateIpcFilePath(
         await realpath(filePath);
     } else {
         await realpath(dirname(filePath));
+        try {
+            const st = await lstat(filePath);
+            if (st.isSymbolicLink()) {
+                throw new Error(
+                    `Write target must not be an existing symlink: "${filePath}"`,
+                );
+            }
+        } catch (e) {
+            if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+            // ENOENT means the file does not exist yet — that is fine for a write target.
+        }
     }
 }
