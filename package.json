@@ -43,7 +43,7 @@
         "prepare": "git config core.hooksPath .githooks || true"
     },
     "dependencies": {
-        "@nanalogue/node": "^0.1.4",
+        "@nanalogue/node": "^0.2.0",
         "@pydantic/monty": "^0.0.17",
         "chart.js": "^4.4.0",
         "chartjs-plugin-annotation": "^3.1.0",
