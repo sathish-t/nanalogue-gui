@@ -40,8 +40,8 @@ per-position tuples of read position, reference position, and probability
 alignment coordinates.
 
 **`windowReads`** — sliding-window modification density per read. The
-native addon returns JSON text, and `src/lib/ai-external-tools/window-reads.ts`
-parses it into an array before exposing it to Python callers. Accepts
+native addon returns structured records directly; `src/lib/ai-external-tools/window-reads.ts`
+passes them through to Python callers after a defensive array-shape check. Accepts
 window-specific options (`win`, `step`, `winOp`) plus most of the same
 filter fields as `ReadOptions`. Note: `WindowOptions` is a standalone type
 in the `.d.ts`; it does not extend `ReadOptions`, though the filter fields

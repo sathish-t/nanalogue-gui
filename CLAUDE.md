@@ -69,12 +69,12 @@ npm run lint           # no lint errors
 npm run lint:fix       # auto-fix what can be fixed
 ```
 
-Then run both AI reviews (redirect each to a temp file to avoid
+Then run AI reviews (redirect each to a temp file to avoid
 interleaved output; use `mktemp` so concurrent runs never collide).
 Give each a timeout of 300s.
 
 ```bash
-CR_OUT=$(mktemp) && CLAUDE_OUT=$(mktemp)
+CLAUDE_OUT=$(mktemp)
 REVIEW_PROMPT=$(cat <<'EOF'
 Act as a skeptical code reviewer, not an implementer.
 
@@ -96,7 +96,6 @@ EOF
 ```
 
 ```bash
-coderabbit review --prompt-only -t uncommitted > "$CR_OUT" 2>&1
 # Send both staged and unstaged changes so the review covers the full
 # uncommitted working tree.
 {
@@ -104,20 +103,18 @@ coderabbit review --prompt-only -t uncommitted > "$CR_OUT" 2>&1
   git diff --cached --no-color
   git diff --no-color
 } | timeout 300s claude -p > "$CLAUDE_OUT" 2>&1
-echo "== coderabbit review =="
-cat "$CR_OUT"
 echo "== claude review =="
 cat "$CLAUDE_OUT"
 ```
 
 Incorporate any suggestions that are worth doing, then repeat the cycle
-until neither tool raises new issues (or the remaining issues are not
+until new issues are not raised (or the remaining issues are not
 worth addressing). Do not run multiple `claude` review instances in
 parallel — deal with its previous output first.
 
 Remove files only after you are sure you have read them fully.
 ```bash
-rm "$CR_OUT" "$CLAUDE_OUT"
+rm "$CLAUDE_OUT"
 ```
 ---
 

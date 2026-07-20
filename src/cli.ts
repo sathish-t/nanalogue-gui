@@ -606,7 +606,7 @@ async function main(): Promise<void> {
             continue;
         }
 
-        if (trimmed === "/quit" || trimmed === "/exit") {
+        if (trimmed === "/quit") {
             console.log("Goodbye!");
             break;
         }

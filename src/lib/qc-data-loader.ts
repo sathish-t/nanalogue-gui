@@ -9,7 +9,6 @@ import type {
     QCData,
     ReadTypeCounts,
     SeqTableRow,
-    WindowReadsRecord,
 } from "./types";
 
 /** Number of reads to fetch per pagination page. */
@@ -148,11 +147,11 @@ async function paginateBamMods(
 }
 
 /**
- * Paginates through windowReads pages, parsing JSON and accumulating densities,
+ * Paginates through windowReads pages, accumulating densities,
  * alignment type counts, and read lengths.
  *
- * Each page returns a JSON array of per-read records. Reads are counted
- * directly from the array length.
+ * Each page returns an array of per-read records. Reads are counted directly
+ * from the array length.
  * Reports progress after each page via the optional callback.
  *
  * @param baseOptions - The shared read options (BAM path, filters, sampling).
@@ -205,16 +204,14 @@ async function paginateWindowReads(
         unmapped: "unmapped",
     };
 
-    // Fetch pages of windowed JSON until a partial page signals the end
+    // Fetch pages of windowed records until a partial page signals the end
     for (;;) {
-        const json = await windowReads({
+        const records = await windowReads({
             ...windowOptions,
             sampleSeed,
             limit: PAGE_SIZE,
             offset,
         });
-
-        const records = parseWindowReadsJson(json);
 
         for (const record of records) {
             // Accumulate alignment type counts
@@ -656,16 +653,4 @@ export async function generateQCData(
         seqTableSkipReason: seqResult.skipReason,
         seqTableAmbiguousReadIds: seqResult.ambiguousReadIds,
     };
-}
-
-/**
- * Parses the JSON string returned by windowReads into typed records.
- *
- * @param json - The raw JSON string output from the windowReads command.
- * @returns An array of parsed WindowReadsRecord objects.
- */
-export function parseWindowReadsJson(json: string): WindowReadsRecord[] {
-    const trimmed = json.trim();
-    if (trimmed.length === 0) return [];
-    return JSON.parse(trimmed) as WindowReadsRecord[];
 }

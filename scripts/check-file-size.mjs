@@ -61,7 +61,8 @@ const EXCEPTIONS = new Map([
     // sandbox-prompt.ts now owns both the long built-in sandbox prompt text
     // and the shared system-prompt assembly helpers; keep the ceiling pinned
     // while that prompt text remains co-located with its assembly logic.
-    ["src/lib/sandbox-prompt.ts", 875],
+    // Raised slightly for the added mapq and window_reads API documentation.
+    ["src/lib/sandbox-prompt.ts", 878],
     // Test files above the 1500-line ceiling:
     // chat-orchestrator-handle-message.test.ts now also carries targeted
     // orchestration regression tests; keep the ceiling pinned while helper

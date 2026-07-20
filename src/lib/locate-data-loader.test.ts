@@ -86,6 +86,7 @@ describe("generateBedLines", () => {
                 alignment_length: 500,
                 alignment_type: "primary_forward",
                 mod_count: "",
+                mapq: 60,
             },
         ];
         const result = generateBedLines(records, 1);
@@ -105,6 +106,7 @@ describe("generateBedLines", () => {
                 alignment_length: 500,
                 alignment_type: "primary_reverse",
                 mod_count: "",
+                mapq: 60,
             },
         ];
         const result = generateBedLines(records, 1);
@@ -122,6 +124,7 @@ describe("generateBedLines", () => {
                 alignment_length: 500,
                 alignment_type: "secondary_forward",
                 mod_count: "",
+                mapq: 60,
             },
             {
                 read_id: "r2",
@@ -132,6 +135,7 @@ describe("generateBedLines", () => {
                 alignment_length: 500,
                 alignment_type: "supplementary_reverse",
                 mod_count: "",
+                mapq: 60,
             },
         ];
         const result = generateBedLines(records, 2);
@@ -146,6 +150,7 @@ describe("generateBedLines", () => {
                 sequence_length: 500,
                 alignment_type: "unmapped",
                 mod_count: "",
+                mapq: 60,
             },
             {
                 read_id: "r2",
@@ -156,6 +161,7 @@ describe("generateBedLines", () => {
                 alignment_length: 500,
                 alignment_type: "primary_forward",
                 mod_count: "",
+                mapq: 60,
             },
         ];
         const result = generateBedLines(records, 2);
@@ -175,12 +181,14 @@ describe("generateBedLines", () => {
                 alignment_length: 500,
                 alignment_type: "primary_forward",
                 mod_count: "",
+                mapq: 60,
             },
             {
                 read_id: "r2",
                 sequence_length: 500,
                 alignment_type: "unmapped",
                 mod_count: "",
+                mapq: 60,
             },
         ];
         const result = generateBedLines(records, 5);
@@ -216,6 +224,7 @@ describe("generateBedLines", () => {
                 alignment_length: 500,
                 alignment_type: "primary_forward",
                 mod_count: "",
+                mapq: 60,
             },
             {
                 read_id: "r1",
@@ -226,6 +235,7 @@ describe("generateBedLines", () => {
                 alignment_length: 200,
                 alignment_type: "supplementary_forward",
                 mod_count: "",
+                mapq: 60,
             },
         ];
         const result = generateBedLines(records, 3);
@@ -245,6 +255,7 @@ describe("generateBedLines", () => {
                 alignment_length: 500,
                 alignment_type: "primary_forward",
                 mod_count: "",
+                mapq: 60,
             },
         ];
         const result = generateBedLines(records, 1);

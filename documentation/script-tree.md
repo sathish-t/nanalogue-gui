@@ -35,7 +35,7 @@ src/
     qc-data-loader.ts                # QC data loader: paginated BAM data retrieval with streaming histograms
     region-parser.ts                 # Parses and validates genomic region strings (e.g. "chr3", "chrI:1000-50000")
     sandbox-cli-args.ts              # Shared sandbox CLI argument definitions, numeric arg parser, and sandbox
-    sandbox-prompt.ts                # Builds the LLM system prompt describing sandbox capabilities, and assembles
+    sandbox-prompt.ts                # Builds the LLM system prompt and assembles the full system message sent on every turn.
     stats.ts                         # Statistics utilities for QC calculations
     swipe-data-loader.ts             # Swipe data loader using nanalogue-node
     system-append.ts                 # Loads the optional SYSTEM_APPEND.md file from an analysis directory.

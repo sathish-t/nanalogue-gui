@@ -26,7 +26,7 @@ export function makeWindowReads(
      *
      * @param bamPath - Path to the BAM file (relative or absolute within allowedDir).
      * @param opts - Optional snake_case options forwarded from Python.
-     * @returns The windowed statistics as a parsed JSON array.
+     * @returns The windowed statistics as an array.
      */
     return async (
         bamPath: string,
@@ -34,19 +34,17 @@ export function makeWindowReads(
     ): Promise<unknown> => {
         rejectTreatAsUrl(opts);
         const resolved = await resolvePath(allowedDir, bamPath);
-        const json = await windowReads(
+        const records = await windowReads(
             toWindowOptions(resolved, opts, maxRecords),
         );
-        const parsed: unknown = JSON.parse(json);
         /* c8 ignore start -- defensive guard; @nanalogue/node always returns an array */
-        if (!Array.isArray(parsed)) {
+        if (!Array.isArray(records)) {
             throw new SandboxError(
                 "RuntimeError",
-                "window_reads returned non-array JSON",
+                "window_reads returned a non-array result",
             );
         }
         /* c8 ignore stop */
-        const records = parsed as unknown[];
         enforceRecordLimit(records, "window_reads", maxRecords);
         return records;
     };

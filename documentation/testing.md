@@ -121,9 +121,5 @@ npm test               # all tests must pass
 npm run lint           # no lint errors
 npm run lint:fix       # auto-fix what can be fixed
 ```
-
-Then run AI reviewers if available (optional but recommended for doc/architecture changes):
-```bash
-coderabbit review --prompt-only -t uncommitted
-codex review --uncommitted
-```
+Then run the repo's AI-review workflow for doc/architecture changes;
+see [`AGENTS.md`](../AGENTS.md) for the current commands.
