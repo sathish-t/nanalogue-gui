@@ -1,5 +1,4 @@
-// Builds the LLM system prompt describing sandbox capabilities, and assembles
-// the full system message sent to the LLM on every turn.
+// Builds the LLM system prompt and assembles the full system message sent on every turn.
 // All numeric limits are derived from code constants, not hardcoded in prose.
 
 import {
@@ -458,7 +457,8 @@ Returns a list of dicts, one per BAM record:
         "reference_end": 200,
         "alignment_length": 100,
         "alignment_type": "primary_forward",
-        "mod_count": "C+m:5;T-7200:40;(probabilities >= 0.5, PHRED base qual >= 0)"
+        "mod_count": "C+m:5;T-7200:40;(probabilities >= 0.5, PHRED base qual >= 0)",
+        "mapq": 60
     },
     ...
 ]
@@ -472,6 +472,7 @@ Returns a list of dicts, one per BAM record:
   just for an example, it is unlikely there is an actual mod corresponding to this ChEBI code).
 - alignment_type can be one of primary_forward,primary_reverse,secondary_forward,secondary_reverse,
   supplementary_forward,supplementary_reverse,unmapped.
+- mapq is the mapping quality (0-254); 255 means mapping quality is unavailable.
 - if alignment_type is unmapped, then fields like contig, reference_start, reference_end,
   alignment_length do not exist.
 
@@ -495,7 +496,8 @@ probabilities:
             },
             ...
         ],
-        "alignment": {"start": 100, "end": 200, "contig": "chr1", "contig_id": 0}
+        "alignment": {"start": 100, "end": 200, "contig": "chr1", "contig_id": 0},
+        "mapq": 60
     },
     ...
 ]
@@ -506,6 +508,7 @@ probabilities:
   For reverse-strand reads, position 0 is the leftmost genomic base (the BAM SEQ is stored reverse-complemented
   from basecalling order). ref_pos runs from start to end, and can be -1 if there are bases on the sequence
   that do not map to the reference.
+- mapq is the mapping quality (0-254); 255 means mapping quality is unavailable.
 - Use this when you need per-base modification probabilities. Use
   read_info when you only need summary mod counts.
 - This command produces a lot of data per read. so if you are querying lots of reads,

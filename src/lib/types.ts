@@ -64,7 +64,7 @@ export interface PlotData {
 }
 
 /**
- * Represents a single modification table entry within a windowReads JSON record.
+ * Represents a single modification table entry within a windowReads record.
  */
 export interface WindowReadsModEntry {
     /** The base at the modification site. */
@@ -78,7 +78,7 @@ export interface WindowReadsModEntry {
 }
 
 /**
- * Represents a single per-read record in the windowReads JSON output.
+ * Represents a single per-read record returned by windowReads.
  */
 export interface WindowReadsRecord {
     /** The alignment type string (e.g. "primary_forward", "unmapped"). */

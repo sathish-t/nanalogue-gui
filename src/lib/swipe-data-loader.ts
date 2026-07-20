@@ -46,16 +46,14 @@ function strandFromAlignmentType(alignmentType: string): string {
 }
 
 /**
- * Parses a JSON string of windowed read data into structured row objects.
+ * Converts windowed read records into structured row objects.
  *
- * @param json - The raw JSON string output from the windowReads command.
- * @returns An array of parsed window read rows, skipping unmapped reads and invalid bounds.
+ * @param records - The records returned by windowReads.
+ * @returns Structured window rows, skipping unmapped reads and invalid bounds.
  */
-export function parseWindowReadsJson(json: string): WindowReadRow[] {
-    const trimmed = json.trim();
-    if (trimmed.length === 0) return [];
-
-    const records = JSON.parse(trimmed) as WindowReadsRecord[];
+export function parseWindowReads(
+    records: WindowReadsRecord[],
+): WindowReadRow[] {
     const rows: WindowReadRow[] = [];
 
     for (const record of records) {
@@ -169,7 +167,7 @@ export async function loadPlotData(
     const region = `${annotation.contig}:${annotation.start}-${Math.min(annotation.end, contigSize)}`;
     const modRegion = `${annotation.contig}:${expandedStart}-${expandedEnd}`;
 
-    const [json, modRecords] = await Promise.all([
+    const [windowRecords, modRecords] = await Promise.all([
         windowReads({
             bamPath,
             treatAsUrl,
@@ -196,7 +194,7 @@ export async function loadPlotData(
         }),
     ]);
 
-    const rows = parseWindowReadsJson(json);
+    const rows = parseWindowReads(windowRecords);
 
     const windowedPoints: WindowedPoint[] = rows.map((row) => ({
         refWinStart: row.ref_win_start,

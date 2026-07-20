@@ -60,6 +60,14 @@ describe("buildSandboxPrompt — external function docs", () => {
             expect(prompt).toMatch(new RegExp(`### ${fn}\\b`));
         }
     });
+
+    it("documents mapq in read_info and bam_mods output", () => {
+        const prompt = buildSandboxPrompt(BASE_OPTIONS);
+        expect(prompt.match(/"mapq": 60/g)).toHaveLength(2);
+        expect(
+            prompt.match(/255 means mapping quality is unavailable/g),
+        ).toHaveLength(2);
+    });
 });
 
 // ---------------------------------------------------------------------------

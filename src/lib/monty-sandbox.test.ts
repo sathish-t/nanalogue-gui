@@ -80,7 +80,7 @@ len(mods)
     expect(typeof result.value).toBe("number");
 });
 
-it("window_reads returns parsed JSON array via sandbox", async () => {
+it("window_reads returns an array via sandbox", async () => {
     const code = `
 records = window_reads("${bamName}", win=100, step=50)
 len(records)

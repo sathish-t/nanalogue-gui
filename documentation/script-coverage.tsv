@@ -24,7 +24,7 @@ src/lib/chat-orchestrator.ts	96.8
 src/lib/chat-session.ts	89.47
 src/lib/format-utils.ts	100
 src/lib/histogram-renderer.ts	100
-src/lib/histogram.ts	96.29
+src/lib/histogram.ts	100
 src/lib/ipc-path-validation.ts	100
 src/lib/line-counter.ts	100
 src/lib/locate-data-loader.ts	100
@@ -33,7 +33,7 @@ src/lib/mod-filter.ts	100
 src/lib/model-listing.ts	92.42
 src/lib/monty-sandbox-helpers.ts	99.34
 src/lib/monty-sandbox.ts	100
-src/lib/qc-data-loader.ts	93.14
+src/lib/qc-data-loader.ts	93.56
 src/lib/region-parser.ts	95.65
 src/lib/sandbox-cli-args.ts	100
 src/lib/sandbox-prompt.ts	100

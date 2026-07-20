@@ -7,86 +7,8 @@ import {
     matchBaseByLength,
     maxReadLengthForBinWidth,
     parseSeqTableTsv,
-    parseWindowReadsJson,
     regionSizeBp,
 } from "./qc-data-loader";
-
-describe("parseWindowReadsJson", () => {
-    it("returns empty array for empty input", () => {
-        expect(parseWindowReadsJson("")).toEqual([]);
-    });
-
-    it("returns empty array for whitespace-only input", () => {
-        expect(parseWindowReadsJson("   ")).toEqual([]);
-    });
-
-    it("parses valid JSON records", () => {
-        const json = JSON.stringify([
-            {
-                alignment_type: "primary_forward",
-                alignment: { start: 9, end: 17, contig: "chr1", contig_id: 0 },
-                mod_table: [
-                    {
-                        base: "C",
-                        is_strand_plus: true,
-                        mod_code: "m",
-                        data: [[10, 20, 0.5, 30, 100, 200]],
-                    },
-                ],
-                read_id: "read1",
-                seq_len: 8,
-            },
-        ]);
-
-        const result = parseWindowReadsJson(json);
-        expect(result).toHaveLength(1);
-        expect(result[0].alignment_type).toBe("primary_forward");
-        expect(result[0].read_id).toBe("read1");
-        expect(result[0].mod_table[0].data[0][2]).toBe(0.5);
-    });
-
-    it("parses multiple records", () => {
-        const json = JSON.stringify([
-            {
-                alignment_type: "primary_forward",
-                alignment: { start: 0, end: 10, contig: "chr1", contig_id: 0 },
-                mod_table: [],
-                read_id: "read1",
-                seq_len: 10,
-            },
-            {
-                alignment_type: "unmapped",
-                mod_table: [],
-                read_id: "read2",
-                seq_len: 5,
-            },
-        ]);
-
-        const result = parseWindowReadsJson(json);
-        expect(result).toHaveLength(2);
-        expect(result[0].alignment_type).toBe("primary_forward");
-        expect(result[1].alignment_type).toBe("unmapped");
-        expect(result[1].alignment).toBeUndefined();
-    });
-
-    it("parses empty JSON array", () => {
-        expect(parseWindowReadsJson("[]")).toEqual([]);
-    });
-
-    it("preserves unmapped records without alignment field", () => {
-        const json = JSON.stringify([
-            {
-                alignment_type: "unmapped",
-                mod_table: [],
-                read_id: "read1",
-                seq_len: 5,
-            },
-        ]);
-        const result = parseWindowReadsJson(json);
-        expect(result).toHaveLength(1);
-        expect(result[0].alignment).toBeUndefined();
-    });
-});
 
 describe("maxReadLengthForBinWidth", () => {
     it("returns 30M for binWidth >= 10000", () => {
