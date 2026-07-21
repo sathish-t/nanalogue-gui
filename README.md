@@ -350,9 +350,9 @@ relevant for you depends on how you use the chat feature here.
 
 We use a Python sandbox to receive code from the LLM and execute it.
 Our sandbox uses the [Monty](https://github.com/pydantic/monty) package from pydantic to run Python
-code in a restricted way so that it has access only to our files and to specific functions.
-This ensures our sandbox is secure against mistakes by the user or the LLM,
-and allows us to inspect what the LLM is doing.
+code in a restricted way so that it has access only to files in the selected analysis directory and to specific functions.
+This helps contain mistakes by the user or the LLM, but it is not a hardened security boundary against adversarial code.
+See [documentation/ai-chat.md](documentation/ai-chat.md#security-model) for the security model and trust boundaries.
 A copy button in the code panel lets you copy the Python code to your clipboard.
 
 ![AI Chat multi-turn conversation with sandbox](demo/screenshot-ai-chat-sandbox-openai.png)
