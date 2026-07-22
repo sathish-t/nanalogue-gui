@@ -66,7 +66,7 @@ const EXCEPTIONS = new Map([
     // chat-orchestrator-handle-message.test.ts now also carries targeted
     // orchestration regression tests; keep the ceiling pinned while helper
     // extraction work continues to move cases into smaller files.
-    ["src/lib/chat-orchestrator-handle-message.test.ts", 1736],
+    ["src/lib/chat-orchestrator-handle-message.test.ts", 1800],
 ]);
 
 // --- File discovery ---

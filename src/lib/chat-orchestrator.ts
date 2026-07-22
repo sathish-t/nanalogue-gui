@@ -26,7 +26,11 @@ import type {
     SandboxResult,
 } from "./chat-types";
 import { generateChatHtml } from "./log-to-html.js";
-import { collectTerminalOutput, runSandboxCode } from "./monty-sandbox";
+import {
+    collectDirectExecutionOutput,
+    collectTerminalOutput,
+    runSandboxCode,
+} from "./monty-sandbox";
 import {
     deriveMaxOutputBytes,
     resolvePath,
@@ -954,7 +958,7 @@ export async function handleUserMessage(
             "# These results do not go to the LLM, so do not reference any of these results in your LLM conversation.\n" +
             "# Any text overflow etc. are the user's responsibility.\n" +
             "# Timeouts may not apply to you (check the package's code if you want to know more).\n\n" +
-            collectTerminalOutput(sandboxResult);
+            collectDirectExecutionOutput(sandboxResult);
         const steps = [{ code, result: sandboxResult }];
         emitEvent({ type: "turn_end", text, steps });
         return { text, steps };

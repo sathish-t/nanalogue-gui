@@ -234,6 +234,43 @@ describe("/exec slash command", () => {
         });
 
         expect(result.text).toContain("Direct user execution");
+        expect(result.text).toContain("RuntimeError");
+        expect(result.text).toContain("undefined_var");
+        expect(result.steps).toHaveLength(1);
+        expect(result.steps[0].result.success).toBe(false);
+    });
+
+    it("includes prints before a runtime error in /exec output", async () => {
+        await writeFile(
+            join(tmpDir, "prints_then_fails.py"),
+            'print("before")\nprint(undefined_var)',
+            "utf-8",
+        );
+        const { config, history, facts, events, signal } = execTestHarness();
+
+        const result = await handleUserMessage({
+            message: "/exec prints_then_fails.py",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events for test assertions.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            facts,
+            signal,
+        });
+
+        expect(result.text).toContain("before");
+        expect(result.text).toContain("RuntimeError");
+        expect(result.text).toContain("undefined_var");
         expect(result.steps).toHaveLength(1);
         expect(result.steps[0].result.success).toBe(false);
     });
