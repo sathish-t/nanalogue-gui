@@ -33,6 +33,7 @@ src/lib/histogram.ts	100
 src/lib/ipc-path-validation.ts	100
 src/lib/line-counter.ts	100
 src/lib/locate-data-loader.ts	100
+src/lib/log-to-html-assets.ts	100
 src/lib/log-to-html.ts	100
 src/lib/mod-filter.ts	100
 src/lib/model-listing.ts	92.42
@@ -41,6 +42,7 @@ src/lib/monty-sandbox.ts	100
 src/lib/qc-data-loader.ts	93.56
 src/lib/region-parser.ts	95.65
 src/lib/sandbox-cli-args.ts	100
+src/lib/sandbox-prompt-text.ts	100
 src/lib/sandbox-prompt.ts	100
 src/lib/stats.ts	98.33
 src/lib/swipe-data-loader.ts	100

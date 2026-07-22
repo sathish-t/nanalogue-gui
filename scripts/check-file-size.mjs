@@ -5,9 +5,6 @@
 // Rules:
 //   - Test files (*.test.ts):  max 1500 lines.
 //   - Other source files:      max  800 lines.
-//   - Files listed in EXCEPTIONS may exceed the default ceiling but must not
-//     grow beyond their individual ceiling (their size at the time they were
-//     grandfathered). This documents known debt and prevents it from worsening.
 //
 // "Lines" is counted the same way as `wc -l`: the number of newline characters
 // in the file content, which equals the visual line count for any file that
@@ -38,25 +35,6 @@ const SOURCE_MAX = 800;
 
 /** Maximum line count for *.test.ts files. */
 const TEST_MAX = 1500;
-
-// Files that currently exceed the default ceiling for their category.
-// Each entry maps a repo-relative path to its individual ceiling: the file
-// must not grow beyond this value, but it need not shrink to pass the check.
-// Remove an entry once the file is refactored below the default ceiling.
-//
-// Grandfathered at their wc -l values as of the time this check was added.
-
-/** @type {Map<string, number>} */
-const EXCEPTIONS = new Map([
-    // Source files above the 800-line ceiling:
-    // log-to-html.ts is self-contained by design: inlined CSS, JS, and JSDoc
-    // account for the majority of lines; logic itself is well under the limit.
-    ["src/lib/log-to-html.ts", 816],
-    // sandbox-prompt.ts now owns both the long built-in sandbox prompt text
-    // and the shared system-prompt assembly helpers; keep the ceiling pinned
-    // while that prompt text remains co-located with its assembly logic.
-    ["src/lib/sandbox-prompt.ts", 879],
-]);
 
 // --- File discovery ---
 
@@ -142,14 +120,7 @@ for (const relPath of files) {
     const defaultMax = isTest ? TEST_MAX : SOURCE_MAX;
     const label = isTest ? "test" : "source";
 
-    if (EXCEPTIONS.has(relPath)) {
-        const ceiling = /** @type {number} */ (EXCEPTIONS.get(relPath));
-        if (lineCount > ceiling) {
-            errors.push(
-                `  ✗ ${relPath}: ${lineCount} lines — exceeds grandfathered ceiling of ${ceiling}`,
-            );
-        }
-    } else if (lineCount > defaultMax) {
+    if (lineCount > defaultMax) {
         errors.push(
             `  ✗ ${relPath}: ${lineCount} lines — exceeds ${label} limit of ${defaultMax}`,
         );
@@ -166,12 +137,7 @@ if (errors.length > 0) {
     console.error(
         `\nLimits: source ≤ ${SOURCE_MAX} lines, test ≤ ${TEST_MAX} lines.`,
     );
-    console.error(
-        "Refactor the file, or add it to EXCEPTIONS in scripts/check-file-size.mjs",
-    );
-    console.error(
-        "with its current line count as the ceiling and a comment explaining the debt.",
-    );
+    console.error("Refactor the file to bring it under the limit.");
     process.exit(1);
 }
 

@@ -32,6 +32,7 @@ src/
     ipc-path-validation.ts                          # IPC path validation: guards file-path arguments in main-process IPC handlers
     line-counter.ts                                 # Streaming utilities for counting lines in text and BED files
     locate-data-loader.ts                           # Locate-reads data loader for parsing read ID files and generating BED output
+    log-to-html-assets.ts                           # Shared inline assets for self-contained chat transcript HTML output.
     log-to-html.ts                                  # Converts LLM message arrays into self-contained HTML files for session review.
     mod-filter.ts                                   # Parses modification filter strings into tag and strand components.
     model-listing.ts                                # Provider detection and model listing for multi-provider LLM endpoints.
@@ -40,6 +41,7 @@ src/
     qc-data-loader.ts                               # QC data loader: paginated BAM data retrieval with streaming histograms
     region-parser.ts                                # Parses and validates genomic region strings (e.g. "chr3", "chrI:1000-50000")
     sandbox-cli-args.ts                             # Shared sandbox CLI argument definitions, numeric arg parser, and sandbox
+    sandbox-prompt-text.ts                          # Contains the large built-in sandbox prompt template used for AI chat.
     sandbox-prompt.ts                               # Builds the LLM system prompt and assembles the full system message sent on every turn.
     stats.ts                                        # Statistics utilities for QC calculations
     swipe-data-loader.ts                            # Swipe data loader using nanalogue-node
