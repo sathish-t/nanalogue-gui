@@ -617,6 +617,7 @@ All four functions accept the same arguments:
 | min_seq_len | int | 0 | Only retain sequences above this length |
 | min_align_len | int | 0 | Only retain alignments above this length |
 | read_id_set | list[str] | None | Only include reads with these IDs |
+| threads | int | implementation default | Number of threads for BAM reading |
 | read_filter | str | "" | Comma-separated alignment types: primary_forward, primary_reverse, secondary_forward, secondary_reverse, supplementary_forward, supplementary_reverse, unmapped |
 | mapq_filter | int | 0 | Exclude reads with mapping quality below this |
 | exclude_mapq_unavail | bool | False | Exclude reads where MAPQ is unavailable |
