@@ -718,6 +718,17 @@ describe("AI Chat permanent session config locking", () => {
         ) as HTMLDialogElement;
         advancedDialog.showModal = vi.fn();
         advancedDialog.close = vi.fn();
+        const systemPromptDialog = document.getElementById(
+            "system-prompt-dialog",
+        ) as HTMLDialogElement;
+        systemPromptDialog.showModal = vi.fn();
+        systemPromptDialog.close = vi.fn();
+        Object.defineProperty(navigator, "clipboard", {
+            configurable: true,
+            value: {
+                writeText: vi.fn().mockResolvedValue(undefined),
+            },
+        });
 
         mockApi = createMockApi();
         (window as unknown as { /** The preload API. */ api: MockApi }).api =
@@ -1114,5 +1125,197 @@ describe("AI Chat permanent session config locking", () => {
         expect(fetchStatus.textContent).toBe("");
 
         vi.useRealTimers();
+    });
+
+    it("calls go-back when the Back button is clicked", async () => {
+        (document.getElementById("btn-back") as HTMLButtonElement).click();
+        await flushMicrotasks();
+
+        expect(mockApi.aiChatGoBack).toHaveBeenCalledTimes(1);
+    });
+
+    it("toggles the code panel label when expanded and collapsed", () => {
+        const toggle = document.getElementById(
+            "code-panel-toggle",
+        ) as HTMLButtonElement;
+        const content = document.getElementById(
+            "code-panel-content",
+        ) as HTMLDivElement;
+
+        toggle.click();
+        expect(content.classList.contains("hidden")).toBe(false);
+        expect(toggle.textContent).toContain("▼");
+
+        toggle.click();
+        expect(content.classList.contains("hidden")).toBe(true);
+        expect(toggle.textContent).toContain("▶");
+    });
+
+    it("supports code pagination and clipboard copy", async () => {
+        const setTimeoutSpy = vi
+            .spyOn(globalThis, "setTimeout")
+            .mockImplementation((callback) => {
+                if (typeof callback === "function") callback();
+                return 0 as ReturnType<typeof setTimeout>;
+            });
+        fillRequiredFields();
+        mockApi.aiChatSendMessage.mockResolvedValueOnce({
+            success: true,
+            text: "ok",
+            steps: [
+                { code: 'print("one")', result: 1 },
+                { code: 'print("two")', result: 2 },
+            ],
+        });
+
+        await sendMessage("hello");
+
+        const prev = document.getElementById(
+            "btn-code-prev",
+        ) as HTMLButtonElement;
+        const next = document.getElementById(
+            "btn-code-next",
+        ) as HTMLButtonElement;
+        const copy = document.getElementById(
+            "btn-copy-code",
+        ) as HTMLButtonElement;
+        const codeDisplay = document.getElementById(
+            "code-display",
+        ) as HTMLPreElement;
+        const writeText = vi.mocked(navigator.clipboard.writeText);
+
+        expect(codeDisplay.textContent).toBe('print("two")');
+        prev.click();
+        expect(codeDisplay.textContent).toBe('print("one")');
+        next.click();
+        expect(codeDisplay.textContent).toBe('print("two")');
+
+        copy.click();
+        await flushMicrotasks();
+        expect(writeText).toHaveBeenCalledWith('print("two")');
+        expect(copy.textContent).toBe("Copy");
+        setTimeoutSpy.mockRestore();
+    });
+
+    it("opens and closes the advanced dialog and resets defaults when unlocked", async () => {
+        const advancedButton = document.getElementById(
+            "btn-advanced",
+        ) as HTMLButtonElement;
+        const closeButton = document.getElementById(
+            "btn-close-advanced",
+        ) as HTMLButtonElement;
+        const defaultsButton = document.getElementById(
+            "btn-defaults",
+        ) as HTMLButtonElement;
+        const advancedDialog = document.getElementById(
+            "advanced-dialog",
+        ) as HTMLDialogElement;
+        const timeout = document.getElementById(
+            "opt-timeout",
+        ) as HTMLInputElement;
+
+        timeout.value = "999";
+        advancedButton.click();
+        expect(advancedDialog.showModal).toHaveBeenCalledTimes(1);
+
+        defaultsButton.click();
+        expect(timeout.value).not.toBe("999");
+
+        closeButton.click();
+        expect(advancedDialog.close).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows, copies, and closes the system prompt dialog", async () => {
+        const setTimeoutSpy = vi
+            .spyOn(globalThis, "setTimeout")
+            .mockImplementation((callback) => {
+                if (typeof callback === "function") callback();
+                return 0 as ReturnType<typeof setTimeout>;
+            });
+        mockApi.aiChatGetSystemPrompt.mockResolvedValueOnce({
+            success: true,
+            prompt: "system prompt text",
+        });
+
+        const openButton = document.getElementById(
+            "btn-view-system-prompt",
+        ) as HTMLButtonElement;
+        const copyButton = document.getElementById(
+            "btn-copy-system-prompt",
+        ) as HTMLButtonElement;
+        const closeButton = document.getElementById(
+            "btn-close-system-prompt",
+        ) as HTMLButtonElement;
+        const promptDialog = document.getElementById(
+            "system-prompt-dialog",
+        ) as HTMLDialogElement;
+        const promptPre = document.getElementById(
+            "system-prompt-pre",
+        ) as HTMLPreElement;
+        const tokenEstimate = document.getElementById(
+            "system-prompt-token-estimate",
+        ) as HTMLSpanElement;
+        const writeText = vi.mocked(navigator.clipboard.writeText);
+
+        openButton.click();
+        await flushMicrotasks();
+
+        expect(promptDialog.showModal).toHaveBeenCalledTimes(1);
+        expect(promptPre.textContent).toBe("system prompt text");
+        expect(tokenEstimate.textContent).toContain("tokens");
+
+        copyButton.click();
+        await flushMicrotasks();
+        expect(writeText).toHaveBeenCalledWith("system prompt text");
+        expect(copyButton.textContent).toBe("Copy");
+
+        closeButton.click();
+        expect(promptDialog.close).toHaveBeenCalledTimes(1);
+        setTimeoutSpy.mockRestore();
+    });
+
+    it("shows a system-prompt error when prompt loading fails", async () => {
+        mockApi.aiChatGetSystemPrompt.mockResolvedValueOnce({
+            success: false,
+            error: "prompt failed",
+        });
+
+        (
+            document.getElementById(
+                "btn-view-system-prompt",
+            ) as HTMLButtonElement
+        ).click();
+        await flushMicrotasks();
+
+        expect(
+            (document.getElementById("system-prompt-pre") as HTMLPreElement)
+                .textContent,
+        ).toBe("Error: prompt failed");
+    });
+
+    it("updates spinner state for AI Chat lifecycle events", () => {
+        const onEvent = mockApi.onAiChatEvent.mock.calls[0]?.[0];
+        if (typeof onEvent !== "function") {
+            throw new Error("AI Chat event callback was not registered");
+        }
+        const spinner = document.getElementById(
+            "chat-spinner",
+        ) as HTMLDivElement;
+        const spinnerText = document.getElementById(
+            "spinner-text",
+        ) as HTMLSpanElement;
+
+        onEvent({ type: "turn_start" });
+        expect(spinner.classList.contains("hidden")).toBe(false);
+        expect(spinnerText.textContent).toBe("Processing...");
+
+        onEvent({ type: "llm_request_start" });
+        expect(spinnerText.textContent).toBe("Waiting for LLM...");
+
+        onEvent({ type: "code_execution_start" });
+        expect(spinnerText.textContent).toBe("Running sandbox code...");
+
+        onEvent({ type: "turn_end" });
+        expect(spinner.classList.contains("hidden")).toBe(true);
     });
 });

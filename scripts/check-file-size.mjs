@@ -49,7 +49,6 @@ const TEST_MAX = 1500;
 /** @type {Map<string, number>} */
 const EXCEPTIONS = new Map([
     // Source files above the 800-line ceiling:
-    ["src/renderer/ai-chat/ai-chat.ts", 1183],
     // log-to-html.ts is self-contained by design: inlined CSS, JS, and JSDoc
     // account for the majority of lines; logic itself is well under the limit.
     ["src/lib/log-to-html.ts", 816],

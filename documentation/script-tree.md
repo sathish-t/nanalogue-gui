@@ -72,9 +72,14 @@ src/
     swipe.ts              # Swipe mode module - handles annotation review workflow
   renderer/
     ai-chat/
+      ai-chat-config.ts     # Advanced configuration helpers for the AI Chat renderer.
+      ai-chat-consent.ts    # Consent dialog helpers for the AI Chat renderer.
+      ai-chat-elements.ts   # DOM element lookups for the AI Chat renderer.
+      ai-chat-types.ts      # Shared TypeScript types for the AI Chat renderer.
+      ai-chat-ui.ts         # UI helpers for the AI Chat renderer.
       ai-chat.css           # Styles for the AI Chat BAM analysis interface.
       ai-chat.html
-      ai-chat.ts            # AI Chat renderer script for nanalogue-gui.
+      ai-chat.ts            # AI Chat renderer bootstrap.
     landing/
       landing.css           # Styles for the landing page mode selection screen.
       landing.html
