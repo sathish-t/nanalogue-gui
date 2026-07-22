@@ -49,10 +49,6 @@ const TEST_MAX = 1500;
 /** @type {Map<string, number>} */
 const EXCEPTIONS = new Map([
     // Source files above the 800-line ceiling:
-    // chat-orchestrator.ts remains oversized while AI Chat context-budgeting
-    // and execution-loop logic are still co-located; keep the ceiling pinned
-    // to the current size so follow-up refactors can pay this debt down.
-    ["src/lib/chat-orchestrator.ts", 1391],
     ["src/renderer/ai-chat/ai-chat.ts", 1183],
     // log-to-html.ts is self-contained by design: inlined CSS, JS, and JSDoc
     // account for the majority of lines; logic itself is well under the limit.
