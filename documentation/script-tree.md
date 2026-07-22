@@ -81,11 +81,17 @@ src/
       locate-config.ts      # Locate reads configuration page renderer.
     qc/
       qc-config.html
-      qc-config.ts          # QC config page renderer
+      qc-config.ts             # QC config page renderer
+      qc-results-charts.ts
+      qc-results-filters.ts
+      qc-results-page.ts
+      qc-results-seq-table.ts
+      qc-results-stats.ts
+      qc-results-types.ts
       qc-results.html
-      qc-results.ts         # QC results page renderer
-      qc.css                # Styles for QC configuration and results pages.
-      seq-mini-charts.ts    # Mini sparkline histograms for the QC Sequences tab.
+      qc-results.ts            # QC results page renderer
+      qc.css                   # Styles for QC configuration and results pages.
+      seq-mini-charts.ts       # Mini sparkline histograms for the QC Sequences tab.
     shared/
       apply-font-size.ts     # Reads the fontSize URL query parameter and applies the matching CSS class
       bam-resource-input.ts  # Reusable custom element for BAM file/URL source selection

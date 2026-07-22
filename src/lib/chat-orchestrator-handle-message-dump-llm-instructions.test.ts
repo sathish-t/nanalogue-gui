@@ -1,21 +1,15 @@
 // End-to-end tests for handleUserMessage /dump_llm_instructions handling.
 
-import {
-    mkdtemp,
-    readdir,
-    readFile,
-    rm,
-    symlink,
-} from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createHandleMessageHarness } from "./chat-orchestrator-handle-message-test-utils";
 import {
     handleUserMessage,
     resetLastSentMessages,
     setLastSentMessages,
 } from "./chat-orchestrator";
+import { createHandleMessageHarness } from "./chat-orchestrator-handle-message-test-utils";
 import type { AiChatEvent } from "./chat-types";
 
 describe("/dump_llm_instructions slash command", () => {
@@ -124,7 +118,10 @@ describe("/dump_llm_instructions slash command", () => {
         const files = await readdir(outputDir);
         const logFile = files.find((f) => f.endsWith(".log"));
         expect(logFile).toBeDefined();
-        const content = await readFile(join(outputDir, logFile as string), "utf-8");
+        const content = await readFile(
+            join(outputDir, logFile as string),
+            "utf-8",
+        );
 
         expect(content).toContain("=== Message 1: system ===");
         expect(content).toContain("You are a helpful assistant.");

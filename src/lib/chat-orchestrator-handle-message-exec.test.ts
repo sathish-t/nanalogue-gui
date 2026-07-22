@@ -4,8 +4,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createHandleMessageHarness } from "./chat-orchestrator-handle-message-test-utils";
 import { handleUserMessage } from "./chat-orchestrator";
+import { createHandleMessageHarness } from "./chat-orchestrator-handle-message-test-utils";
 import type { AiChatEvent } from "./chat-types";
 
 describe("/exec slash command", () => {

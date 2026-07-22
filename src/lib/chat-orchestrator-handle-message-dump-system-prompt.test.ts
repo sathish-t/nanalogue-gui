@@ -1,20 +1,11 @@
 // End-to-end tests for handleUserMessage /dump_system_prompt handling.
 
-import {
-    mkdtemp,
-    readdir,
-    readFile,
-    rm,
-    symlink,
-} from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { handleUserMessage, resetLastSentMessages } from "./chat-orchestrator";
 import { createHandleMessageHarness } from "./chat-orchestrator-handle-message-test-utils";
-import {
-    handleUserMessage,
-    resetLastSentMessages,
-} from "./chat-orchestrator";
 import type { AiChatEvent } from "./chat-types";
 
 describe("/dump_system_prompt slash command", () => {

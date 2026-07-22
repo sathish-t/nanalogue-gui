@@ -52,6 +52,8 @@ export function createAiChatConfig(
  * Builds common config and state for handleUserMessage tests.
  *
  * @param options - Optional config and signal overrides.
+ * @param options.config - Optional config overrides.
+ * @param options.signalTimeoutMs - Timeout in milliseconds for AbortSignal.timeout.
  * @returns Shared harness state.
  */
 export function createHandleMessageHarness(options?: {
