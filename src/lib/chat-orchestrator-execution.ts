@@ -3,7 +3,7 @@
 
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 import {
     FEEDBACK_OUTPUT_MAX_BYTES,
     TERMINAL_OUTPUT_OVERFLOW_BYTES,
@@ -109,8 +109,7 @@ export async function handleTerminalOverflow(
             const filename = `${randomUUID()}.txt`;
             const outputFile = join(safeDir, filename);
             await writeFile(outputFile, text, "utf-8");
-            const relPath = relative(allowedDir, outputFile);
-            return `Output too large (${outputBytes} bytes). Written to ${relPath}`;
+            return `Output too large (${outputBytes} bytes). Full output saved to ai_chat_output/${filename} in the allowed directory.`;
         } catch {
             return `Output too large (${outputBytes} bytes) but could not write to file (path validation failed).`;
         }

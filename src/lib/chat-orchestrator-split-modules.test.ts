@@ -44,7 +44,7 @@ describe("chat-orchestrator-execution helpers", () => {
         const result = await handleTerminalOverflow(text, tmpPath);
 
         expect(result).toMatch(
-            /^Output too large \(\d+ bytes\)\. Written to ai_chat_output\/.+\.txt$/,
+            /^Output too large \(\d+ bytes\)\. Full output saved to ai_chat_output\/.+\.txt in the allowed directory\.$/,
         );
     });
 
