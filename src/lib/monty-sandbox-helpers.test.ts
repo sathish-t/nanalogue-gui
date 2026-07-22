@@ -107,6 +107,7 @@ describe("toReadOptions", () => {
             read_filter: "primary_forward",
             region: "chr1:1000-2000",
             full_region: true,
+            threads: 7,
         });
         expect(opts.bamPath).toBe("/data/test.bam");
         expect(opts.sampleFraction).toBe(0.1);
@@ -115,6 +116,7 @@ describe("toReadOptions", () => {
         expect(opts.readFilter).toBe("primary_forward");
         expect(opts.region).toBe("chr1:1000-2000");
         expect(opts.fullRegion).toBe(true);
+        expect(opts.threads).toBe(7);
     });
 
     it("passes limit and offset from kwargs", () => {

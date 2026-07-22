@@ -81,7 +81,7 @@ export const /** Validation specs for each integer AiChatConfig field (temperatu
         /** Sandbox allocation count; 1 floor, 100 M ceiling. */
         maxAllocations: {
             min: 1,
-            max: 100_000_000,
+            max: 100_000_000_000,
             fallback: 100_000,
             label: "max sandbox allocations",
         },

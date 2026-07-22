@@ -211,6 +211,7 @@ export function toReadOptions(
         minSeqLen: opts?.min_seq_len as number | undefined,
         minAlignLen: opts?.min_align_len as number | undefined,
         readIdSet: opts?.read_id_set as string[] | undefined,
+        threads: opts?.threads as number | undefined,
         readFilter: opts?.read_filter as string | undefined,
         mapqFilter: opts?.mapq_filter as number | undefined,
         excludeMapqUnavail: opts?.exclude_mapq_unavail as boolean | undefined,
