@@ -12,35 +12,36 @@ src/
   main.ts               # Electron main process for nanalogue-gui with multi-mode support
   preload.ts            # Preload script for nanalogue-gui
   lib/
-    ai-chat-constants.ts             # Main-process constants for the AI Chat feature.
-    ai-chat-ipc-validation.ts        # Per-channel IPC payload validation for AI Chat mode.
-    ai-chat-shared-constants.ts      # Config field specs and shared constants for the AI Chat feature.
-    bed-parser.ts                    # BED file parser for nanalogue-swipe
-    chat-orchestrator-helpers.ts     # Helper utilities for chat-orchestrator.
-    chat-orchestrator-test-utils.ts  # Shared mock server infrastructure for chat-orchestrator tests.
-    chat-orchestrator.ts             # Chat orchestrator for AI Chat mode.
-    chat-session.ts                  # Reusable chat session state for the AI Chat feature.
-    chat-types.ts                    # Shared types for the AI Chat feature.
-    format-utils.ts                  # Pure formatting and trimming utilities shared across renderer pages.
-    histogram-renderer.ts            # Histogram SVG renderer backed by Vega-Lite.
-    histogram.ts                     # Streaming histogram accumulator for binning data without storing raw arrays
-    ipc-path-validation.ts           # IPC path validation: guards file-path arguments in main-process IPC handlers
-    line-counter.ts                  # Streaming utilities for counting lines in text and BED files
-    locate-data-loader.ts            # Locate-reads data loader for parsing read ID files and generating BED output
-    log-to-html.ts                   # Converts LLM message arrays into self-contained HTML files for session review.
-    mod-filter.ts                    # Parses modification filter strings into tag and strand components.
-    model-listing.ts                 # Provider detection and model listing for multi-provider LLM endpoints.
-    monty-sandbox-helpers.ts         # Utility helpers for monty-sandbox: path security, option translation,
-    monty-sandbox.ts                 # Monty sandbox wrapper for AI Chat mode.
-    qc-data-loader.ts                # QC data loader: paginated BAM data retrieval with streaming histograms
-    region-parser.ts                 # Parses and validates genomic region strings (e.g. "chr3", "chrI:1000-50000")
-    sandbox-cli-args.ts              # Shared sandbox CLI argument definitions, numeric arg parser, and sandbox
-    sandbox-prompt.ts                # Builds the LLM system prompt and assembles the full system message sent on every turn.
-    stats.ts                         # Statistics utilities for QC calculations
-    swipe-data-loader.ts             # Swipe data loader using nanalogue-node
-    system-append.ts                 # Loads the optional SYSTEM_APPEND.md file from an analysis directory.
-    types.ts                         # Type definitions shared across nanalogue-gui modes
-    xy-renderer.ts                   # XY series SVG renderer backed by Vega-Lite.
+    ai-chat-constants.ts                            # Main-process constants for the AI Chat feature.
+    ai-chat-ipc-validation.ts                       # Per-channel IPC payload validation for AI Chat mode.
+    ai-chat-shared-constants.ts                     # Config field specs and shared constants for the AI Chat feature.
+    bed-parser.ts                                   # BED file parser for nanalogue-swipe
+    chat-orchestrator-handle-message-test-utils.ts  # Shared helpers for handleUserMessage integration tests.
+    chat-orchestrator-helpers.ts                    # Helper utilities for chat-orchestrator.
+    chat-orchestrator-test-utils.ts                 # Shared mock server infrastructure for chat-orchestrator tests.
+    chat-orchestrator.ts                            # Chat orchestrator for AI Chat mode.
+    chat-session.ts                                 # Reusable chat session state for the AI Chat feature.
+    chat-types.ts                                   # Shared types for the AI Chat feature.
+    format-utils.ts                                 # Pure formatting and trimming utilities shared across renderer pages.
+    histogram-renderer.ts                           # Histogram SVG renderer backed by Vega-Lite.
+    histogram.ts                                    # Streaming histogram accumulator for binning data without storing raw arrays
+    ipc-path-validation.ts                          # IPC path validation: guards file-path arguments in main-process IPC handlers
+    line-counter.ts                                 # Streaming utilities for counting lines in text and BED files
+    locate-data-loader.ts                           # Locate-reads data loader for parsing read ID files and generating BED output
+    log-to-html.ts                                  # Converts LLM message arrays into self-contained HTML files for session review.
+    mod-filter.ts                                   # Parses modification filter strings into tag and strand components.
+    model-listing.ts                                # Provider detection and model listing for multi-provider LLM endpoints.
+    monty-sandbox-helpers.ts                        # Utility helpers for monty-sandbox: path security, option translation,
+    monty-sandbox.ts                                # Monty sandbox wrapper for AI Chat mode.
+    qc-data-loader.ts                               # QC data loader: paginated BAM data retrieval with streaming histograms
+    region-parser.ts                                # Parses and validates genomic region strings (e.g. "chr3", "chrI:1000-50000")
+    sandbox-cli-args.ts                             # Shared sandbox CLI argument definitions, numeric arg parser, and sandbox
+    sandbox-prompt.ts                               # Builds the LLM system prompt and assembles the full system message sent on every turn.
+    stats.ts                                        # Statistics utilities for QC calculations
+    swipe-data-loader.ts                            # Swipe data loader using nanalogue-node
+    system-append.ts                                # Loads the optional SYSTEM_APPEND.md file from an analysis directory.
+    types.ts                                        # Type definitions shared across nanalogue-gui modes
+    xy-renderer.ts                                  # XY series SVG renderer backed by Vega-Lite.
     ai-external-tools/
       bam-mods.ts           # External tool: bam_mods
       bash.ts               # External tool: bash

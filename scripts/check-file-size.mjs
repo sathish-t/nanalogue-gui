@@ -62,11 +62,6 @@ const EXCEPTIONS = new Map([
     // and the shared system-prompt assembly helpers; keep the ceiling pinned
     // while that prompt text remains co-located with its assembly logic.
     ["src/lib/sandbox-prompt.ts", 879],
-    // Test files above the 1500-line ceiling:
-    // chat-orchestrator-handle-message.test.ts now also carries targeted
-    // orchestration regression tests; keep the ceiling pinned while helper
-    // extraction work continues to move cases into smaller files.
-    ["src/lib/chat-orchestrator-handle-message.test.ts", 1800],
 ]);
 
 // --- File discovery ---
@@ -181,7 +176,7 @@ if (errors.length > 0) {
         "Refactor the file, or add it to EXCEPTIONS in scripts/check-file-size.mjs",
     );
     console.error(
-        "with its current line count as the ceiling (with a comment explaining the debt).",
+        "with its current line count as the ceiling and a comment explaining the debt.",
     );
     process.exit(1);
 }

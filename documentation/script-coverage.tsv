@@ -18,6 +18,7 @@ src/lib/ai-external-tools/seq-table.ts	100
 src/lib/ai-external-tools/window-reads.ts	100
 src/lib/ai-external-tools/write-file.ts	100
 src/lib/bed-parser.ts	93.1
+src/lib/chat-orchestrator-handle-message-test-utils.ts	100
 src/lib/chat-orchestrator-helpers.ts	100
 src/lib/chat-orchestrator-test-utils.ts	100
 src/lib/chat-orchestrator.ts	96.8
