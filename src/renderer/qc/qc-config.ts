@@ -572,7 +572,7 @@ async function generateQC() {
             : null;
         if (size === null) {
             seqProgressEl.textContent =
-                "Loading reads for sequences: (no region selected)";
+                "Loading reads for sequences: (no coordinate range selected)";
         } else if (size > 500) {
             seqProgressEl.textContent =
                 "Loading reads for sequences: (region > 500 bp)";

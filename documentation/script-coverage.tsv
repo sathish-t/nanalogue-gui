@@ -18,9 +18,14 @@ src/lib/ai-external-tools/seq-table.ts	100
 src/lib/ai-external-tools/window-reads.ts	100
 src/lib/ai-external-tools/write-file.ts	100
 src/lib/bed-parser.ts	93.1
+src/lib/chat-orchestrator-execution.ts	100
+src/lib/chat-orchestrator-facts.ts	100
+src/lib/chat-orchestrator-handle-message-test-utils.ts	100
 src/lib/chat-orchestrator-helpers.ts	100
+src/lib/chat-orchestrator-history.ts	100
+src/lib/chat-orchestrator-llm.ts	100
 src/lib/chat-orchestrator-test-utils.ts	100
-src/lib/chat-orchestrator.ts	96.8
+src/lib/chat-orchestrator.ts	98.68
 src/lib/chat-session.ts	89.47
 src/lib/format-utils.ts	100
 src/lib/histogram-renderer.ts	100
@@ -28,6 +33,7 @@ src/lib/histogram.ts	100
 src/lib/ipc-path-validation.ts	100
 src/lib/line-counter.ts	100
 src/lib/locate-data-loader.ts	100
+src/lib/log-to-html-assets.ts	100
 src/lib/log-to-html.ts	100
 src/lib/mod-filter.ts	100
 src/lib/model-listing.ts	92.42
@@ -36,6 +42,7 @@ src/lib/monty-sandbox.ts	100
 src/lib/qc-data-loader.ts	93.56
 src/lib/region-parser.ts	95.65
 src/lib/sandbox-cli-args.ts	100
+src/lib/sandbox-prompt-text.ts	100
 src/lib/sandbox-prompt.ts	100
 src/lib/stats.ts	98.33
 src/lib/swipe-data-loader.ts	100
@@ -45,7 +52,11 @@ src/modes/ai-chat.ts	96.96
 src/modes/qc.ts	100
 src/modes/swipe.ts	100
 src/preload.ts	100
-src/renderer/ai-chat/ai-chat.ts	73.63
+src/renderer/ai-chat/ai-chat-config.ts	100
+src/renderer/ai-chat/ai-chat-consent.ts	100
+src/renderer/ai-chat/ai-chat-elements.ts	100
+src/renderer/ai-chat/ai-chat-ui.ts	100
+src/renderer/ai-chat/ai-chat.ts	83.26
 src/renderer/qc/seq-mini-charts.ts	100
 src/renderer/shared/apply-font-size.ts	100
 src/renderer/shared/bam-resource-input.ts	100

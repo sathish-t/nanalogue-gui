@@ -73,6 +73,23 @@ export function collectTerminalOutput(result: SandboxResult): string {
 }
 
 /**
+ * Collects direct-execution output for display to the user.
+ * Includes traceback text on failure so /exec users can see sandbox errors.
+ *
+ * @param result - The sandbox execution result.
+ * @returns Terminal output on success, or prints plus error details on failure.
+ */
+export function collectDirectExecutionOutput(result: SandboxResult): string {
+    if (result.success) {
+        return collectTerminalOutput(result);
+    }
+
+    const parts: string[] = [...(result.prints ?? [])];
+    parts.push(`${result.errorType}: ${result.message}`);
+    return parts.join("") || "(Execution failed.)";
+}
+
+/**
  * Wraps external functions to convert plain JS Error to Monty-compatible SandboxError.
  * Monty only accepts specific Python exception type names (e.g. RuntimeError, ValueError).
  *

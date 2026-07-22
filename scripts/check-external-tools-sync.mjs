@@ -6,7 +6,7 @@
 //   2. Source files in src/lib/ai-external-tools/ (excluding index.ts and *.test.ts)
 //   3. Top-level keys of the registration object inside Object.fromEntries(Object.entries({…}))
 //      in src/lib/monty-sandbox.ts
-//   4. "### tool_name(" section headings in src/lib/sandbox-prompt.ts
+//   4. "### tool_name(" section headings in src/lib/sandbox-prompt-text.ts
 //
 // Each location independently declares the set of external tools.  When a new
 // tool is added or an old one is removed, all four must be updated together.
@@ -311,7 +311,7 @@ function reportPair(a, labelA, b, labelB) {
 const LABEL_CONSTANT = "EXTERNAL_FUNCTIONS (ai-chat-constants.ts)";
 const LABEL_FOLDER = "ai-external-tools/ files";
 const LABEL_SANDBOX = "registration object (monty-sandbox.ts)";
-const LABEL_PROMPT = "sandbox-prompt.ts (### tool_name( headings)";
+const LABEL_PROMPT = "sandbox-prompt-text.ts (### tool_name( headings)";
 
 reportPair(constantNames, LABEL_CONSTANT, folderNames, LABEL_FOLDER);
 reportPair(constantNames, LABEL_CONSTANT, sandboxNames, LABEL_SANDBOX);
@@ -319,13 +319,13 @@ reportPair(folderNames, LABEL_FOLDER, sandboxNames, LABEL_SANDBOX);
 
 /**
  * Checks that every tool in `canonicalNames` has a "### tool_name(" section
- * heading in src/lib/sandbox-prompt.ts. Uses the canonical set rather than
+ * heading in src/lib/sandbox-prompt-text.ts. Uses the canonical set rather than
  * extracting an independent set because the prompt is free-form prose.
  *
  * @param {Set<string>} canonicalNames - The authoritative set of tool names.
  */
 function checkPromptMentions(canonicalNames) {
-    const relPath = "src/lib/sandbox-prompt.ts";
+    const relPath = "src/lib/sandbox-prompt-text.ts";
     const source = readSource(relPath);
     const missing = [...canonicalNames]
         .filter((name) => !source.includes(`### ${name}(`))
@@ -348,7 +348,7 @@ if (errors.length > 0) {
             "  1. EXTERNAL_FUNCTIONS in src/lib/ai-chat-constants.ts\n" +
             "  2. The tool file in src/lib/ai-external-tools/\n" +
             "  3. The registration object in src/lib/monty-sandbox.ts\n" +
-            "  4. A ### tool_name(... heading in src/lib/sandbox-prompt.ts",
+            "  4. A ### tool_name(... heading in src/lib/sandbox-prompt-text.ts",
     );
     process.exit(1);
 }

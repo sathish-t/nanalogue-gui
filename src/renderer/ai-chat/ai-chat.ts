@@ -1,159 +1,62 @@
-// AI Chat renderer script for nanalogue-gui.
-// Handles the chat UI, configuration panel, code panel, and IPC communication.
+// AI Chat renderer bootstrap.
+// Wires the chat UI, configuration panel, code panel, and IPC communication.
 
 import { NOMINAL_BYTES_PER_TOKEN } from "../../lib/ai-chat-constants";
-import { CONFIG_FIELD_SPECS } from "../../lib/ai-chat-shared-constants";
 import { applyFontSize } from "../shared/apply-font-size";
+import {
+    applyConfigBounds,
+    getConfig,
+    lockSessionConfig,
+    resetDefaults,
+    unlockSessionConfig,
+    validateConfig,
+} from "./ai-chat-config";
+import { initConsentDialog, requestConsent } from "./ai-chat-consent";
+import { getAiChatElements } from "./ai-chat-elements";
+import type { AiChatApi, AiChatEvent, CodeStep } from "./ai-chat-types";
+import {
+    appendMessage,
+    hideModelDropdown,
+    setSpinner,
+    showCodePage,
+    showModelDropdown,
+    updateConnectionStatus,
+} from "./ai-chat-ui";
+
+const {
+    advancedDialog,
+    btnAdvanced,
+    btnBack,
+    btnBrowse,
+    btnCancel,
+    btnCloseAdvanced,
+    btnCloseSystemPrompt,
+    btnCodeNext,
+    btnCodePrev,
+    btnCopyCode,
+    btnCopySystemPrompt,
+    btnDefaults,
+    btnFetchModels,
+    btnNewChat,
+    btnSend,
+    btnViewSystemPrompt,
+    chatMessages,
+    codePanelContent,
+    codePanelToggle,
+    fetchStatus,
+    inputApiKey,
+    inputDir,
+    inputEndpoint,
+    inputMessage,
+    inputModel,
+    modelDropdown,
+    systemPromptConfigNote,
+    systemPromptDialog,
+    systemPromptPre,
+    systemPromptTokenEstimate,
+} = getAiChatElements();
 
 applyFontSize();
-
-/** Result returned by mode launch IPC handlers. */
-interface LaunchResult {
-    /** Whether the launch succeeded. */
-    success: boolean;
-    /** The reason for failure. */
-    reason?: string;
-}
-
-/** Successful send-message response with assistant text and optional code steps. */
-interface SendMessageSuccess {
-    /** Discriminant — the request succeeded. */
-    success: true;
-    /** The assistant's text response. */
-    text?: string;
-    /** Tool execution steps for the code panel. */
-    steps?: Array<{
-        /** The Python code that was executed. */
-        code: string;
-        /** The sandbox execution result. */
-        result: unknown;
-    }>;
-}
-
-/** Failed send-message response with an error description. */
-interface SendMessageFailure {
-    /** Discriminant — the request failed. */
-    success: false;
-    /** Error message describing the failure. */
-    error: string;
-    /** Whether the error was a timeout. */
-    isTimeout?: boolean;
-    /** Endpoint origin requiring consent (set when error is CONSENT_REQUIRED). */
-    origin?: string;
-}
-
-/** Discriminated union for the send-message IPC response. */
-type SendMessageResult = SendMessageSuccess | SendMessageFailure;
-
-/** Successful get-system-prompt response with the prompt text. */
-interface GetSystemPromptSuccess {
-    /** Discriminant — the request succeeded. */
-    success: true;
-    /** The static system prompt text. */
-    prompt: string;
-}
-
-/** Failed get-system-prompt response with an error description. */
-interface GetSystemPromptFailure {
-    /** Discriminant — the request failed. */
-    success: false;
-    /** Error message describing the failure. */
-    error: string;
-}
-
-/** Discriminated union for the get-system-prompt IPC response. */
-type GetSystemPromptResult = GetSystemPromptSuccess | GetSystemPromptFailure;
-
-/** Successful list-models response with the available model IDs. */
-interface ListModelsSuccess {
-    /** Discriminant — the request succeeded. */
-    success: true;
-    /** Available model IDs. */
-    models: string[];
-}
-
-/** Failed list-models response with an error description. */
-interface ListModelsFailure {
-    /** Discriminant — the request failed. */
-    success: false;
-    /** Error message describing the failure. */
-    error: string;
-    /** Endpoint origin when consent is required. */
-    origin?: string;
-}
-
-/** Discriminated union for the list-models IPC response. */
-type ListModelsResult = ListModelsSuccess | ListModelsFailure;
-
-/** Event sent from main process during AI Chat turns. */
-interface AiChatEvent {
-    /** The event type discriminator. */
-    type: string;
-    /** Python code for code_execution_start events. */
-    code?: string;
-    /** Sandbox result for code_execution_end events. */
-    result?: unknown;
-    /** Assistant text for turn_end events. */
-    text?: string;
-    /** Code steps for turn_end events. */
-    steps?: Array<{
-        /** The Python code that was executed. */
-        code: string;
-        /** The sandbox execution result. */
-        result: unknown;
-    }>;
-    /** Error message for turn_error events. */
-    error?: string;
-    /** Whether the error was a timeout. */
-    isTimeout?: boolean;
-}
-
-/** Preload API exposed to the AI Chat renderer. */
-interface AiChatApi {
-    /** Launch the AI Chat mode. */
-    launchAiChat: () => Promise<LaunchResult>;
-    /** Retrieve the effective system prompt for the given config. */
-    aiChatGetSystemPrompt: (payload: {
-        /** The advanced configuration options. */
-        config: Record<string, unknown>;
-        /** The analysis directory for SYSTEM_APPEND.md lookup (optional). */
-        allowedDir?: string;
-    }) => Promise<GetSystemPromptResult>;
-    /** Query endpoint for available models. */
-    aiChatListModels: (payload: {
-        /** The base URL of the LLM endpoint. */
-        endpointUrl: string;
-        /** The API key for authentication. */
-        apiKey: string;
-    }) => Promise<ListModelsResult>;
-    /** Send a user message. */
-    aiChatSendMessage: (payload: {
-        /** The base URL of the LLM endpoint. */
-        endpointUrl: string;
-        /** The API key for authentication. */
-        apiKey: string;
-        /** The model identifier to use. */
-        model: string;
-        /** The user's chat message text. */
-        message: string;
-        /** The directory the sandbox may access. */
-        allowedDir: string;
-        /** Advanced configuration options. */
-        config: Record<string, unknown>;
-    }) => Promise<SendMessageResult>;
-    /** Cancel the current request. */
-    aiChatCancel: () => Promise<void>;
-    /** Reset conversation state. */
-    aiChatNewChat: () => Promise<void>;
-    /** Open directory picker. */
-    aiChatPickDirectory: () => Promise<string | null>;
-    /** Navigate back to landing. */
-    aiChatGoBack: () => Promise<void>;
-    /** Record endpoint consent. */
-    aiChatConsent: (origin: string) => Promise<void>;
-    /** Register event listener. */
-    onAiChatEvent: (callback: (event: AiChatEvent) => void) => () => void;
-}
 
 /** The preload API instance. */
 const api = (
@@ -163,158 +66,8 @@ const api = (
     }
 ).api;
 
-// DOM references
-const inputDir = document.getElementById("input-dir") as HTMLInputElement;
-const btnBrowse = document.getElementById("btn-browse") as HTMLButtonElement;
-const inputEndpoint = document.getElementById(
-    "input-endpoint",
-) as HTMLInputElement;
-const inputApiKey = document.getElementById(
-    "input-api-key",
-) as HTMLInputElement;
-const inputModel = document.getElementById("input-model") as HTMLInputElement;
-const modelDropdown = document.getElementById(
-    "model-dropdown",
-) as HTMLDivElement;
-const btnFetchModels = document.getElementById(
-    "btn-fetch-models",
-) as HTMLButtonElement;
-const fetchStatus = document.getElementById("fetch-status") as HTMLDivElement;
-const connectionStatus = document.getElementById(
-    "connection-status",
-) as HTMLDivElement;
-const btnAdvanced = document.getElementById(
-    "btn-advanced",
-) as HTMLButtonElement;
-const chatMessages = document.getElementById("chat-messages") as HTMLDivElement;
-const chatSpinner = document.getElementById("chat-spinner") as HTMLDivElement;
-const spinnerText = document.getElementById("spinner-text") as HTMLSpanElement;
-const codePanelToggle = document.getElementById(
-    "code-panel-toggle",
-) as HTMLButtonElement;
-const codePanelContent = document.getElementById(
-    "code-panel-content",
-) as HTMLDivElement;
-const codeDisplay = document.getElementById("code-display") as HTMLPreElement;
-const codePageIndicator = document.getElementById(
-    "code-page-indicator",
-) as HTMLSpanElement;
-const btnCodePrev = document.getElementById(
-    "btn-code-prev",
-) as HTMLButtonElement;
-const btnCodeNext = document.getElementById(
-    "btn-code-next",
-) as HTMLButtonElement;
-const btnCopyCode = document.getElementById(
-    "btn-copy-code",
-) as HTMLButtonElement;
-const inputMessage = document.getElementById(
-    "input-message",
-) as HTMLInputElement;
-const btnSend = document.getElementById("btn-send") as HTMLButtonElement;
-const btnCancel = document.getElementById("btn-cancel") as HTMLButtonElement;
-const btnNewChat = document.getElementById("btn-new-chat") as HTMLButtonElement;
-const btnBack = document.getElementById("btn-back") as HTMLButtonElement;
-const advancedDialog = document.getElementById(
-    "advanced-dialog",
-) as HTMLDialogElement;
-const consentDialog = document.getElementById(
-    "consent-dialog",
-) as HTMLDialogElement;
-const btnViewSystemPrompt = document.getElementById(
-    "btn-view-system-prompt",
-) as HTMLButtonElement;
-const systemPromptDialog = document.getElementById(
-    "system-prompt-dialog",
-) as HTMLDialogElement;
-const systemPromptPre = document.getElementById(
-    "system-prompt-pre",
-) as HTMLPreElement;
-const systemPromptConfigNote = document.getElementById(
-    "system-prompt-config-note",
-) as HTMLParagraphElement;
-const systemPromptTokenEstimate = document.getElementById(
-    "system-prompt-token-estimate",
-) as HTMLSpanElement;
-const btnCopySystemPrompt = document.getElementById(
-    "btn-copy-system-prompt",
-) as HTMLButtonElement;
-const btnCloseSystemPrompt = document.getElementById(
-    "btn-close-system-prompt",
-) as HTMLButtonElement;
-const optContextWindow = document.getElementById(
-    "opt-context-window",
-) as HTMLInputElement;
-const optMaxRetries = document.getElementById(
-    "opt-max-retries",
-) as HTMLInputElement;
-const optTimeout = document.getElementById("opt-timeout") as HTMLInputElement;
-const optMaxReadInfo = document.getElementById(
-    "opt-max-read-info",
-) as HTMLInputElement;
-const optMaxBamMods = document.getElementById(
-    "opt-max-bam-mods",
-) as HTMLInputElement;
-const optMaxWindowReads = document.getElementById(
-    "opt-max-window-reads",
-) as HTMLInputElement;
-const optMaxSeqTable = document.getElementById(
-    "opt-max-seq-table",
-) as HTMLInputElement;
-const optMaxCodeRounds = document.getElementById(
-    "opt-max-code-rounds",
-) as HTMLInputElement;
-const optMaxDuration = document.getElementById(
-    "opt-max-duration",
-) as HTMLInputElement;
-const optMaxMemory = document.getElementById(
-    "opt-max-memory",
-) as HTMLInputElement;
-const optMaxAllocations = document.getElementById(
-    "opt-max-allocations",
-) as HTMLInputElement;
-const optTemperature = document.getElementById(
-    "opt-temperature",
-) as HTMLInputElement;
-const optMaxReadMB = document.getElementById(
-    "opt-max-read-mb",
-) as HTMLInputElement;
-const optMaxWriteMB = document.getElementById(
-    "opt-max-write-mb",
-) as HTMLInputElement;
-
-/**
- * Maps each advanced-option input element to its CONFIG_FIELD_SPECS key.
- *
- * Used by getConfig, lockSessionConfig, unlockSessionConfig,
- * applyConfigBounds, and resetDefaults to avoid repeating the same
- * element list in five places.
- */
-const ADVANCED_OPTION_FIELDS: ReadonlyArray<
-    readonly [HTMLInputElement, keyof typeof CONFIG_FIELD_SPECS]
-> = [
-    [optContextWindow, "contextWindowTokens"],
-    [optMaxRetries, "maxRetries"],
-    [optTimeout, "timeoutSeconds"],
-    [optMaxReadInfo, "maxRecordsReadInfo"],
-    [optMaxBamMods, "maxRecordsBamMods"],
-    [optMaxWindowReads, "maxRecordsWindowReads"],
-    [optMaxSeqTable, "maxRecordsSeqTable"],
-    [optMaxCodeRounds, "maxCodeRounds"],
-    [optMaxDuration, "maxDurationSecs"],
-    [optMaxMemory, "maxMemoryMB"],
-    [optMaxAllocations, "maxAllocations"],
-    [optMaxReadMB, "maxReadMB"],
-    [optMaxWriteMB, "maxWriteMB"],
-] as const;
-
 /** Stored code steps for the code panel pagination. */
-let codeSteps: Array<{
-    /** The Python code that was executed. */
-    code: string;
-    /** The sandbox execution result. */
-    result: unknown;
-}> = [];
+let codeSteps: CodeStep[] = [];
 /** Current page index in the code panel. */
 let currentCodePage = 0;
 /** Whether a chat has been started (locks advanced options). */
@@ -326,8 +79,6 @@ let chatStarted = false;
  * response (when chatStarted is still false but inputs are temporarily locked).
  */
 let sessionLockedConfig: Record<string, unknown> | null = null;
-/** Pending consent resolver (for the consent dialog flow). */
-let pendingConsentResolve: ((accepted: boolean) => void) | null = null;
 /** Fetched model IDs for filtering in the custom dropdown. */
 let fetchedModels: string[] = [];
 /** Origin of the last successfully connected endpoint, or null. */
@@ -337,135 +88,9 @@ let chatGeneration = 0;
 /** Generation counter incremented on each prompt preview open to discard stale IPC responses. */
 let systemPromptGeneration = 0;
 
-/** Hostnames that count as localhost. */
-const LOCALHOST_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
-
 /**
- * Updates the connection status indicator based on the endpoint URL
- * and whether the last request succeeded.
- *
- * @param connected - Whether we have a confirmed connection.
- */
-function updateConnectionStatus(connected: boolean): void {
-    const raw = inputEndpoint.value.trim();
-    if (!raw) {
-        connectionStatus.textContent = "";
-        connectionStatus.className = "status-indicator";
-        return;
-    }
-
-    let url: URL;
-    try {
-        url = new URL(raw);
-    } catch {
-        connectionStatus.textContent = "";
-        connectionStatus.className = "status-indicator";
-        return;
-    }
-
-    const isLocal = LOCALHOST_HOSTS.has(url.hostname);
-    const isHttps = url.protocol === "https:";
-
-    let text: string;
-    let cssClass: string;
-
-    if (isLocal) {
-        text = connected ? "\u25cf Connected (local)" : "Local endpoint";
-        cssClass = connected ? "status-connected" : "status-idle";
-    } else if (isHttps) {
-        text = connected
-            ? "\u25cf Connected (remote, HTTPS)"
-            : "Remote endpoint (HTTPS)";
-        cssClass = connected ? "status-connected" : "status-idle";
-    } else {
-        text = connected
-            ? "\u25cf Connected (remote, HTTP) \u2014 unencrypted"
-            : "Remote endpoint (HTTP) \u2014 unencrypted";
-        cssClass = "status-warning";
-    }
-
-    connectionStatus.textContent = text;
-    connectionStatus.className = `status-indicator ${cssClass}`;
-}
-
-/**
- * Populates the custom model dropdown with matching options.
- *
- * @param filter - The text to filter model names by.
- */
-function showModelDropdown(filter: string): void {
-    const lowerFilter = filter.toLowerCase();
-    const matches = fetchedModels.filter((m) =>
-        m.toLowerCase().includes(lowerFilter),
-    );
-    if (matches.length === 0) {
-        modelDropdown.classList.add("hidden");
-        return;
-    }
-    modelDropdown.innerHTML = "";
-    for (const modelId of matches) {
-        const option = document.createElement("div");
-        option.className = "model-option";
-        option.textContent = modelId;
-        option.addEventListener("mousedown", (e) => {
-            e.preventDefault();
-            if (chatStarted) return;
-            inputModel.value = modelId;
-            modelDropdown.classList.add("hidden");
-        });
-        modelDropdown.appendChild(option);
-    }
-    modelDropdown.classList.remove("hidden");
-}
-
-/**
- * Hides the custom model dropdown.
- */
-function hideModelDropdown(): void {
-    modelDropdown.classList.add("hidden");
-}
-
-/**
- * Appends a message bubble to the chat area.
- *
- * @param role - The message role: "user", "assistant", or "error".
- * @param text - The message text content.
- */
-function appendMessage(role: string, text: string): void {
-    const div = document.createElement("div");
-    div.className = `chat-msg-${role}`;
-
-    const label = document.createElement("div");
-    label.className = "msg-label";
-    label.textContent =
-        role === "user" ? "You" : role === "error" ? "Error" : "Assistant";
-    div.appendChild(label);
-
-    const content = document.createElement("div");
-    content.className = "msg-text";
-    content.textContent = text;
-    div.appendChild(content);
-
-    chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-/**
- * Shows or hides the loading spinner with a message.
- *
- * @param show - Whether to show the spinner.
- * @param text - The spinner text message.
- */
-function setSpinner(show: boolean, text?: string): void {
-    chatSpinner.classList.toggle("hidden", !show);
-    if (text) spinnerText.textContent = text;
-}
-
-/**
- * Temporarily disables or re-enables the config fields (directory, endpoint,
- * API key, model, and their buttons) during in-flight requests. Skipped when
- * chatStarted is true because those fields will be permanently locked once a
- * session-level lock is in place.
+ * Temporarily disables or re-enables the config fields during in-flight requests.
+ * Skipped when chatStarted is true because those fields are permanently locked.
  *
  * @param disabled - Whether to disable the fields.
  */
@@ -493,133 +118,6 @@ function setProcessing(processing: boolean): void {
     if (processing) {
         hideModelDropdown();
     }
-}
-
-/**
- * Updates the code panel to show a specific page.
- *
- * @param page - The zero-based page index to display.
- */
-function showCodePage(page: number): void {
-    if (codeSteps.length === 0) {
-        codeDisplay.textContent = "No code executed yet.";
-        codePageIndicator.textContent = "0 / 0";
-        btnCopyCode.disabled = true;
-        return;
-    }
-    const clampedPage = Math.max(0, Math.min(page, codeSteps.length - 1));
-    currentCodePage = clampedPage;
-    codeDisplay.textContent = codeSteps[clampedPage].code;
-    codePageIndicator.textContent = `${clampedPage + 1} / ${codeSteps.length}`;
-    btnCopyCode.disabled = false;
-}
-
-/**
- * Returns the current advanced options config values.
- *
- * @returns A config object with the current field values.
- */
-function getConfig(): Record<string, unknown> {
-    /**
-     * Parses a numeric input value, returning the fallback if the value is
-     * not a finite number. Unlike `Number(x) || fallback`, this preserves 0.
-     *
-     * @param raw - The raw string from the input element.
-     * @param fallback - The fallback value from CONFIG_FIELD_SPECS.
-     * @returns The parsed number or the fallback.
-     */
-    const parse = (raw: string, fallback: number): number => {
-        const v = Number(raw);
-        return Number.isFinite(v) ? v : fallback;
-    };
-
-    const config: Record<string, unknown> = {};
-    for (const [input, key] of ADVANCED_OPTION_FIELDS) {
-        config[key] = parse(input.value, CONFIG_FIELD_SPECS[key].fallback);
-    }
-    // Temperature is optional — empty string means undefined (omit from request)
-    config.temperature = optTemperature.value.trim()
-        ? Number.parseFloat(optTemperature.value)
-        : undefined;
-    return config;
-}
-
-/**
- * Permanently locks all session config fields after the first successful send.
- * Sets chatStarted first so setConfigFieldsDisabled becomes a no-op, then
- * disables main config controls directly and locks advanced options.
- */
-function lockSessionConfig(): void {
-    chatStarted = true;
-    // Disable main config controls directly (not via setConfigFieldsDisabled,
-    // which is now a no-op because chatStarted is true).
-    inputDir.disabled = true;
-    btnBrowse.disabled = true;
-    inputEndpoint.disabled = true;
-    inputApiKey.disabled = true;
-    inputModel.disabled = true;
-    btnFetchModels.disabled = true;
-    hideModelDropdown();
-    // Disable advanced options
-    for (const [input] of ADVANCED_OPTION_FIELDS) {
-        input.disabled = true;
-    }
-    optTemperature.disabled = true;
-}
-
-/**
- * Unlocks all session config fields (for New Chat). Sets chatStarted false
- * first so setConfigFieldsDisabled is re-enabled for future temporary locking,
- * then re-enables main config controls directly and unlocks advanced options.
- */
-function unlockSessionConfig(): void {
-    chatStarted = false;
-    // Re-enable main config controls directly (symmetric with lockSessionConfig)
-    inputDir.disabled = false;
-    btnBrowse.disabled = false;
-    inputEndpoint.disabled = false;
-    inputApiKey.disabled = false;
-    inputModel.disabled = false;
-    btnFetchModels.disabled = false;
-    // Re-enable advanced options
-    for (const [input] of ADVANCED_OPTION_FIELDS) {
-        input.disabled = false;
-    }
-    optTemperature.disabled = false;
-}
-
-/**
- * Applies min/max bounds to all numeric config inputs from CONFIG_FIELD_SPECS.
- * Called once at page load so the HTML attributes are never the source of truth.
- */
-function applyConfigBounds(): void {
-    for (const [input, key] of ADVANCED_OPTION_FIELDS) {
-        const spec = CONFIG_FIELD_SPECS[key];
-        input.min = String(spec.min);
-        input.max = String(spec.max);
-    }
-}
-
-/**
- * Resets the advanced options to default values.
- */
-function resetDefaults(): void {
-    for (const [input, key] of ADVANCED_OPTION_FIELDS) {
-        input.value = String(CONFIG_FIELD_SPECS[key].fallback);
-    }
-    optTemperature.value = "";
-}
-
-/**
- * Validates that required config fields are filled before sending.
- *
- * @returns An error message string, or null if valid.
- */
-function validateConfig(): string | null {
-    if (!inputDir.value) return "Please select a BAM directory.";
-    if (!inputEndpoint.value) return "Please enter an endpoint URL.";
-    if (!inputModel.value) return "Please enter a model name.";
-    return null;
 }
 
 // Browse button — open directory picker
@@ -663,20 +161,12 @@ btnFetchModels.addEventListener("click", async () => {
             apiKey: inputApiKey.value,
         });
 
-        // Handle consent-required for non-localhost endpoints
         if (
             !result.success &&
             result.error === "CONSENT_REQUIRED" &&
             result.origin
         ) {
-            const consentOrigin = document.getElementById(
-                "consent-origin",
-            ) as HTMLElement;
-            consentOrigin.textContent = result.origin;
-            const accepted = await new Promise<boolean>((resolve) => {
-                pendingConsentResolve = resolve;
-                consentDialog.showModal();
-            });
+            const accepted = await requestConsent(result.origin);
             if (accepted) {
                 if (generation !== chatGeneration) return;
                 await api.aiChatConsent(result.origin);
@@ -695,17 +185,14 @@ btnFetchModels.addEventListener("click", async () => {
             }
         }
 
-        // Discard stale response if New Chat was clicked during the request.
-        // Do not re-enable fields here — New Chat already handled that.
         if (generation !== chatGeneration) return;
 
-        // Only update connection status if endpoint hasn't changed during request
         const endpointStillMatches =
             inputEndpoint.value.trim() === requestedEndpoint;
 
         if (result.success) {
             fetchedModels = result.models;
-            showModelDropdown(inputModel.value);
+            showModelDropdown(fetchedModels, inputModel.value, chatStarted);
             fetchStatus.textContent = `Found ${result.models.length} model(s).`;
             if (endpointStillMatches) {
                 try {
@@ -723,7 +210,6 @@ btnFetchModels.addEventListener("click", async () => {
             }
         }
 
-        // Auto-dismiss after 8 seconds
         setTimeout(() => {
             fetchStatus.textContent = "";
         }, 8000);
@@ -743,14 +229,14 @@ btnFetchModels.addEventListener("click", async () => {
 // Model input — filter and show/hide the custom dropdown
 inputModel.addEventListener("input", () => {
     if (fetchedModels.length > 0) {
-        showModelDropdown(inputModel.value);
+        showModelDropdown(fetchedModels, inputModel.value, chatStarted);
     }
 });
 
 // Show dropdown on focus if models are available
 inputModel.addEventListener("focus", () => {
     if (fetchedModels.length > 0) {
-        showModelDropdown(inputModel.value);
+        showModelDropdown(fetchedModels, inputModel.value, chatStarted);
     }
 });
 
@@ -774,9 +260,6 @@ async function sendUserMessage(
     if (showBubble) {
         appendMessage("user", message);
     }
-    // Snapshot config on the first send so the system-prompt preview stays
-    // consistent with the config actually sent to the LLM (the advanced inputs
-    // remain editable until lockSessionConfig fires on the first success).
     if (!chatStarted && sessionLockedConfig === null) {
         sessionLockedConfig = getConfig();
     }
@@ -795,21 +278,23 @@ async function sendUserMessage(
             config: getConfig(),
         });
 
-        // Discard stale response if New Chat was clicked during the request
         if (generation !== chatGeneration) return;
 
-        // Only update connection status if endpoint hasn't changed during request
         const endpointStillMatches =
             inputEndpoint.value.trim() === requestedEndpoint;
 
         if (result.success) {
-            if (!chatStarted) lockSessionConfig();
+            if (!chatStarted) {
+                chatStarted = true;
+                lockSessionConfig();
+                hideModelDropdown();
+            }
             if (result.text) {
                 appendMessage("assistant", result.text);
             }
             if (result.steps) {
                 codeSteps.push(...result.steps);
-                showCodePage(codeSteps.length - 1);
+                currentCodePage = showCodePage(codeSteps, codeSteps.length - 1);
             }
             if (endpointStillMatches) {
                 try {
@@ -820,19 +305,10 @@ async function sendUserMessage(
                 updateConnectionStatus(true);
             }
         } else if (result.error === "CONSENT_REQUIRED" && result.origin) {
-            // Show consent dialog
-            const consentOrigin = document.getElementById(
-                "consent-origin",
-            ) as HTMLElement;
-            consentOrigin.textContent = result.origin;
-            const accepted = await new Promise<boolean>((resolve) => {
-                pendingConsentResolve = resolve;
-                consentDialog.showModal();
-            });
+            const accepted = await requestConsent(result.origin);
             if (accepted) {
                 if (generation !== chatGeneration) return;
                 await api.aiChatConsent(result.origin);
-                // Retry without re-appending the user bubble
                 await sendUserMessage(message, false);
             } else if (generation === chatGeneration) {
                 appendMessage(
@@ -858,9 +334,6 @@ async function sendUserMessage(
             appendMessage("error", `Unexpected error: ${msg}`);
         }
     } finally {
-        // If the send did not establish a session (chatStarted still false),
-        // discard the config snapshot so the next attempt re-captures it from
-        // the current inputs rather than showing stale settings in the preview.
         if (!chatStarted) {
             sessionLockedConfig = null;
         }
@@ -887,9 +360,9 @@ btnSend.addEventListener("click", async () => {
 });
 
 // Enter key sends the message
-inputMessage.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
+inputMessage.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
         btnSend.click();
     }
 });
@@ -903,21 +376,18 @@ btnCancel.addEventListener("click", async () => {
 
 // New Chat button — full reset of conversation and connection state
 btnNewChat.addEventListener("click", async () => {
-    // Bump generation first so any in-flight response that resolves during
-    // the aiChatNewChat await is discarded by the generation guard.
     chatGeneration++;
     sessionLockedConfig = null;
 
     await api.aiChatNewChat();
     chatMessages.innerHTML = "";
     codeSteps = [];
-    currentCodePage = 0;
-    showCodePage(0);
+    currentCodePage = showCodePage(codeSteps, 0);
     setSpinner(false);
     setProcessing(false);
+    chatStarted = false;
     unlockSessionConfig();
 
-    // Reset model/connection state so stale provider data doesn't leak
     fetchedModels = [];
     connectedOrigin = null;
     fetchStatus.textContent = "";
@@ -941,11 +411,11 @@ codePanelToggle.addEventListener("click", () => {
 
 // Code panel pagination
 btnCodePrev.addEventListener("click", () => {
-    showCodePage(currentCodePage - 1);
+    currentCodePage = showCodePage(codeSteps, currentCodePage - 1);
 });
 
 btnCodeNext.addEventListener("click", () => {
-    showCodePage(currentCodePage + 1);
+    currentCodePage = showCodePage(codeSteps, currentCodePage + 1);
 });
 
 // Copy code button — copies the currently displayed code block to the clipboard
@@ -973,23 +443,19 @@ btnAdvanced.addEventListener("click", () => {
     advancedDialog.showModal();
 });
 
-document.getElementById("btn-close-advanced")?.addEventListener("click", () => {
+btnCloseAdvanced?.addEventListener("click", () => {
     advancedDialog.close();
 });
 
-document.getElementById("btn-defaults")?.addEventListener("click", () => {
+btnDefaults?.addEventListener("click", () => {
     if (!chatStarted) resetDefaults();
 });
 
 // View System Prompt button — fetch and display the static system prompt
 btnViewSystemPrompt.addEventListener("click", async () => {
-    // Bump generation so any in-flight request from a previous open is discarded.
     const generation = ++systemPromptGeneration;
     systemPromptPre.textContent = "Loading…";
     systemPromptTokenEstimate.textContent = "";
-    // Once the first send has been initiated, sessionLockedConfig holds the
-    // config that was (or will be) sent to the LLM. Use it so the preview
-    // matches the actual session prompt even before chatStarted is set.
     systemPromptConfigNote.textContent =
         sessionLockedConfig !== null
             ? "Based on the settings for this session."
@@ -1003,10 +469,6 @@ btnViewSystemPrompt.addEventListener("click", async () => {
     if (generation !== systemPromptGeneration) return;
     if (result.success) {
         systemPromptPre.textContent = result.prompt;
-        // Rough token estimate: 1 token ≈ NOMINAL_BYTES_PER_TOKEN bytes of
-        // on average. This is a well-known rule of thumb and is intentionally
-        // approximate — the UI label already says "(rough)". A proper tokenizer
-        // is not worth the dependency cost for a display hint.
         const byteLength = new TextEncoder().encode(result.prompt).byteLength;
         const roughTokens = Math.round(byteLength / NOMINAL_BYTES_PER_TOKEN);
         systemPromptTokenEstimate.textContent = `~${roughTokens.toLocaleString()} tokens (rough)`;
@@ -1040,35 +502,6 @@ btnCloseSystemPrompt.addEventListener("click", () => {
     systemPromptDialog.close();
 });
 
-/**
- * Atomically captures and clears the consent resolver to prevent double invocation
- * from both the button click and the dialog close event.
- *
- * @param accepted - Whether the user accepted the consent prompt.
- */
-function resolveConsent(accepted: boolean): void {
-    const resolver = pendingConsentResolve;
-    if (!resolver) return;
-    pendingConsentResolve = null;
-    resolver(accepted);
-}
-
-// Consent dialog buttons
-document.getElementById("btn-consent-accept")?.addEventListener("click", () => {
-    consentDialog.close();
-    resolveConsent(true);
-});
-
-document.getElementById("btn-consent-cancel")?.addEventListener("click", () => {
-    consentDialog.close();
-    resolveConsent(false);
-});
-
-// Handle Esc key or backdrop click dismissing the consent dialog
-consentDialog.addEventListener("close", () => {
-    resolveConsent(false);
-});
-
 // Listen for AI Chat events from the main process
 api.onAiChatEvent((event: AiChatEvent) => {
     switch (event.type) {
@@ -1087,13 +520,7 @@ api.onAiChatEvent((event: AiChatEvent) => {
         case "llm_request_end":
             break;
         case "turn_end":
-            setSpinner(false);
-            setProcessing(false);
-            break;
         case "turn_error":
-            setSpinner(false);
-            setProcessing(false);
-            break;
         case "turn_cancelled":
             setSpinner(false);
             setProcessing(false);
@@ -1101,7 +528,7 @@ api.onAiChatEvent((event: AiChatEvent) => {
     }
 });
 
-// Apply bounds and defaults from CONFIG_FIELD_SPECS on page load so the
-// HTML attributes are never the source of truth for min, max, or initial value.
+initConsentDialog();
 applyConfigBounds();
 resetDefaults();
+currentCodePage = showCodePage(codeSteps, 0);

@@ -424,7 +424,9 @@ async function fetchSeqTable(
     const size = regionSizeBp(config.region);
 
     if (size === null) {
-        return { skipReason: "no region selected" };
+        return {
+            skipReason: "no coordinate range selected",
+        };
     }
 
     if (size > SEQ_TABLE_MAX_REGION_BP) {

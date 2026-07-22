@@ -227,9 +227,7 @@ export function makeBash(
             // Fixed: stack depth guard against infinite recursion, not a
             // throughput limit.
             maxCallDepth: 100,
-            // Allocation-derived: scale iteration limits at 1:10 relative to
-            // maxAllocations (default 100 000 → 10 000, matching the previous
-            // hardcoded values).
+            // Allocation-derived: scale iteration limits at 1:10 relative to maxAllocations
             maxCommandCount: Math.max(1, Math.floor(maxAllocations / 10)),
             maxLoopIterations: Math.max(1, Math.floor(maxAllocations / 10)),
             maxAwkIterations: Math.max(1, Math.floor(maxAllocations / 10)),
