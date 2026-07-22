@@ -220,7 +220,7 @@ describe("generateQCData", () => {
         expect(result.wholeReadDensityStats.count).toBe(0);
         expect(result.windowedDensityStats.count).toBe(0);
         expect(result.rawProbabilityStats.count).toBe(0);
-        expect(result.seqTableSkipReason).toBe("no region selected");
+        expect(result.seqTableSkipReason).toBe("no coordinate range selected");
         expect(result.seqTableRows).toBeUndefined();
     });
 
@@ -340,7 +340,7 @@ describe("generateQCData", () => {
             region: undefined,
         });
 
-        expect(result.seqTableSkipReason).toBe("no region selected");
+        expect(result.seqTableSkipReason).toBe("no coordinate range selected");
         expect(seqTable).not.toHaveBeenCalled();
     });
 
@@ -354,7 +354,7 @@ describe("generateQCData", () => {
             fullRegion: false,
         });
 
-        expect(result.seqTableSkipReason).toBe("no region selected");
+        expect(result.seqTableSkipReason).toBe("no coordinate range selected");
         expect(seqTable).not.toHaveBeenCalled();
     });
 
