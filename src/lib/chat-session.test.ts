@@ -277,6 +277,37 @@ describe("ChatSession", () => {
     });
 
     describe("stale response detection", () => {
+        it("returns cancelled when a completed request was aborted while pending", async () => {
+            let finishRequest!: () => void;
+            setMockImplementation(handleUserMessage, async () => {
+                await new Promise<void>((resolve) => {
+                    finishRequest = resolve;
+                });
+                return { text: "stale response", steps: [] };
+            });
+
+            const emitEvent = vi.fn();
+            const result = session.sendMessage({
+                endpointUrl: "http://localhost:11434/v1",
+                apiKey: "",
+                model: "llama3",
+                message: "test",
+                allowedDir: "/tmp",
+                config: defaultConfig,
+                emitEvent,
+            });
+
+            session.cancel();
+            finishRequest();
+
+            await expect(result).resolves.toEqual({
+                success: false,
+                reason: "cancelled",
+                error: "Cancelled",
+            });
+            expect(emitEvent).toHaveBeenCalledWith({ type: "turn_cancelled" });
+        });
+
         it("returns cancelled when signal is aborted during request", async () => {
             setMockImplementation(handleUserMessage, async (opts) => {
                 // Simulate abort during execution
