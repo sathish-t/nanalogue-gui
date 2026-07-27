@@ -139,13 +139,13 @@ jobs:
         include:
           # Node 22 across all platforms (minimum supported version)
           - os: ubuntu-latest
-            node: "22.13.0"
+            node: "22.16.0"
           - os: ubuntu-24.04-arm
-            node: "22.13.0"
+            node: "22.16.0"
           - os: macos-latest
-            node: "22.13.0"
+            node: "22.16.0"
           - os: macos-15-intel
-            node: "22.13.0"
+            node: "22.16.0"
           # Node 24 version coverage on Linux
           - os: ubuntu-latest
             node: "24.15.0"
