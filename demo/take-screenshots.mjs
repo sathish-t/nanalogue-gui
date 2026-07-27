@@ -127,16 +127,17 @@ test("Swipe mode screenshots", async () => {
     // Start swipe session via IPC, bypassing file dialogs
     await page.evaluate(
         ({ bamPath, bedPath, outputPath }) => {
-            return window.api.swipeStart(
+            return window.api.swipeStart({
                 bamPath,
                 bedPath,
                 outputPath,
-                50,
-                "T",
-                "bc",
-                100,
-                false,
-            );
+                windowSize: 50,
+                modTag: "T",
+                modStrand: "bc",
+                regionExpansion: 100,
+                showAnnotationHighlight: false,
+                treatAsUrl: false,
+            });
         },
         { bamPath: swipeBam, bedPath: swipeBed, outputPath: swipeOutput },
     );
