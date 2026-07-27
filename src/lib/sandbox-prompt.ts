@@ -2,40 +2,10 @@
 // All numeric limits are derived from code constants, not hardcoded in prose.
 
 import type { AiChatConfig, Fact } from "./chat-types";
-import { buildSandboxPromptText } from "./sandbox-prompt-text";
+import { buildSandboxPrompt } from "./sandbox-prompt-text";
 
-/** Options for building the sandbox prompt. */
-export interface SandboxPromptOptions {
-    /** The maximum output size in kilobytes. */
-    maxOutputKB: number;
-    /** Maximum records from read_info per call. */
-    maxRecordsReadInfo: number;
-    /** Maximum records from bam_mods per call. */
-    maxRecordsBamMods: number;
-    /** Maximum records from window_reads per call. */
-    maxRecordsWindowReads: number;
-    /** Maximum records from seq_table per call. */
-    maxRecordsSeqTable: number;
-    /** Maximum read_file size in megabytes. */
-    maxReadMB: number;
-    /** Maximum write_file size in megabytes. */
-    maxWriteMB: number;
-    /** Maximum sandbox execution duration in seconds. */
-    maxDurationSecs: number;
-}
-
-/**
- * Builds the sandbox prompt template with all limits interpolated.
- *
- * @param options - The template options with runtime limits.
- * @returns The complete static system prompt for the LLM, including the
- *   Python REPL preamble and the full sandbox reference with all limits
- *   interpolated. Dynamic append/facts blocks are not included here; they are
- *   assembled separately by buildSystemPromptParts() and joinSystemPromptParts().
- */
-export function buildSandboxPrompt(options: SandboxPromptOptions): string {
-    return buildSandboxPromptText(options);
-}
+export type { SandboxPromptOptions } from "./sandbox-prompt-text";
+export { buildSandboxPrompt } from "./sandbox-prompt-text";
 
 /**
  * Renders the facts array as a JSON data block for the system prompt.

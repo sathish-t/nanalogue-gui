@@ -6,15 +6,37 @@ import {
     MAX_FILENAME_LENGTH,
     MAX_LS_ENTRIES,
 } from "./ai-chat-constants";
-import type { SandboxPromptOptions } from "./sandbox-prompt";
+
+/** Options for building the sandbox prompt. */
+export interface SandboxPromptOptions {
+    /** The maximum output size in kilobytes. */
+    maxOutputKB: number;
+    /** Maximum records from read_info per call. */
+    maxRecordsReadInfo: number;
+    /** Maximum records from bam_mods per call. */
+    maxRecordsBamMods: number;
+    /** Maximum records from window_reads per call. */
+    maxRecordsWindowReads: number;
+    /** Maximum records from seq_table per call. */
+    maxRecordsSeqTable: number;
+    /** Maximum read_file size in megabytes. */
+    maxReadMB: number;
+    /** Maximum write_file size in megabytes. */
+    maxWriteMB: number;
+    /** Maximum sandbox execution duration in seconds. */
+    maxDurationSecs: number;
+}
 
 /**
- * Builds the large built-in sandbox prompt text with all limits interpolated.
+ * Builds the sandbox prompt template with all limits interpolated.
  *
  * @param options - The template options with runtime limits.
- * @returns The complete static system prompt for the LLM.
+ * @returns The complete static system prompt for the LLM, including the
+ *   Python REPL preamble and the full sandbox reference with all limits
+ *   interpolated. Dynamic append/facts blocks are not included here; they are
+ *   assembled separately by buildSystemPromptParts() and joinSystemPromptParts().
  */
-export function buildSandboxPromptText(options: SandboxPromptOptions): string {
+export function buildSandboxPrompt(options: SandboxPromptOptions): string {
     const {
         maxOutputKB,
         maxRecordsReadInfo,

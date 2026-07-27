@@ -6,6 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { suppressConsoleError } from "../../test-helpers";
 
 /**
  * Reads the swipe.html template and injects it into the jsdom document body.
@@ -361,6 +362,14 @@ describe("swipe.html", () => {
         });
     });
 
+    describe("load-failed message", () => {
+        it("exists and starts hidden", () => {
+            const loadFailed = document.querySelector("#load-failed-message");
+            expect(loadFailed).not.toBeNull();
+            expect(loadFailed?.classList.contains("hidden")).toBe(true);
+        });
+    });
+
     describe("done message", () => {
         it("exists and starts hidden", () => {
             const done = document.querySelector("#done-message");
@@ -687,7 +696,7 @@ describe("swipe.html", () => {
             installChartHarness();
             mockApi.getState.mockResolvedValueOnce({
                 currentIndex: 0,
-                totalCount: 1,
+                totalCount: 2,
                 acceptedCount: 0,
                 rejectedCount: 0,
                 showAnnotationHighlight: true,
@@ -699,17 +708,17 @@ describe("swipe.html", () => {
                 done: false,
                 state: {
                     currentIndex: 1,
-                    totalCount: 1,
+                    totalCount: 2,
                     acceptedCount: 1,
                     rejectedCount: 0,
                 },
-                plotData: null,
+                plotData: makePlotData("chr1\t2000\t3000\tread-2"),
             });
             mockApi.reject.mockResolvedValueOnce({
-                done: false,
+                done: true,
                 state: {
-                    currentIndex: 1,
-                    totalCount: 1,
+                    currentIndex: 2,
+                    totalCount: 2,
                     acceptedCount: 1,
                     rejectedCount: 1,
                 },
@@ -743,12 +752,184 @@ describe("swipe.html", () => {
             expect(mockApi.reject).toHaveBeenCalledTimes(1);
         });
 
+        it("blocks accept/reject and retries loading when the next annotation fails to load", async () => {
+            installChartHarness();
+            mockApi.getState.mockResolvedValueOnce({
+                currentIndex: 0,
+                totalCount: 2,
+                acceptedCount: 0,
+                rejectedCount: 0,
+                showAnnotationHighlight: true,
+            });
+            mockApi.getPlotData.mockResolvedValueOnce(
+                makePlotData("chr1\t1000\t2000\tread-1"),
+            );
+            // Accept commits (index advances to 1) but the next plot fails to load.
+            mockApi.accept.mockResolvedValueOnce({
+                done: false,
+                state: {
+                    currentIndex: 1,
+                    totalCount: 2,
+                    acceptedCount: 1,
+                    rejectedCount: 0,
+                },
+                plotData: null,
+            });
+            // Retry via getPlotData succeeds on the second call.
+            mockApi.getPlotData.mockResolvedValueOnce(
+                makePlotData("chr1\t2000\t3000\tread-2"),
+            );
+            // After retry succeeds, a reject can proceed normally.
+            mockApi.reject.mockResolvedValueOnce({
+                done: true,
+                state: {
+                    currentIndex: 2,
+                    totalCount: 2,
+                    acceptedCount: 1,
+                    rejectedCount: 1,
+                },
+                plotData: null,
+            });
+
+            await import("./swipe");
+            await yieldToEventLoop();
+
+            // Accept the first annotation.
+            document.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "ArrowRight",
+                    bubbles: true,
+                    cancelable: true,
+                }),
+            );
+            await yieldToEventLoop();
+            await waitFor(200);
+
+            // Action committed but next plot failed: load-failed message shown.
+            expect(mockApi.accept).toHaveBeenCalledTimes(1);
+            expect(mockApi.reject).not.toHaveBeenCalled();
+            expect(
+                document
+                    .querySelector("#load-failed-message")
+                    ?.classList.contains("hidden"),
+            ).toBe(false);
+            expect(
+                document
+                    .querySelector("#no-data-message")
+                    ?.classList.contains("hidden"),
+            ).toBe(true);
+
+            // Next arrow press retries loading instead of advancing.
+            document.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "ArrowRight",
+                    bubbles: true,
+                    cancelable: true,
+                }),
+            );
+            await yieldToEventLoop();
+            await waitFor(200);
+
+            // getPlotData called a second time (retry); reject still not called.
+            expect(mockApi.getPlotData).toHaveBeenCalledTimes(2);
+            expect(mockApi.reject).not.toHaveBeenCalled();
+            expect(
+                document
+                    .querySelector("#load-failed-message")
+                    ?.classList.contains("hidden"),
+            ).toBe(true);
+
+            // Now a reject can proceed on the seen annotation.
+            document.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "ArrowLeft",
+                    bubbles: true,
+                    cancelable: true,
+                }),
+            );
+            await yieldToEventLoop();
+            await waitFor(200);
+
+            expect(mockApi.reject).toHaveBeenCalledTimes(1);
+            expect(
+                document
+                    .querySelector("#done-message")
+                    ?.classList.contains("hidden"),
+            ).toBe(false);
+        });
+
+        it("shows load-failed again when the retry itself fails", async () => {
+            installChartHarness();
+            mockApi.getState.mockResolvedValueOnce({
+                currentIndex: 0,
+                totalCount: 2,
+                acceptedCount: 0,
+                rejectedCount: 0,
+                showAnnotationHighlight: true,
+            });
+            mockApi.getPlotData.mockResolvedValueOnce(
+                makePlotData("chr1\t1000\t2000\tread-1"),
+            );
+            // Accept commits but the next plot fails to load.
+            mockApi.accept.mockResolvedValueOnce({
+                done: false,
+                state: {
+                    currentIndex: 1,
+                    totalCount: 2,
+                    acceptedCount: 1,
+                    rejectedCount: 0,
+                },
+                plotData: null,
+            });
+            // Retry via getPlotData also rejects.
+            mockApi.getPlotData.mockRejectedValueOnce(new Error("retry boom"));
+
+            const consoleErrorSpy = suppressConsoleError();
+
+            await import("./swipe");
+            await yieldToEventLoop();
+
+            // Accept the first annotation.
+            document.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "ArrowRight",
+                    bubbles: true,
+                    cancelable: true,
+                }),
+            );
+            await yieldToEventLoop();
+            await waitFor(200);
+
+            // Retry arrow press — getPlotData rejects.
+            document.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "ArrowRight",
+                    bubbles: true,
+                    cancelable: true,
+                }),
+            );
+            await yieldToEventLoop();
+            await waitFor(200);
+
+            // Still in pendingRetry: load-failed message visible, reject not called.
+            expect(mockApi.getPlotData).toHaveBeenCalledTimes(2);
+            expect(mockApi.reject).not.toHaveBeenCalled();
+            expect(
+                document
+                    .querySelector("#load-failed-message")
+                    ?.classList.contains("hidden"),
+            ).toBe(false);
+            expect(document.querySelector("#plot-title")?.textContent).toBe(
+                "Error — failed to load annotation, please retry",
+            );
+
+            consoleErrorSpy.mockRestore();
+        });
+
         it("logs initialization failures", async () => {
             installChartHarness();
             const error = new Error("init failed");
-            const consoleErrorSpy = vi
-                .spyOn(console, "error")
-                .mockImplementation(() => {});
+            const consoleErrorSpy = suppressConsoleError();
             mockApi.getState.mockRejectedValueOnce(error);
 
             await import("./swipe");
@@ -766,9 +947,7 @@ describe("swipe.html", () => {
         it("logs action failures when accept rejects", async () => {
             installChartHarness();
             const error = new Error("accept failed");
-            const consoleErrorSpy = vi
-                .spyOn(console, "error")
-                .mockImplementation(() => {});
+            const consoleErrorSpy = suppressConsoleError();
             mockApi.getState.mockResolvedValueOnce({
                 currentIndex: 0,
                 totalCount: 1,
@@ -798,14 +977,15 @@ describe("swipe.html", () => {
                     .querySelector("#loading-overlay")
                     ?.classList.contains("hidden"),
             ).toBe(true);
+            expect(document.querySelector("#plot-title")?.textContent).toBe(
+                "Error — action failed, please retry",
+            );
         });
 
         it("logs back-navigation failures", async () => {
             installChartHarness();
             const error = new Error("back failed");
-            const consoleErrorSpy = vi
-                .spyOn(console, "error")
-                .mockImplementation(() => {});
+            const consoleErrorSpy = suppressConsoleError();
             mockApi.getState.mockResolvedValueOnce({
                 currentIndex: 0,
                 totalCount: 0,

@@ -5,6 +5,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resolvingFn } from "../../test-helpers";
 import type { OutputSelectedDetail } from "./output-file-input";
 import { OutputFileInput } from "./output-file-input";
 
@@ -198,14 +199,14 @@ describe("OutputFileInput", () => {
         });
 
         it("sets the value when a path is picked", async () => {
-            el.selectFileFn = vi.fn().mockResolvedValue("/output/result.bed");
+            el.selectFileFn = resolvingFn("/output/result.bed");
             const btn = el.querySelector<HTMLButtonElement>("button");
             btn?.click();
             await vi.waitFor(() => expect(el.value).toBe("/output/result.bed"));
         });
 
         it("fires output-selected after a path is picked", async () => {
-            el.selectFileFn = vi.fn().mockResolvedValue("/output/result.bed");
+            el.selectFileFn = resolvingFn("/output/result.bed");
             const handler = vi.fn();
             el.addEventListener("output-selected", handler);
 
@@ -215,7 +216,7 @@ describe("OutputFileInput", () => {
         });
 
         it("does not fire output-selected when dialog is cancelled", async () => {
-            el.selectFileFn = vi.fn().mockResolvedValue(null);
+            el.selectFileFn = resolvingFn(null);
             const handler = vi.fn();
             el.addEventListener("output-selected", handler);
 
@@ -235,8 +236,8 @@ describe("OutputFileInput", () => {
 
     describe("checkExistsFn — overwrite flow", () => {
         it("sets requiresOverwrite to true when the file exists", async () => {
-            el.selectFileFn = vi.fn().mockResolvedValue("/out/existing.bed");
-            el.checkExistsFn = vi.fn().mockResolvedValue(true);
+            el.selectFileFn = resolvingFn("/out/existing.bed");
+            el.checkExistsFn = resolvingFn(true);
 
             const btn = el.querySelector<HTMLButtonElement>("button");
             btn?.click();
@@ -244,8 +245,8 @@ describe("OutputFileInput", () => {
         });
 
         it("shows the warning and confirm label when file exists", async () => {
-            el.selectFileFn = vi.fn().mockResolvedValue("/out/existing.bed");
-            el.checkExistsFn = vi.fn().mockResolvedValue(true);
+            el.selectFileFn = resolvingFn("/out/existing.bed");
+            el.checkExistsFn = resolvingFn(true);
 
             const btn = el.querySelector<HTMLButtonElement>("button");
             btn?.click();
@@ -264,8 +265,8 @@ describe("OutputFileInput", () => {
         });
 
         it("leaves requiresOverwrite false when the file does not exist", async () => {
-            el.selectFileFn = vi.fn().mockResolvedValue("/out/new.bed");
-            el.checkExistsFn = vi.fn().mockResolvedValue(false);
+            el.selectFileFn = resolvingFn("/out/new.bed");
+            el.checkExistsFn = resolvingFn(false);
 
             const btn = el.querySelector<HTMLButtonElement>("button");
             btn?.click();
@@ -282,8 +283,8 @@ describe("OutputFileInput", () => {
     describe("overwrite confirm checkbox", () => {
         it("overwriteConfirmed reflects the checkbox checked state", async () => {
             // First, trigger the overwrite flow so the checkbox is visible.
-            el.selectFileFn = vi.fn().mockResolvedValue("/out/existing.bed");
-            el.checkExistsFn = vi.fn().mockResolvedValue(true);
+            el.selectFileFn = resolvingFn("/out/existing.bed");
+            el.checkExistsFn = resolvingFn(true);
             const btn = el.querySelector<HTMLButtonElement>("button");
             btn?.click();
             await vi.waitFor(() => expect(el.requiresOverwrite).toBe(true));
@@ -301,8 +302,8 @@ describe("OutputFileInput", () => {
         });
 
         it("fires overwrite-confirmed when the checkbox changes", async () => {
-            el.selectFileFn = vi.fn().mockResolvedValue("/out/existing.bed");
-            el.checkExistsFn = vi.fn().mockResolvedValue(true);
+            el.selectFileFn = resolvingFn("/out/existing.bed");
+            el.checkExistsFn = resolvingFn(true);
             const btn = el.querySelector<HTMLButtonElement>("button");
             btn?.click();
             await vi.waitFor(() => expect(el.requiresOverwrite).toBe(true));
@@ -328,8 +329,8 @@ describe("OutputFileInput", () => {
 
     describe("output-selected event detail", () => {
         it("includes value, requiresOverwrite, and overwriteConfirmed", async () => {
-            el.selectFileFn = vi.fn().mockResolvedValue("/out/new.bed");
-            el.checkExistsFn = vi.fn().mockResolvedValue(false);
+            el.selectFileFn = resolvingFn("/out/new.bed");
+            el.checkExistsFn = resolvingFn(false);
 
             const handler = vi.fn();
             el.addEventListener("output-selected", handler);

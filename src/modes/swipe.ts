@@ -149,40 +149,31 @@ async function loadCurrentPlotData(): Promise<PlotData | null> {
 
     const annotation = annotations[appState.currentIndex];
 
-    try {
-        return await loadPlotData(
-            cliArgs.bamPath,
-            annotation,
-            contigSizes,
-            cliArgs.windowSize,
-            {
-                modTag,
-                modStrand,
-                regionExpansion,
-                treatAsUrl: cliArgs.treatAsUrl,
-            },
-        );
-    } catch (error) {
-        console.error(
-            `Error loading data for annotation ${appState.currentIndex + 1}:`,
-            error,
-        );
-        return null;
-    }
+    return await loadPlotData(
+        cliArgs.bamPath,
+        annotation,
+        contigSizes,
+        cliArgs.windowSize,
+        {
+            modTag,
+            modStrand,
+            regionExpansion,
+            treatAsUrl: cliArgs.treatAsUrl,
+        },
+    );
 }
 
 /**
  * Appends an accepted annotation line to the output BED file.
  *
+ * Throws if the write fails so the caller can surface the error to the user
+ * instead of silently losing curated data.
+ *
  * @param outputPath - Path to the output BED file.
  * @param rawLine - The raw BED line to append.
  */
-function writeAcceptedAnnotation(outputPath: string, rawLine: string) {
-    try {
-        appendFileSync(outputPath, `${rawLine}\n`, "utf-8");
-    } catch (error) {
-        console.error("Error writing annotation:", error);
-    }
+function writeAcceptedAnnotation(outputPath: string, rawLine: string): void {
+    appendFileSync(outputPath, `${rawLine}\n`, "utf-8");
 }
 
 /**
@@ -218,8 +209,16 @@ export function registerIpcHandlers(): void {
             return { done: true, state: appState };
         }
 
-        const plotData = await loadCurrentPlotData();
-        return { done: false, state: appState, plotData };
+        try {
+            const plotData = await loadCurrentPlotData();
+            return { done: false, state: appState, plotData };
+        } catch (error) {
+            console.error(
+                `Error loading data for annotation ${appState.currentIndex + 1}:`,
+                error,
+            );
+            return { done: false, state: appState, plotData: null };
+        }
     });
 
     ipcMain.handle("reject", async () => {
@@ -241,7 +240,15 @@ export function registerIpcHandlers(): void {
             return { done: true, state: appState };
         }
 
-        const plotData = await loadCurrentPlotData();
-        return { done: false, state: appState, plotData };
+        try {
+            const plotData = await loadCurrentPlotData();
+            return { done: false, state: appState, plotData };
+        } catch (error) {
+            console.error(
+                `Error loading data for annotation ${appState.currentIndex + 1}:`,
+                error,
+            );
+            return { done: false, state: appState, plotData: null };
+        }
     });
 }

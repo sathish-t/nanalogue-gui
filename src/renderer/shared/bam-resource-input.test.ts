@@ -4,6 +4,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resolvingFn } from "../../test-helpers";
 import { BamResourceInput } from "./bam-resource-input";
 
 /**
@@ -202,7 +203,7 @@ describe("BamResourceInput", () => {
         });
 
         it("sets value and fires bam-selected when file is picked", async () => {
-            el.selectFileFn = vi.fn().mockResolvedValue("/picked/file.bam");
+            el.selectFileFn = resolvingFn("/picked/file.bam");
             const handler = vi.fn();
             el.addEventListener("bam-selected", handler);
 
@@ -217,7 +218,7 @@ describe("BamResourceInput", () => {
         });
 
         it("does not fire bam-selected when file dialog is cancelled", async () => {
-            el.selectFileFn = vi.fn().mockResolvedValue(null);
+            el.selectFileFn = resolvingFn(null);
             const handler = vi.fn();
             el.addEventListener("bam-selected", handler);
 

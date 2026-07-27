@@ -17,6 +17,13 @@ import {
     vi,
 } from "vitest";
 import type { PlotData } from "../lib/types";
+import {
+    setMockImplementation,
+    setMockRejectedValue,
+    setMockResolvedValue,
+    setMockReturnValue,
+    suppressConsoleError,
+} from "../test-helpers";
 import type { SwipeArgs } from "./swipe";
 
 // ---------------------------------------------------------------------------
@@ -123,12 +130,12 @@ const BASE_ARGS: SwipeArgs = {
  * @returns A promise that resolves when initialization completes.
  */
 async function initializeWithFakes(): Promise<void> {
-    vi.mocked(parseBedFile).mockReturnValue({
+    setMockReturnValue(parseBedFile, {
         capped: false,
         annotations: [...FAKE_ANNOTATIONS],
     });
-    vi.mocked(loadContigSizes).mockResolvedValue({ chr1: 5000 });
-    vi.mocked(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    setMockResolvedValue(loadContigSizes, { chr1: 5000 });
+    setMockReturnValue(existsSync as ReturnType<typeof vi.fn>, false);
     await initialize(BASE_ARGS, true);
 }
 
@@ -140,9 +147,7 @@ async function initializeWithFakes(): Promise<void> {
 
 describe("swipe mode — IPC handlers before initialize (cliArgs is null)", () => {
     it("accept returns done and logs error when cliArgs is not set", async () => {
-        const consoleSpy = vi
-            .spyOn(console, "error")
-            .mockImplementation(() => undefined);
+        const consoleSpy = suppressConsoleError();
 
         const result = (await ipcHandlers.get("accept")?.(
             undefined,
@@ -156,9 +161,7 @@ describe("swipe mode — IPC handlers before initialize (cliArgs is null)", () =
     });
 
     it("reject returns done and logs error when cliArgs is not set", async () => {
-        const consoleSpy = vi
-            .spyOn(console, "error")
-            .mockImplementation(() => undefined);
+        const consoleSpy = suppressConsoleError();
 
         const result = (await ipcHandlers.get("reject")?.(
             undefined,
@@ -179,17 +182,16 @@ describe("swipe mode — IPC handlers before initialize (cliArgs is null)", () =
 describe("swipe mode — initialize()", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(realpathSync as ReturnType<typeof vi.fn>).mockImplementation(
+        setMockImplementation(
+            realpathSync as ReturnType<typeof vi.fn>,
             (p: string) => p,
         );
-        vi.mocked(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(
-            false,
-        );
-        vi.mocked(loadContigSizes).mockResolvedValue({ chr1: 5000 });
+        setMockReturnValue(existsSync as ReturnType<typeof vi.fn>, false);
+        setMockResolvedValue(loadContigSizes, { chr1: 5000 });
     });
 
     it("calls loadContigSizes with the BAM path and treatAsUrl flag", async () => {
-        vi.mocked(parseBedFile).mockReturnValue({
+        setMockReturnValue(parseBedFile, {
             capped: false,
             annotations: [...FAKE_ANNOTATIONS],
         });
@@ -203,7 +205,7 @@ describe("swipe mode — initialize()", () => {
     });
 
     it("calls parseBedFile with the BED path", async () => {
-        vi.mocked(parseBedFile).mockReturnValue({
+        setMockReturnValue(parseBedFile, {
             capped: false,
             annotations: [...FAKE_ANNOTATIONS],
         });
@@ -216,7 +218,7 @@ describe("swipe mode — initialize()", () => {
     });
 
     it("writes an empty output file after successful initialization", async () => {
-        vi.mocked(parseBedFile).mockReturnValue({
+        setMockReturnValue(parseBedFile, {
             capped: false,
             annotations: [...FAKE_ANNOTATIONS],
         });
@@ -231,7 +233,7 @@ describe("swipe mode — initialize()", () => {
     });
 
     it("throws when the BED file exceeds 10 000 annotations", async () => {
-        vi.mocked(parseBedFile).mockReturnValue({
+        setMockReturnValue(parseBedFile, {
             capped: true,
             annotations: [],
         });
@@ -240,15 +242,16 @@ describe("swipe mode — initialize()", () => {
     });
 
     it("throws when outputPath resolves to the same file as bedPath", async () => {
-        vi.mocked(parseBedFile).mockReturnValue({
+        setMockReturnValue(parseBedFile, {
             capped: false,
             annotations: [...FAKE_ANNOTATIONS],
         });
         // Make realpathSync return the same value for both paths to trigger the guard.
-        vi.mocked(realpathSync as ReturnType<typeof vi.fn>).mockReturnValue(
+        setMockReturnValue(
+            realpathSync as ReturnType<typeof vi.fn>,
             "/data/same.bed",
         );
-        vi.mocked(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+        setMockReturnValue(existsSync as ReturnType<typeof vi.fn>, true);
 
         const collidingArgs: SwipeArgs = {
             ...BASE_ARGS,
@@ -262,15 +265,13 @@ describe("swipe mode — initialize()", () => {
     });
 
     it("throws when resolved outputPath matches bedPath and output file does not yet exist", async () => {
-        vi.mocked(parseBedFile).mockReturnValue({
+        setMockReturnValue(parseBedFile, {
             capped: false,
             annotations: [...FAKE_ANNOTATIONS],
         });
         // existsSync returns false so the first guard is skipped; the second
         // guard catches the collision via path.resolve vs realpathSync.
-        vi.mocked(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(
-            false,
-        );
+        setMockReturnValue(existsSync as ReturnType<typeof vi.fn>, false);
 
         const collidingArgs: SwipeArgs = {
             ...BASE_ARGS,
@@ -334,7 +335,8 @@ describe("swipe mode — IPC handlers", () => {
 
     beforeEach(async () => {
         vi.clearAllMocks();
-        vi.mocked(realpathSync as ReturnType<typeof vi.fn>).mockImplementation(
+        setMockImplementation(
+            realpathSync as ReturnType<typeof vi.fn>,
             (p: string) => p,
         );
         await initializeWithFakes();
@@ -368,7 +370,8 @@ describe("swipe mode — IPC handlers", () => {
     describe("get-plot-data", () => {
         it("calls loadPlotData and returns the result", async () => {
             const fakePlotData = { rawPoints: [], windowedPoints: [] };
-            vi.mocked(loadPlotData).mockResolvedValue(
+            setMockResolvedValue(
+                loadPlotData,
                 fakePlotData as unknown as PlotData,
             );
 
@@ -378,13 +381,12 @@ describe("swipe mode — IPC handlers", () => {
             expect(result).toEqual(fakePlotData);
         });
 
-        it("returns null when an error occurs during plot data loading", async () => {
-            vi.mocked(loadPlotData).mockRejectedValue(new Error("BAM error"));
-            vi.spyOn(console, "error").mockImplementation(() => undefined);
+        it("rejects when an error occurs during plot data loading", async () => {
+            setMockRejectedValue(loadPlotData, new Error("BAM error"));
 
-            const result = await ipcHandlers.get("get-plot-data")?.(undefined);
-
-            expect(result).toBeNull();
+            await expect(
+                ipcHandlers.get("get-plot-data")?.(undefined),
+            ).rejects.toThrow("BAM error");
         });
     });
 
@@ -394,7 +396,7 @@ describe("swipe mode — IPC handlers", () => {
 
     describe("accept", () => {
         it("increments acceptedCount and currentIndex", async () => {
-            vi.mocked(loadPlotData).mockResolvedValue({
+            setMockResolvedValue(loadPlotData, {
                 rawPoints: [],
                 windowedPoints: [],
             } as unknown as PlotData);
@@ -408,7 +410,7 @@ describe("swipe mode — IPC handlers", () => {
         });
 
         it("writes the accepted annotation to the output file", async () => {
-            vi.mocked(loadPlotData).mockResolvedValue({
+            setMockResolvedValue(loadPlotData, {
                 rawPoints: [],
                 windowedPoints: [],
             } as unknown as PlotData);
@@ -423,7 +425,7 @@ describe("swipe mode — IPC handlers", () => {
         });
 
         it("returns done: true when the last annotation is accepted", async () => {
-            vi.mocked(loadPlotData).mockResolvedValue({
+            setMockResolvedValue(loadPlotData, {
                 rawPoints: [],
                 windowedPoints: [],
             } as unknown as PlotData);
@@ -444,7 +446,7 @@ describe("swipe mode — IPC handlers", () => {
 
     describe("reject", () => {
         it("increments rejectedCount and currentIndex", async () => {
-            vi.mocked(loadPlotData).mockResolvedValue({
+            setMockResolvedValue(loadPlotData, {
                 rawPoints: [],
                 windowedPoints: [],
             } as unknown as PlotData);
@@ -458,7 +460,7 @@ describe("swipe mode — IPC handlers", () => {
         });
 
         it("does NOT write to the output file on reject", async () => {
-            vi.mocked(loadPlotData).mockResolvedValue({
+            setMockResolvedValue(loadPlotData, {
                 rawPoints: [],
                 windowedPoints: [],
             } as unknown as PlotData);
@@ -469,7 +471,7 @@ describe("swipe mode — IPC handlers", () => {
         });
 
         it("returns done: true when the last annotation is rejected", async () => {
-            vi.mocked(loadPlotData).mockResolvedValue({
+            setMockResolvedValue(loadPlotData, {
                 rawPoints: [],
                 windowedPoints: [],
             } as unknown as PlotData);
@@ -491,11 +493,12 @@ describe("swipe mode — IPC handlers", () => {
 describe("swipe mode — initialize() overwrite dialog", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(realpathSync as ReturnType<typeof vi.fn>).mockImplementation(
+        setMockImplementation(
+            realpathSync as ReturnType<typeof vi.fn>,
             (p: string) => p,
         );
-        vi.mocked(loadContigSizes).mockResolvedValue({ chr1: 5000 });
-        vi.mocked(parseBedFile).mockReturnValue({
+        setMockResolvedValue(loadContigSizes, { chr1: 5000 });
+        setMockReturnValue(parseBedFile, {
             capped: false,
             annotations: [
                 {
@@ -508,9 +511,9 @@ describe("swipe mode — initialize() overwrite dialog", () => {
             ],
         });
         // Output file exists by default in these tests
-        vi.mocked(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+        setMockReturnValue(existsSync as ReturnType<typeof vi.fn>, true);
         // Default dialog response: user confirms (response 0 = Overwrite)
-        vi.mocked(dialog.showMessageBox).mockResolvedValue({ response: 0 });
+        setMockResolvedValue(dialog.showMessageBox, { response: 0 });
     });
 
     afterEach(() => {
@@ -539,7 +542,7 @@ describe("swipe mode — initialize() overwrite dialog", () => {
 
     it("throws when user cancels the overwrite dialog", async () => {
         // Response 1 = Cancel button
-        vi.mocked(dialog.showMessageBox).mockResolvedValue({ response: 1 });
+        setMockResolvedValue(dialog.showMessageBox, { response: 1 });
 
         await expect(initialize(BASE_ARGS, false)).rejects.toThrow(
             "User cancelled",
@@ -547,7 +550,7 @@ describe("swipe mode — initialize() overwrite dialog", () => {
     });
 
     it("does not delete the file when user cancels", async () => {
-        vi.mocked(dialog.showMessageBox).mockResolvedValue({ response: 1 });
+        setMockResolvedValue(dialog.showMessageBox, { response: 1 });
 
         await expect(initialize(BASE_ARGS, false)).rejects.toThrow();
         expect(vi.mocked(unlinkSync)).not.toHaveBeenCalled();
@@ -561,8 +564,15 @@ describe("swipe mode — initialize() overwrite dialog", () => {
 describe("swipe mode — IPC handler edge cases", () => {
     beforeEach(async () => {
         vi.clearAllMocks();
-        vi.mocked(realpathSync as ReturnType<typeof vi.fn>).mockImplementation(
+        setMockImplementation(
+            realpathSync as ReturnType<typeof vi.fn>,
             (p: string) => p,
+        );
+        // Reset appendFileSync to a no-op since vi.clearAllMocks() does not
+        // restore mock implementations set by individual tests.
+        setMockImplementation(
+            appendFileSync as ReturnType<typeof vi.fn>,
+            () => undefined,
         );
         await initializeWithFakes();
     });
@@ -573,7 +583,7 @@ describe("swipe mode — IPC handler edge cases", () => {
 
     it("get-plot-data returns null after all annotations have been reviewed", async () => {
         // Accept both annotations to exhaust the list
-        vi.mocked(loadPlotData).mockResolvedValue({
+        setMockResolvedValue(loadPlotData, {
             rawPoints: [],
             windowedPoints: [],
         } as unknown as PlotData);
@@ -589,32 +599,61 @@ describe("swipe mode — IPC handler edge cases", () => {
         expect(vi.mocked(loadPlotData)).not.toHaveBeenCalled();
     });
 
-    it("accept handles appendFileSync errors gracefully without throwing", async () => {
-        vi.mocked(loadPlotData).mockResolvedValue({
+    it("accept rejects when appendFileSync fails so the user can retry", async () => {
+        setMockResolvedValue(loadPlotData, {
             rawPoints: [],
             windowedPoints: [],
         } as unknown as PlotData);
-        vi.mocked(
+        setMockImplementation(
             appendFileSync as ReturnType<typeof vi.fn>,
-        ).mockImplementation(() => {
-            throw new Error("disk full");
-        });
-        const consoleSpy = vi
-            .spyOn(console, "error")
-            .mockImplementation(() => undefined);
-
-        // Should resolve rather than propagating the appendFileSync error
-        await expect(
-            ipcHandlers.get("accept")?.(undefined),
-        ).resolves.toBeDefined();
-        expect(consoleSpy).toHaveBeenCalledWith(
-            "Error writing annotation:",
-            expect.any(Error),
+            () => {
+                throw new Error("disk full");
+            },
         );
+
+        await expect(ipcHandlers.get("accept")?.(undefined)).rejects.toThrow(
+            "disk full",
+        );
+
+        // Counters should not have incremented — the user can retry the accept
+        const state = (await ipcHandlers.get("get-state")?.(
+            undefined,
+        )) as TestAppState;
+        expect(state.acceptedCount).toBe(0);
+        expect(state.currentIndex).toBe(0);
+    });
+
+    it("accept resolves with plotData null when next plot load fails", async () => {
+        // First accept succeeds (write works), but loading the next plot fails.
+        setMockRejectedValue(loadPlotData, new Error("BAM read error"));
+        suppressConsoleError();
+
+        const result = (await ipcHandlers.get("accept")?.(
+            undefined,
+        )) as HandlerResult;
+
+        // The accept was recorded — counter and index advanced.
+        expect(result.state.acceptedCount).toBe(1);
+        expect(result.state.currentIndex).toBe(1);
+        // But no plot data is available for the next annotation.
+        expect(result.plotData).toBeNull();
+    });
+
+    it("reject resolves with plotData null when next plot load fails", async () => {
+        setMockRejectedValue(loadPlotData, new Error("BAM read error"));
+        suppressConsoleError();
+
+        const result = (await ipcHandlers.get("reject")?.(
+            undefined,
+        )) as HandlerResult;
+
+        expect(result.state.rejectedCount).toBe(1);
+        expect(result.state.currentIndex).toBe(1);
+        expect(result.plotData).toBeNull();
     });
 
     it("accept logs error when called after all annotations are exhausted", async () => {
-        vi.mocked(loadPlotData).mockResolvedValue({
+        setMockResolvedValue(loadPlotData, {
             rawPoints: [],
             windowedPoints: [],
         } as unknown as PlotData);
@@ -623,9 +662,7 @@ describe("swipe mode — IPC handler edge cases", () => {
         await ipcHandlers.get("accept")?.(undefined);
         await ipcHandlers.get("accept")?.(undefined);
 
-        const consoleSpy = vi
-            .spyOn(console, "error")
-            .mockImplementation(() => undefined);
+        const consoleSpy = suppressConsoleError();
         const result = (await ipcHandlers.get("accept")?.(
             undefined,
         )) as HandlerResult;
@@ -637,7 +674,7 @@ describe("swipe mode — IPC handler edge cases", () => {
     });
 
     it("reject logs error when called after all annotations are exhausted", async () => {
-        vi.mocked(loadPlotData).mockResolvedValue({
+        setMockResolvedValue(loadPlotData, {
             rawPoints: [],
             windowedPoints: [],
         } as unknown as PlotData);
@@ -646,9 +683,7 @@ describe("swipe mode — IPC handler edge cases", () => {
         await ipcHandlers.get("reject")?.(undefined);
         await ipcHandlers.get("reject")?.(undefined);
 
-        const consoleSpy = vi
-            .spyOn(console, "error")
-            .mockImplementation(() => undefined);
+        const consoleSpy = suppressConsoleError();
         const result = (await ipcHandlers.get("reject")?.(
             undefined,
         )) as HandlerResult;

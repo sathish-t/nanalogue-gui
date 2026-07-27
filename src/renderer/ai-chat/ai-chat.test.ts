@@ -6,6 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mockImmediateSetTimeout } from "../../test-helpers";
 
 /** Result from the list-models IPC handler (mirrors ai-chat.ts). */
 interface ListModelsResult {
@@ -1152,12 +1153,7 @@ describe("AI Chat permanent session config locking", () => {
     });
 
     it("supports code pagination and clipboard copy", async () => {
-        const setTimeoutSpy = vi
-            .spyOn(globalThis, "setTimeout")
-            .mockImplementation((callback) => {
-                if (typeof callback === "function") callback();
-                return 0 as ReturnType<typeof setTimeout>;
-            });
+        const setTimeoutSpy = mockImmediateSetTimeout();
         fillRequiredFields();
         mockApi.aiChatSendMessage.mockResolvedValueOnce({
             success: true,
@@ -1226,12 +1222,7 @@ describe("AI Chat permanent session config locking", () => {
     });
 
     it("shows, copies, and closes the system prompt dialog", async () => {
-        const setTimeoutSpy = vi
-            .spyOn(globalThis, "setTimeout")
-            .mockImplementation((callback) => {
-                if (typeof callback === "function") callback();
-                return 0 as ReturnType<typeof setTimeout>;
-            });
+        const setTimeoutSpy = mockImmediateSetTimeout();
         mockApi.aiChatGetSystemPrompt.mockResolvedValueOnce({
             success: true,
             prompt: "system prompt text",

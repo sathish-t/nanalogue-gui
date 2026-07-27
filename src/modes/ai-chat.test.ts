@@ -17,6 +17,11 @@ import {
     it,
     vi,
 } from "vitest";
+import {
+    setMockImplementation,
+    setMockResolvedValue,
+    setMockResolvedValueOnce,
+} from "../test-helpers";
 
 // ---------------------------------------------------------------------------
 // Mutable mock state — reassigned in beforeEach; class methods below read
@@ -163,7 +168,7 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
 
         // Reset loadSystemAppend to return undefined by default.
         vi.mocked(loadSystemAppend).mockReset();
-        vi.mocked(loadSystemAppend).mockResolvedValue(undefined);
+        setMockResolvedValue(loadSystemAppend, undefined);
 
         // Ensure mainWindow is null so pick-directory and emitEvent tests
         // start from a known state.
@@ -195,7 +200,8 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
     }
 
     it("passes appendSystemPrompt to sendMessage when SYSTEM_APPEND.md exists", async () => {
-        vi.mocked(loadSystemAppend).mockResolvedValue(
+        setMockResolvedValue(
+            loadSystemAppend,
             "## Domain context\nFocus on CpG methylation.",
         );
 
@@ -211,7 +217,7 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
     });
 
     it("passes undefined appendSystemPrompt when SYSTEM_APPEND.md is absent", async () => {
-        vi.mocked(loadSystemAppend).mockResolvedValue(undefined);
+        setMockResolvedValue(loadSystemAppend, undefined);
 
         await invokeSendMessage();
 
@@ -228,7 +234,7 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
     });
 
     it("caches the result — loadSystemAppend is called only once for the same allowedDir", async () => {
-        vi.mocked(loadSystemAppend).mockResolvedValue("## Cached context");
+        setMockResolvedValue(loadSystemAppend, "## Cached context");
 
         await invokeSendMessage();
         await invokeSendMessage();
@@ -245,9 +251,8 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
     });
 
     it("re-reads the file when allowedDir changes between messages", async () => {
-        vi.mocked(loadSystemAppend)
-            .mockResolvedValueOnce("## Dir A context")
-            .mockResolvedValueOnce("## Dir B context");
+        setMockResolvedValueOnce(loadSystemAppend, "## Dir A context");
+        setMockResolvedValueOnce(loadSystemAppend, "## Dir B context");
 
         await invokeSendMessage({ allowedDir: "/tmp/dir-a" });
         await invokeSendMessage({ allowedDir: "/tmp/dir-b" });
@@ -262,7 +267,7 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
     });
 
     it("clears the cache and re-reads the file after ai-chat-new-chat", async () => {
-        vi.mocked(loadSystemAppend).mockResolvedValue("## Session 1 context");
+        setMockResolvedValue(loadSystemAppend, "## Session 1 context");
         await invokeSendMessage();
         expect(loadSystemAppend).toHaveBeenCalledOnce();
 
@@ -270,7 +275,7 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         await ipcHandlers.get("ai-chat-new-chat")?.();
         expect(mockReset).toHaveBeenCalled();
 
-        vi.mocked(loadSystemAppend).mockResolvedValue("## Session 2 context");
+        setMockResolvedValue(loadSystemAppend, "## Session 2 context");
         await invokeSendMessage();
 
         // File must be re-read after the cache was cleared.
@@ -285,7 +290,8 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         // Simulate a slow file read so the second send arrives while the
         // first is still in-flight — both should share the same Promise.
         let resolveLoad!: (value: string | undefined) => void;
-        vi.mocked(loadSystemAppend).mockImplementation(
+        setMockImplementation(
+            loadSystemAppend,
             () =>
                 new Promise<string | undefined>((resolve) => {
                     resolveLoad = resolve;
@@ -311,7 +317,7 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
     });
 
     it("clears the cache and re-reads the file after ai-chat-go-back", async () => {
-        vi.mocked(loadSystemAppend).mockResolvedValue("## Session 1 context");
+        setMockResolvedValue(loadSystemAppend, "## Session 1 context");
         await invokeSendMessage();
         expect(loadSystemAppend).toHaveBeenCalledOnce();
 
@@ -319,7 +325,7 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         await ipcHandlers.get("ai-chat-go-back")?.();
         expect(mockReset).toHaveBeenCalled();
 
-        vi.mocked(loadSystemAppend).mockResolvedValue("## Session 2 context");
+        setMockResolvedValue(loadSystemAppend, "## Session 2 context");
         await invokeSendMessage();
 
         // File must be re-read after the cache was cleared.
@@ -332,7 +338,7 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
 
     it("prompt preview does not prime the send cache", async () => {
         // Simulate the user clicking "View System Prompt" before sending.
-        vi.mocked(loadSystemAppend).mockResolvedValue("## Old content");
+        setMockResolvedValue(loadSystemAppend, "## Old content");
         const previewHandler = ipcHandlers.get("ai-chat-get-system-prompt");
         if (!previewHandler)
             throw new Error("ai-chat-get-system-prompt handler not registered");
@@ -342,7 +348,7 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         });
 
         // The user edits SYSTEM_APPEND.md after seeing the preview.
-        vi.mocked(loadSystemAppend).mockResolvedValue("## New content");
+        setMockResolvedValue(loadSystemAppend, "## New content");
 
         // Send the first message — must pick up the new content, not the
         // stale value that the preview read.
@@ -359,12 +365,12 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
 
     it("prompt preview uses the session cache mid-session", async () => {
         // Send the first message — this populates the cache.
-        vi.mocked(loadSystemAppend).mockResolvedValue("## Session content");
+        setMockResolvedValue(loadSystemAppend, "## Session content");
         await invokeSendMessage();
         expect(loadSystemAppend).toHaveBeenCalledOnce();
 
         // Now the user edits SYSTEM_APPEND.md mid-session.
-        vi.mocked(loadSystemAppend).mockResolvedValue("## Edited content");
+        setMockResolvedValue(loadSystemAppend, "## Edited content");
 
         // Preview mid-session must show the cached value, not the edited file,
         // because the send path is also using the cached value.
@@ -398,7 +404,7 @@ describe("ai-chat IPC handlers — additional coverage", () => {
         mockCancel = vi.fn();
 
         vi.mocked(loadSystemAppend).mockReset();
-        vi.mocked(loadSystemAppend).mockResolvedValue(undefined);
+        setMockResolvedValue(loadSystemAppend, undefined);
 
         vi.mocked(fetchModels).mockReset();
 
@@ -432,7 +438,7 @@ describe("ai-chat IPC handlers — additional coverage", () => {
         setMainWindow(
             mockWindow as unknown as import("electron").BrowserWindow,
         );
-        vi.mocked(dialog.showOpenDialog).mockResolvedValue({
+        setMockResolvedValue(dialog.showOpenDialog, {
             canceled: true,
             filePaths: [],
         });
@@ -501,7 +507,7 @@ describe("ai-chat IPC handlers — additional coverage", () => {
     });
 
     it("list-models calls fetchModels for a localhost endpoint", async () => {
-        vi.mocked(fetchModels).mockResolvedValue({
+        setMockResolvedValue(fetchModels, {
             success: true,
             models: ["llama3"],
         });
@@ -539,7 +545,7 @@ describe("ai-chat IPC handlers — additional coverage", () => {
     });
 
     it("list-models calls fetchModels after consent is given for a non-localhost endpoint", async () => {
-        vi.mocked(fetchModels).mockResolvedValue({
+        setMockResolvedValue(fetchModels, {
             success: true,
             models: ["gpt-4"],
         });
@@ -646,7 +652,7 @@ describe("ai-chat IPC handlers — additional coverage", () => {
         setMainWindow(
             mockWindow as unknown as import("electron").BrowserWindow,
         );
-        vi.mocked(dialog.showOpenDialog).mockResolvedValue({
+        setMockResolvedValue(dialog.showOpenDialog, {
             canceled: true,
             filePaths: [],
         });
@@ -662,7 +668,7 @@ describe("ai-chat IPC handlers — additional coverage", () => {
         setMainWindow(
             mockWindow as unknown as import("electron").BrowserWindow,
         );
-        vi.mocked(dialog.showOpenDialog).mockResolvedValue({
+        setMockResolvedValue(dialog.showOpenDialog, {
             canceled: false,
             filePaths: [],
         });
@@ -678,7 +684,7 @@ describe("ai-chat IPC handlers — additional coverage", () => {
         setMainWindow(
             mockWindow as unknown as import("electron").BrowserWindow,
         );
-        vi.mocked(dialog.showOpenDialog).mockResolvedValue({
+        setMockResolvedValue(dialog.showOpenDialog, {
             canceled: false,
             filePaths: ["/home/user/bam-data"],
         });

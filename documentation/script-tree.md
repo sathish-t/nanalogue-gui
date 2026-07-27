@@ -11,6 +11,7 @@ src/
   font-size.ts          # Shared font-size state for the main process.
   main.ts               # Electron main process for nanalogue-gui with multi-mode support
   preload.ts            # Preload script for nanalogue-gui
+  test-helpers.ts       # Shared test helpers that centralise repeated mock/setup patterns.
   lib/
     ai-chat-constants.ts                            # Main-process constants for the AI Chat feature.
     ai-chat-ipc-validation.ts                       # Per-channel IPC payload validation for AI Chat mode.

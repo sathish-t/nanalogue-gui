@@ -162,6 +162,12 @@ let chart: ChartInstance | null = null;
 let isProcessing = false;
 let isInitialized = false;
 let showAnnotationHighlight = true;
+/**
+ * Set when the previous action committed but the next annotation failed to
+ * load. While true, accept/reject are blocked and arrow/button presses retry
+ * loading the current annotation instead of advancing.
+ */
+let pendingRetry = false;
 
 /**
  * Cached references to the DOM elements used throughout the swipe UI.
@@ -181,6 +187,11 @@ const elements = {
 
     /** The element displayed when no plot data is available for the current annotation. */
     noDataMessage: document.getElementById("no-data-message") as HTMLElement,
+
+    /** The element displayed when the previous action was saved but the next annotation failed to load. */
+    loadFailedMessage: document.getElementById(
+        "load-failed-message",
+    ) as HTMLElement,
 
     /** The element displayed when all annotations have been reviewed. */
     doneMessage: document.getElementById("done-message") as HTMLElement,
@@ -213,6 +224,7 @@ const elements = {
 function showLoading() {
     elements.loadingOverlay.classList.remove("hidden");
     elements.noDataMessage.classList.add("hidden");
+    elements.loadFailedMessage.classList.add("hidden");
     elements.doneMessage.classList.add("hidden");
 }
 
@@ -224,11 +236,23 @@ function hideLoading() {
 }
 
 /**
+ * Shows the load-failed message and hides the loading and done overlays.
+ * Used when an action committed but the next annotation failed to load.
+ */
+function showLoadFailed() {
+    hideLoading();
+    elements.noDataMessage.classList.add("hidden");
+    elements.doneMessage.classList.add("hidden");
+    elements.loadFailedMessage.classList.remove("hidden");
+}
+
+/**
  * Shows the no-data message and hides the loading and done overlays.
  */
 function showNoData() {
     elements.loadingOverlay.classList.add("hidden");
     elements.noDataMessage.classList.remove("hidden");
+    elements.loadFailedMessage.classList.add("hidden");
     elements.doneMessage.classList.add("hidden");
 }
 
@@ -240,6 +264,7 @@ function showNoData() {
 function showDone(state: AppState) {
     elements.loadingOverlay.classList.add("hidden");
     elements.noDataMessage.classList.add("hidden");
+    elements.loadFailedMessage.classList.add("hidden");
     elements.doneMessage.classList.remove("hidden");
     elements.summary.textContent = `Accepted: ${state.acceptedCount} | Rejected: ${state.rejectedCount}`;
     if (state.outputPath) {
@@ -477,13 +502,60 @@ function renderChart(plotData: PlotData) {
 }
 
 /**
+ * Renders the given plot data, or shows the no-data message when the plot is empty.
+ *
+ * @param plotData - The plot data for the current annotation, or null/empty.
+ */
+function renderPlotData(plotData: PlotData | null) {
+    if (
+        plotData &&
+        (plotData.rawPoints.length > 0 || plotData.windowedPoints.length > 0)
+    ) {
+        hideLoading();
+        updateTitle(plotData);
+        updateClampWarning(plotData);
+        updateBedExtraInfo(plotData);
+        renderChart(plotData);
+    } else {
+        updateTitle(plotData);
+        updateClampWarning(plotData);
+        updateBedExtraInfo(plotData);
+        showNoData();
+    }
+}
+
+/**
  * Handles an accept or reject action by sending it to the main process and updating the UI accordingly.
+ *
+ * When a previous action committed but the next annotation failed to load
+ * (`pendingRetry`), an arrow or button press retries loading the current
+ * annotation instead of advancing, so an unseen annotation can never be
+ * accepted or rejected.
  *
  * @param action - The swipe action to perform.
  */
 async function handleAction(action: "accept" | "reject") {
     if (isProcessing) return;
     isProcessing = true;
+
+    // If the previous action saved but the next plot failed to load, retry
+    // loading the current annotation rather than advancing past an unseen one.
+    if (pendingRetry) {
+        showLoading();
+        try {
+            const plotData = await api.getPlotData();
+            pendingRetry = false;
+            elements.loadFailedMessage.classList.add("hidden");
+            renderPlotData(plotData);
+        } catch (error) {
+            console.error("Error retrying plot load:", error);
+            elements.title.textContent =
+                "Error — failed to load annotation, please retry";
+            showLoadFailed();
+        }
+        isProcessing = false;
+        return;
+    }
 
     flash(action);
 
@@ -496,27 +568,26 @@ async function handleAction(action: "accept" | "reject") {
         updateProgress(result.state);
 
         if (result.done) {
+            pendingRetry = false;
             updateClampWarning(null);
             updateBedExtraInfo(null);
             showDone(result.state);
-        } else if (
-            result.plotData &&
-            (result.plotData.rawPoints.length > 0 ||
-                result.plotData.windowedPoints.length > 0)
-        ) {
-            hideLoading();
-            updateTitle(result.plotData);
-            updateClampWarning(result.plotData);
-            updateBedExtraInfo(result.plotData);
-            renderChart(result.plotData);
+        } else if (result.plotData) {
+            pendingRetry = false;
+            renderPlotData(result.plotData);
         } else {
-            updateTitle(result.plotData ?? null);
-            updateClampWarning(result.plotData ?? null);
-            updateBedExtraInfo(result.plotData ?? null);
-            showNoData();
+            // Action committed but the next annotation failed to load.
+            // Block further accept/reject until a retry succeeds so an unseen
+            // annotation is never classified.
+            pendingRetry = true;
+            updateClampWarning(null);
+            updateBedExtraInfo(null);
+            elements.title.textContent = "Failed to load next annotation";
+            showLoadFailed();
         }
     } catch (error) {
         console.error("Error handling action:", error);
+        elements.title.textContent = "Error — action failed, please retry";
         hideLoading();
     }
 
