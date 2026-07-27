@@ -72,6 +72,26 @@ jobs:
       - name: Check markdown links
         run: node scripts/check-md-links.mjs
 
+  check-repository-content:
+    name: Check secrets and characters
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24.15.0"
+
+      - name: Check for committed secrets
+        run: node --experimental-strip-types scripts/check-committed-secrets.ts
+
+      - name: Check for strange characters
+        run: node --experimental-strip-types scripts/check-strange-characters.ts
+
   lint-and-typecheck:
     name: Lint & Typecheck
     runs-on: ubuntu-latest
@@ -84,11 +104,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: "22"
+          node-version: "24.15.0"
           cache: "npm"
-
-      - name: Upgrade npm
-        run: npm install -g npm@11.10.0
 
       - name: Install npm dependencies
         run: |
@@ -122,18 +139,18 @@ jobs:
         include:
           # Node 22 across all platforms (minimum supported version)
           - os: ubuntu-latest
-            node: "22"
+            node: "22.13.0"
           - os: ubuntu-24.04-arm
-            node: "22"
+            node: "22.13.0"
           - os: macos-latest
-            node: "22"
+            node: "22.13.0"
           - os: macos-15-intel
-            node: "22"
+            node: "22.13.0"
           # Node 24 version coverage on Linux
           - os: ubuntu-latest
-            node: "24"
+            node: "24.15.0"
           - os: ubuntu-24.04-arm
-            node: "24"
+            node: "24.15.0"
 
     steps:
       - name: Checkout code
@@ -147,8 +164,10 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: "npm"
 
-      - name: Upgrade npm
-        run: npm install -g npm@11.10.0
+      # Node 22 does not bundle the npm version required for min-release-age.
+      - name: Upgrade npm for Node 22 compatibility
+        if: startsWith(matrix.node, '22.')
+        run: npm install -g npm@11.10.0 # zizmor: ignore[adhoc-packages]
 
       - name: Snapshot running processes
         if: runner.os == 'Linux'
@@ -300,11 +319,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: "22"
+          node-version: "24.15.0"
           cache: "npm"
-
-      - name: Upgrade npm
-        run: npm install -g npm@11.10.0
 
       - name: Install npm dependencies
         run: |
@@ -333,11 +349,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: "22"
+          node-version: "24.15.0"
           cache: "npm"
-
-      - name: Upgrade npm
-        run: npm install -g npm@11.10.0
 
       - name: Install npm dependencies
         run: |
@@ -374,11 +387,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: "22"
+          node-version: "24.15.0"
           cache: "npm"
-
-      - name: Upgrade npm
-        run: npm install -g npm@11.10.0
 
       - name: Install npm dependencies
         run: |

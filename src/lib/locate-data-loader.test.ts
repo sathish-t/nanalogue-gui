@@ -41,7 +41,9 @@ describe("validateLocateGenerateBedRequest", () => {
             "fullRegion must be a boolean",
         ],
     ])("rejects invalid request %#", (request, message) => {
-        expect(() => validateLocateGenerateBedRequest(request)).toThrow(message);
+        expect(() => validateLocateGenerateBedRequest(request)).toThrow(
+            message,
+        );
     });
 
     it("retains valid region filtering fields", () => {

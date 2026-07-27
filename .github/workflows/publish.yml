@@ -75,11 +75,8 @@ jobs:
         if: ${{ !matrix.use_docker }}
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: "22"
-          cache: "npm"
-
-      - name: Upgrade npm
-        run: npm install -g npm@11.10.0
+          node-version: "24.15.0"
+          package-manager-cache: false
 
       - name: Install npm dependencies
         if: ${{ !matrix.use_docker }}
@@ -109,16 +106,30 @@ jobs:
             bash -c '
               set -e
 
-              # Install Node.js 22 via NodeSource
-              curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
-              yum install -y nodejs
+              # Install a checksum-pinned Node.js release that bundles npm >=11.10.0.
+              case "$(uname -m)" in
+                x86_64)
+                  NODE_ARCH=x64
+                  NODE_SHA256=472655581fb851559730c48763e0c9d3bc25975c59d518003fc0849d3e4ba0f6
+                  ;;
+                aarch64)
+                  NODE_ARCH=arm64
+                  NODE_SHA256=f3d5a797b5d210ce8e2cb265544c8e482eaedcb8aa409a8b46da7e8595d0dda0
+                  ;;
+                *)
+                  echo "Unsupported Node.js architecture: $(uname -m)" >&2
+                  exit 1
+                  ;;
+              esac
+              NODE_ARCHIVE="node-v24.15.0-linux-${NODE_ARCH}.tar.xz"
+              curl -fsSLO "https://nodejs.org/dist/v24.15.0/${NODE_ARCHIVE}"
+              echo "${NODE_SHA256}  ${NODE_ARCHIVE}" | sha256sum --check -
+              tar -xJf "${NODE_ARCHIVE}" -C /usr/local --strip-components=1
+              rm "${NODE_ARCHIVE}"
 
               # Print Node.js version for debugging
               echo "Node.js version: $(node --version)"
               echo "npm version: $(npm --version)"
-
-              # Upgrade npm for min-release-age support
-              npm install -g npm@11.10.0
 
               # Install npm dependencies, build, and test
               npm ci --ignore-scripts

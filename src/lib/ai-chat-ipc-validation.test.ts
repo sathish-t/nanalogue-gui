@@ -93,7 +93,8 @@ describe("validateListModels", () => {
     it("rejects URL with embedded credentials", () => {
         const result = validateListModels(
             validListModelsPayload({
-                endpointUrl: "http://user:pass@localhost:11434/v1",
+                endpointUrl:
+                    "http://example-user-test:example-password-test@localhost:11434/v1",
             }),
         );
         expect(result.valid).toBe(false);
@@ -206,7 +207,8 @@ describe("validateSendMessage", () => {
     it("rejects URL with embedded credentials", () => {
         const result = validateSendMessage(
             validSendPayload({
-                endpointUrl: "http://admin:secret@localhost/v1",
+                endpointUrl:
+                    "http://example-user-test:example-password-test@localhost/v1",
             }),
         );
         expect(result.valid).toBe(false);
