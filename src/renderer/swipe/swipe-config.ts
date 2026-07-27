@@ -16,17 +16,11 @@ import type { OutputFileInput } from "../shared/output-file-input";
 import "../shared/output-file-input";
 import type { WindowSizeInput } from "../shared/window-size-input";
 import "../shared/window-size-input";
+import type {
+    SwipeLaunchResult,
+    SwipeStartRequest,
+} from "../../lib/swipe-contract";
 import type { PeekResult } from "../../lib/types";
-
-/**
- * Result returned by mode launch IPC handlers.
- */
-interface LaunchResult {
-    /** Whether the launch succeeded. */
-    success: boolean;
-    /** The reason for failure when success is false. */
-    reason?: string;
-}
 
 /**
  * Defines the preload API exposed to the swipe config renderer.
@@ -45,17 +39,7 @@ interface SwipeConfigApi {
     /** Peeks at a BAM file to extract header metadata. */
     peekBam: (bamPath: string, treatAsUrl: boolean) => Promise<PeekResult>;
     /** Initializes swipe mode and navigates to the review interface. */
-    swipeStart: (
-        bamPath: string,
-        bedPath: string,
-        outputPath: string,
-        windowSize: number,
-        modTag?: string,
-        modStrand?: "bc" | "bc_comp",
-        flankingRegion?: number,
-        showAnnotationHighlight?: boolean,
-        treatAsUrl?: boolean,
-    ) => Promise<LaunchResult>;
+    swipeStart: (request: SwipeStartRequest) => Promise<SwipeLaunchResult>;
     /** Navigates back to the landing page. */
     swipeGoBack: () => Promise<void>;
 }
@@ -110,8 +94,8 @@ const elements = {
     btnBack: document.getElementById("btn-back") as HTMLButtonElement,
     /** File summary panel. */
     fileSummary: document.getElementById("file-summary") as HTMLElement,
-    /** Flanking region input. */
-    flankingRegion: document.getElementById(
+    /** Region expansion input. */
+    regionExpansion: document.getElementById(
         "flanking-region",
     ) as HTMLInputElement,
     /** Annotation highlight checkbox. */
@@ -334,7 +318,7 @@ function updateStartButton(): void {
         !outputSource.requiresOverwrite || outputSource.overwriteConfirmed;
 
     // Enable flanking region when all paths are valid
-    elements.flankingRegion.disabled = !(
+    elements.regionExpansion.disabled = !(
         allFilled &&
         overwriteOk &&
         !sameAsBed
@@ -449,13 +433,13 @@ elements.btnStart.addEventListener("click", async () => {
     }
 
     const { tag: modTag, modStrand } = modFilter;
-    const rawFlanking = Number(elements.flankingRegion.value);
-    if (!Number.isInteger(rawFlanking) || rawFlanking < 0) {
+    const rawExpansion = Number(elements.regionExpansion.value);
+    if (!Number.isInteger(rawExpansion) || rawExpansion < 0) {
         alert("Flanking region must be a non-negative integer.");
         elements.btnStart.disabled = false;
         return;
     }
-    const flankingRegion = rawFlanking;
+    const regionExpansion = rawExpansion;
     const showAnnotationHighlight = elements.showAnnotationHighlight.checked;
     const treatAsUrl = bamSource.isUrl;
 
@@ -464,17 +448,17 @@ elements.btnStart.addEventListener("click", async () => {
     elements.loadingOverlay.classList.remove("hidden");
 
     try {
-        const result = await api.swipeStart(
+        const result = await api.swipeStart({
             bamPath,
             bedPath,
             outputPath,
             windowSize,
             modTag,
             modStrand,
-            flankingRegion,
+            regionExpansion,
             showAnnotationHighlight,
             treatAsUrl,
-        );
+        });
         if (!result.success) {
             elements.loadingOverlay.classList.add("hidden");
             elements.btnBack.disabled = false;

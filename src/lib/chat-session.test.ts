@@ -2,6 +2,7 @@
 // Verifies session state management, cancellation, reset, and delegation to the orchestrator.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setMockImplementation, setMockResolvedValue } from "../test-helpers";
 import type { AiChatConfig } from "./chat-types";
 
 // Mock the orchestrator so tests don't need a real LLM or sandbox
@@ -47,7 +48,7 @@ describe("ChatSession", () => {
 
     describe("sendMessage", () => {
         it("calls handleUserMessage with correct arguments", async () => {
-            vi.mocked(handleUserMessage).mockResolvedValue({
+            setMockResolvedValue(handleUserMessage, {
                 text: "hello",
                 steps: [],
             });
@@ -78,7 +79,7 @@ describe("ChatSession", () => {
         });
 
         it("returns the orchestrator result on success", async () => {
-            vi.mocked(handleUserMessage).mockResolvedValue({
+            setMockResolvedValue(handleUserMessage, {
                 text: "42 reads",
                 steps: [
                     {
@@ -111,7 +112,7 @@ describe("ChatSession", () => {
         });
 
         it("increments requestId on each call", async () => {
-            vi.mocked(handleUserMessage).mockResolvedValue({
+            setMockResolvedValue(handleUserMessage, {
                 text: "",
                 steps: [],
             });
@@ -135,7 +136,7 @@ describe("ChatSession", () => {
 
         it("aborts previous request when sending a new one", async () => {
             let capturedSignal = null as AbortSignal | null;
-            vi.mocked(handleUserMessage).mockImplementation(async (opts) => {
+            setMockImplementation(handleUserMessage, async (opts) => {
                 capturedSignal = opts.signal;
                 return { text: "", steps: [] };
             });
@@ -163,7 +164,7 @@ describe("ChatSession", () => {
     describe("cancel", () => {
         it("aborts the current abort controller", async () => {
             let capturedSignal = null as AbortSignal | null;
-            vi.mocked(handleUserMessage).mockImplementation(async (opts) => {
+            setMockImplementation(handleUserMessage, async (opts) => {
                 capturedSignal = opts.signal;
                 return { text: "", steps: [] };
             });
@@ -186,7 +187,7 @@ describe("ChatSession", () => {
         });
 
         it("increments requestId when cancelling", async () => {
-            vi.mocked(handleUserMessage).mockResolvedValue({
+            setMockResolvedValue(handleUserMessage, {
                 text: "",
                 steps: [],
             });
@@ -213,7 +214,7 @@ describe("ChatSession", () => {
 
     describe("reset", () => {
         it("clears history and facts", async () => {
-            vi.mocked(handleUserMessage).mockImplementation(async (opts) => {
+            setMockImplementation(handleUserMessage, async (opts) => {
                 // Simulate adding to history/facts inside orchestrator
                 opts.history.push({ role: "user", content: "test" });
                 opts.facts.push({
@@ -252,7 +253,7 @@ describe("ChatSession", () => {
 
         it("aborts current request and increments requestId", async () => {
             let capturedSignal = null as AbortSignal | null;
-            vi.mocked(handleUserMessage).mockImplementation(async (opts) => {
+            setMockImplementation(handleUserMessage, async (opts) => {
                 capturedSignal = opts.signal;
                 return { text: "", steps: [] };
             });
@@ -276,8 +277,39 @@ describe("ChatSession", () => {
     });
 
     describe("stale response detection", () => {
+        it("returns cancelled when a completed request was aborted while pending", async () => {
+            let finishRequest!: () => void;
+            setMockImplementation(handleUserMessage, async () => {
+                await new Promise<void>((resolve) => {
+                    finishRequest = resolve;
+                });
+                return { text: "stale response", steps: [] };
+            });
+
+            const emitEvent = vi.fn();
+            const result = session.sendMessage({
+                endpointUrl: "http://localhost:11434/v1",
+                apiKey: "",
+                model: "llama3",
+                message: "test",
+                allowedDir: "/tmp",
+                config: defaultConfig,
+                emitEvent,
+            });
+
+            session.cancel();
+            finishRequest();
+
+            await expect(result).resolves.toEqual({
+                success: false,
+                reason: "cancelled",
+                error: "Cancelled",
+            });
+            expect(emitEvent).toHaveBeenCalledWith({ type: "turn_cancelled" });
+        });
+
         it("returns cancelled when signal is aborted during request", async () => {
-            vi.mocked(handleUserMessage).mockImplementation(async (opts) => {
+            setMockImplementation(handleUserMessage, async (opts) => {
                 // Simulate abort during execution
                 opts.signal.addEventListener(
                     "abort",
@@ -306,6 +338,7 @@ describe("ChatSession", () => {
             const outcome = await result;
             expect(outcome).toEqual({
                 success: false,
+                reason: "cancelled",
                 error: "Cancelled",
             });
         });
@@ -313,7 +346,7 @@ describe("ChatSession", () => {
 
     describe("appendSystemPrompt threading", () => {
         it("passes appendSystemPrompt to handleUserMessage when provided", async () => {
-            vi.mocked(handleUserMessage).mockResolvedValue({
+            setMockResolvedValue(handleUserMessage, {
                 text: "ok",
                 steps: [],
             });
@@ -337,7 +370,7 @@ describe("ChatSession", () => {
         });
 
         it("passes undefined appendSystemPrompt to handleUserMessage when not provided", async () => {
-            vi.mocked(handleUserMessage).mockResolvedValue({
+            setMockResolvedValue(handleUserMessage, {
                 text: "ok",
                 steps: [],
             });
@@ -360,7 +393,7 @@ describe("ChatSession", () => {
 
     describe("removedTools threading", () => {
         it("passes removedTools to handleUserMessage when provided", async () => {
-            vi.mocked(handleUserMessage).mockResolvedValue({
+            setMockResolvedValue(handleUserMessage, {
                 text: "ok",
                 steps: [],
             });
@@ -383,7 +416,7 @@ describe("ChatSession", () => {
         });
 
         it("passes undefined removedTools to handleUserMessage when not provided", async () => {
-            vi.mocked(handleUserMessage).mockResolvedValue({
+            setMockResolvedValue(handleUserMessage, {
                 text: "ok",
                 steps: [],
             });
@@ -423,6 +456,7 @@ describe("ChatSession", () => {
 
             expect(result).toEqual({
                 success: false,
+                reason: "error",
                 error: "network failure",
                 isTimeout: false,
             });
@@ -451,6 +485,7 @@ describe("ChatSession", () => {
 
             expect(result).toEqual({
                 success: false,
+                reason: "error",
                 error: "timed out waiting for response",
                 isTimeout: true,
             });
@@ -496,6 +531,7 @@ describe("ChatSession", () => {
 
             expect(result).toEqual({
                 success: false,
+                reason: "error",
                 error: "something went wrong",
                 isTimeout: false,
             });

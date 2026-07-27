@@ -26,7 +26,7 @@ src/lib/chat-orchestrator-history.ts	100
 src/lib/chat-orchestrator-llm.ts	100
 src/lib/chat-orchestrator-test-utils.ts	100
 src/lib/chat-orchestrator.ts	98.68
-src/lib/chat-session.ts	89.47
+src/lib/chat-session.ts	100
 src/lib/format-utils.ts	100
 src/lib/histogram-renderer.ts	100
 src/lib/histogram.ts	100
@@ -39,16 +39,19 @@ src/lib/mod-filter.ts	100
 src/lib/model-listing.ts	92.42
 src/lib/monty-sandbox-helpers.ts	99.34
 src/lib/monty-sandbox.ts	100
+src/lib/qc-config-builder.ts	100
 src/lib/qc-data-loader.ts	93.56
 src/lib/region-parser.ts	95.65
 src/lib/sandbox-cli-args.ts	100
 src/lib/sandbox-prompt-text.ts	100
 src/lib/sandbox-prompt.ts	100
 src/lib/stats.ts	98.33
+src/lib/swipe-contract.ts	100
 src/lib/swipe-data-loader.ts	100
 src/lib/system-append.ts	100
 src/lib/xy-renderer.ts	100
-src/modes/ai-chat.ts	96.96
+src/modes/ai-chat.ts	97.05
+src/modes/locate.ts	100
 src/modes/qc.ts	100
 src/modes/swipe.ts	100
 src/preload.ts	100
@@ -65,3 +68,4 @@ src/renderer/shared/mod-filter-input.ts	100
 src/renderer/shared/output-file-input.ts	98.68
 src/renderer/shared/window-size-input.ts	100
 src/renderer/swipe/swipe.ts	100
+src/test-helpers.ts	100

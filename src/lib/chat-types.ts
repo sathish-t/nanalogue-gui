@@ -1,29 +1,38 @@
 // Shared types for the AI Chat feature.
 // Used by monty-sandbox, chat-orchestrator, ai-chat mode module, and renderer.
 
-/** Result of running Python code in the Monty sandbox. */
-export interface SandboxResult {
-    /** Whether the code executed without errors. */
-    success: boolean;
-    /** The return value of the sandbox code (if successful). */
-    value?: unknown;
-    /** Whether the output was truncated by the output gate. */
-    truncated?: boolean;
-    /** Whether the code ended with a bare expression (heuristic). */
-    endedWithExpression?: boolean;
-    /** The type of error that occurred (if unsuccessful). */
-    errorType?: string;
-    /** The error message (if unsuccessful). */
-    message?: string;
-    /** Whether the error was caused by a timeout. */
-    isTimeout?: boolean;
+/** Print metadata shared by successful and failed sandbox executions. */
+interface SandboxPrintMetadata {
     /** Whether print() output was clipped by the maxPrintBytes limit. */
     printsTruncated?: boolean;
-    /** Whether continue_thinking() was called in the sandbox code. */
-    continueThinkingCalled?: boolean;
     /** Captured print() output segments from sandbox code. */
     prints?: string[];
 }
+
+/** Result of running Python code in the Monty sandbox. */
+export type SandboxResult =
+    | (SandboxPrintMetadata & {
+          /** The code executed without errors. */
+          success: true;
+          /** The sandbox return value; undefined is a valid successful value. */
+          value: unknown;
+          /** Whether the return value was truncated by the output gate. */
+          truncated: boolean;
+          /** Whether the code ended with a bare expression (heuristic). */
+          endedWithExpression: boolean;
+          /** Whether continue_thinking() was called in the sandbox code. */
+          continueThinkingCalled: boolean;
+      })
+    | (SandboxPrintMetadata & {
+          /** The code failed to execute. */
+          success: false;
+          /** Producer-defined error class; intentionally not a closed enum. */
+          errorType: string;
+          /** Human-readable error details. */
+          message: string;
+          /** Whether the failure was caused by a timeout. */
+          isTimeout: boolean;
+      });
 
 /** Configuration options for the Monty sandbox. */
 export interface SandboxOptions {
@@ -179,6 +188,77 @@ export interface HandleMessageResult {
     /** The sandbox execution steps taken during this turn. */
     steps: StepInfo[];
 }
+
+/** A remote endpoint must be approved before a request can be sent. */
+export interface AiChatConsentRequiredResult {
+    /** The operation failed. */
+    success: false;
+    /** Stable machine-readable reason. */
+    reason: "consent_required";
+    /** Kept as display text for backwards-compatible UI copy. */
+    error: "CONSENT_REQUIRED";
+    /** Endpoint origin requiring consent. */
+    origin: string;
+}
+
+/** Successful send-message IPC result. */
+interface AiChatSendSuccess extends HandleMessageResult {
+    /** The request succeeded. */
+    success: true;
+}
+
+/** Cancelled send-message IPC result. */
+interface AiChatSendCancelled {
+    /** The request failed. */
+    success: false;
+    /** Stable cancellation reason. */
+    reason: "cancelled";
+    /** User-facing cancellation text. */
+    error: "Cancelled";
+}
+
+/** Ordinary send-message IPC failure. */
+interface AiChatSendFailure {
+    /** The request failed. */
+    success: false;
+    /** Stable ordinary-error reason. */
+    reason: "error";
+    /** User-facing error details. */
+    error: string;
+    /** Whether the request timed out. */
+    isTimeout: boolean;
+}
+
+/** Result returned by the send-message IPC handler. */
+export type AiChatSendMessageResult =
+    | AiChatSendSuccess
+    | AiChatConsentRequiredResult
+    | AiChatSendCancelled
+    | AiChatSendFailure;
+
+/** Successful list-models IPC result. */
+interface AiChatListModelsSuccess {
+    /** The request succeeded. */
+    success: true;
+    /** Available model identifiers. */
+    models: string[];
+}
+
+/** Ordinary list-models IPC failure. */
+interface AiChatListModelsFailure {
+    /** The request failed. */
+    success: false;
+    /** Stable ordinary-error reason. */
+    reason: "error";
+    /** User-facing error details. */
+    error: string;
+}
+
+/** Result returned by the list-models IPC handler. */
+export type AiChatListModelsResult =
+    | AiChatListModelsSuccess
+    | AiChatConsentRequiredResult
+    | AiChatListModelsFailure;
 
 /** Configuration for the context transformation pipeline. */
 export interface ContextConfig {

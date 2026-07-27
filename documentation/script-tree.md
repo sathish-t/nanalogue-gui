@@ -11,6 +11,7 @@ src/
   font-size.ts          # Shared font-size state for the main process.
   main.ts               # Electron main process for nanalogue-gui with multi-mode support
   preload.ts            # Preload script for nanalogue-gui
+  test-helpers.ts       # Shared test helpers that centralise repeated mock/setup patterns.
   lib/
     ai-chat-constants.ts                            # Main-process constants for the AI Chat feature.
     ai-chat-ipc-validation.ts                       # Per-channel IPC payload validation for AI Chat mode.
@@ -38,12 +39,14 @@ src/
     model-listing.ts                                # Provider detection and model listing for multi-provider LLM endpoints.
     monty-sandbox-helpers.ts                        # Utility helpers for monty-sandbox: path security, option translation,
     monty-sandbox.ts                                # Monty sandbox wrapper for AI Chat mode.
+    qc-config-builder.ts                            # Pure validation and construction of QC configuration form snapshots.
     qc-data-loader.ts                               # QC data loader: paginated BAM data retrieval with streaming histograms
     region-parser.ts                                # Parses and validates genomic region strings (e.g. "chr3", "chrI:1000-50000")
     sandbox-cli-args.ts                             # Shared sandbox CLI argument definitions, numeric arg parser, and sandbox
     sandbox-prompt-text.ts                          # Contains the large built-in sandbox prompt template used for AI chat.
     sandbox-prompt.ts                               # Builds the LLM system prompt and assembles the full system message sent on every turn.
     stats.ts                                        # Statistics utilities for QC calculations
+    swipe-contract.ts
     swipe-data-loader.ts                            # Swipe data loader using nanalogue-node
     system-append.ts                                # Loads the optional SYSTEM_APPEND.md file from an analysis directory.
     types.ts                                        # Type definitions shared across nanalogue-gui modes
@@ -70,6 +73,7 @@ src/
         minimap2.wasm
   modes/
     ai-chat.ts            # AI Chat mode logic for nanalogue-gui.
+    locate.ts
     qc.ts                 # QC mode logic for nanalogue-gui
     swipe.ts              # Swipe mode module - handles annotation review workflow
   renderer/

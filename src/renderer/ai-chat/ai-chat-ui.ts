@@ -1,7 +1,7 @@
 // UI helpers for the AI Chat renderer.
 
+import type { StepInfo } from "../../lib/chat-types";
 import { getAiChatElements } from "./ai-chat-elements";
-import type { CodeStep } from "./ai-chat-types";
 
 const {
     btnCopyCode,
@@ -153,7 +153,7 @@ export function setSpinner(show: boolean, text?: string): void {
  * @param page - The zero-based page index to display.
  * @returns The clamped page index that is now displayed.
  */
-export function showCodePage(codeSteps: CodeStep[], page: number): number {
+export function showCodePage(codeSteps: StepInfo[], page: number): number {
     if (codeSteps.length === 0) {
         codeDisplay.textContent = "No code executed yet.";
         codePageIndicator.textContent = "0 / 0";

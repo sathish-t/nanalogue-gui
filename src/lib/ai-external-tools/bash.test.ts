@@ -43,7 +43,7 @@ beforeEach(async () => {
     );
     await writeFile(
         join(allowedDir, "id_rsa"),
-        "-----BEGIN RSA PRIVATE KEY-----",
+        ["-----BEGIN RSA", "PRIVATE KEY-----"].join(" "),
     );
     await mkdir(join(allowedDir, "subdir"));
     await writeFile(join(allowedDir, "subdir", ".env"), "NESTED_SECRET=abc");

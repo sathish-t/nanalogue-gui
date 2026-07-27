@@ -163,3 +163,15 @@ if [ "$PATH_LEAK_FOUND" -ne 0 ]; then
   echo "  Remove or replace any hardcoded paths containing your local username before committing." >&2
   exit 1
 fi
+
+# Scan the final staged repository snapshot after every hook operation that can
+# update the index. Reading index blobs prevents unstaged working-tree edits
+# from hiding or inventing findings for the pending commit.
+if ! node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/check-committed-secrets.ts --cached-only; then
+  echo "pre-commit: committed-secret check failed, aborting commit" >&2
+  exit 1
+fi
+if ! node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/check-strange-characters.ts --cached-only; then
+  echo "pre-commit: strange-character check failed, aborting commit" >&2
+  exit 1
+fi

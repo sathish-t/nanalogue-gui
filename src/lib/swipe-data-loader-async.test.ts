@@ -3,6 +3,7 @@
 
 import type { BamModRecord, WindowReadEntry } from "@nanalogue/node";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { setMockResolvedValue } from "../test-helpers";
 import type { BedAnnotation } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -117,7 +118,7 @@ describe("loadContigSizes", () => {
     });
 
     it("returns contigs from peek result", async () => {
-        vi.mocked(peek).mockResolvedValue({
+        setMockResolvedValue(peek, {
             contigs: { chr1: 5000, chr2: 10000 },
             modifications: [],
         });
@@ -128,7 +129,7 @@ describe("loadContigSizes", () => {
     });
 
     it("passes bamPath and treatAsUrl to peek", async () => {
-        vi.mocked(peek).mockResolvedValue({
+        setMockResolvedValue(peek, {
             contigs: { chr1: 5000 },
             modifications: [],
         });
@@ -142,7 +143,7 @@ describe("loadContigSizes", () => {
     });
 
     it("returns an empty object when the BAM has no contigs", async () => {
-        vi.mocked(peek).mockResolvedValue({
+        setMockResolvedValue(peek, {
             contigs: {},
             modifications: [],
         });
@@ -153,7 +154,7 @@ describe("loadContigSizes", () => {
     });
 
     it("treats undefined treatAsUrl as falsy (no explicit true)", async () => {
-        vi.mocked(peek).mockResolvedValue({
+        setMockResolvedValue(peek, {
             contigs: { chr1: 5000 },
             modifications: [],
         });
@@ -175,10 +176,8 @@ describe("loadPlotData", () => {
     });
 
     it("returns windowedPoints and rawPoints for a valid annotation", async () => {
-        vi.mocked(windowReads).mockResolvedValue(
-            makeWindowRecords(1000, 2000, 0.7),
-        );
-        vi.mocked(bamMods).mockResolvedValue(makeBamModRecords(1500, 200));
+        setMockResolvedValue(windowReads, makeWindowRecords(1000, 2000, 0.7));
+        setMockResolvedValue(bamMods, makeBamModRecords(1500, 200));
 
         const result = await loadPlotData(
             "/data/sample.bam",
@@ -195,8 +194,8 @@ describe("loadPlotData", () => {
     });
 
     it("throws when the annotation contig is not in contigSizes", async () => {
-        vi.mocked(windowReads).mockResolvedValue([]);
-        vi.mocked(bamMods).mockResolvedValue([]);
+        setMockResolvedValue(windowReads, []);
+        setMockResolvedValue(bamMods, []);
 
         await expect(
             loadPlotData("/data/sample.bam", BASE_ANNOTATION, {}, 300),
@@ -204,8 +203,8 @@ describe("loadPlotData", () => {
     });
 
     it("sets clampWarning when annotation end exceeds contig length", async () => {
-        vi.mocked(windowReads).mockResolvedValue([]);
-        vi.mocked(bamMods).mockResolvedValue([]);
+        setMockResolvedValue(windowReads, []);
+        setMockResolvedValue(bamMods, []);
 
         // Annotation end (2000) > contig size (1500) → clamp warning
         const result = await loadPlotData(
@@ -219,8 +218,8 @@ describe("loadPlotData", () => {
     });
 
     it("throws when the annotation is entirely outside contig bounds", async () => {
-        vi.mocked(windowReads).mockResolvedValue([]);
-        vi.mocked(bamMods).mockResolvedValue([]);
+        setMockResolvedValue(windowReads, []);
+        setMockResolvedValue(bamMods, []);
 
         // start=1000, end=2000, contigSize=500 → expandedEnd=500 > expandedStart after clamping
         // But more directly: annotation.start(1000) - expansion(10000) = max(0,0) = 0,
@@ -262,8 +261,8 @@ describe("loadPlotData", () => {
                 seq_len: 2000,
             },
         ];
-        vi.mocked(windowReads).mockResolvedValue(records);
-        vi.mocked(bamMods).mockResolvedValue([]);
+        setMockResolvedValue(windowReads, records);
+        setMockResolvedValue(bamMods, []);
 
         const result = await loadPlotData(
             "/data/sample.bam",
@@ -303,8 +302,8 @@ describe("loadPlotData", () => {
                 mapq: 60,
             },
         ];
-        vi.mocked(windowReads).mockResolvedValue([]);
-        vi.mocked(bamMods).mockResolvedValue(modRecords);
+        setMockResolvedValue(windowReads, []);
+        setMockResolvedValue(bamMods, modRecords);
 
         const result = await loadPlotData(
             "/data/sample.bam",
@@ -344,8 +343,8 @@ describe("loadPlotData", () => {
                 mapq: 60,
             },
         ];
-        vi.mocked(windowReads).mockResolvedValue([]);
-        vi.mocked(bamMods).mockResolvedValue(modRecords);
+        setMockResolvedValue(windowReads, []);
+        setMockResolvedValue(bamMods, modRecords);
 
         const result = await loadPlotData(
             "/data/sample.bam",
@@ -375,8 +374,8 @@ describe("loadPlotData", () => {
                 mapq: 255,
             },
         ];
-        vi.mocked(windowReads).mockResolvedValue([]);
-        vi.mocked(bamMods).mockResolvedValue(modRecords);
+        setMockResolvedValue(windowReads, []);
+        setMockResolvedValue(bamMods, modRecords);
 
         const result = await loadPlotData(
             "/data/sample.bam",
@@ -389,8 +388,8 @@ describe("loadPlotData", () => {
     });
 
     it("includes expandedRegion in the result", async () => {
-        vi.mocked(windowReads).mockResolvedValue([]);
-        vi.mocked(bamMods).mockResolvedValue([]);
+        setMockResolvedValue(windowReads, []);
+        setMockResolvedValue(bamMods, []);
 
         const result = await loadPlotData(
             "/data/sample.bam",
@@ -408,8 +407,8 @@ describe("loadPlotData", () => {
     });
 
     it("uses default region expansion of 10 000 when not specified", async () => {
-        vi.mocked(windowReads).mockResolvedValue([]);
-        vi.mocked(bamMods).mockResolvedValue([]);
+        setMockResolvedValue(windowReads, []);
+        setMockResolvedValue(bamMods, []);
 
         const result = await loadPlotData(
             "/data/sample.bam",
@@ -424,8 +423,8 @@ describe("loadPlotData", () => {
     });
 
     it("clamps non-finite regionExpansion to the default", async () => {
-        vi.mocked(windowReads).mockResolvedValue([]);
-        vi.mocked(bamMods).mockResolvedValue([]);
+        setMockResolvedValue(windowReads, []);
+        setMockResolvedValue(bamMods, []);
 
         const result = await loadPlotData(
             "/data/sample.bam",
@@ -440,8 +439,8 @@ describe("loadPlotData", () => {
     });
 
     it("includes the annotation in the result", async () => {
-        vi.mocked(windowReads).mockResolvedValue([]);
-        vi.mocked(bamMods).mockResolvedValue([]);
+        setMockResolvedValue(windowReads, []);
+        setMockResolvedValue(bamMods, []);
 
         const result = await loadPlotData(
             "/data/sample.bam",

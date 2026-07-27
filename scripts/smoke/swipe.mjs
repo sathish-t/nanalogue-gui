@@ -45,17 +45,17 @@ await run("Swipe mode", async () => {
         // --- start swipe session via IPC ---
         const result = await page.evaluate(
             ({ bam, bed, out }) =>
-                window.api.swipeStart(
-                    bam,
-                    bed,
-                    out,
-                    /* windowSize        */ 300,
-                    /* modTag            */ "T",
-                    /* modStrand         */ "bc",
-                    /* flankingRegion    */ 1000,
-                    /* showAnnotHighlight*/ true,
-                    /* treatAsUrl        */ false,
-                ),
+                window.api.swipeStart({
+                    bamPath: bam,
+                    bedPath: bed,
+                    outputPath: out,
+                    windowSize: 300,
+                    modTag: "T",
+                    modStrand: "bc",
+                    regionExpansion: 1000,
+                    showAnnotationHighlight: true,
+                    treatAsUrl: false,
+                }),
             { bam: DEMO_BAM, bed: DEMO_BED, out: OUTPUT_BED },
         );
         assert(

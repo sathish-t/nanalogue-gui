@@ -1,6 +1,95 @@
 // Locate-reads data loader for parsing read ID files and generating BED output
 
 import type { ReadInfoRecord } from "@nanalogue/node";
+import { validateIpcRemoteBamUrl } from "./ipc-path-validation";
+
+/** Named request used to generate a Locate BED file. */
+export type LocateGenerateBedRequest = {
+    /** BAM file path or URL. */
+    bamPath: string;
+    /** Path to the read ID text file. */
+    readIdPath: string;
+    /** Destination BED file path. */
+    outputPath: string;
+    /** Whether bamPath is a remote URL. */
+    treatAsUrl: boolean;
+} & (
+    | {
+          /** No genomic region constraint. */
+          region?: undefined;
+          /** Full-region filtering requires a region. */
+          fullRegion?: undefined;
+      }
+    | {
+          /** Genomic region constraint. */
+          region: string;
+          /** Whether reads must span the complete region. */
+          fullRegion?: boolean;
+      }
+);
+
+/**
+ * Validates an untrusted Locate BED-generation IPC payload.
+ *
+ * @param value - The untrusted IPC payload.
+ * @returns The validated Locate request.
+ */
+export function validateLocateGenerateBedRequest(
+    value: unknown,
+): LocateGenerateBedRequest {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        throw new Error("Invalid Locate request: expected an object");
+    }
+    const request = value as Record<string, unknown>;
+    for (const field of ["bamPath", "readIdPath", "outputPath"] as const) {
+        if (typeof request[field] !== "string" || request[field].length === 0) {
+            throw new Error(
+                `Invalid Locate request: ${field} must be a non-empty string`,
+            );
+        }
+    }
+    if (typeof request.treatAsUrl !== "boolean") {
+        throw new Error("Invalid Locate request: treatAsUrl must be a boolean");
+    }
+    if (
+        request.region !== undefined &&
+        (typeof request.region !== "string" ||
+            request.region.trim().length === 0)
+    ) {
+        throw new Error(
+            "Invalid Locate request: region must be a non-empty string",
+        );
+    }
+    if (
+        request.fullRegion !== undefined &&
+        typeof request.fullRegion !== "boolean"
+    ) {
+        throw new Error("Invalid Locate request: fullRegion must be a boolean");
+    }
+    if (request.fullRegion !== undefined && request.region === undefined) {
+        throw new Error("Invalid Locate request: fullRegion requires region");
+    }
+    if (request.treatAsUrl) {
+        validateIpcRemoteBamUrl(request.bamPath as string, "Locate");
+    }
+    const region = request.region as string | undefined;
+    if (region !== undefined) {
+        return {
+            bamPath: request.bamPath as string,
+            readIdPath: request.readIdPath as string,
+            outputPath: request.outputPath as string,
+            treatAsUrl: request.treatAsUrl as boolean,
+            region,
+            fullRegion: request.fullRegion as boolean | undefined,
+        };
+    }
+    return {
+        bamPath: request.bamPath as string,
+        readIdPath: request.readIdPath as string,
+        outputPath: request.outputPath as string,
+        treatAsUrl: request.treatAsUrl as boolean,
+    };
+}
 
 /** Result of parsing read IDs, including whether the ID cap was hit. */
 export interface ParseReadIdsResult {

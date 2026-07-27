@@ -140,6 +140,7 @@ body {
 /* Centered overlay panels for loading, empty-data, and completion states. */
 #loading-overlay,
 #no-data-message,
+#load-failed-message,
 #done-message {
     align-items: center;
     background: rgb(255 255 255 / 95%);
@@ -154,6 +155,7 @@ body {
 /* Hide overlays by toggling the hidden class. */
 #loading-overlay.hidden,
 #no-data-message.hidden,
+#load-failed-message.hidden,
 #done-message.hidden {
     display: none;
 }
@@ -177,13 +179,15 @@ body {
 
 /* Status text beneath loading and empty-data overlays. */
 #loading-overlay p,
-#no-data-message p {
+#no-data-message p,
+#load-failed-message p {
     color: #666;
     margin-top: 16px;
 }
 
 /* Smaller hint text within the empty-data and completion overlays. */
 #no-data-message .hint,
+#load-failed-message .hint,
 #done-message .hint {
     color: #888;
     font-size: 0.929rem;

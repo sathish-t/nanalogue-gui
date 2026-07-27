@@ -17,12 +17,17 @@ import {
     vi,
 } from "vitest";
 import type { QCConfig, QCData } from "../lib/types";
+import {
+    setMockImplementation,
+    setMockResolvedValue,
+    setMockReturnValue,
+} from "../test-helpers";
 
 // ---------------------------------------------------------------------------
-// Stable handler map – populated when registerIpcHandlers() runs.
+// Stable handler map – populated when registerQcIpcHandlers() runs.
 // ---------------------------------------------------------------------------
 
-/** IPC handlers registered by registerIpcHandlers(), keyed by channel name. */
+/** IPC handlers registered by registerQcIpcHandlers(), keyed by channel name. */
 const ipcHandlers = new Map<string, (...args: unknown[]) => Promise<unknown>>();
 
 // ---------------------------------------------------------------------------
@@ -84,10 +89,10 @@ const { dialog } = await import("electron");
 const { readFile } = await import("node:fs/promises");
 const { parseReadIds } = await import("../lib/locate-data-loader");
 const { validateIpcFilePath } = await import("../lib/ipc-path-validation");
-const { registerIpcHandlers, setMainWindow } = await import("./qc");
+const { registerQcIpcHandlers, setQcMainWindow } = await import("./qc");
 
 // Register all IPC handlers once; ipcHandlers is populated as a side-effect.
-registerIpcHandlers();
+registerQcIpcHandlers();
 
 // ---------------------------------------------------------------------------
 // Shared mock window object.
@@ -123,11 +128,11 @@ describe("qc IPC handlers", () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        setMainWindow(null);
+        setQcMainWindow(null);
     });
 
     afterEach(() => {
-        setMainWindow(null);
+        setQcMainWindow(null);
     });
 
     // -------------------------------------------------------------------------
@@ -136,7 +141,7 @@ describe("qc IPC handlers", () => {
 
     describe("peek-bam", () => {
         it("delegates to peekBam with the supplied arguments", async () => {
-            vi.mocked(peekBam).mockResolvedValue({
+            setMockResolvedValue(peekBam, {
                 contigs: ["chr1"],
                 totalContigs: 1,
                 modifications: [],
@@ -163,7 +168,7 @@ describe("qc IPC handlers", () => {
                 modifications: ["m6A"],
                 allContigs: { chr1: 1000, chr2: 2000 },
             };
-            vi.mocked(peekBam).mockResolvedValue(mockResult);
+            setMockResolvedValue(peekBam, mockResult);
 
             const result = await ipcHandlers.get("peek-bam")?.(
                 undefined,
@@ -175,7 +180,7 @@ describe("qc IPC handlers", () => {
         });
 
         it("validates the bam path when treatAsUrl is false", async () => {
-            vi.mocked(peekBam).mockResolvedValue({
+            setMockResolvedValue(peekBam, {
                 contigs: [],
                 totalContigs: 0,
                 modifications: [],
@@ -195,7 +200,7 @@ describe("qc IPC handlers", () => {
         });
 
         it("skips path validation when treatAsUrl is true", async () => {
-            vi.mocked(peekBam).mockResolvedValue({
+            setMockResolvedValue(peekBam, {
                 contigs: [],
                 totalContigs: 0,
                 modifications: [],
@@ -224,8 +229,8 @@ describe("qc IPC handlers", () => {
         });
 
         it("opens a dialog and returns the selected path", async () => {
-            setMainWindow(mockWindow);
-            vi.mocked(dialog.showOpenDialog).mockResolvedValue({
+            setQcMainWindow(mockWindow);
+            setMockResolvedValue(dialog.showOpenDialog, {
                 canceled: false,
                 filePaths: ["/data/sample.bam"],
             });
@@ -237,8 +242,8 @@ describe("qc IPC handlers", () => {
         });
 
         it("returns null when the dialog is cancelled", async () => {
-            setMainWindow(mockWindow);
-            vi.mocked(dialog.showOpenDialog).mockResolvedValue({
+            setQcMainWindow(mockWindow);
+            setMockResolvedValue(dialog.showOpenDialog, {
                 canceled: true,
                 filePaths: [],
             });
@@ -249,8 +254,8 @@ describe("qc IPC handlers", () => {
         });
 
         it("returns null when dialog returns an empty filePaths array", async () => {
-            setMainWindow(mockWindow);
-            vi.mocked(dialog.showOpenDialog).mockResolvedValue({
+            setQcMainWindow(mockWindow);
+            setMockResolvedValue(dialog.showOpenDialog, {
                 canceled: false,
                 filePaths: [],
             });
@@ -329,11 +334,12 @@ describe("qc IPC handlers", () => {
         };
 
         beforeEach(() => {
-            setMainWindow(mockWindow);
-            vi.mocked(
+            setQcMainWindow(mockWindow);
+            setMockResolvedValue(
                 mockWindow.loadFile as ReturnType<typeof vi.fn>,
-            ).mockResolvedValue(undefined);
-            vi.mocked(generateQCData).mockResolvedValue(stubQCData);
+                undefined,
+            );
+            setMockResolvedValue(generateQCData, stubQCData);
         });
 
         it("calls generateQCData with the provided config", async () => {
@@ -361,7 +367,8 @@ describe("qc IPC handlers", () => {
 
         it("sends qc-progress events via webContents during generation", async () => {
             // Intercept the onProgress callback and invoke it synchronously.
-            vi.mocked(generateQCData).mockImplementation(
+            setMockImplementation(
+                generateQCData,
                 async (_config, onProgress) => {
                     onProgress?.("modifications", 100);
                     onProgress?.("windows", 50);
@@ -386,16 +393,15 @@ describe("qc IPC handlers", () => {
         });
 
         it("resolves readIdFilePath and injects readIdSet into config", async () => {
-            vi.mocked(readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+            setMockResolvedValue(
+                readFile as ReturnType<typeof vi.fn>,
                 "read-a\nread-b\n",
             );
-            vi.mocked(parseReadIds as ReturnType<typeof vi.fn>).mockReturnValue(
-                {
-                    capped: false,
-                    ids: ["read-a", "read-b"],
-                    count: 2,
-                },
-            );
+            setMockReturnValue(parseReadIds as ReturnType<typeof vi.fn>, {
+                capped: false,
+                ids: ["read-a", "read-b"],
+                count: 2,
+            });
 
             await ipcHandlers.get("generate-qc")?.(undefined, {
                 ...baseConfig,
@@ -441,12 +447,15 @@ describe("qc IPC handlers", () => {
         });
 
         it("validates readIdFilePath", async () => {
-            vi.mocked(readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
+            setMockResolvedValue(
+                readFile as ReturnType<typeof vi.fn>,
                 "read-a\n",
             );
-            vi.mocked(parseReadIds as ReturnType<typeof vi.fn>).mockReturnValue(
-                { capped: false, ids: ["read-a"], count: 1 },
-            );
+            setMockReturnValue(parseReadIds as ReturnType<typeof vi.fn>, {
+                capped: false,
+                ids: ["read-a"],
+                count: 1,
+            });
 
             await ipcHandlers.get("generate-qc")?.(undefined, {
                 ...baseConfig,
@@ -460,16 +469,12 @@ describe("qc IPC handlers", () => {
         });
 
         it("throws when the read ID file exceeds the 200 000-ID limit", async () => {
-            vi.mocked(readFile as ReturnType<typeof vi.fn>).mockResolvedValue(
-                "",
-            );
-            vi.mocked(parseReadIds as ReturnType<typeof vi.fn>).mockReturnValue(
-                {
-                    capped: true,
-                    ids: [],
-                    count: 200_001,
-                },
-            );
+            setMockResolvedValue(readFile as ReturnType<typeof vi.fn>, "");
+            setMockReturnValue(parseReadIds as ReturnType<typeof vi.fn>, {
+                capped: true,
+                ids: [],
+                count: 200_001,
+            });
 
             await expect(
                 ipcHandlers.get("generate-qc")?.(undefined, {
@@ -486,9 +491,9 @@ describe("qc IPC handlers", () => {
 
     describe("get-qc-data (after generate-qc)", () => {
         it("returns the data produced by the most recent generate-qc call", async () => {
-            setMainWindow(mockWindow);
+            setQcMainWindow(mockWindow);
             const stubData = { sampleSeed: 99 } as unknown as QCData;
-            vi.mocked(generateQCData).mockResolvedValue(stubData);
+            setMockResolvedValue(generateQCData, stubData);
 
             await ipcHandlers.get("generate-qc")?.(undefined, {
                 bamPath: "/data/sample.bam",

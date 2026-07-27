@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CodeStep } from "./ai-chat-types";
+import type { StepInfo } from "../../lib/chat-types";
 
 /**
  * Loads the ai-chat.html template into the jsdom document.
@@ -52,9 +52,9 @@ describe("ai-chat-ui", () => {
         const btnCopy = document.getElementById(
             "btn-copy-code",
         ) as HTMLButtonElement;
-        const codeSteps: CodeStep[] = [
-            { code: 'print("one")', result: 1 },
-            { code: 'print("two")', result: 2 },
+        const codeSteps: StepInfo[] = [
+            { code: 'print("one")', result: { success: true, value: 1 } },
+            { code: 'print("two")', result: { success: true, value: 2 } },
         ];
 
         expect(showCodePage(codeSteps, 99)).toBe(1);

@@ -15,14 +15,14 @@ let mainWindow: BrowserWindow | null = null;
  *
  * @param window - The main BrowserWindow instance, or null to clear the reference.
  */
-export function setMainWindow(window: BrowserWindow | null) {
+export function setQcMainWindow(window: BrowserWindow | null) {
     mainWindow = window;
 }
 
 /**
  * Registers all IPC handlers for the QC mode, including BAM peeking, file selection, and QC generation.
  */
-export function registerIpcHandlers() {
+export function registerQcIpcHandlers() {
     ipcMain.handle(
         "peek-bam",
         async (_event, bamPath: string, treatAsUrl: boolean) => {

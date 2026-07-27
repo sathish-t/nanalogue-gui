@@ -4,7 +4,9 @@
 import { handleUserMessage, resetLastSentMessages } from "./chat-orchestrator";
 import type {
     AiChatConfig,
+    AiChatConsentRequiredResult,
     AiChatEvent,
+    AiChatSendMessageResult,
     Fact,
     HistoryEntry,
 } from "./chat-types";
@@ -45,42 +47,11 @@ export interface SendMessageOptions {
     removedTools?: ReadonlySet<string>;
 }
 
-/** Successful send result. */
-interface SendSuccess {
-    /** Whether the send succeeded. */
-    success: true;
-    /** The assistant's text response. */
-    text: string;
-    /** The sandbox execution steps. */
-    steps: Array<{
-        /** The Python code that was executed. */
-        code: string;
-        /** The sandbox execution result. */
-        result: {
-            /** Whether the execution succeeded. */
-            success: boolean;
-            /** The return value (if successful). */
-            value?: unknown;
-            /** The error type (if unsuccessful). */
-            errorType?: string;
-            /** The error message (if unsuccessful). */
-            message?: string;
-        };
-    }>;
-}
-
-/** Failed send result. */
-interface SendFailure {
-    /** Whether the send succeeded. */
-    success: false;
-    /** The error message. */
-    error: string;
-    /** Whether the failure was caused by a timeout. */
-    isTimeout?: boolean;
-}
-
 /** Result of a sendMessage call. */
-export type SendMessageResult = SendSuccess | SendFailure;
+export type SendMessageResult = Exclude<
+    AiChatSendMessageResult,
+    AiChatConsentRequiredResult
+>;
 
 /**
  * Manages conversation state for a single AI Chat session.
@@ -117,7 +88,6 @@ export class ChatSession {
         } = options;
 
         this.requestId += 1;
-        const thisRequestId = this.requestId;
         this.currentAbortController?.abort();
         this.currentAbortController = new AbortController();
         const localSignal = this.currentAbortController.signal;
@@ -139,15 +109,15 @@ export class ChatSession {
                 removedTools,
             });
 
-            // Check for cancellation or stale response. Cancel increments
-            // requestId, so check the abort signal first to return the
-            // correct "Cancelled" status instead of "Request superseded".
+            // Starting, cancelling, or resetting a request aborts the
+            // previous controller, so stale requests are cancellations.
             if (localSignal.aborted) {
                 emitEvent({ type: "turn_cancelled" });
-                return { success: false, error: "Cancelled" };
-            }
-            if (thisRequestId !== this.requestId) {
-                return { success: false, error: "Request superseded" };
+                return {
+                    success: false,
+                    reason: "cancelled",
+                    error: "Cancelled",
+                };
             }
 
             return {
@@ -163,11 +133,12 @@ export class ChatSession {
                         error.message.includes("timed out"));
                 if (!isTimeout) {
                     emitEvent({ type: "turn_cancelled" });
-                    return { success: false, error: "Cancelled" };
+                    return {
+                        success: false,
+                        reason: "cancelled",
+                        error: "Cancelled",
+                    };
                 }
-            }
-            if (thisRequestId !== this.requestId) {
-                return { success: false, error: "Request superseded" };
             }
             const isTimeout =
                 error instanceof Error &&
@@ -182,6 +153,7 @@ export class ChatSession {
             });
             return {
                 success: false,
+                reason: "error",
                 error: errorMsg,
                 isTimeout,
             };

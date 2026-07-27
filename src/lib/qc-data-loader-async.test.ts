@@ -4,6 +4,10 @@
 
 import type { BamModRecord, WindowReadEntry } from "@nanalogue/node";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+    setMockResolvedValue,
+    setMockResolvedValueOnce,
+} from "../test-helpers";
 import type { QCConfig } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -102,7 +106,7 @@ describe("peekBam", () => {
     });
 
     it("formats contigs and modifications from peek result", async () => {
-        vi.mocked(peek).mockResolvedValue({
+        setMockResolvedValue(peek, {
             contigs: { chr1: 5000, chr2: 10000, chr3: 8000 },
             modifications: [
                 ["C", "+", "m"],
@@ -123,7 +127,7 @@ describe("peekBam", () => {
     });
 
     it("limits example contigs to three when the BAM has more", async () => {
-        vi.mocked(peek).mockResolvedValue({
+        setMockResolvedValue(peek, {
             contigs: { a: 1, b: 2, c: 3, d: 4, e: 5 },
             modifications: [],
         });
@@ -135,7 +139,7 @@ describe("peekBam", () => {
     });
 
     it("deduplicates modifications with the same strand and code", async () => {
-        vi.mocked(peek).mockResolvedValue({
+        setMockResolvedValue(peek, {
             contigs: { chr1: 5000 },
             modifications: [
                 ["C", "+", "m"],
@@ -150,7 +154,7 @@ describe("peekBam", () => {
     });
 
     it("formats negative-strand modifications with a - prefix", async () => {
-        vi.mocked(peek).mockResolvedValue({
+        setMockResolvedValue(peek, {
             contigs: { chr1: 5000 },
             modifications: [["C", "-", "m"]],
         });
@@ -161,7 +165,7 @@ describe("peekBam", () => {
     });
 
     it("passes bamPath and treatAsUrl through to peek", async () => {
-        vi.mocked(peek).mockResolvedValue({
+        setMockResolvedValue(peek, {
             contigs: { chr1: 5000 },
             modifications: [],
         });
@@ -175,7 +179,7 @@ describe("peekBam", () => {
     });
 
     it("returns empty modification list when BAM has no mods", async () => {
-        vi.mocked(peek).mockResolvedValue({
+        setMockResolvedValue(peek, {
             contigs: { chr1: 5000 },
             modifications: [],
         });
@@ -186,7 +190,7 @@ describe("peekBam", () => {
     });
 
     it("returns zero totalContigs for an empty BAM", async () => {
-        vi.mocked(peek).mockResolvedValue({
+        setMockResolvedValue(peek, {
             contigs: {},
             modifications: [],
         });
@@ -211,8 +215,8 @@ describe("generateQCData", () => {
     });
 
     it("returns empty histograms when both BAM and windowReads have no records", async () => {
-        vi.mocked(bamMods).mockResolvedValue([]);
-        vi.mocked(windowReads).mockResolvedValue([]);
+        setMockResolvedValue(bamMods, []);
+        setMockResolvedValue(windowReads, []);
 
         const result = await generateQCData(BASE_CONFIG);
 
@@ -225,8 +229,8 @@ describe("generateQCData", () => {
     });
 
     it("accumulates rawProbability and wholeReadDensity from bamMods records", async () => {
-        vi.mocked(bamMods).mockResolvedValue(makeBamModRecords(3, 128));
-        vi.mocked(windowReads).mockResolvedValue([]);
+        setMockResolvedValue(bamMods, makeBamModRecords(3, 128));
+        setMockResolvedValue(windowReads, []);
 
         const result = await generateQCData(BASE_CONFIG);
 
@@ -237,8 +241,8 @@ describe("generateQCData", () => {
     });
 
     it("accumulates read lengths and windowed density from windowReads records", async () => {
-        vi.mocked(bamMods).mockResolvedValue([]);
-        vi.mocked(windowReads).mockResolvedValue(makeWindowRecords(2, 0.6));
+        setMockResolvedValue(bamMods, []);
+        setMockResolvedValue(windowReads, makeWindowRecords(2, 0.6));
 
         const result = await generateQCData(BASE_CONFIG);
 
@@ -249,7 +253,7 @@ describe("generateQCData", () => {
     });
 
     it("counts alignment types in readTypeCounts", async () => {
-        vi.mocked(bamMods).mockResolvedValue([]);
+        setMockResolvedValue(bamMods, []);
         const records: WindowReadEntry[] = [
             {
                 alignment_type: "primary_forward",
@@ -275,7 +279,7 @@ describe("generateQCData", () => {
                 mapq: 255,
             },
         ];
-        vi.mocked(windowReads).mockResolvedValue(records);
+        setMockResolvedValue(windowReads, records);
 
         const result = await generateQCData(BASE_CONFIG);
 
@@ -301,8 +305,8 @@ describe("generateQCData", () => {
                 mapq: 255,
             },
         ];
-        vi.mocked(bamMods).mockResolvedValue(records);
-        vi.mocked(windowReads).mockResolvedValue([]);
+        setMockResolvedValue(bamMods, records);
+        setMockResolvedValue(windowReads, []);
 
         const result = await generateQCData(BASE_CONFIG);
 
@@ -322,8 +326,8 @@ describe("generateQCData", () => {
                 mapq: 60,
             },
         ] as unknown as BamModRecord[];
-        vi.mocked(bamMods).mockResolvedValue(records);
-        vi.mocked(windowReads).mockResolvedValue([]);
+        setMockResolvedValue(bamMods, records);
+        setMockResolvedValue(windowReads, []);
 
         const result = await generateQCData(BASE_CONFIG);
 
@@ -332,8 +336,8 @@ describe("generateQCData", () => {
     });
 
     it("sets seqTableSkipReason when no region is configured", async () => {
-        vi.mocked(bamMods).mockResolvedValue([]);
-        vi.mocked(windowReads).mockResolvedValue([]);
+        setMockResolvedValue(bamMods, []);
+        setMockResolvedValue(windowReads, []);
 
         const result = await generateQCData({
             ...BASE_CONFIG,
@@ -345,8 +349,8 @@ describe("generateQCData", () => {
     });
 
     it("sets seqTableSkipReason when region is a bare contig name (no range)", async () => {
-        vi.mocked(bamMods).mockResolvedValue([]);
-        vi.mocked(windowReads).mockResolvedValue([]);
+        setMockResolvedValue(bamMods, []);
+        setMockResolvedValue(windowReads, []);
 
         const result = await generateQCData({
             ...BASE_CONFIG,
@@ -359,8 +363,8 @@ describe("generateQCData", () => {
     });
 
     it("sets seqTableSkipReason when region exceeds 500 bp", async () => {
-        vi.mocked(bamMods).mockResolvedValue([]);
-        vi.mocked(windowReads).mockResolvedValue([]);
+        setMockResolvedValue(bamMods, []);
+        setMockResolvedValue(windowReads, []);
 
         // 1000 bp region → too large for seqTable
         const result = await generateQCData({
@@ -374,12 +378,12 @@ describe("generateQCData", () => {
     });
 
     it("calls seqTable twice and returns rows when region is within the 500 bp limit", async () => {
-        vi.mocked(bamMods).mockResolvedValue([]);
-        vi.mocked(windowReads).mockResolvedValue([]);
+        setMockResolvedValue(bamMods, []);
+        setMockResolvedValue(windowReads, []);
 
         // Both tagged and base calls return the same single-row TSV
         const tsv = "read_id\tsequence\tqualities\nread1\tACGT\t10.20.30.40\n";
-        vi.mocked(seqTable).mockResolvedValue(tsv);
+        setMockResolvedValue(seqTable, tsv);
 
         const result = await generateQCData({
             ...BASE_CONFIG,
@@ -394,8 +398,8 @@ describe("generateQCData", () => {
     });
 
     it("passes optional read filters through and warns on exceeded read lengths", async () => {
-        vi.mocked(bamMods).mockResolvedValue([]);
-        vi.mocked(windowReads).mockResolvedValue([
+        setMockResolvedValue(bamMods, []);
+        setMockResolvedValue(windowReads, [
             {
                 alignment_type: "primary_forward",
                 alignment: {
@@ -410,7 +414,8 @@ describe("generateQCData", () => {
                 mapq: 60,
             },
         ]);
-        vi.mocked(seqTable).mockResolvedValue(
+        setMockResolvedValue(
+            seqTable,
             "read_id\tsequence\tqualities\nr1\tACGT\t10.20.30.40\n",
         );
 
@@ -496,8 +501,8 @@ describe("generateQCData", () => {
     });
 
     it("calls onProgress with modification and window counts", async () => {
-        vi.mocked(bamMods).mockResolvedValue(makeBamModRecords(1));
-        vi.mocked(windowReads).mockResolvedValue(makeWindowRecords(1));
+        setMockResolvedValue(bamMods, makeBamModRecords(1));
+        setMockResolvedValue(windowReads, makeWindowRecords(1));
 
         const onProgress = vi.fn();
         await generateQCData(BASE_CONFIG, onProgress);
@@ -511,10 +516,9 @@ describe("generateQCData", () => {
 
     it("paginates bamMods when first page is full", async () => {
         // First call returns a full page (1000 records), second returns empty
-        vi.mocked(bamMods)
-            .mockResolvedValueOnce(makeBamModRecords(1000))
-            .mockResolvedValueOnce([]);
-        vi.mocked(windowReads).mockResolvedValue([]);
+        setMockResolvedValueOnce(bamMods, makeBamModRecords(1000));
+        setMockResolvedValueOnce(bamMods, []);
+        setMockResolvedValue(windowReads, []);
 
         const result = await generateQCData(BASE_CONFIG);
 
@@ -525,10 +529,9 @@ describe("generateQCData", () => {
 
     it("paginates windowReads when first page is full", async () => {
         const fullPage = makeWindowRecords(10_000);
-        vi.mocked(bamMods).mockResolvedValue([]);
-        vi.mocked(windowReads)
-            .mockResolvedValueOnce(fullPage)
-            .mockResolvedValueOnce([]);
+        setMockResolvedValue(bamMods, []);
+        setMockResolvedValueOnce(windowReads, fullPage);
+        setMockResolvedValueOnce(windowReads, []);
 
         await generateQCData(BASE_CONFIG);
 
@@ -537,8 +540,8 @@ describe("generateQCData", () => {
     });
 
     it("stores sampleSeed in the returned data", async () => {
-        vi.mocked(bamMods).mockResolvedValue([]);
-        vi.mocked(windowReads).mockResolvedValue([]);
+        setMockResolvedValue(bamMods, []);
+        setMockResolvedValue(windowReads, []);
 
         const result = await generateQCData({ ...BASE_CONFIG, sampleSeed: 99 });
 
@@ -546,8 +549,8 @@ describe("generateQCData", () => {
     });
 
     it("records readLengthBinWidth in the result", async () => {
-        vi.mocked(bamMods).mockResolvedValue([]);
-        vi.mocked(windowReads).mockResolvedValue([]);
+        setMockResolvedValue(bamMods, []);
+        setMockResolvedValue(windowReads, []);
 
         const result = await generateQCData({
             ...BASE_CONFIG,

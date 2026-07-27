@@ -6,6 +6,24 @@ import { dirname, isAbsolute } from "node:path";
 import { hasControlChars } from "./monty-sandbox-helpers";
 
 /**
+ * Asserts that a remote BAM value received over IPC is an HTTP(S) URL.
+ *
+ * @param value - BAM URL received from the renderer.
+ * @param feature - Feature name used in validation errors.
+ */
+export function validateIpcRemoteBamUrl(value: string, feature: string): void {
+    let parsed: URL;
+    try {
+        parsed = new URL(value);
+    } catch {
+        throw new Error(`Invalid ${feature} BAM URL`);
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new Error(`Invalid ${feature} BAM URL: expected HTTP or HTTPS`);
+    }
+}
+
+/**
  * Asserts that a file path supplied by the renderer is safe to use for a
  * filesystem operation.
  *

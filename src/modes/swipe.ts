@@ -10,36 +10,22 @@ import {
 import { resolve } from "node:path";
 import { dialog, ipcMain } from "electron";
 import { parseBedFile } from "../lib/bed-parser";
+import type {
+    SwipePlotData,
+    SwipeReviewState,
+    SwipeStartRequest,
+} from "../lib/swipe-contract";
 import {
     type ContigSizes,
     loadContigSizes,
     loadPlotData,
 } from "../lib/swipe-data-loader";
-import type { AppState, BedAnnotation, PlotData } from "../lib/types";
+import type { BedAnnotation } from "../lib/types";
 
 /**
  * Configuration arguments for the swipe annotation review mode.
  */
-export interface SwipeArgs {
-    /** Path to the BAM file containing nanopore signal data. */
-    bamPath: string;
-    /** Path to the BED file containing base modification annotations. */
-    bedPath: string;
-    /** Path for the output BED file where accepted annotations are written. */
-    outputPath: string;
-    /** Window size in base pairs around each annotation for the signal plot. */
-    windowSize: number;
-    /** Modification tag code to filter by (e.g. "m", "a", "T"). */
-    modTag?: string;
-    /** Strand convention for modification calls. */
-    modStrand?: "bc" | "bc_comp";
-    /** Number of base pairs to expand the annotation region by on each side. */
-    regionExpansion?: number;
-    /** Whether to show the annotation region highlight box on the chart. */
-    showAnnotationHighlight?: boolean;
-    /** Whether to treat the BAM path as a remote URL rather than a local file. */
-    treatAsUrl?: boolean;
-}
+export type SwipeArgs = SwipeStartRequest;
 
 let annotations: BedAnnotation[] = [];
 let contigSizes: ContigSizes = {};
@@ -47,7 +33,7 @@ let cliArgs: SwipeArgs | null = null;
 let modTag: string | undefined;
 let modStrand: "bc" | "bc_comp" | undefined;
 let regionExpansion: number | undefined;
-const appState: AppState = {
+const appState: SwipeReviewState = {
     currentIndex: 0,
     totalCount: 0,
     acceptedCount: 0,
@@ -61,7 +47,7 @@ const appState: AppState = {
  * @param skipOverwriteConfirm - Whether to skip the overwrite confirmation dialog (used when the GUI config page already warned the user).
  * @returns A promise that resolves when initialization is complete.
  */
-export async function initialize(
+export async function initializeSwipeReview(
     args: SwipeArgs,
     skipOverwriteConfirm = false,
 ): Promise<void> {
@@ -140,7 +126,7 @@ export async function initialize(
  *
  * @returns A promise that resolves to the plot data, or null if no more annotations remain or arguments are missing.
  */
-async function loadCurrentPlotData(): Promise<PlotData | null> {
+async function loadCurrentPlotData(): Promise<SwipePlotData | null> {
     if (!cliArgs) return null;
 
     if (appState.currentIndex >= annotations.length) {
@@ -149,46 +135,37 @@ async function loadCurrentPlotData(): Promise<PlotData | null> {
 
     const annotation = annotations[appState.currentIndex];
 
-    try {
-        return await loadPlotData(
-            cliArgs.bamPath,
-            annotation,
-            contigSizes,
-            cliArgs.windowSize,
-            {
-                modTag,
-                modStrand,
-                regionExpansion,
-                treatAsUrl: cliArgs.treatAsUrl,
-            },
-        );
-    } catch (error) {
-        console.error(
-            `Error loading data for annotation ${appState.currentIndex + 1}:`,
-            error,
-        );
-        return null;
-    }
+    return await loadPlotData(
+        cliArgs.bamPath,
+        annotation,
+        contigSizes,
+        cliArgs.windowSize,
+        {
+            modTag,
+            modStrand,
+            regionExpansion,
+            treatAsUrl: cliArgs.treatAsUrl,
+        },
+    );
 }
 
 /**
  * Appends an accepted annotation line to the output BED file.
  *
+ * Throws if the write fails so the caller can surface the error to the user
+ * instead of silently losing curated data.
+ *
  * @param outputPath - Path to the output BED file.
  * @param rawLine - The raw BED line to append.
  */
-function writeAcceptedAnnotation(outputPath: string, rawLine: string) {
-    try {
-        appendFileSync(outputPath, `${rawLine}\n`, "utf-8");
-    } catch (error) {
-        console.error("Error writing annotation:", error);
-    }
+function writeAcceptedAnnotation(outputPath: string, rawLine: string): void {
+    appendFileSync(outputPath, `${rawLine}\n`, "utf-8");
 }
 
 /**
  * Registers IPC handlers for the renderer process to request state, plot data, and accept or reject annotations.
  */
-export function registerIpcHandlers(): void {
+export function registerSwipeIpcHandlers(): void {
     ipcMain.handle("get-state", () => {
         return appState;
     });
@@ -218,8 +195,16 @@ export function registerIpcHandlers(): void {
             return { done: true, state: appState };
         }
 
-        const plotData = await loadCurrentPlotData();
-        return { done: false, state: appState, plotData };
+        try {
+            const plotData = await loadCurrentPlotData();
+            return { done: false, state: appState, plotData };
+        } catch (error) {
+            console.error(
+                `Error loading data for annotation ${appState.currentIndex + 1}:`,
+                error,
+            );
+            return { done: false, state: appState, plotData: null };
+        }
     });
 
     ipcMain.handle("reject", async () => {
@@ -241,7 +226,15 @@ export function registerIpcHandlers(): void {
             return { done: true, state: appState };
         }
 
-        const plotData = await loadCurrentPlotData();
-        return { done: false, state: appState, plotData };
+        try {
+            const plotData = await loadCurrentPlotData();
+            return { done: false, state: appState, plotData };
+        } catch (error) {
+            console.error(
+                `Error loading data for annotation ${appState.currentIndex + 1}:`,
+                error,
+            );
+            return { done: false, state: appState, plotData: null };
+        }
     });
 }

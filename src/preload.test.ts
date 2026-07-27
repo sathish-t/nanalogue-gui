@@ -281,33 +281,21 @@ describe("invoke routing", () => {
         );
     });
 
-    it("swipeStart forwards to swipe-start with all arguments", () => {
-        (
-            exposedApi.swipeStart as (
-                bam: string,
-                bed: string,
-                out: string,
-                win: number,
-                tag?: string,
-                strand?: string,
-                flank?: number,
-                highlight?: boolean,
-                url?: boolean,
-            ) => void
-        )("/bam", "/bed", "/out", 300, "m", "bc", 500, true, false);
+    it("swipeStart forwards one named request", () => {
+        const request = {
+            bamPath: "/bam",
+            bedPath: "/bed",
+            outputPath: "/out",
+            windowSize: 300,
+            modTag: "m",
+            modStrand: "bc",
+            regionExpansion: 500,
+            showAnnotationHighlight: true,
+            treatAsUrl: false,
+        };
+        (exposedApi.swipeStart as (request: object) => void)(request);
 
-        expect(ipcRenderer.invoke).toHaveBeenCalledWith(
-            "swipe-start",
-            "/bam",
-            "/bed",
-            "/out",
-            300,
-            "m",
-            "bc",
-            500,
-            true,
-            false,
-        );
+        expect(ipcRenderer.invoke).toHaveBeenCalledWith("swipe-start", request);
     });
 
     // -----------------------------------------------------------------------
@@ -429,26 +417,20 @@ describe("invoke routing", () => {
         );
     });
 
-    it("locateGenerateBed forwards to locate-generate-bed with all arguments", () => {
-        (
-            exposedApi.locateGenerateBed as (
-                bam: string,
-                ids: string,
-                out: string,
-                url: boolean,
-                region?: string,
-                full?: boolean,
-            ) => void
-        )("/bam", "/ids.txt", "/out.bed", false, "chr1:0-1000", true);
+    it("locateGenerateBed forwards one named request", () => {
+        const request = {
+            bamPath: "/bam",
+            readIdPath: "/ids.txt",
+            outputPath: "/out.bed",
+            treatAsUrl: false,
+            region: "chr1:0-1000",
+            fullRegion: true,
+        };
+        (exposedApi.locateGenerateBed as (request: object) => void)(request);
 
         expect(ipcRenderer.invoke).toHaveBeenCalledWith(
             "locate-generate-bed",
-            "/bam",
-            "/ids.txt",
-            "/out.bed",
-            false,
-            "chr1:0-1000",
-            true,
+            request,
         );
     });
 

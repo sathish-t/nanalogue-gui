@@ -4,16 +4,16 @@
 process.env.GSETTINGS_BACKEND ??= "memory";
 
 import { type ChildProcess, fork } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { readInfo } from "@nanalogue/node";
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import type { FontSize } from "./font-size";
 import { getFontSize, setFontSize } from "./font-size";
 import { validateIpcFilePath } from "./lib/ipc-path-validation";
-import { countBedDataLines, countNonEmptyLines } from "./lib/line-counter";
-import { generateBedLines, parseReadIds } from "./lib/locate-data-loader";
+import { countBedDataLines } from "./lib/line-counter";
+import { validateSwipeStartRequest } from "./lib/swipe-contract";
 import * as aiChatModule from "./modes/ai-chat";
+import * as locateModule from "./modes/locate";
 import * as qcModule from "./modes/qc";
 import * as swipeModule from "./modes/swipe";
 
@@ -232,8 +232,9 @@ function createWindow(mode: AppMode) {
     }
 
     // Set main window reference for mode modules
-    qcModule.setMainWindow(mainWindow);
-    aiChatModule.setMainWindow(mainWindow);
+    qcModule.setQcMainWindow(mainWindow);
+    aiChatModule.setAiChatMainWindow(mainWindow);
+    locateModule.setLocateMainWindow(mainWindow);
 
     mainWindow.on("closed", () => {
         mainWindow = null;
@@ -259,8 +260,9 @@ function resizeAndLoadMode(mode: AppMode) {
     const { width, height } = getWindowSize(mode);
 
     // Update module window references when changing modes
-    qcModule.setMainWindow(mainWindow);
-    aiChatModule.setMainWindow(mainWindow);
+    qcModule.setQcMainWindow(mainWindow);
+    aiChatModule.setAiChatMainWindow(mainWindow);
+    locateModule.setLocateMainWindow(mainWindow);
 
     mainWindow.setSize(width, height);
     mainWindow.center();
@@ -423,47 +425,18 @@ ipcMain.handle(
      * Initializes the swipe module with the provided file paths and navigates to the swipe UI.
      *
      * @param _event - The IPC event (unused).
-     * @param bamPath - The path to the BAM file.
-     * @param bedPath - The path to the BED annotations file.
-     * @param outputPath - The path for the output BED file.
-     * @param windowSize - The number of bases of interest per analysis window.
-     * @param modTag - The modification tag code to filter by.
-     * @param modStrand - The strand convention for modification calls.
-     * @param flankingRegion - The number of base pairs to expand the region by on each side.
-     * @param showAnnotationHighlight - Whether to show the annotation region highlight box.
-     * @param treatAsUrl - Whether to treat the BAM path as a remote URL.
+     * @param payload - Untrusted named Swipe review configuration.
      * @returns A result object indicating success or failure.
      */
-    async (
-        _event,
-        bamPath: string,
-        bedPath: string,
-        outputPath: string,
-        windowSize: number,
-        modTag?: string,
-        modStrand?: "bc" | "bc_comp",
-        flankingRegion?: number,
-        showAnnotationHighlight?: boolean,
-        treatAsUrl?: boolean,
-    ) => {
-        if (!treatAsUrl) await validateIpcFilePath(bamPath, "read");
-        await validateIpcFilePath(bedPath, "read");
-        await validateIpcFilePath(outputPath, "write");
-
-        const swipeArgs: swipeModule.SwipeArgs = {
-            bamPath,
-            bedPath,
-            outputPath,
-            windowSize,
-            modTag,
-            modStrand,
-            regionExpansion: flankingRegion,
-            showAnnotationHighlight,
-            treatAsUrl,
-        };
+    async (_event, payload: unknown) => {
+        const swipeArgs = validateSwipeStartRequest(payload);
+        if (!swipeArgs.treatAsUrl)
+            await validateIpcFilePath(swipeArgs.bamPath, "read");
+        await validateIpcFilePath(swipeArgs.bedPath, "read");
+        await validateIpcFilePath(swipeArgs.outputPath, "write");
 
         try {
-            await swipeModule.initialize(swipeArgs, true);
+            await swipeModule.initializeSwipeReview(swipeArgs, true);
             resizeAndLoadMode("swipe");
             return { success: true };
         } catch (error) {
@@ -569,95 +542,6 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-    "locate-pick-read-ids",
-    /**
-     * Opens a native file dialog for selecting a read ID text file.
-     *
-     * @returns The selected file path, or null if cancelled.
-     */
-    async () => {
-        if (!mainWindow) return null;
-        const result = await dialog.showOpenDialog(mainWindow, {
-            title: "Select read ID file",
-            filters: [
-                { name: "Text files", extensions: ["txt"] },
-                { name: "All files", extensions: ["*"] },
-            ],
-            properties: ["openFile"],
-        });
-        if (result.canceled || result.filePaths.length === 0) return null;
-        return result.filePaths[0];
-    },
-);
-
-ipcMain.handle(
-    "locate-count-read-ids",
-    /**
-     * Counts the number of non-empty lines in a read ID file.
-     *
-     * @param _event - The IPC event (unused).
-     * @param filePath - The path to the read ID file.
-     * @returns The number of non-empty lines.
-     */
-    async (_event, filePath: string) => {
-        await validateIpcFilePath(filePath, "read");
-        return countNonEmptyLines(filePath);
-    },
-);
-
-ipcMain.handle(
-    "locate-generate-bed",
-    /**
-     * Generates a BED file from read IDs found in a BAM file.
-     *
-     * @param _event - The IPC event (unused).
-     * @param bamPath - The path or URL to the BAM file.
-     * @param readIdPath - The path to the read ID text file.
-     * @param outputPath - The path for the output BED file.
-     * @param treatAsUrl - Whether to treat the BAM path as a remote URL.
-     * @param region - Optional genomic region to constrain the search.
-     * @param fullRegion - Whether to restrict to reads spanning the full region.
-     * @returns A summary of the BED generation results.
-     */
-    async (
-        _event,
-        bamPath: string,
-        readIdPath: string,
-        outputPath: string,
-        treatAsUrl: boolean,
-        region?: string,
-        fullRegion?: boolean,
-    ) => {
-        if (!treatAsUrl) await validateIpcFilePath(bamPath, "read");
-        await validateIpcFilePath(readIdPath, "read");
-        await validateIpcFilePath(outputPath, "write");
-        const content = readFileSync(readIdPath, "utf-8");
-        const parseResult = parseReadIds(content);
-        if (parseResult.capped) {
-            throw new Error(
-                `Read ID file contains ${parseResult.count.toLocaleString()} unique IDs, exceeding the limit of 200,000. Please reduce the file.`,
-            );
-        }
-        const ids = parseResult.ids;
-
-        const options = region
-            ? { bamPath, treatAsUrl, readIdSet: ids, region, fullRegion }
-            : { bamPath, treatAsUrl, readIdSet: ids };
-
-        const records = await readInfo(options);
-        const { lines, summary } = generateBedLines(records, ids.length);
-
-        writeFileSync(
-            outputPath,
-            lines.length > 0 ? `${lines.join("\n")}\n` : "",
-            "utf-8",
-        );
-
-        return summary;
-    },
-);
-
-ipcMain.handle(
     "locate-go-back",
     /**
      * Navigates back to the landing page from the locate config screen.
@@ -691,9 +575,10 @@ ipcMain.handle(
 );
 
 // Register mode IPC handlers
-swipeModule.registerIpcHandlers();
-qcModule.registerIpcHandlers();
-aiChatModule.registerIpcHandlers();
+swipeModule.registerSwipeIpcHandlers();
+locateModule.registerLocateIpcHandlers();
+qcModule.registerQcIpcHandlers();
+aiChatModule.registerAiChatIpcHandlers();
 
 app.whenReady().then(() => {
     initExitWatchdog();

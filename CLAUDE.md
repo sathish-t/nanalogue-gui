@@ -36,6 +36,15 @@ Electron). Two standalone **CLIs** (`cli.ts`, `execute-cli.ts`) reuse
 
 ---
 
+## Coding skills
+
+Before writing or renaming code, read and apply the
+[`write-discoverable-code` skill](documentation/skills/write-discoverable-code/SKILL.md)
+so identifiers, contracts, files, errors, and documentation remain easy for
+agents and humans to find through plain-text search.
+
+---
+
 ## Key external dependencies
 
 | Package | What it is | Reference |
@@ -69,9 +78,12 @@ npm run lint           # no lint errors
 npm run lint:fix       # auto-fix what can be fixed
 ```
 
-Then run AI reviews (redirect each to a temp file to avoid
-interleaved output; use `mktemp` so concurrent runs never collide).
-Give each a timeout of 300s.
+### If Claude is available
+
+If the Claude CLI is installed and you can authenticate with it, run the
+following review. Redirect its output to a temp file to avoid interleaved
+output; use `mktemp` so concurrent runs never collide. Give the review a
+timeout of 300s.
 
 ```bash
 CLAUDE_OUT=$(mktemp)
@@ -116,6 +128,12 @@ Remove files only after you are sure you have read them fully.
 ```bash
 rm "$CLAUDE_OUT"
 ```
+
+### If you have access to the Oracle
+
+If you have access to a tool called the Oracle, ask it for its opinion on the
+code changes. Fix anything it identifies that you think is worth fixing.
+
 ---
 
 ## Testing

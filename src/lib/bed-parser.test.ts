@@ -4,6 +4,7 @@ import { unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { suppressConsoleWarn } from "../test-helpers";
 import { parseBedFile } from "./bed-parser";
 
 /** Paths of temporary files created during the current test, removed in afterEach. */
@@ -81,7 +82,7 @@ describe("parseBedFile", () => {
     });
 
     it("skips lines with insufficient columns", async () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const warnSpy = suppressConsoleWarn();
         const path = await writeTempBed(
             "chr1\t100\t200\nchr1\t100\t200\tread1",
         );
@@ -93,7 +94,7 @@ describe("parseBedFile", () => {
     });
 
     it("skips lines with NaN coordinates", async () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const warnSpy = suppressConsoleWarn();
         const path = await writeTempBed("chr1\tabc\t200\tread1");
         const result = parseBedFile(path);
         expect(result.annotations).toHaveLength(0);
@@ -103,7 +104,7 @@ describe("parseBedFile", () => {
     });
 
     it("skips lines with negative start coordinate", async () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const warnSpy = suppressConsoleWarn();
         const path = await writeTempBed("chr1\t-10\t200\tread1");
         const result = parseBedFile(path);
         expect(result.annotations).toHaveLength(0);
@@ -113,7 +114,7 @@ describe("parseBedFile", () => {
     });
 
     it("skips lines with negative end coordinate", async () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const warnSpy = suppressConsoleWarn();
         const path = await writeTempBed("chr1\t10\t-5\tread1");
         const result = parseBedFile(path);
         expect(result.annotations).toHaveLength(0);
@@ -123,7 +124,7 @@ describe("parseBedFile", () => {
     });
 
     it("skips lines where start equals end", async () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const warnSpy = suppressConsoleWarn();
         const path = await writeTempBed("chr1\t100\t100\tread1");
         const result = parseBedFile(path);
         expect(result.annotations).toHaveLength(0);
@@ -133,7 +134,7 @@ describe("parseBedFile", () => {
     });
 
     it("skips lines where start is greater than end", async () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const warnSpy = suppressConsoleWarn();
         const path = await writeTempBed("chr1\t300\t100\tread1");
         const result = parseBedFile(path);
         expect(result.annotations).toHaveLength(0);
