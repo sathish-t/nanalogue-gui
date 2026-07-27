@@ -65,7 +65,7 @@ export {
  */
 export function collectTerminalOutput(result: SandboxResult): string {
     const parts: string[] = [...(result.prints ?? [])];
-    if (result.endedWithExpression && result.value != null) {
+    if (result.success && result.endedWithExpression && result.value != null) {
         const valStr = safeStringify(result.value);
         parts.push(`${valStr.ok ? valStr.json : valStr.fallback}\n`);
     }

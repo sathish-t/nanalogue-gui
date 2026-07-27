@@ -17,6 +17,7 @@ import {
     it,
     vi,
 } from "vitest";
+import type { AiChatEvent } from "../lib/chat-types";
 import {
     setMockImplementation,
     setMockResolvedValue,
@@ -122,10 +123,11 @@ const { fetchModels } = await import("../lib/model-listing");
 // Import dialog so tests can configure its showOpenDialog mock.
 const { dialog } = await import("electron");
 // Import both entry points from the module under test.
-const { registerIpcHandlers, setMainWindow } = await import("./ai-chat");
+const { registerAiChatIpcHandlers, setAiChatMainWindow: setMainWindow } =
+    await import("./ai-chat");
 
 // Register all IPC handlers once. ipcHandlers is populated as a side-effect.
-registerIpcHandlers();
+registerAiChatIpcHandlers();
 
 // ---------------------------------------------------------------------------
 // Minimal valid payload shape for ai-chat-send-message.
@@ -462,12 +464,12 @@ describe("ai-chat IPC handlers — additional coverage", () => {
 
         // Capture the emitEvent callback that the send-message handler passes
         // to session.sendMessage, then invoke it directly.
-        let capturedEmitEvent: ((event: unknown) => void) | undefined;
+        let capturedEmitEvent: ((event: AiChatEvent) => void) | undefined;
 
         /** Args shape accepted by session.sendMessage in the mock. */
         type SendArgs = {
             /** Event emitter callback forwarded from the send-message handler. */
-            emitEvent: (event: unknown) => void;
+            emitEvent: (event: AiChatEvent) => void;
         };
         mockSendMessage = vi.fn().mockImplementation((args: SendArgs) => {
             capturedEmitEvent = args.emitEvent;
@@ -480,12 +482,11 @@ describe("ai-chat IPC handlers — additional coverage", () => {
 
         expect(capturedEmitEvent).toBeDefined();
         if (capturedEmitEvent) {
-            capturedEmitEvent({ type: "token", content: "hello" });
+            capturedEmitEvent({ type: "turn_start" });
         }
 
         expect(mockSend).toHaveBeenCalledWith("ai-chat-event", {
-            type: "token",
-            content: "hello",
+            type: "turn_start",
         });
     });
 
@@ -538,6 +539,7 @@ describe("ai-chat IPC handlers — additional coverage", () => {
 
         expect(result).toMatchObject({
             success: false,
+            reason: "consent_required",
             error: "CONSENT_REQUIRED",
             origin: "http://unconsented-list-models.example.com",
         });
@@ -598,6 +600,7 @@ describe("ai-chat IPC handlers — additional coverage", () => {
 
         expect(result).toMatchObject({
             success: false,
+            reason: "consent_required",
             error: "CONSENT_REQUIRED",
             origin: "http://unconsented-send-msg.example.com",
         });
@@ -686,13 +689,13 @@ describe("ai-chat IPC handlers — additional coverage", () => {
         );
         setMockResolvedValue(dialog.showOpenDialog, {
             canceled: false,
-            filePaths: ["/home/user/bam-data"],
+            filePaths: ["/home/example-test-account/bam-data"],
         });
 
         const handler = ipcHandlers.get("ai-chat-pick-directory");
         if (!handler) throw new Error("ai-chat-pick-directory not registered");
 
-        expect(await handler()).toBe("/home/user/bam-data");
+        expect(await handler()).toBe("/home/example-test-account/bam-data");
     });
 
     // -------------------------------------------------------------------------

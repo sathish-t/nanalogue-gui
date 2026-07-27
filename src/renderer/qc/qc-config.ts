@@ -1,12 +1,12 @@
 // QC config page renderer
 
 import { formatContigLength } from "../../lib/format-utils";
+import { buildQCConfig } from "../../lib/qc-config-builder";
 import { applyFontSize } from "../shared/apply-font-size";
 
 applyFontSize();
 
-import { parseRegion, validateModRegionOverlap } from "../../lib/region-parser";
-import type { PeekResult } from "../../lib/types";
+import type { PeekResult, QCConfig } from "../../lib/types";
 import type { BamSelectedDetail } from "../shared/bam-resource-input";
 import "../shared/bam-resource-input";
 import type { ModFilterInput } from "../shared/mod-filter-input";
@@ -22,7 +22,7 @@ interface QCApi {
     peekBam: (bamPath: string, treatAsUrl: boolean) => Promise<PeekResult>;
 
     /** Generates a QC report from the given configuration options. */
-    generateQC: (options: Record<string, unknown>) => Promise<void>;
+    generateQC: (options: QCConfig) => Promise<void>;
 
     /** Opens a native file dialog and returns the selected file path, or null if cancelled. */
     selectFile: () => Promise<string | null>;
@@ -406,151 +406,37 @@ async function generateQC() {
         return;
     }
 
-    const sampleFraction = parseFloat(elements.sampleFraction.value);
-    const windowSize = elements.windowSize.value;
-
-    if (
-        Number.isNaN(sampleFraction) ||
-        sampleFraction < 0.01 ||
-        sampleFraction > 100
-    ) {
-        alert("Sample fraction must be a number between 0.01 and 100.");
-        elements.btnGenerate.disabled = false;
-        return;
-    }
-
-    const sampleSeed = parseInt(elements.sampleSeed.value, 10);
-    if (Number.isNaN(sampleSeed) || sampleSeed < 0) {
-        alert("Sample seed must be a non-negative integer.");
-        elements.btnGenerate.disabled = false;
-        return;
-    }
-
-    if (!elements.windowSize.isValid) {
-        alert("Window size must be an integer between 2 and 10,000.");
-        elements.btnGenerate.disabled = false;
-        return;
-    }
-
-    const readLengthBinWidth = parseInt(
-        elements.readLengthGranularity.value,
-        10,
-    );
-
-    if (
-        !Number.isFinite(readLengthBinWidth) ||
-        readLengthBinWidth < 1 ||
-        readLengthBinWidth !== Math.floor(readLengthBinWidth)
-    ) {
-        alert("Read length granularity must be a positive integer.");
-        elements.btnGenerate.disabled = false;
-        return;
-    }
-
     const regionInput = elements.region.value.trim();
-    if (regionInput && peekResult?.allContigs) {
-        const regionResult = parseRegion(regionInput, peekResult.allContigs);
-        if (!regionResult.valid) {
-            alert(`Invalid region: ${regionResult.reason}`);
-            elements.btnGenerate.disabled = false;
-            return;
-        }
-    }
-
-    const modRegionInput = elements.modRegion.value.trim();
-    let modRegionStr: string | undefined;
-    if (modRegionInput) {
-        if (!regionInput) {
-            alert("Mod region requires a region to be set.");
-            elements.btnGenerate.disabled = false;
-            return;
-        }
-        if (peekResult?.allContigs) {
-            const modRegionResult = parseRegion(
-                modRegionInput,
-                peekResult.allContigs,
-            );
-            if (!modRegionResult.valid) {
-                alert(`Invalid mod region: ${modRegionResult.reason}`);
-                elements.btnGenerate.disabled = false;
-                return;
-            }
-            const regionResult = parseRegion(
-                regionInput,
-                peekResult.allContigs,
-            );
-            if (regionResult.valid) {
-                const overlapError = validateModRegionOverlap(
-                    regionResult,
-                    modRegionResult,
-                );
-                if (overlapError) {
-                    alert(overlapError);
-                    elements.btnGenerate.disabled = false;
-                    return;
-                }
-            }
-        }
-        modRegionStr = modRegionInput;
-    }
-
-    const region = regionInput || undefined;
-
-    const mapqFilter = parseOptionalNumber(elements.mapqFilter);
-    const excludeMapqUnavail = elements.excludeMapqUnavail.checked || undefined;
-    const readFilter = getReadFilter();
-    const minSeqLen = parseOptionalNumber(elements.minSeqLen);
-    const minAlignLen = parseOptionalNumber(elements.minAlignLen);
-    const readIdFilePath = elements.readIdPath.value.trim() || undefined;
-    const baseQualFilterMod = parseOptionalNumber(elements.baseQualFilterMod);
-    const trimReadEndsMod = parseOptionalNumber(elements.trimReadEndsMod);
-
-    const probLow = parseOptionalNumber(elements.modProbLow);
-    const probHigh = parseOptionalNumber(elements.modProbHigh);
-    const hasLow = probLow !== undefined;
-    const hasHigh = probHigh !== undefined;
-
-    if (hasLow !== hasHigh) {
-        alert("Mod probability filter requires both low and high bounds.");
-        elements.btnGenerate.disabled = false;
-        return;
-    }
-
-    if (hasLow && hasHigh && probLow >= probHigh) {
-        alert(
-            "Mod probability filter: low bound must be less than high bound.",
-        );
-        elements.btnGenerate.disabled = false;
-        return;
-    }
-
-    const rejectModQualNonInclusive =
-        hasLow && hasHigh
-            ? ([probLow, probHigh] as [number, number])
-            : undefined;
-
-    const config = {
+    const result = buildQCConfig({
         bamPath,
         treatAsUrl: bamSource.isUrl,
         tag,
         modStrand,
-        region,
-        modRegion: modRegionStr,
-        fullRegion: region ? elements.fullRegion.checked : undefined,
-        sampleFraction,
-        sampleSeed,
-        windowSize,
-        readLengthBinWidth,
-        mapqFilter,
-        excludeMapqUnavail,
-        readFilter,
-        minSeqLen,
-        minAlignLen,
-        readIdFilePath,
-        baseQualFilterMod,
-        trimReadEndsMod,
-        rejectModQualNonInclusive,
-    };
+        sampleFraction: elements.sampleFraction.value,
+        sampleSeed: elements.sampleSeed.value,
+        windowSize: elements.windowSize.value,
+        readLengthBinWidth: elements.readLengthGranularity.value,
+        region: regionInput,
+        modRegion: elements.modRegion.value,
+        fullRegion: elements.fullRegion.checked,
+        contigs: peekResult?.allContigs,
+        mapqFilter: parseOptionalNumber(elements.mapqFilter),
+        excludeMapqUnavail: elements.excludeMapqUnavail.checked,
+        readFilter: getReadFilter(),
+        minSeqLen: parseOptionalNumber(elements.minSeqLen),
+        minAlignLen: parseOptionalNumber(elements.minAlignLen),
+        readIdFilePath: elements.readIdPath.value,
+        baseQualFilterMod: parseOptionalNumber(elements.baseQualFilterMod),
+        trimReadEndsMod: parseOptionalNumber(elements.trimReadEndsMod),
+        modProbLow: parseOptionalNumber(elements.modProbLow),
+        modProbHigh: parseOptionalNumber(elements.modProbHigh),
+    });
+    if (!result.success) {
+        alert(result.message);
+        elements.btnGenerate.disabled = false;
+        return;
+    }
+    const config = result.config;
 
     const progressLabels: Record<string, string> = {
         modifications: "Loading reads for modification data",

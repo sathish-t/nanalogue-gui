@@ -1,3 +1,9 @@
+import type {
+    SwipePlotData,
+    SwipePlotDataPoint,
+    SwipeReviewActionResult,
+    SwipeReviewState,
+} from "../../lib/swipe-contract";
 import { applyFontSize } from "../shared/apply-font-size";
 
 applyFontSize();
@@ -27,125 +33,19 @@ interface ChartInstance {
  */
 interface SwipeApi {
     /** Retrieves the current application state from the main process. */
-    getState: () => Promise<AppState>;
+    getState: () => Promise<SwipeReviewState>;
 
     /** Retrieves the plot data for the current annotation from the main process. */
-    getPlotData: () => Promise<PlotData | null>;
+    getPlotData: () => Promise<SwipePlotData | null>;
 
     /** Sends an accept action for the current annotation to the main process. */
-    accept: () => Promise<ActionResult>;
+    accept: () => Promise<SwipeReviewActionResult>;
 
     /** Sends a reject action for the current annotation to the main process. */
-    reject: () => Promise<ActionResult>;
+    reject: () => Promise<SwipeReviewActionResult>;
 
     /** Navigates back to the landing page from swipe review. */
     swipeGoBack: () => Promise<void>;
-}
-
-/**
- * Represents the overall application state including progress and decision counts.
- */
-interface AppState {
-    /** The zero-based index of the current annotation being reviewed. */
-    currentIndex: number;
-
-    /** The total number of annotations available for review. */
-    totalCount: number;
-
-    /** The number of annotations that have been accepted so far. */
-    acceptedCount: number;
-
-    /** The number of annotations that have been rejected so far. */
-    rejectedCount: number;
-
-    /** The file path where accepted annotations are being written. */
-    outputPath?: string;
-
-    /** Whether to show the annotation region highlight box on the chart. */
-    showAnnotationHighlight?: boolean;
-}
-
-/**
- * Represents a single raw data point with genomic position and modification probability.
- */
-interface PlotDataPoint {
-    /** The genomic position in base pairs. */
-    x: number;
-
-    /** The modification probability value between zero and one. */
-    y: number;
-}
-
-/**
- * Represents a windowed aggregation point over a genomic region.
- */
-interface WindowedPoint {
-    /** The start position of the reference window in base pairs. */
-    refWinStart: number;
-
-    /** The end position of the reference window in base pairs. */
-    refWinEnd: number;
-
-    /** The aggregated modification value for this window. */
-    winVal: number;
-}
-
-/**
- * Contains all data needed to render a modification probability plot for one annotation.
- */
-interface PlotData {
-    /** The array of raw per-position modification probability points. */
-    rawPoints: PlotDataPoint[];
-
-    /** The array of windowed aggregation points for the step-line overlay. */
-    windowedPoints: WindowedPoint[];
-
-    /** The annotation region metadata including contig, coordinates, read identifier, and raw BED line. */
-    annotation: {
-        /** The contig or chromosome name for the annotation. */
-        contig: string;
-
-        /** The start position of the annotation in base pairs. */
-        start: number;
-
-        /** The end position of the annotation in base pairs. */
-        end: number;
-
-        /** The nanopore read identifier associated with this annotation. */
-        readId: string;
-
-        /** The original unparsed line from the BED file, used to extract extra columns. */
-        rawLine: string;
-    };
-
-    /** The expanded genomic region used for the plot viewport. */
-    expandedRegion: {
-        /** The contig or chromosome name for the expanded region. */
-        contig: string;
-
-        /** The start position of the expanded viewing region in base pairs. */
-        start: number;
-
-        /** The end position of the expanded viewing region in base pairs. */
-        end: number;
-    };
-
-    /** Warning message if annotation coordinates were clamped to contig bounds. */
-    clampWarning?: string;
-}
-
-/**
- * Represents the result returned after an accept or reject action.
- */
-interface ActionResult {
-    /** Whether all annotations have been reviewed. */
-    done: boolean;
-
-    /** The updated application state after the action. */
-    state: AppState;
-
-    /** The plot data for the next annotation, or null if unavailable. */
-    plotData?: PlotData | null;
 }
 
 /**
@@ -261,7 +161,7 @@ function showNoData() {
  *
  * @param state - The final application state containing the decision counts.
  */
-function showDone(state: AppState) {
+function showDone(state: SwipeReviewState) {
     elements.loadingOverlay.classList.add("hidden");
     elements.noDataMessage.classList.add("hidden");
     elements.loadFailedMessage.classList.add("hidden");
@@ -277,7 +177,7 @@ function showDone(state: AppState) {
  *
  * @param state - The current application state with index and total counts.
  */
-function updateProgress(state: AppState) {
+function updateProgress(state: SwipeReviewState) {
     const progress =
         state.totalCount > 0
             ? (state.currentIndex / state.totalCount) * 100
@@ -291,7 +191,7 @@ function updateProgress(state: AppState) {
  *
  * @param plotData - The plot data containing annotation metadata, or null if unavailable.
  */
-function updateTitle(plotData: PlotData | null) {
+function updateTitle(plotData: SwipePlotData | null) {
     if (plotData) {
         const { annotation } = plotData;
         elements.title.textContent = `Showing ${annotation.contig}:${annotation.start.toLocaleString()}-${annotation.end.toLocaleString()} on read id ${annotation.readId}`;
@@ -307,7 +207,7 @@ function updateTitle(plotData: PlotData | null) {
  *
  * @param plotData - The plot data whose annotation may have extra BED columns, or null to hide.
  */
-function updateBedExtraInfo(plotData: PlotData | null) {
+function updateBedExtraInfo(plotData: SwipePlotData | null) {
     if (!plotData) {
         elements.bedExtraInfo.classList.add("hidden");
         return;
@@ -330,7 +230,7 @@ function updateBedExtraInfo(plotData: PlotData | null) {
  *
  * @param plotData - The plot data that may contain a clamp warning, or null to hide.
  */
-function updateClampWarning(plotData: PlotData | null) {
+function updateClampWarning(plotData: SwipePlotData | null) {
     if (plotData?.clampWarning) {
         elements.clampWarning.textContent = plotData.clampWarning;
         elements.clampWarning.classList.remove("hidden");
@@ -357,7 +257,7 @@ function flash(type: "accept" | "reject") {
  *
  * @param plotData - The plot data containing raw points, windowed points, and region metadata.
  */
-function renderChart(plotData: PlotData) {
+function renderChart(plotData: SwipePlotData) {
     const ctx = elements.chartCanvas.getContext("2d");
     if (!ctx) return;
 
@@ -369,7 +269,7 @@ function renderChart(plotData: PlotData) {
 
     // Build explicit horizontal segments for each window with vertical
     // connectors between them, avoiding Chart.js stepped interpolation.
-    const stepLineData: PlotDataPoint[] = [];
+    const stepLineData: SwipePlotDataPoint[] = [];
     for (const wp of windowedPoints) {
         stepLineData.push({ x: wp.refWinStart, y: wp.winVal });
         stepLineData.push({ x: wp.refWinEnd, y: wp.winVal });
@@ -431,7 +331,7 @@ function renderChart(plotData: PlotData) {
                          */
                         label: (context: {
                             /** The raw data point behind this tooltip. */
-                            raw: PlotDataPoint;
+                            raw: SwipePlotDataPoint;
                         }) => {
                             const point = context.raw;
                             return `Position: ${Math.round(point.x).toLocaleString()}, Value: ${point.y.toFixed(3)}`;
@@ -506,7 +406,7 @@ function renderChart(plotData: PlotData) {
  *
  * @param plotData - The plot data for the current annotation, or null/empty.
  */
-function renderPlotData(plotData: PlotData | null) {
+function renderPlotData(plotData: SwipePlotData | null) {
     if (
         plotData &&
         (plotData.rawPoints.length > 0 || plotData.windowedPoints.length > 0)

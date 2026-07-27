@@ -31,6 +31,9 @@ export interface ChatCompletionResponse {
 /** Retryable HTTP status codes. */
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 
+/** Marks an HTTP response failure so retry control flow does not inspect display text. */
+class HttpResponseError extends Error {}
+
 /**
  * Sleeps for the given duration, rejecting immediately if the signal is aborted.
  * Cleans up the abort listener when the timer fires normally.
@@ -144,13 +147,13 @@ export async function fetchChatCompletion(
                     errorMsg +=
                         "\nIf you're using Ollama, make sure your endpoint URL ends with /v1 (e.g., http://localhost:11434/v1).";
                 }
-                throw new Error(errorMsg);
+                throw new HttpResponseError(errorMsg);
             }
             return (await response.json()) as ChatCompletionResponse;
         } catch (e) {
             if (signal.aborted) throw e;
-            // Non-retryable HTTP errors are thrown with "HTTP " prefix — re-throw immediately
-            if (e instanceof Error && e.message.startsWith("HTTP ")) throw e;
+            // A received non-retryable HTTP response is never a transport retry.
+            if (e instanceof HttpResponseError) throw e;
             // Malformed JSON from a 200 response — not retryable
             if (e instanceof SyntaxError) throw e;
             // Network errors (no response received) are retryable

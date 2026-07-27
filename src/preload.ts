@@ -2,6 +2,13 @@
 // Exposes IPC methods to the renderer process
 
 import { contextBridge, ipcRenderer } from "electron";
+import type {
+    AiChatEvent,
+    AiChatListModelsResult,
+    AiChatSendMessageResult,
+} from "./lib/chat-types";
+import type { LocateGenerateBedRequest } from "./lib/locate-data-loader";
+import type { SwipeStartRequest } from "./lib/swipe-contract";
 
 // Expose all APIs to all pages. Each page uses what it needs.
 // Note: We don't filter by page URL because the project path may contain
@@ -92,40 +99,11 @@ contextBridge.exposeInMainWorld("api", {
     /**
      * Initialize swipe mode and navigate to the swipe review interface.
      *
-     * @param bamPath - The path to the BAM file.
-     * @param bedPath - The path to the BED annotations file.
-     * @param outputPath - The path for the output BED file.
-     * @param windowSize - The number of bases of interest per analysis window.
-     * @param modTag - The modification tag code to filter by.
-     * @param modStrand - The strand convention for modification calls.
-     * @param flankingRegion - The number of base pairs to expand the region by on each side.
-     * @param showAnnotationHighlight - Whether to show the annotation region highlight box.
-     * @param treatAsUrl - Whether to treat the BAM path as a remote URL.
+     * @param request - Named Swipe review configuration.
      * @returns A promise that resolves with a result object indicating success or failure.
      */
-    swipeStart: (
-        bamPath: string,
-        bedPath: string,
-        outputPath: string,
-        windowSize: number,
-        modTag?: string,
-        modStrand?: "bc" | "bc_comp",
-        flankingRegion?: number,
-        showAnnotationHighlight?: boolean,
-        treatAsUrl?: boolean,
-    ) =>
-        ipcRenderer.invoke(
-            "swipe-start",
-            bamPath,
-            bedPath,
-            outputPath,
-            windowSize,
-            modTag,
-            modStrand,
-            flankingRegion,
-            showAnnotationHighlight,
-            treatAsUrl,
-        ),
+    swipeStart: (request: SwipeStartRequest) =>
+        ipcRenderer.invoke("swipe-start", request),
 
     /**
      * Navigate back to the landing page from the swipe config screen.
@@ -289,31 +267,11 @@ contextBridge.exposeInMainWorld("api", {
     /**
      * Generate a BED file from read IDs found in a BAM file.
      *
-     * @param bamPath - The path or URL to the BAM file.
-     * @param readIdPath - The path to the read ID text file.
-     * @param outputPath - The path for the output BED file.
-     * @param treatAsUrl - Whether to treat the BAM path as a remote URL.
-     * @param region - Optional genomic region to constrain the search.
-     * @param fullRegion - Whether to restrict to reads spanning the full region.
+     * @param request - Named Locate BED-generation configuration.
      * @returns A promise that resolves with the locate result summary.
      */
-    locateGenerateBed: (
-        bamPath: string,
-        readIdPath: string,
-        outputPath: string,
-        treatAsUrl: boolean,
-        region?: string,
-        fullRegion?: boolean,
-    ) =>
-        ipcRenderer.invoke(
-            "locate-generate-bed",
-            bamPath,
-            readIdPath,
-            outputPath,
-            treatAsUrl,
-            region,
-            fullRegion,
-        ),
+    locateGenerateBed: (request: LocateGenerateBedRequest) =>
+        ipcRenderer.invoke("locate-generate-bed", request),
 
     /**
      * Navigate back to the landing page from the locate config screen.
@@ -344,7 +302,8 @@ contextBridge.exposeInMainWorld("api", {
         endpointUrl: string;
         /** The API key for authentication. */
         apiKey: string;
-    }) => ipcRenderer.invoke("ai-chat-list-models", payload),
+    }): Promise<AiChatListModelsResult> =>
+        ipcRenderer.invoke("ai-chat-list-models", payload),
 
     /**
      * Send a user message to the AI Chat orchestrator.
@@ -371,7 +330,8 @@ contextBridge.exposeInMainWorld("api", {
         allowedDir: string;
         /** Advanced configuration options. */
         config: Record<string, unknown>;
-    }) => ipcRenderer.invoke("ai-chat-send-message", payload),
+    }): Promise<AiChatSendMessageResult> =>
+        ipcRenderer.invoke("ai-chat-send-message", payload),
 
     /**
      * Cancel the current in-flight AI Chat request.
@@ -437,7 +397,7 @@ contextBridge.exposeInMainWorld("api", {
      * @param callback - The event handler function.
      * @returns A cleanup function to remove the listener.
      */
-    onAiChatEvent: (callback: (event: unknown) => void) => {
+    onAiChatEvent: (callback: (event: AiChatEvent) => void) => {
         /**
          * Forwards IPC events to the provided callback, stripping the Electron event.
          *
@@ -445,7 +405,7 @@ contextBridge.exposeInMainWorld("api", {
          * @param data - The AI Chat event payload.
          * @returns The result of invoking the callback.
          */
-        const handler = (_event: unknown, data: unknown) => callback(data);
+        const handler = (_event: unknown, data: AiChatEvent) => callback(data);
         ipcRenderer.on("ai-chat-event", handler);
         return () => {
             ipcRenderer.removeListener("ai-chat-event", handler);

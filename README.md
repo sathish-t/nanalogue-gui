@@ -353,7 +353,8 @@ Our sandbox uses the [Monty](https://github.com/pydantic/monty) package from pyd
 code in a restricted way so that it has access only to our files and to specific functions.
 This ensures our sandbox is secure against mistakes by the user or the LLM,
 and allows us to inspect what the LLM is doing.
-A copy button in the code panel lets you copy the Python code to your clipboard.
+See [documentation/ai-chat.md](documentation/ai-chat.md#security-model) for the security model
+and trust boundaries. A copy button in the code panel lets you copy the Python code to your clipboard.
 
 ![AI Chat multi-turn conversation with sandbox](demo/screenshot-ai-chat-sandbox-openai.png)
 
@@ -592,6 +593,10 @@ The AI Chat `minimap2` external tool uses a WebAssembly build of
 [minimap2](https://github.com/lh3/minimap2) produced by the
 [biowasm](https://github.com/biowasm/biowasm) project.
 biowasm is released under the [MIT License](https://github.com/biowasm/biowasm/blob/main/LICENSE).
+
+Some skills under `documentation/skills/` were obtained from the
+[modem-dev skills repository](https://github.com/modem-dev/skills). These
+skills are MIT licensed; see the [included license](documentation/skills/write-discoverable-code/LICENSE.md).
 
 ## Acknowledgments
 

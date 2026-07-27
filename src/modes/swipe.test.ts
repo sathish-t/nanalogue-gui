@@ -89,10 +89,12 @@ const { loadContigSizes, loadPlotData } = await import(
     "../lib/swipe-data-loader"
 );
 const { parseBedFile } = await import("../lib/bed-parser");
-const { initialize, registerIpcHandlers } = await import("./swipe");
+const { initializeSwipeReview, registerSwipeIpcHandlers } = await import(
+    "./swipe"
+);
 
 // Register IPC handlers once; ipcHandlers is populated as a side-effect.
-registerIpcHandlers();
+registerSwipeIpcHandlers();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -136,7 +138,7 @@ async function initializeWithFakes(): Promise<void> {
     });
     setMockResolvedValue(loadContigSizes, { chr1: 5000 });
     setMockReturnValue(existsSync as ReturnType<typeof vi.fn>, false);
-    await initialize(BASE_ARGS, true);
+    await initializeSwipeReview(BASE_ARGS, true);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +198,7 @@ describe("swipe mode — initialize()", () => {
             annotations: [...FAKE_ANNOTATIONS],
         });
 
-        await initialize(BASE_ARGS, true);
+        await initializeSwipeReview(BASE_ARGS, true);
 
         expect(vi.mocked(loadContigSizes)).toHaveBeenCalledWith(
             "/data/sample.bam",
@@ -210,7 +212,7 @@ describe("swipe mode — initialize()", () => {
             annotations: [...FAKE_ANNOTATIONS],
         });
 
-        await initialize(BASE_ARGS, true);
+        await initializeSwipeReview(BASE_ARGS, true);
 
         expect(vi.mocked(parseBedFile)).toHaveBeenCalledWith(
             "/data/annotations.bed",
@@ -223,7 +225,7 @@ describe("swipe mode — initialize()", () => {
             annotations: [...FAKE_ANNOTATIONS],
         });
 
-        await initialize(BASE_ARGS, true);
+        await initializeSwipeReview(BASE_ARGS, true);
 
         expect(vi.mocked(writeFileSync)).toHaveBeenCalledWith(
             "/data/output.bed",
@@ -238,7 +240,9 @@ describe("swipe mode — initialize()", () => {
             annotations: [],
         });
 
-        await expect(initialize(BASE_ARGS, true)).rejects.toThrow("10,000");
+        await expect(initializeSwipeReview(BASE_ARGS, true)).rejects.toThrow(
+            "10,000",
+        );
     });
 
     it("throws when outputPath resolves to the same file as bedPath", async () => {
@@ -259,9 +263,9 @@ describe("swipe mode — initialize()", () => {
             bedPath: "/data/same.bed",
         };
 
-        await expect(initialize(collidingArgs, true)).rejects.toThrow(
-            "same file",
-        );
+        await expect(
+            initializeSwipeReview(collidingArgs, true),
+        ).rejects.toThrow("same file");
     });
 
     it("throws when resolved outputPath matches bedPath and output file does not yet exist", async () => {
@@ -279,9 +283,9 @@ describe("swipe mode — initialize()", () => {
             bedPath: "/data/annotations.bed",
         };
 
-        await expect(initialize(collidingArgs, true)).rejects.toThrow(
-            "same file",
-        );
+        await expect(
+            initializeSwipeReview(collidingArgs, true),
+        ).rejects.toThrow("same file");
     });
 });
 
@@ -521,13 +525,13 @@ describe("swipe mode — initialize() overwrite dialog", () => {
     });
 
     it("shows the overwrite dialog when output file exists and skipOverwriteConfirm is false", async () => {
-        await initialize(BASE_ARGS, false);
+        await initializeSwipeReview(BASE_ARGS, false);
 
         expect(dialog.showMessageBox).toHaveBeenCalledOnce();
     });
 
     it("deletes the existing output file when user confirms overwrite", async () => {
-        await initialize(BASE_ARGS, false);
+        await initializeSwipeReview(BASE_ARGS, false);
 
         expect(vi.mocked(unlinkSync)).toHaveBeenCalledWith(
             BASE_ARGS.outputPath,
@@ -535,7 +539,7 @@ describe("swipe mode — initialize() overwrite dialog", () => {
     });
 
     it("does not show the dialog when skipOverwriteConfirm is true", async () => {
-        await initialize(BASE_ARGS, true);
+        await initializeSwipeReview(BASE_ARGS, true);
 
         expect(dialog.showMessageBox).not.toHaveBeenCalled();
     });
@@ -544,7 +548,7 @@ describe("swipe mode — initialize() overwrite dialog", () => {
         // Response 1 = Cancel button
         setMockResolvedValue(dialog.showMessageBox, { response: 1 });
 
-        await expect(initialize(BASE_ARGS, false)).rejects.toThrow(
+        await expect(initializeSwipeReview(BASE_ARGS, false)).rejects.toThrow(
             "User cancelled",
         );
     });
@@ -552,7 +556,7 @@ describe("swipe mode — initialize() overwrite dialog", () => {
     it("does not delete the file when user cancels", async () => {
         setMockResolvedValue(dialog.showMessageBox, { response: 1 });
 
-        await expect(initialize(BASE_ARGS, false)).rejects.toThrow();
+        await expect(initializeSwipeReview(BASE_ARGS, false)).rejects.toThrow();
         expect(vi.mocked(unlinkSync)).not.toHaveBeenCalled();
     });
 });

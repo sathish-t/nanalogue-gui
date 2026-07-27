@@ -149,6 +149,7 @@ describe("fetchModels (openai-compat)", () => {
         );
         expect(result).toEqual({
             success: false,
+            reason: "error",
             error: "Authentication failed \u2014 check your API key",
         });
     });
@@ -162,6 +163,7 @@ describe("fetchModels (openai-compat)", () => {
         );
         expect(result).toEqual({
             success: false,
+            reason: "error",
             error: "Authentication failed \u2014 check your API key",
         });
     });
@@ -175,6 +177,7 @@ describe("fetchModels (openai-compat)", () => {
         );
         expect(result).toEqual({
             success: false,
+            reason: "error",
             error: "Endpoint does not support model listing \u2014 type a model name manually",
         });
     });
@@ -188,6 +191,7 @@ describe("fetchModels (openai-compat)", () => {
         );
         expect(result).toEqual({
             success: false,
+            reason: "error",
             error: "Unexpected response format from endpoint",
         });
     });
@@ -258,6 +262,7 @@ describe("fetchModels (anthropic)", () => {
         const result = await fetchModels(server.url, "bad-key", "anthropic");
         expect(result).toEqual({
             success: false,
+            reason: "error",
             error: "Authentication failed \u2014 check your API key",
         });
     });
@@ -342,6 +347,7 @@ describe("fetchModels (google-gemini)", () => {
         );
         expect(result).toEqual({
             success: false,
+            reason: "error",
             error: "Authentication failed \u2014 check your API key",
         });
     });
@@ -355,6 +361,7 @@ describe("fetchModels (google-gemini)", () => {
         );
         expect(result).toEqual({
             success: false,
+            reason: "error",
             error: "Unexpected response format from endpoint",
         });
     });
@@ -388,6 +395,7 @@ describe("fetchModels (error handling)", () => {
         const result = await fetchModels("http://127.0.0.1:1", "key");
         expect(result).toEqual({
             success: false,
+            reason: "error",
             error: "Could not reach endpoint",
         });
     });
@@ -399,6 +407,7 @@ describe("fetchModels (error handling)", () => {
         const result = await fetchModels(server.url, "key", undefined, 100);
         expect(result).toEqual({
             success: false,
+            reason: "error",
             error: "Request timed out",
         });
     }, 5000);

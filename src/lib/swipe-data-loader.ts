@@ -2,13 +2,11 @@
 
 import { bamMods, peek, windowReads } from "@nanalogue/node";
 import type {
-    BedAnnotation,
-    PlotData,
-    PlotDataPoint,
-    WindowedPoint,
-    WindowReadRow,
-    WindowReadsRecord,
-} from "./types";
+    SwipePlotData,
+    SwipePlotDataPoint,
+    SwipeWindowedPoint,
+} from "./swipe-contract";
+import type { BedAnnotation, WindowReadRow, WindowReadsRecord } from "./types";
 
 const REGION_EXPANSION = 10000;
 
@@ -133,7 +131,7 @@ export async function loadPlotData(
     contigSizes: ContigSizes,
     windowSize: number,
     options: LoadPlotDataOptions = {},
-): Promise<PlotData> {
+): Promise<SwipePlotData> {
     const {
         regionExpansion: rawExpansion = REGION_EXPANSION,
         modTag,
@@ -196,7 +194,7 @@ export async function loadPlotData(
 
     const rows = parseWindowReads(windowRecords);
 
-    const windowedPoints: WindowedPoint[] = rows.map((row) => ({
+    const windowedPoints: SwipeWindowedPoint[] = rows.map((row) => ({
         refWinStart: row.ref_win_start,
         refWinEnd: row.ref_win_end,
         winVal: row.win_val,
@@ -204,7 +202,7 @@ export async function loadPlotData(
 
     windowedPoints.sort((a, b) => a.refWinStart - b.refWinStart);
 
-    const rawPoints: PlotDataPoint[] = [];
+    const rawPoints: SwipePlotDataPoint[] = [];
     for (const record of modRecords) {
         if (record.alignment_type === "unmapped") continue;
         if (!record.mod_table) continue;

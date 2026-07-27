@@ -6,40 +6,17 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+    AiChatListModelsResult,
+    AiChatSendMessageResult,
+} from "../../lib/chat-types";
 import { mockImmediateSetTimeout } from "../../test-helpers";
 
-/** Result from the list-models IPC handler (mirrors ai-chat.ts). */
-interface ListModelsResult {
-    /** Whether the request succeeded. */
-    success: boolean;
-    /** Available model IDs. */
-    models?: string[];
-    /** Error message when success is false. */
-    error?: string;
-    /** Endpoint origin when consent is required. */
-    origin?: string;
-}
+/** Canonical list-models IPC result used by deferred mocks. */
+type ListModelsResult = AiChatListModelsResult;
 
-/** Result from the send-message IPC handler (mirrors ai-chat.ts). */
-interface SendMessageResult {
-    /** Whether the request succeeded. */
-    success: boolean;
-    /** The assistant's text response. */
-    text?: string;
-    /** Tool execution steps for the code panel. */
-    steps?: Array<{
-        /** The Python code that was executed. */
-        code: string;
-        /** The sandbox execution result. */
-        result: unknown;
-    }>;
-    /** Error message when success is false. */
-    error?: string;
-    /** Whether the error was a timeout. */
-    isTimeout?: boolean;
-    /** Endpoint origin requiring consent. */
-    origin?: string;
-}
+/** Canonical send-message IPC result used by deferred mocks. */
+type SendMessageResult = AiChatSendMessageResult;
 
 /** Shape of the mock preload API. */
 interface MockApi {
@@ -379,16 +356,20 @@ describe("AI Chat generation guard", () => {
         await flushMicrotasks();
 
         // Stale send resolves while New Chat handler is still awaiting
-        resolveSend({ success: false, error: "Request superseded" });
+        resolveSend({
+            success: false,
+            reason: "cancelled",
+            error: "Cancelled",
+        });
         await flushMicrotasks();
 
         // New Chat hasn't finished yet (still awaiting resolveNewChat), so
-        // innerHTML hasn't been cleared. If the stale error leaked through
+        // innerHTML hasn't been cleared. If the stale result leaked through
         // the generation guard, it would be visible here.
         const chatMessages = document.getElementById(
             "chat-messages",
         ) as HTMLDivElement;
-        expect(chatMessages.textContent).not.toContain("Request superseded");
+        expect(chatMessages.textContent).not.toContain("Request cancelled");
 
         // Let New Chat finish
         resolveNewChat();
@@ -806,6 +787,7 @@ describe("AI Chat permanent session config locking", () => {
         fillRequiredFields();
         mockApi.aiChatSendMessage.mockResolvedValueOnce({
             success: false,
+            reason: "consent_required",
             error: "CONSENT_REQUIRED",
             origin: "https://api.example.com",
         });
@@ -1065,6 +1047,7 @@ describe("AI Chat permanent session config locking", () => {
     it("does not call consent or retry fetch-models after New Chat during consent dialog", async () => {
         mockApi.aiChatListModels.mockResolvedValueOnce({
             success: false,
+            reason: "consent_required",
             error: "CONSENT_REQUIRED",
             origin: "https://api.example.com",
         });
@@ -1099,6 +1082,7 @@ describe("AI Chat permanent session config locking", () => {
 
         mockApi.aiChatListModels.mockResolvedValueOnce({
             success: false,
+            reason: "consent_required",
             error: "CONSENT_REQUIRED",
             origin: "https://api.example.com",
         });
@@ -1159,8 +1143,26 @@ describe("AI Chat permanent session config locking", () => {
             success: true,
             text: "ok",
             steps: [
-                { code: 'print("one")', result: 1 },
-                { code: 'print("two")', result: 2 },
+                {
+                    code: 'print("one")',
+                    result: {
+                        success: true,
+                        value: 1,
+                        truncated: false,
+                        endedWithExpression: true,
+                        continueThinkingCalled: false,
+                    },
+                },
+                {
+                    code: 'print("two")',
+                    result: {
+                        success: true,
+                        value: 2,
+                        truncated: false,
+                        endedWithExpression: true,
+                        continueThinkingCalled: false,
+                    },
+                },
             ],
         });
 

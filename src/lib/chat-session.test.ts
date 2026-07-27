@@ -307,6 +307,7 @@ describe("ChatSession", () => {
             const outcome = await result;
             expect(outcome).toEqual({
                 success: false,
+                reason: "cancelled",
                 error: "Cancelled",
             });
         });
@@ -424,6 +425,7 @@ describe("ChatSession", () => {
 
             expect(result).toEqual({
                 success: false,
+                reason: "error",
                 error: "network failure",
                 isTimeout: false,
             });
@@ -452,6 +454,7 @@ describe("ChatSession", () => {
 
             expect(result).toEqual({
                 success: false,
+                reason: "error",
                 error: "timed out waiting for response",
                 isTimeout: true,
             });
@@ -497,6 +500,7 @@ describe("ChatSession", () => {
 
             expect(result).toEqual({
                 success: false,
+                reason: "error",
                 error: "something went wrong",
                 isTimeout: false,
             });

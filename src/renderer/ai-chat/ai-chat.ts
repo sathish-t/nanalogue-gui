@@ -2,6 +2,7 @@
 // Wires the chat UI, configuration panel, code panel, and IPC communication.
 
 import { NOMINAL_BYTES_PER_TOKEN } from "../../lib/ai-chat-constants";
+import type { AiChatEvent, StepInfo } from "../../lib/chat-types";
 import { applyFontSize } from "../shared/apply-font-size";
 import {
     applyConfigBounds,
@@ -13,7 +14,7 @@ import {
 } from "./ai-chat-config";
 import { initConsentDialog, requestConsent } from "./ai-chat-consent";
 import { getAiChatElements } from "./ai-chat-elements";
-import type { AiChatApi, AiChatEvent, CodeStep } from "./ai-chat-types";
+import type { AiChatApi } from "./ai-chat-types";
 import {
     appendMessage,
     hideModelDropdown,
@@ -67,7 +68,7 @@ const api = (
 ).api;
 
 /** Stored code steps for the code panel pagination. */
-let codeSteps: CodeStep[] = [];
+let codeSteps: StepInfo[] = [];
 /** Current page index in the code panel. */
 let currentCodePage = 0;
 /** Whether a chat has been started (locks advanced options). */
@@ -161,11 +162,7 @@ btnFetchModels.addEventListener("click", async () => {
             apiKey: inputApiKey.value,
         });
 
-        if (
-            !result.success &&
-            result.error === "CONSENT_REQUIRED" &&
-            result.origin
-        ) {
+        if (!result.success && result.reason === "consent_required") {
             const accepted = await requestConsent(result.origin);
             if (accepted) {
                 if (generation !== chatGeneration) return;
@@ -304,7 +301,7 @@ async function sendUserMessage(
                 }
                 updateConnectionStatus(true);
             }
-        } else if (result.error === "CONSENT_REQUIRED" && result.origin) {
+        } else if (result.reason === "consent_required") {
             const accepted = await requestConsent(result.origin);
             if (accepted) {
                 if (generation !== chatGeneration) return;
@@ -316,7 +313,7 @@ async function sendUserMessage(
                     "Connection cancelled — endpoint consent denied.",
                 );
             }
-        } else if (result.error === "Cancelled") {
+        } else if (result.reason === "cancelled") {
             appendMessage("error", "Request cancelled.");
         } else {
             const errorMsg = result.isTimeout

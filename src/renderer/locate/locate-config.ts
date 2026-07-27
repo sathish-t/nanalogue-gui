@@ -6,6 +6,10 @@ import { applyFontSize } from "../shared/apply-font-size";
 
 applyFontSize();
 
+import type {
+    LocateGenerateBedRequest,
+    LocateResult,
+} from "../../lib/locate-data-loader";
 import { parseRegion } from "../../lib/region-parser";
 import type { PeekResult } from "../../lib/types";
 import type {
@@ -19,19 +23,6 @@ import "../shared/output-file-input";
 /**
  * Summary of a locate-reads BED generation run.
  */
-interface LocateResult {
-    /** Total number of IDs in the read ID file. */
-    totalIds: number;
-    /** Number of IDs that matched records in the BAM. */
-    found: number;
-    /** Number of matched records that were unmapped. */
-    unmapped: number;
-    /** Number of BED entries written. */
-    bedEntries: number;
-    /** Number of IDs not found in the BAM. */
-    notFound: number;
-}
-
 /**
  * Defines the preload API exposed to the locate config renderer.
  */
@@ -48,12 +39,7 @@ interface LocateConfigApi {
     locateCountReadIds: (filePath: string) => Promise<number>;
     /** Generates a BED file from read IDs found in a BAM file. */
     locateGenerateBed: (
-        bamPath: string,
-        readIdPath: string,
-        outputPath: string,
-        treatAsUrl: boolean,
-        region?: string,
-        fullRegion?: boolean,
+        request: LocateGenerateBedRequest,
     ) => Promise<LocateResult>;
     /** Peeks at a BAM file to extract header metadata. */
     peekBam: (bamPath: string, treatAsUrl: boolean) => Promise<PeekResult>;
@@ -439,14 +425,17 @@ elements.btnGenerate.addEventListener("click", async () => {
     elements.loadingOverlay.classList.remove("hidden");
 
     try {
-        const result = await api.locateGenerateBed(
-            bamPath,
-            readIdPath,
-            outputPath,
-            treatAsUrl,
-            region,
-            fullRegion,
-        );
+        const request: LocateGenerateBedRequest = region
+            ? {
+                  bamPath,
+                  readIdPath,
+                  outputPath,
+                  treatAsUrl,
+                  region,
+                  fullRegion,
+              }
+            : { bamPath, readIdPath, outputPath, treatAsUrl };
+        const result = await api.locateGenerateBed(request);
 
         elements.loadingOverlay.classList.add("hidden");
         showResults(result);

@@ -24,10 +24,10 @@ import {
 } from "../test-helpers";
 
 // ---------------------------------------------------------------------------
-// Stable handler map – populated when registerIpcHandlers() runs.
+// Stable handler map – populated when registerQcIpcHandlers() runs.
 // ---------------------------------------------------------------------------
 
-/** IPC handlers registered by registerIpcHandlers(), keyed by channel name. */
+/** IPC handlers registered by registerQcIpcHandlers(), keyed by channel name. */
 const ipcHandlers = new Map<string, (...args: unknown[]) => Promise<unknown>>();
 
 // ---------------------------------------------------------------------------
@@ -89,10 +89,10 @@ const { dialog } = await import("electron");
 const { readFile } = await import("node:fs/promises");
 const { parseReadIds } = await import("../lib/locate-data-loader");
 const { validateIpcFilePath } = await import("../lib/ipc-path-validation");
-const { registerIpcHandlers, setMainWindow } = await import("./qc");
+const { registerQcIpcHandlers, setQcMainWindow } = await import("./qc");
 
 // Register all IPC handlers once; ipcHandlers is populated as a side-effect.
-registerIpcHandlers();
+registerQcIpcHandlers();
 
 // ---------------------------------------------------------------------------
 // Shared mock window object.
@@ -128,11 +128,11 @@ describe("qc IPC handlers", () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        setMainWindow(null);
+        setQcMainWindow(null);
     });
 
     afterEach(() => {
-        setMainWindow(null);
+        setQcMainWindow(null);
     });
 
     // -------------------------------------------------------------------------
@@ -229,7 +229,7 @@ describe("qc IPC handlers", () => {
         });
 
         it("opens a dialog and returns the selected path", async () => {
-            setMainWindow(mockWindow);
+            setQcMainWindow(mockWindow);
             setMockResolvedValue(dialog.showOpenDialog, {
                 canceled: false,
                 filePaths: ["/data/sample.bam"],
@@ -242,7 +242,7 @@ describe("qc IPC handlers", () => {
         });
 
         it("returns null when the dialog is cancelled", async () => {
-            setMainWindow(mockWindow);
+            setQcMainWindow(mockWindow);
             setMockResolvedValue(dialog.showOpenDialog, {
                 canceled: true,
                 filePaths: [],
@@ -254,7 +254,7 @@ describe("qc IPC handlers", () => {
         });
 
         it("returns null when dialog returns an empty filePaths array", async () => {
-            setMainWindow(mockWindow);
+            setQcMainWindow(mockWindow);
             setMockResolvedValue(dialog.showOpenDialog, {
                 canceled: false,
                 filePaths: [],
@@ -334,7 +334,7 @@ describe("qc IPC handlers", () => {
         };
 
         beforeEach(() => {
-            setMainWindow(mockWindow);
+            setQcMainWindow(mockWindow);
             setMockResolvedValue(
                 mockWindow.loadFile as ReturnType<typeof vi.fn>,
                 undefined,
@@ -491,7 +491,7 @@ describe("qc IPC handlers", () => {
 
     describe("get-qc-data (after generate-qc)", () => {
         it("returns the data produced by the most recent generate-qc call", async () => {
-            setMainWindow(mockWindow);
+            setQcMainWindow(mockWindow);
             const stubData = { sampleSeed: 99 } as unknown as QCData;
             setMockResolvedValue(generateQCData, stubData);
 

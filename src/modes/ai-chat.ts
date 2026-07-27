@@ -8,7 +8,11 @@ import {
     validateSendMessage,
 } from "../lib/ai-chat-ipc-validation";
 import { ChatSession } from "../lib/chat-session";
-import type { AiChatEvent } from "../lib/chat-types";
+import type {
+    AiChatEvent,
+    AiChatListModelsResult,
+    AiChatSendMessageResult,
+} from "../lib/chat-types";
 import { fetchModels } from "../lib/model-listing";
 import { deriveMaxOutputBytes } from "../lib/monty-sandbox-helpers";
 import { buildSandboxPrompt } from "../lib/sandbox-prompt";
@@ -94,7 +98,7 @@ function clearSystemAppendCache(): void {
  *
  * @param window - The main BrowserWindow instance, or null to clear.
  */
-export function setMainWindow(window: BrowserWindow | null): void {
+export function setAiChatMainWindow(window: BrowserWindow | null): void {
     mainWindow = window;
 }
 
@@ -142,9 +146,89 @@ function getOrigin(url: string): string {
 }
 
 /**
+ * Validates and handles an AI Chat model-listing request.
+ *
+ * @param payload - Untrusted renderer payload.
+ * @returns The canonical model-listing IPC result.
+ */
+async function listAiChatModels(
+    payload: unknown,
+): Promise<AiChatListModelsResult> {
+    const validation = validateListModels(payload);
+    if (!validation.valid) {
+        return {
+            success: false,
+            reason: "error",
+            error: validation.error,
+        };
+    }
+    const { endpointUrl, apiKey } = validation.data;
+
+    if (!isLocalhost(endpointUrl)) {
+        const origin = getOrigin(endpointUrl);
+        if (!endpointConsent.has(origin)) {
+            return {
+                success: false,
+                reason: "consent_required",
+                error: "CONSENT_REQUIRED",
+                origin,
+            };
+        }
+    }
+
+    return fetchModels(endpointUrl, apiKey);
+}
+
+/**
+ * Validates and handles an AI Chat send-message request.
+ *
+ * @param payload - Untrusted renderer payload.
+ * @returns The canonical send-message IPC result.
+ */
+async function sendAiChatMessage(
+    payload: unknown,
+): Promise<AiChatSendMessageResult> {
+    const validation = validateSendMessage(payload);
+    if (!validation.valid) {
+        return {
+            success: false,
+            reason: "error",
+            error: validation.error,
+            isTimeout: false,
+        };
+    }
+    const { endpointUrl, apiKey, model, message, allowedDir, config } =
+        validation.data;
+
+    if (!isLocalhost(endpointUrl)) {
+        const origin = getOrigin(endpointUrl);
+        if (!endpointConsent.has(origin)) {
+            return {
+                success: false,
+                reason: "consent_required",
+                error: "CONSENT_REQUIRED",
+                origin,
+            };
+        }
+    }
+
+    const appendSystemPrompt = await getCachedSystemAppend(allowedDir);
+    return session.sendMessage({
+        endpointUrl,
+        apiKey,
+        model,
+        message,
+        allowedDir,
+        config,
+        emitEvent,
+        appendSystemPrompt,
+    });
+}
+
+/**
  * Registers all IPC handlers for the AI Chat mode.
  */
-export function registerIpcHandlers(): void {
+export function registerAiChatIpcHandlers(): void {
     ipcMain.handle(
         "ai-chat-list-models",
         /**
@@ -154,27 +238,7 @@ export function registerIpcHandlers(): void {
          * @param payload - The endpoint URL and API key.
          * @returns A list of model IDs or an error message.
          */
-        async (_event, payload: unknown) => {
-            const validation = validateListModels(payload);
-            if (!validation.valid) {
-                return { success: false, error: validation.error };
-            }
-            const { endpointUrl, apiKey } = validation.data;
-
-            // Require consent for non-localhost endpoints before sending requests
-            if (!isLocalhost(endpointUrl)) {
-                const origin = getOrigin(endpointUrl);
-                if (!endpointConsent.has(origin)) {
-                    return {
-                        success: false,
-                        error: "CONSENT_REQUIRED",
-                        origin,
-                    };
-                }
-            }
-
-            return fetchModels(endpointUrl, apiKey);
-        },
+        async (_event, payload: unknown) => listAiChatModels(payload),
     );
 
     ipcMain.handle(
@@ -186,38 +250,7 @@ export function registerIpcHandlers(): void {
          * @param payload - The message, endpoint, model, directory, and config.
          * @returns The assistant response with text and code steps.
          */
-        async (_event, payload: unknown) => {
-            const validation = validateSendMessage(payload);
-            if (!validation.valid) {
-                return { success: false, error: validation.error };
-            }
-            const { endpointUrl, apiKey, model, message, allowedDir, config } =
-                validation.data;
-
-            // Check endpoint consent for non-localhost
-            if (!isLocalhost(endpointUrl)) {
-                const origin = getOrigin(endpointUrl);
-                if (!endpointConsent.has(origin)) {
-                    return {
-                        success: false,
-                        error: "CONSENT_REQUIRED",
-                        origin,
-                    };
-                }
-            }
-
-            const appendSystemPrompt = await getCachedSystemAppend(allowedDir);
-            return session.sendMessage({
-                endpointUrl,
-                apiKey,
-                model,
-                message,
-                allowedDir,
-                config,
-                emitEvent,
-                appendSystemPrompt,
-            });
-        },
+        async (_event, payload: unknown) => sendAiChatMessage(payload),
     );
 
     ipcMain.handle(

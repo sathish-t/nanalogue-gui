@@ -2,7 +2,68 @@
 
 import type { ReadInfoRecord } from "@nanalogue/node";
 import { describe, expect, it } from "vitest";
-import { generateBedLines, parseReadIds } from "./locate-data-loader";
+import {
+    generateBedLines,
+    parseReadIds,
+    validateLocateGenerateBedRequest,
+} from "./locate-data-loader";
+
+describe("validateLocateGenerateBedRequest", () => {
+    it.each([
+        [null, "expected an object"],
+        [
+            {
+                bamPath: "/a.bam",
+                readIdPath: "/ids",
+                outputPath: "/out",
+            },
+            "treatAsUrl must be a boolean",
+        ],
+        [
+            {
+                bamPath: "/a.bam",
+                readIdPath: "/ids",
+                outputPath: "/out",
+                treatAsUrl: false,
+                region: " ",
+            },
+            "region must be a non-empty string",
+        ],
+        [
+            {
+                bamPath: "/a.bam",
+                readIdPath: "/ids",
+                outputPath: "/out",
+                treatAsUrl: false,
+                region: "chr1",
+                fullRegion: "yes",
+            },
+            "fullRegion must be a boolean",
+        ],
+    ])("rejects invalid request %#", (request, message) => {
+        expect(() => validateLocateGenerateBedRequest(request)).toThrow(message);
+    });
+
+    it("retains valid region filtering fields", () => {
+        expect(
+            validateLocateGenerateBedRequest({
+                bamPath: "/a.bam",
+                readIdPath: "/ids",
+                outputPath: "/out",
+                treatAsUrl: false,
+                region: "chr1:10-20",
+                fullRegion: true,
+            }),
+        ).toEqual({
+            bamPath: "/a.bam",
+            readIdPath: "/ids",
+            outputPath: "/out",
+            treatAsUrl: false,
+            region: "chr1:10-20",
+            fullRegion: true,
+        });
+    });
+});
 
 describe("parseReadIds", () => {
     it("parses one ID per line", () => {

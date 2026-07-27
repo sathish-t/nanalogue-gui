@@ -2,28 +2,29 @@
 // Maps endpoint URLs to Provider types and fetches available models.
 
 import { MODEL_LIST_TIMEOUT_MS } from "./ai-chat-constants";
+import type {
+    AiChatConsentRequiredResult,
+    AiChatListModelsResult,
+} from "./chat-types";
 
 /** Supported LLM API provider types. */
 export type Provider = "anthropic" | "google-gemini" | "openai-compat";
-
-/** Successful model listing result. */
-interface FetchModelsSuccess {
-    /** Whether the fetch succeeded. */
-    success: true;
-    /** The list of available model identifiers. */
-    models: string[];
-}
 
 /** Failed model listing result. */
 interface FetchModelsFailure {
     /** Whether the fetch succeeded. */
     success: false;
+    /** Stable failure discriminator. */
+    reason: "error";
     /** A human-readable error message. */
     error: string;
 }
 
 /** Result of a model listing request. */
-export type FetchModelsResult = FetchModelsSuccess | FetchModelsFailure;
+export type FetchModelsResult = Exclude<
+    AiChatListModelsResult,
+    AiChatConsentRequiredResult
+>;
 
 /**
  * Detects the API provider from an endpoint URL by inspecting its hostname.
@@ -58,12 +59,14 @@ function handleErrorStatus(status: number): FetchModelsFailure | null {
     if (status === 401 || status === 403) {
         return {
             success: false,
+            reason: "error",
             error: "Authentication failed \u2014 check your API key",
         };
     }
     if (status === 404) {
         return {
             success: false,
+            reason: "error",
             error: "Endpoint does not support model listing \u2014 type a model name manually",
         };
     }
@@ -103,6 +106,7 @@ async function fetchModelsOpenAiCompat(
         }
         return {
             success: false,
+            reason: "error",
             error: `Unexpected response: ${response.status}`,
         };
     }
@@ -118,6 +122,7 @@ async function fetchModelsOpenAiCompat(
     if (!body.data || !Array.isArray(body.data)) {
         return {
             success: false,
+            reason: "error",
             error: "Unexpected response format from endpoint",
         };
     }
@@ -167,6 +172,7 @@ async function fetchModelsAnthropic(
         }
         return {
             success: false,
+            reason: "error",
             error: `Unexpected response: ${response.status}`,
         };
     }
@@ -182,6 +188,7 @@ async function fetchModelsAnthropic(
     if (!body.data || !Array.isArray(body.data)) {
         return {
             success: false,
+            reason: "error",
             error: "Unexpected response format from endpoint",
         };
     }
@@ -225,6 +232,7 @@ async function fetchModelsGoogleGemini(
         }
         return {
             success: false,
+            reason: "error",
             error: `Unexpected response: ${response.status}`,
         };
     }
@@ -240,6 +248,7 @@ async function fetchModelsGoogleGemini(
     if (!body.models || !Array.isArray(body.models)) {
         return {
             success: false,
+            reason: "error",
             error: "Unexpected response format from endpoint",
         };
     }
@@ -292,8 +301,16 @@ export async function fetchModels(
         }
     } catch (error: unknown) {
         if (error instanceof Error && error.name === "TimeoutError") {
-            return { success: false, error: "Request timed out" };
+            return {
+                success: false,
+                reason: "error",
+                error: "Request timed out",
+            };
         }
-        return { success: false, error: "Could not reach endpoint" };
+        return {
+            success: false,
+            reason: "error",
+            error: "Could not reach endpoint",
+        };
     }
 }
