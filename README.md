@@ -456,7 +456,7 @@ to write the full LLM request payload (system prompt + conversation) to a dated
 
 **Remove tools:** use `--rm-tools "tool1,tool2"` to disable specific external
 functions (e.g. `--rm-tools "write_file,read_file"`) — useful for restricting
-sandbox capabilities.
+sandbox capabilities. This flag requires `--system-prompt`.
 
 **REPL commands:**
 
