@@ -44,7 +44,11 @@ export function mockImmediateSetTimeout() {
 // so the raw vi.mocked call stays in this file rather than every test file.
 // ---------------------------------------------------------------------------
 
-/* eslint-disable @typescript-eslint/no-explicit-any -- generic mock wrappers require any for parameter types */
+/** Represents an async mocked function without using explicit any. */
+type MockableAsyncFunction = (...args: never[]) => Promise<unknown>;
+
+/** Represents a mocked function without using explicit any. */
+type MockableFunction = (...args: never[]) => unknown;
 
 /**
  * Sets a resolved value on a mocked async function.
@@ -52,9 +56,10 @@ export function mockImmediateSetTimeout() {
  * @param fn - The mocked function (from a vi.mock module).
  * @param value - The value the mock should resolve to.
  */
-export function setMockResolvedValue<
-    T extends (...args: any[]) => Promise<any>,
->(fn: T, value: Awaited<ReturnType<T>>): void {
+export function setMockResolvedValue<T extends MockableAsyncFunction>(
+    fn: T,
+    value: Awaited<ReturnType<T>>,
+): void {
     vi.mocked(fn).mockResolvedValue(value);
 }
 
@@ -65,9 +70,10 @@ export function setMockResolvedValue<
  * @param fn - The mocked function (from a vi.mock module).
  * @param value - The value the mock should resolve to once.
  */
-export function setMockResolvedValueOnce<
-    T extends (...args: any[]) => Promise<any>,
->(fn: T, value: Awaited<ReturnType<T>>): void {
+export function setMockResolvedValueOnce<T extends MockableAsyncFunction>(
+    fn: T,
+    value: Awaited<ReturnType<T>>,
+): void {
     vi.mocked(fn).mockResolvedValueOnce(value);
 }
 
@@ -77,9 +83,10 @@ export function setMockResolvedValueOnce<
  * @param fn - The mocked function (from a vi.mock module).
  * @param error - The error the mock should reject with.
  */
-export function setMockRejectedValue<
-    T extends (...args: any[]) => Promise<any>,
->(fn: T, error: unknown): void {
+export function setMockRejectedValue<T extends MockableAsyncFunction>(
+    fn: T,
+    error: unknown,
+): void {
     vi.mocked(fn).mockRejectedValue(error);
 }
 
@@ -89,7 +96,7 @@ export function setMockRejectedValue<
  * @param fn - The mocked function (from a vi.mock module).
  * @param impl - The implementation to use.
  */
-export function setMockImplementation<T extends (...args: any[]) => any>(
+export function setMockImplementation<T extends MockableFunction>(
     fn: T,
     impl: (...args: Parameters<T>) => ReturnType<T>,
 ): void {
@@ -102,14 +109,12 @@ export function setMockImplementation<T extends (...args: any[]) => any>(
  * @param fn - The mocked function (from a vi.mock module).
  * @param value - The value the mock should return.
  */
-export function setMockReturnValue<T extends (...args: any[]) => any>(
+export function setMockReturnValue<T extends MockableFunction>(
     fn: T,
     value: ReturnType<T>,
 ): void {
     vi.mocked(fn).mockReturnValue(value);
 }
-
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 /**
  * Creates a vi.fn() that resolves to the given value.
