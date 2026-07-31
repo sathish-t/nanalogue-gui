@@ -94,15 +94,26 @@ export async function fetchChatCompletion(
 ): Promise<ChatCompletionResponse> {
     const base = endpointUrl.endsWith("/") ? endpointUrl : `${endpointUrl}/`;
     const url = new URL("chat/completions", base).href;
-    // Mistral and chutes.ai use the older max_tokens field; all other
-    // OpenAI-compatible providers use max_completion_tokens. Sending both
-    // causes errors on providers that validate for unknown fields, so we
-    // pick one based on the endpoint URL — same approach as pi-mono's
-    // openai-completions provider.
-    const maxTokensField =
-        endpointUrl.includes("mistral.ai") || endpointUrl.includes("chutes.ai")
-            ? "max_tokens"
-            : "max_completion_tokens";
+    // Mistral, chutes.ai, and Ollama's OpenAI-compatible API use the older
+    // max_tokens field; many other OpenAI-compatible providers expect
+    // max_completion_tokens instead. Sending both causes errors on providers
+    // that validate for unknown fields, so we pick one based on the endpoint
+    // URL — same approach as pi-mono's openai-completions provider.
+    const endpointUrlObject = new URL(base);
+    const endpointHostname = endpointUrlObject.hostname;
+    const endpointPort = endpointUrlObject.port;
+    // TODO: This Ollama heuristic breaks if users run Ollama on a
+    // non-11434 port; replace it with real provider detection later.
+    const usesLegacyMaxTokensField =
+        endpointUrl.includes("mistral.ai") ||
+        endpointUrl.includes("chutes.ai") ||
+        endpointHostname === "ollama.com" ||
+        ((endpointHostname === "localhost" ||
+            endpointHostname === "127.0.0.1") &&
+            endpointPort === "11434");
+    const maxTokensField = usesLegacyMaxTokensField
+        ? "max_tokens"
+        : "max_completion_tokens";
     const payload: Record<string, unknown> = {
         model,
         [maxTokensField]: DEFAULT_MAX_COMPLETION_TOKENS,

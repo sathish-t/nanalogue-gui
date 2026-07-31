@@ -158,6 +158,41 @@ describe("chat-orchestrator-llm helpers", () => {
         expect(body.max_completion_tokens).toBeUndefined();
     });
 
+    it("uses max_tokens for Ollama OpenAI-compatible endpoints", async () => {
+        const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+            ok: true,
+            /**
+             * Returns a minimal successful completion payload.
+             *
+             * @returns A minimal completion response.
+             */
+            json: async () => ({
+                choices: [
+                    {
+                        message: { role: "assistant", content: "ok" },
+                        finish_reason: "stop",
+                    },
+                ],
+            }),
+        } as Response);
+
+        await fetchChatCompletion(
+            "http://localhost:11434/v1",
+            "",
+            "test-model",
+            "system",
+            [{ role: "user", content: "hello" }],
+            0,
+            new AbortController().signal,
+        );
+
+        const body = JSON.parse(
+            String(fetchMock.mock.calls[0]?.[1]?.body),
+        ) as Record<string, unknown>;
+        expect(body.max_tokens).toBeDefined();
+        expect(body.max_completion_tokens).toBeUndefined();
+    });
+
     it("retries network failures and rethrows the last error", async () => {
         vi.spyOn(globalThis, "fetch").mockRejectedValue(
             new Error("network down"),
