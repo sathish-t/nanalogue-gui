@@ -402,7 +402,6 @@ export async function handleUserMessage(
             ...lastSentMessages,
             { role: "assistant", content: rawCode },
         ];
-        if (!rawCode.trim()) break;
 
         // Check finish_reason — "length" means response was truncated by token limit
         const finishReason = completion.choices?.[0]?.finish_reason;
@@ -425,6 +424,26 @@ export async function handleUserMessage(
             });
             continue;
         }
+        if (finishReason?.includes("MALFORMED_FUNCTION_CALL")) {
+            history.push({ role: "assistant", content: rawCode });
+            const malformedFunctionCallMsg =
+                "Code execution result: " +
+                JSON.stringify({
+                    success: false,
+                    error_type: "MalformedFunctionCall",
+                    message:
+                        "The provider rejected an API function call. Do not use the model API's function-calling or tool-calling channel. Return all external function calls as raw Python source text in the assistant message content.",
+                    rounds_remaining: maxRounds - (round + 1),
+                });
+            history.push({
+                role: "user",
+                content: malformedFunctionCallMsg,
+                isExecutionResult: true,
+                executionStatus: "error",
+            });
+            continue;
+        }
+        if (!rawCode.trim()) break;
 
         // Execute code. On SyntaxError, try markdown fence extraction.
         let code = rawCode;

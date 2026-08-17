@@ -119,6 +119,16 @@ export async function fetchChatCompletion(
         [maxTokensField]: DEFAULT_MAX_COMPLETION_TOKENS,
         messages: [{ role: "system", content: systemPrompt }, ...messages],
     };
+    // Gemini 3.1 Pro defaults to high reasoning, which can consume the entire
+    // completion budget before producing executable code. Google's
+    // OpenAI-compatible API maps medium reasoning effort to the model's medium
+    // thinking level, leaving room for the visible response.
+    if (
+        endpointHostname === "generativelanguage.googleapis.com" &&
+        model.startsWith("gemini-3.1-pro")
+    ) {
+        payload.reasoning_effort = "medium";
+    }
     // Only include temperature when explicitly set — omitting lets the
     // provider choose its own default, which is the safest universal behavior.
     if (temperature !== undefined) {

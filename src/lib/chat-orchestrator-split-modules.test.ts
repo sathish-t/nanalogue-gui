@@ -194,6 +194,41 @@ describe("chat-orchestrator-llm helpers", () => {
         expect(body.max_completion_tokens).toBeUndefined();
     });
 
+    it("uses medium reasoning effort for Gemini 3.1 Pro", async () => {
+        const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+            ok: true,
+            /**
+             * Returns a minimal successful completion payload.
+             *
+             * @returns A minimal completion response.
+             */
+            json: async () => ({
+                choices: [
+                    {
+                        message: { role: "assistant", content: "ok" },
+                        finish_reason: "stop",
+                    },
+                ],
+            }),
+        } as Response);
+
+        await fetchChatCompletion(
+            "https://generativelanguage.googleapis.com/v1beta",
+            "",
+            "gemini-3.1-pro-preview",
+            "system",
+            [{ role: "user", content: "hello" }],
+            0,
+            new AbortController().signal,
+        );
+
+        const body = JSON.parse(
+            String(fetchMock.mock.calls[0]?.[1]?.body),
+        ) as Record<string, unknown>;
+        expect(body.reasoning_effort).toBe("medium");
+        expect(body.max_completion_tokens).toBe(DEFAULT_MAX_COMPLETION_TOKENS);
+    });
+
     it("retries network failures and rethrows the last error", async () => {
         vi.spyOn(globalThis, "fetch").mockRejectedValue(
             new Error("network down"),

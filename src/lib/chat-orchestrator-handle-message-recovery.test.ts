@@ -103,6 +103,110 @@ describe("main-loop recovery paths", () => {
         ).toHaveLength(1);
     });
 
+    it("retries when a length-truncated response has no visible content", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: { role: "assistant", content: null },
+                        finish_reason: "length",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('final answer')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const history: HistoryEntry[] = [];
+        const result = await handleUserMessage({
+            message: "test",
+            endpointUrl: mockServer.url,
+            apiKey: "",
+            model: "test-model",
+            allowedDir: tmpDir,
+            config: cfg,
+            /** No-op event handler for test isolation. */
+            emitEvent: () => {
+                /* no-op */
+            },
+            history,
+            facts: [],
+            signal: new AbortController().signal,
+        });
+
+        expect(result.text).toContain("final answer");
+        expect(mockServer.requestCount()).toBe(2);
+        expect(
+            history.some(
+                (entry) =>
+                    entry.role === "user" &&
+                    entry.content.includes("TruncatedResponse"),
+            ),
+        ).toBe(true);
+    });
+
+    it("retries a provider-filtered malformed function call as source text", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: { role: "assistant", content: null },
+                        finish_reason:
+                            "function_call_filter: MALFORMED_FUNCTION_CALL",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('final answer')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const history: HistoryEntry[] = [];
+        const result = await handleUserMessage({
+            message: "test",
+            endpointUrl: mockServer.url,
+            apiKey: "",
+            model: "test-model",
+            allowedDir: tmpDir,
+            config: cfg,
+            /** No-op event handler for test isolation. */
+            emitEvent: () => {
+                /* no-op */
+            },
+            history,
+            facts: [],
+            signal: new AbortController().signal,
+        });
+
+        expect(result.text).toContain("final answer");
+        expect(mockServer.requestCount()).toBe(2);
+        expect(
+            history.some(
+                (entry) =>
+                    entry.role === "user" &&
+                    entry.content.includes("MalformedFunctionCall") &&
+                    entry.content.includes("raw Python source text"),
+            ),
+        ).toBe(true);
+    });
+
     it("retries when successful code produces no terminal output", async () => {
         mockServer = await startMockServer([
             {

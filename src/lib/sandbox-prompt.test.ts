@@ -47,6 +47,16 @@ describe("buildSandboxPrompt — external function docs", () => {
         expect(prompt).toContain("Only re and json imports are available.");
     });
 
+    it("requires external functions to be returned as Python source text", () => {
+        const prompt = buildSandboxPrompt(BASE_OPTIONS);
+        expect(prompt).toContain(
+            "Do not use the model API's function-calling or tool-calling channel.",
+        );
+        expect(prompt).toContain(
+            "Write every external function call as Python source text",
+        );
+    });
+
     it("documents peek, read_info, bam_mods, window_reads, seq_table as section headings", () => {
         const prompt = buildSandboxPrompt(BASE_OPTIONS);
         const required = [
