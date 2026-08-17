@@ -484,11 +484,17 @@ export async function handleUserMessage(
         if (sandboxResult.success) {
             extractFacts(sandboxResult, { code }, roundId, facts);
 
-            if (sandboxResult.continueThinkingCalled) {
-                // Non-terminal: feed structured result back to LLM
+            const automaticContinuation =
+                !sandboxResult.continueThinkingCalled &&
+                (sandboxResult.sandboxToolCalled ||
+                    sandboxResult.endedWithExpression);
+            if (sandboxResult.continueThinkingCalled || automaticContinuation) {
+                // Sandbox calls and bare expressions are intermediate by
+                // construction, even when the model omits continue_thinking().
                 const feedback = buildExecutionFeedback(
                     sandboxResult,
                     roundsRemaining,
+                    automaticContinuation,
                 );
                 history.push({
                     role: "user",
@@ -497,11 +503,9 @@ export async function handleUserMessage(
                     executionStatus: "ok",
                 });
             } else {
-                // Terminal (default): collect print output + final expression for user
-                const hasOutput =
-                    (sandboxResult.prints?.length ?? 0) > 0 ||
-                    (sandboxResult.endedWithExpression &&
-                        sandboxResult.value != null);
+                // A terminal round is print-only and uses values already
+                // available from earlier execution feedback.
+                const hasOutput = (sandboxResult.prints?.length ?? 0) > 0;
                 if (!hasOutput) {
                     // No output produced — feed error back so the LLM can retry
                     const noOutputMsg =

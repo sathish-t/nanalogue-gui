@@ -147,11 +147,13 @@ function truncatePrints(
  *
  * @param result - The sandbox execution result.
  * @param roundsRemaining - The number of execution rounds remaining.
+ * @param automaticContinuation - Whether orchestration retained an unmarked intermediate result.
  * @returns The formatted feedback string.
  */
 export function buildExecutionFeedback(
     result: SandboxResult,
     roundsRemaining: number,
+    automaticContinuation = false,
 ): string {
     if (result.success) {
         const feedback: Record<string, unknown> = { success: true };
@@ -195,6 +197,11 @@ export function buildExecutionFeedback(
                 // truncated representation fits within the feedback byte budget.
                 if (result.truncated) feedback.value_truncated = true;
             }
+        }
+        if (automaticContinuation) {
+            feedback.automatic_continuation = true;
+            feedback.hint =
+                "A sandbox tool was called or the code ended with a bare expression, so this output was kept internal. Continue the analysis. To finish, use print() without calling a sandbox tool or ending with a bare expression.";
         }
         feedback.rounds_remaining = roundsRemaining;
         return `Code execution result: ${JSON.stringify(feedback)}`;

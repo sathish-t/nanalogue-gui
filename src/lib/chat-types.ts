@@ -22,6 +22,8 @@ export type SandboxResult =
           endedWithExpression: boolean;
           /** Whether continue_thinking() was called in the sandbox code. */
           continueThinkingCalled: boolean;
+          /** Whether a sandbox data, file, plotting, or command tool was called. */
+          sandboxToolCalled: boolean;
       })
     | (SandboxPrintMetadata & {
           /** The code failed to execute. */

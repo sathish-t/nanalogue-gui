@@ -263,4 +263,107 @@ describe("main-loop recovery paths", () => {
             ),
         ).toBe(true);
     });
+
+    it("automatically continues a tool-using round without continue_thinking", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: 'files = ls()\nprint("inspected files")',
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('final answer')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const history: HistoryEntry[] = [];
+        const result = await handleUserMessage({
+            message: "test",
+            endpointUrl: mockServer.url,
+            apiKey: "",
+            model: "test-model",
+            allowedDir: tmpDir,
+            config: cfg,
+            /** No-op event handler for test isolation. */
+            emitEvent: () => {
+                /* no-op */
+            },
+            history,
+            facts: [],
+            signal: new AbortController().signal,
+        });
+
+        expect(result.text).toBe("final answer\n");
+        expect(result.steps).toHaveLength(2);
+        expect(mockServer.requestCount()).toBe(2);
+        expect(result.steps[0].result.sandboxToolCalled).toBe(true);
+        expect(
+            history.some(
+                (entry) =>
+                    entry.role === "user" &&
+                    entry.content.includes('"automatic_continuation":true'),
+            ),
+        ).toBe(true);
+    });
+
+    it("automatically continues a bare-expression round without continue_thinking", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "1 + 1",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('The answer is 2')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const result = await handleUserMessage({
+            message: "test",
+            endpointUrl: mockServer.url,
+            apiKey: "",
+            model: "test-model",
+            allowedDir: tmpDir,
+            config: cfg,
+            /** No-op event handler for test isolation. */
+            emitEvent: () => {
+                /* no-op */
+            },
+            history: [],
+            facts: [],
+            signal: new AbortController().signal,
+        });
+
+        expect(result.text).toBe("The answer is 2\n");
+        expect(result.steps).toHaveLength(2);
+        expect(mockServer.requestCount()).toBe(2);
+    });
 });

@@ -94,10 +94,12 @@ export function collectDirectExecutionOutput(result: SandboxResult): string {
  * Monty only accepts specific Python exception type names (e.g. RuntimeError, ValueError).
  *
  * @param fns - Map of function names to their implementations.
+ * @param onCall - Optional callback invoked with each called function name.
  * @returns A new map with each function wrapped in SandboxError conversion.
  */
 export function wrapForMonty(
     fns: Record<string, (...args: never[]) => unknown>,
+    onCall?: (name: string) => void,
 ): Record<string, (...args: unknown[]) => unknown> {
     const wrapped: Record<string, (...args: unknown[]) => unknown> = {};
     for (const [name, fn] of Object.entries(fns)) {
@@ -108,6 +110,7 @@ export function wrapForMonty(
          * @returns The result of the external function call.
          */
         wrapped[name] = async (...args: unknown[]) => {
+            onCall?.(name);
             try {
                 return await (fn as (...a: unknown[]) => Promise<unknown>)(
                     ...args,
@@ -154,6 +157,7 @@ export async function runSandboxCode(
     } = options;
 
     let continueThinkingCalled = false;
+    let sandboxToolCalled = false;
     const prints: string[] = [];
     let printBytes = 0;
     let printsTruncated = false;
@@ -234,6 +238,11 @@ export async function runSandboxCode(
                         minimap2: makeRunMinimap2(allowedDir),
                     }).filter(([name]) => !removedTools?.has(name)),
                 ) as Record<string, (...args: never[]) => unknown>,
+                (name) => {
+                    if (name !== "continue_thinking") {
+                        sandboxToolCalled = true;
+                    }
+                },
             ),
         });
 
@@ -260,6 +269,7 @@ export async function runSandboxCode(
             truncated,
             endedWithExpression: converted != null,
             continueThinkingCalled,
+            sandboxToolCalled,
             prints,
             printsTruncated,
         };
