@@ -22,10 +22,10 @@ export const /** Validation specs for each integer AiChatConfig field (temperatu
         },
         /** At least one attempt; cap to avoid runaway retry loops. */
         maxRetries: { min: 1, max: 20, fallback: 5, label: "max retries" },
-        /** Per-request HTTP timeout; 1 s floor, 2-minute ceiling. */
+        /** Per-request HTTP timeout; 1 s floor, 20-minute ceiling. */
         timeoutSeconds: {
             min: 1,
-            max: 120,
+            max: 1_200,
             fallback: 60,
             label: "timeout seconds",
         },

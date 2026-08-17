@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
     CONFIG_FIELD_SPECS,
+    DEFAULT_MAX_COMPLETION_TOKENS,
     MAX_INPUT_CONTEXT_FRACTION,
     MAX_MESSAGE_BYTES,
     MODEL_LIST_TIMEOUT_MS,
@@ -72,5 +73,16 @@ describe("ai-chat-constants scalar exports", () => {
     it("has MODEL_LIST_TIMEOUT_MS as a positive integer", () => {
         expect(MODEL_LIST_TIMEOUT_MS).toBeGreaterThan(0);
         expect(Number.isInteger(MODEL_LIST_TIMEOUT_MS)).toBe(true);
+    });
+
+    it("allows 16,384 completion tokens per LLM request", () => {
+        expect(DEFAULT_MAX_COMPLETION_TOKENS).toBe(16_384);
+    });
+
+    it("allows an optional 1,200-second LLM response timeout", () => {
+        expect(CONFIG_FIELD_SPECS.timeoutSeconds).toMatchObject({
+            max: 1_200,
+            fallback: 60,
+        });
     });
 });

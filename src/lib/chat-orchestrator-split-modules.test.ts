@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+    DEFAULT_MAX_COMPLETION_TOKENS,
     FEEDBACK_OUTPUT_MAX_BYTES,
     TERMINAL_OUTPUT_OVERFLOW_BYTES,
 } from "./ai-chat-constants";
@@ -154,7 +155,7 @@ describe("chat-orchestrator-llm helpers", () => {
         const body = JSON.parse(
             String(fetchMock.mock.calls[0]?.[1]?.body),
         ) as Record<string, unknown>;
-        expect(body.max_tokens).toBeDefined();
+        expect(body.max_tokens).toBe(DEFAULT_MAX_COMPLETION_TOKENS);
         expect(body.max_completion_tokens).toBeUndefined();
     });
 
@@ -189,7 +190,7 @@ describe("chat-orchestrator-llm helpers", () => {
         const body = JSON.parse(
             String(fetchMock.mock.calls[0]?.[1]?.body),
         ) as Record<string, unknown>;
-        expect(body.max_tokens).toBeDefined();
+        expect(body.max_tokens).toBe(DEFAULT_MAX_COMPLETION_TOKENS);
         expect(body.max_completion_tokens).toBeUndefined();
     });
 

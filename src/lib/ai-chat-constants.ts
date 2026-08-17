@@ -51,7 +51,7 @@ export const /** Maximum bytes for execution feedback sent back to the LLM. */ F
 
 // --- LLM request parameters ---
 
-export const /** Maximum completion tokens sent to the LLM per request. */ DEFAULT_MAX_COMPLETION_TOKENS = 4096;
+export const /** Maximum completion tokens sent to the LLM per request. */ DEFAULT_MAX_COMPLETION_TOKENS = 16_384;
 
 // --- Message size limits ---
 
