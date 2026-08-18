@@ -12,6 +12,8 @@ import {
 } from "./ai-chat-constants";
 import {
     buildExecutionFeedback,
+    buildMalformedAssistantProtocolFeedback,
+    detectMalformedAssistantProtocol,
     handleTerminalOverflow,
     runSandboxGuarded,
 } from "./chat-orchestrator-execution";
@@ -59,6 +61,49 @@ describe("chat-orchestrator-execution helpers", () => {
         const result = await handleTerminalOverflow(text, filePath);
 
         expect(result).toContain("could not write to file");
+    });
+
+    it("detects native tool markup and simulated execution transcripts", () => {
+        expect(
+            detectMalformedAssistantProtocol(
+                '<tool_calls>\n<invoke name="ls">\n' +
+                    '<parameter name="pattern">**/*.bam</parameter>\n' +
+                    "</invoke>\n</tool_calls>",
+            ),
+        ).toBe("native_tool_markup");
+        expect(
+            detectMalformedAssistantProtocol(
+                "files = ls()\nfiles</think>Code execution result (get_ai_response):\n['x.bam']",
+            ),
+        ).toBe("simulated_execution_transcript");
+    });
+
+    it("allows direct Python and protocol-like text in strings or comments", () => {
+        expect(
+            detectMalformedAssistantProtocol('files = ls("**/*.bam")\nfiles'),
+        ).toBeNull();
+        expect(
+            detectMalformedAssistantProtocol(
+                '# <tool_calls> is invalid\nprint("Code execution result: example")\n' +
+                    'example = """\n<invoke name="ls">\n</invoke>\n"""\n' +
+                    "print(example)",
+            ),
+        ).toBeNull();
+    });
+
+    it("builds focused malformed-protocol repair feedback", () => {
+        const feedback = buildMalformedAssistantProtocolFeedback(
+            "native_tool_markup",
+            2,
+        );
+        const payload = JSON.parse(
+            feedback.replace("Code execution result: ", ""),
+        ) as Record<string, unknown>;
+
+        expect(payload.error_type).toBe("MalformedAssistantProtocol");
+        expect(payload.protocol).toBe("native_tool_markup");
+        expect(payload.message).toContain('files = ls("**/*.bam")\nfiles');
+        expect(payload.rounds_remaining).toBe(2);
     });
 
     it("marks oversized expression values as truncated", () => {

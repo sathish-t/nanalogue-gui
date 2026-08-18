@@ -86,6 +86,129 @@ export function extractCodeFromFences(response: string): string | null {
     return matches.map((m) => m[1].trimEnd()).join("\n\n");
 }
 
+/** Malformed assistant protocol that must be repaired before sandbox execution. */
+export type MalformedAssistantProtocol =
+    | "native_tool_markup"
+    | "simulated_execution_transcript";
+
+/**
+ * Replaces Python string and comment contents with spaces while retaining code layout.
+ * Protocol-like text inside a legitimate string or comment must not reject the response.
+ *
+ * @param code - Candidate Python source.
+ * @returns Source-shaped text containing only executable tokens and line breaks.
+ */
+function maskPythonStringsAndComments(code: string): string {
+    let masked = "";
+    let index = 0;
+
+    while (index < code.length) {
+        const char = code[index];
+        if (char === "#") {
+            while (index < code.length && code[index] !== "\n") {
+                masked += " ";
+                index += 1;
+            }
+            continue;
+        }
+        if (char !== '"' && char !== "'") {
+            masked += char;
+            index += 1;
+            continue;
+        }
+
+        const quote = char;
+        const tripleQuoted = code.slice(index, index + 3) === quote.repeat(3);
+        const delimiterLength = tripleQuoted ? 3 : 1;
+        masked += " ".repeat(delimiterLength);
+        index += delimiterLength;
+
+        while (index < code.length) {
+            if (
+                tripleQuoted &&
+                code.slice(index, index + 3) === quote.repeat(3)
+            ) {
+                masked += "   ";
+                index += 3;
+                break;
+            }
+            if (!tripleQuoted && code[index] === quote) {
+                masked += " ";
+                index += 1;
+                break;
+            }
+            if (code[index] === "\\") {
+                masked += " ";
+                index += 1;
+                if (index < code.length) {
+                    masked += code[index] === "\n" ? "\n" : " ";
+                    index += 1;
+                }
+                continue;
+            }
+            masked += code[index] === "\n" ? "\n" : " ";
+            index += 1;
+        }
+    }
+
+    return masked;
+}
+
+/**
+ * Detects native tool markup or a simulated execution transcript before Monty runs it.
+ * Python strings and comments are ignored so examples and diagnostic text remain valid.
+ *
+ * @param response - Raw assistant message content.
+ * @returns The malformed protocol kind, or null for ordinary Python source.
+ */
+export function detectMalformedAssistantProtocol(
+    response: string,
+): MalformedAssistantProtocol | null {
+    const executableText = maskPythonStringsAndComments(response);
+    if (
+        /(?:^|\n)\s*<\/?(?:tool_calls?|invoke|parameter)(?:\s[^>\r\n]*)?>/i.test(
+            executableText,
+        )
+    ) {
+        return "native_tool_markup";
+    }
+    if (
+        /(?:^|\n|<\/think>)\s*Code execution result(?:\s*\([^\r\n)]*\))?\s*:/i.test(
+            executableText,
+        )
+    ) {
+        return "simulated_execution_transcript";
+    }
+    return null;
+}
+
+/**
+ * Builds focused repair feedback for malformed assistant tool protocols.
+ *
+ * @param protocol - The malformed protocol kind detected in the response.
+ * @param roundsRemaining - The number of execution rounds remaining.
+ * @returns A structured execution-result message for the next model request.
+ */
+export function buildMalformedAssistantProtocolFeedback(
+    protocol: MalformedAssistantProtocol,
+    roundsRemaining: number,
+): string {
+    return (
+        "Code execution result: " +
+        JSON.stringify({
+            success: false,
+            error_type: "MalformedAssistantProtocol",
+            protocol,
+            message:
+                "Your response used native tool markup or simulated a tool transcript. " +
+                "Do not write <tool_calls>, <invoke>, <parameter>, or Code execution result blocks, " +
+                "and do not invent tool results. Call sandbox tools as direct Python source in the " +
+                'assistant message, for example: files = ls("**/*.bam")\nfiles',
+            rounds_remaining: roundsRemaining,
+        })
+    );
+}
+
 /**
  * Handles overflow for terminal output: if > TERMINAL_OUTPUT_OVERFLOW_BYTES,
  * writes full output to a file and returns a pointer message.

@@ -207,6 +207,74 @@ describe("main-loop recovery paths", () => {
         ).toBe(true);
     });
 
+    it("repairs native tool markup before starting Monty execution", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content:
+                                "```python\n<tool_calls>\n" +
+                                '<invoke name="ls">\n' +
+                                '<parameter name="pattern">**/*.bam</parameter>\n' +
+                                "</invoke>\n</tool_calls>\n```",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('repaired response')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const history: HistoryEntry[] = [];
+        const events: AiChatEvent[] = [];
+        const result = await handleUserMessage({
+            message: "test",
+            endpointUrl: mockServer.url,
+            apiKey: "",
+            model: "test-model",
+            allowedDir: tmpDir,
+            config: cfg,
+            /**
+             * Collects progress events to prove malformed text never reaches Monty.
+             *
+             * @param event - The event to collect.
+             */
+            emitEvent: (event: AiChatEvent) => {
+                events.push(event);
+            },
+            history,
+            facts: [],
+            signal: new AbortController().signal,
+        });
+
+        expect(result.text).toBe("repaired response\n");
+        expect(result.steps).toHaveLength(1);
+        expect(result.steps[0].code).toBe("print('repaired response')");
+        expect(
+            events.filter((event) => event.type === "code_execution_start"),
+        ).toHaveLength(1);
+        expect(
+            history.some(
+                (entry) =>
+                    entry.role === "user" &&
+                    entry.content.includes("MalformedAssistantProtocol") &&
+                    entry.content.includes('files = ls(\\"**/*.bam\\")'),
+            ),
+        ).toBe(true);
+    });
+
     it("retries when successful code produces no terminal output", async () => {
         mockServer = await startMockServer([
             {

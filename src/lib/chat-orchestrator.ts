@@ -14,6 +14,8 @@ import {
 } from "./ai-chat-constants";
 import {
     buildExecutionFeedback,
+    buildMalformedAssistantProtocolFeedback,
+    detectMalformedAssistantProtocol,
     extractCodeFromFences,
     handleTerminalOverflow,
     runSandboxGuarded,
@@ -445,6 +447,21 @@ export async function handleUserMessage(
         }
         if (!rawCode.trim()) break;
 
+        const malformedProtocol = detectMalformedAssistantProtocol(rawCode);
+        if (malformedProtocol) {
+            history.push({ role: "assistant", content: rawCode });
+            history.push({
+                role: "user",
+                content: buildMalformedAssistantProtocolFeedback(
+                    malformedProtocol,
+                    maxRounds - (round + 1),
+                ),
+                isExecutionResult: true,
+                executionStatus: "error",
+            });
+            continue;
+        }
+
         // Execute code. On SyntaxError, try markdown fence extraction.
         let code = rawCode;
         emitEvent({ type: "code_execution_start", code });
@@ -626,11 +643,24 @@ export async function handleUserMessage(
             { role: "assistant", content: rawFinal },
         ];
         const finalFinishReason = completion.choices?.[0]?.finish_reason;
+        const malformedFinalProtocol =
+            detectMalformedAssistantProtocol(rawFinal);
         if (finalFinishReason === "length") {
             // Truncated forced-final response — do not execute partial code.
             // Push the truncated content as assistant message for context,
             // then fall through to the fallback message.
             history.push({ role: "assistant", content: rawFinal });
+        } else if (malformedFinalProtocol) {
+            history.push({ role: "assistant", content: rawFinal });
+            history.push({
+                role: "user",
+                content: buildMalformedAssistantProtocolFeedback(
+                    malformedFinalProtocol,
+                    0,
+                ),
+                isExecutionResult: true,
+                executionStatus: "error",
+            });
         } else if (
             rawFinal.trim() &&
             cumulativeSandboxMs >= cumulativeBudgetMs

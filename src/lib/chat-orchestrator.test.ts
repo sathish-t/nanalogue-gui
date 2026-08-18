@@ -826,6 +826,51 @@ describe("adversarial/edge-case tests", () => {
         expect(last.content).toBe("print('truncated");
     });
 
+    it("forced-final rejects malformed native tool markup", async () => {
+        const malformedResponse =
+            '<tool_calls><invoke name="ls"></invoke></tool_calls>';
+        const responses: MockCompletion[] = [
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "continue_thinking()\n42",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: malformedResponse,
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ];
+        mockServer = await startMockServer(responses);
+
+        const { result, history, events } = await callOrchestrator(
+            mockServer.url,
+            { config: { maxCodeRounds: 1 } },
+        );
+
+        expect(result.text).toContain("did not produce a usable response");
+        expect(
+            events.filter((event) => event.type === "code_execution_start"),
+        ).toHaveLength(1);
+        expect(history).toContainEqual({
+            role: "assistant",
+            content: malformedResponse,
+        });
+        expect(history.at(-1)?.content).toContain("MalformedAssistantProtocol");
+    });
+
     it("forced-final fence-extraction retry on SyntaxError", async () => {
         const responses: MockCompletion[] = [
             // Round 1: continue_thinking (exhausts maxRounds=1)
