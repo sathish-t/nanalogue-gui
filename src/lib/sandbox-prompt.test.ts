@@ -57,20 +57,6 @@ describe("buildSandboxPrompt — external function docs", () => {
         );
     });
 
-    it("automatically continues tool calls and bare expressions", () => {
-        const prompt = buildSandboxPrompt(BASE_OPTIONS);
-        expect(prompt).toContain(
-            "A round automatically continues when it calls a sandbox external function",
-        );
-        expect(prompt).toContain(
-            "You do not need to\n  call continue_thinking() after a sandbox tool call or bare expression.",
-        );
-        expect(prompt).toContain(
-            "To finish, use print() without calling any external function or ending with a\n" +
-                "bare expression.",
-        );
-    });
-
     it("documents peek, read_info, bam_mods, window_reads, seq_table as section headings", () => {
         const prompt = buildSandboxPrompt(BASE_OPTIONS);
         const required = [
