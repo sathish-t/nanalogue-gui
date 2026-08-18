@@ -1,5 +1,5 @@
 // Unit tests for chat orchestrator pure functions and adversarial edge cases.
-// Tests pruneFailedRounds, facts extraction, context pipeline, runSandboxGuarded, and adversarial edge cases.
+// Tests facts extraction, context limits, runSandboxGuarded, and adversarial edge cases.
 // handleUserMessage end-to-end tests live in chat-orchestrator-handle-message.test.ts.
 
 import { mkdtemp, rm } from "node:fs/promises";
@@ -15,7 +15,6 @@ import {
     extractFacts,
     getLastSentMessages,
     handleUserMessage,
-    pruneFailedRounds,
     resetLastSentMessages,
     runSandboxGuarded,
     transformContext,
@@ -32,129 +31,6 @@ import type {
     HistoryEntry,
 } from "./chat-types";
 import { renderFactsBlock } from "./sandbox-prompt";
-
-describe("pruneFailedRounds", () => {
-    it("drops old failed rounds but keeps the most recent one", () => {
-        const history: HistoryEntry[] = [
-            { role: "user", content: "How many reads?" },
-            { role: "assistant", content: "x = bad_code1" },
-            {
-                role: "user",
-                content: 'Code execution result: {"success":false}',
-                isExecutionResult: true,
-                executionStatus: "error",
-            },
-            { role: "assistant", content: "x = bad_code2" },
-            {
-                role: "user",
-                content: 'Code execution result: {"success":false}',
-                isExecutionResult: true,
-                executionStatus: "error",
-            },
-            { role: "assistant", content: "print('good')" },
-            {
-                role: "user",
-                content: 'Code execution result: {"success":true}',
-                isExecutionResult: true,
-                executionStatus: "ok",
-            },
-            { role: "assistant", content: "There are 42 reads." },
-        ];
-        const pruned = pruneFailedRounds(history);
-        // First failed pair removed, second (most recent) kept
-        expect(pruned).toHaveLength(6);
-        expect(pruned.some((m) => m.content === "x = bad_code1")).toBe(false);
-        expect(pruned.some((m) => m.content === "x = bad_code2")).toBe(true);
-    });
-
-    it("keeps the only failed round (it is the most recent)", () => {
-        const history: HistoryEntry[] = [
-            { role: "user", content: "How many reads?" },
-            { role: "assistant", content: "x = bad_code" },
-            {
-                role: "user",
-                content: 'Code execution result: {"success":false}',
-                isExecutionResult: true,
-                executionStatus: "error",
-            },
-            { role: "assistant", content: "print('good')" },
-            {
-                role: "user",
-                content: 'Code execution result: {"success":true}',
-                isExecutionResult: true,
-                executionStatus: "ok",
-            },
-            { role: "assistant", content: "There are 42 reads." },
-        ];
-        const pruned = pruneFailedRounds(history);
-        // Single failed pair is the most recent — kept
-        expect(pruned).toHaveLength(6);
-        expect(pruned.some((m) => m.content === "x = bad_code")).toBe(true);
-    });
-
-    it("preserves all-successful rounds unchanged", () => {
-        const history: HistoryEntry[] = [
-            { role: "user", content: "Count reads" },
-            { role: "assistant", content: "print(100)" },
-            {
-                role: "user",
-                content: 'Code execution result: {"success":true}',
-                isExecutionResult: true,
-                executionStatus: "ok",
-            },
-            { role: "assistant", content: "100 reads." },
-        ];
-        const pruned = pruneFailedRounds(history);
-        expect(pruned).toHaveLength(4);
-    });
-
-    it("handles turns with no execution results", () => {
-        const history: HistoryEntry[] = [
-            { role: "user", content: "Hello" },
-            { role: "assistant", content: "Hi there!" },
-        ];
-        const pruned = pruneFailedRounds(history);
-        expect(pruned).toHaveLength(2);
-    });
-
-    it("prunes all but most recent consecutive failed round", () => {
-        const history: HistoryEntry[] = [
-            { role: "user", content: "query" },
-            { role: "assistant", content: "bad1" },
-            {
-                role: "user",
-                content: "error1",
-                isExecutionResult: true,
-                executionStatus: "error",
-            },
-            { role: "assistant", content: "bad2" },
-            {
-                role: "user",
-                content: "error2",
-                isExecutionResult: true,
-                executionStatus: "error",
-            },
-            { role: "assistant", content: "print('ok')" },
-        ];
-        const pruned = pruneFailedRounds(history);
-        // First failed pair pruned, second (most recent) kept, plus query + final
-        expect(pruned).toHaveLength(4);
-        expect(pruned[0].content).toBe("query");
-        expect(pruned[1].content).toBe("bad2");
-        expect(pruned[2].content).toBe("error2");
-        expect(pruned[3].content).toBe("print('ok')");
-    });
-
-    it("does not prune user messages without executionStatus", () => {
-        const history: HistoryEntry[] = [
-            { role: "user", content: "Hello" },
-            { role: "assistant", content: "print('hi')" },
-            { role: "user", content: "Another question" },
-        ];
-        const pruned = pruneFailedRounds(history);
-        expect(pruned).toHaveLength(3);
-    });
-});
 
 describe("applySlidingWindow", () => {
     it("keeps all messages when within budget", () => {
@@ -258,7 +134,7 @@ describe("deriveHistoryBudgetTokens", () => {
 });
 
 describe("transformContext", () => {
-    it("combines pruning and sliding window", () => {
+    it("preserves failed rounds while they fit within the context budget", () => {
         const history: HistoryEntry[] = [
             { role: "user", content: "test" },
             { role: "assistant", content: "bad_code_old" },
@@ -266,25 +142,31 @@ describe("transformContext", () => {
                 role: "user",
                 content: "error_old",
                 isExecutionResult: true,
-                executionStatus: "error",
             },
             { role: "assistant", content: "bad_code_recent" },
             {
                 role: "user",
                 content: "error_recent",
                 isExecutionResult: true,
-                executionStatus: "error",
             },
             { role: "assistant", content: "Done" },
         ];
         const result = transformContext(history, {
             contextBudgetTokens: 10000,
         });
-        // Old failed round should be pruned, most recent kept
-        expect(result.some((m) => m.content === "bad_code_old")).toBe(false);
-        expect(result.some((m) => m.content === "error_old")).toBe(false);
-        expect(result.some((m) => m.content === "bad_code_recent")).toBe(true);
-        expect(result.some((m) => m.content === "error_recent")).toBe(true);
+        expect(result).toEqual(history);
+    });
+
+    it("still drops the oldest messages when the context budget is exceeded", () => {
+        const history: HistoryEntry[] = Array.from({ length: 20 }, (_, i) => ({
+            role: "user" as const,
+            content: `Message ${i} ${"x".repeat(200)}`,
+        }));
+        const result = transformContext(history, {
+            contextBudgetTokens: 100,
+        });
+        expect(result.length).toBeLessThan(history.length);
+        expect(result[result.length - 1]).toEqual(history[history.length - 1]);
     });
 });
 
@@ -960,6 +842,69 @@ describe("adversarial/edge-case tests", () => {
         // Last message is the user-facing final answer
         expect(stored?.[stored.length - 1].role).toBe("assistant");
         expect(stored?.[stored.length - 1].content).toBe("ok\n");
+    });
+
+    it("sends all earlier failed rounds in the next LLM request", async () => {
+        const responses: MockCompletion[] = [
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "if True print('first')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "if False print('second')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('ok')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ];
+        mockServer = await startMockServer(responses);
+
+        const { result } = await callOrchestrator(mockServer.url, {
+            config: { maxCodeRounds: 3 },
+        });
+
+        expect(result.text).toBe("ok\n");
+        const finalRequestMessages = mockServer.requestBodies()[2]
+            .messages as Array<{
+            /** Message role sent to the mock LLM. */
+            role: string;
+            /** Message content sent to the mock LLM. */
+            content: string;
+        }>;
+        expect(
+            finalRequestMessages.map((message) => message.content),
+        ).toContain("if True print('first')");
+        expect(
+            finalRequestMessages.map((message) => message.content),
+        ).toContain("if False print('second')");
+        expect(
+            finalRequestMessages.filter((message) =>
+                message.content.includes("SyntaxError"),
+            ),
+        ).toHaveLength(2);
     });
 
     it("lastSentMessages includes assistant response from forced-final path", async () => {
