@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { DEFAULT_MAX_BLANK_RETRIES } from "./ai-chat-constants";
 import { handleUserMessage, resetLastSentMessages } from "./chat-orchestrator";
 import { createAiChatConfig } from "./chat-orchestrator-handle-message-test-utils";
 import {
@@ -154,6 +155,141 @@ describe("main-loop recovery paths", () => {
         ).toBe(true);
     });
 
+    it("retries blank responses and records their finish reasons", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: { role: "assistant", content: "   " },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: { role: "assistant", content: null },
+                        finish_reason: "content_filter",
+                    },
+                ],
+            },
+            { choices: [] },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('final answer')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const history: HistoryEntry[] = [];
+        const result = await handleUserMessage({
+            message: "test",
+            endpointUrl: mockServer.url,
+            apiKey: "",
+            model: "test-model",
+            allowedDir: tmpDir,
+            config: createAiChatConfig({
+                maxCodeRounds: DEFAULT_MAX_BLANK_RETRIES + 2,
+            }),
+            /** No-op event handler for test isolation. */
+            emitEvent: () => {
+                /* no-op */
+            },
+            history,
+            facts: [],
+            signal: new AbortController().signal,
+        });
+
+        const blankFeedback = history
+            .filter(
+                (entry) =>
+                    entry.role === "user" &&
+                    entry.content.includes("BlankAssistantResponse"),
+            )
+            .map(
+                (entry) =>
+                    JSON.parse(
+                        entry.content.replace("Code execution result: ", ""),
+                    ) as Record<string, unknown>,
+            );
+        expect(result.text).toBe("final answer\n");
+        expect(result.steps).toHaveLength(1);
+        expect(mockServer.requestCount()).toBe(4);
+        expect(blankFeedback).toHaveLength(DEFAULT_MAX_BLANK_RETRIES);
+        expect(blankFeedback.map((feedback) => feedback.finish_reason)).toEqual(
+            ["stop", "content_filter", null],
+        );
+        expect(
+            blankFeedback.map((feedback) => feedback.blank_retries_remaining),
+        ).toEqual([3, 2, 1]);
+    });
+
+    it("stops after three retries when responses remain blank", async () => {
+        const blankCompletion = {
+            choices: [
+                {
+                    message: { role: "assistant", content: null },
+                    finish_reason: "stop",
+                },
+            ],
+        };
+        mockServer = await startMockServer([
+            blankCompletion,
+            blankCompletion,
+            blankCompletion,
+            blankCompletion,
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('must not be requested')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const history: HistoryEntry[] = [];
+        const result = await handleUserMessage({
+            message: "test",
+            endpointUrl: mockServer.url,
+            apiKey: "",
+            model: "test-model",
+            allowedDir: tmpDir,
+            config: createAiChatConfig({
+                maxCodeRounds: DEFAULT_MAX_BLANK_RETRIES + 2,
+            }),
+            /** No-op event handler for test isolation. */
+            emitEvent: () => {
+                /* no-op */
+            },
+            history,
+            facts: [],
+            signal: new AbortController().signal,
+        });
+
+        const blankFeedback = history.filter(
+            (entry) =>
+                entry.role === "user" &&
+                entry.content.includes("BlankAssistantResponse"),
+        );
+        expect(result.text).toContain("did not produce a usable response");
+        expect(result.steps).toHaveLength(0);
+        expect(mockServer.requestCount()).toBe(DEFAULT_MAX_BLANK_RETRIES + 1);
+        expect(blankFeedback).toHaveLength(DEFAULT_MAX_BLANK_RETRIES + 1);
+        expect(blankFeedback.at(-1)?.content).toContain(
+            '"blank_retries_remaining":0',
+        );
+    });
+
     it("retries a provider-filtered malformed function call as source text", async () => {
         mockServer = await startMockServer([
             {
@@ -203,6 +339,70 @@ describe("main-loop recovery paths", () => {
                     entry.role === "user" &&
                     entry.content.includes("MalformedFunctionCall") &&
                     entry.content.includes("raw Python source text"),
+            ),
+        ).toBe(true);
+    });
+
+    it("repairs reasoning markup before starting Monty execution", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content:
+                                "```python\nfiles = ls()\nfiles\n</think>\n```",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('repaired response')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const history: HistoryEntry[] = [];
+        const events: AiChatEvent[] = [];
+        const result = await handleUserMessage({
+            message: "test",
+            endpointUrl: mockServer.url,
+            apiKey: "",
+            model: "test-model",
+            allowedDir: tmpDir,
+            config: cfg,
+            /**
+             * Collects progress events to prove reasoning markup never reaches Monty.
+             *
+             * @param event - The event to collect.
+             */
+            emitEvent: (event: AiChatEvent) => {
+                events.push(event);
+            },
+            history,
+            facts: [],
+            signal: new AbortController().signal,
+        });
+
+        expect(result.text).toBe("repaired response\n");
+        expect(result.steps).toHaveLength(1);
+        expect(
+            events.filter((event) => event.type === "code_execution_start"),
+        ).toHaveLength(1);
+        expect(
+            history.some(
+                (entry) =>
+                    entry.role === "user" &&
+                    entry.content.includes('"protocol":"reasoning_markup"') &&
+                    entry.content.includes("<think>"),
             ),
         ).toBe(true);
     });

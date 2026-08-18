@@ -89,6 +89,7 @@ export function extractCodeFromFences(response: string): string | null {
 /** Malformed assistant protocol that must be repaired before sandbox execution. */
 export type MalformedAssistantProtocol =
     | "native_tool_markup"
+    | "reasoning_markup"
     | "simulated_execution_transcript";
 
 /**
@@ -155,7 +156,7 @@ function maskPythonStringsAndComments(code: string): string {
 }
 
 /**
- * Detects native tool markup or a simulated execution transcript before Monty runs it.
+ * Detects reasoning markup, native tool markup, or simulated execution transcripts before Monty runs them.
  * Python strings and comments are ignored so examples and diagnostic text remain valid.
  *
  * @param response - Raw assistant message content.
@@ -165,6 +166,9 @@ export function detectMalformedAssistantProtocol(
     response: string,
 ): MalformedAssistantProtocol | null {
     const executableText = maskPythonStringsAndComments(response);
+    if (/<\/?think(?:\s[^>\r\n]*)?>/i.test(executableText)) {
+        return "reasoning_markup";
+    }
     if (
         /(?:^|\n)\s*<\/?(?:tool_calls?|invoke|parameter)(?:\s[^>\r\n]*)?>/i.test(
             executableText,
@@ -200,8 +204,8 @@ export function buildMalformedAssistantProtocolFeedback(
             error_type: "MalformedAssistantProtocol",
             protocol,
             message:
-                "Your response used native tool markup or simulated a tool transcript. " +
-                "Do not write <tool_calls>, <invoke>, <parameter>, or Code execution result blocks, " +
+                "Your response used reasoning markup, native tool markup, or a simulated tool transcript. " +
+                "Do not write <think>, </think>, <tool_calls>, <invoke>, <parameter>, or Code execution result blocks, " +
                 "and do not invent tool results. Call sandbox tools as direct Python source in the " +
                 'assistant message, for example: files = ls("**/*.bam")\nfiles',
             rounds_remaining: roundsRemaining,

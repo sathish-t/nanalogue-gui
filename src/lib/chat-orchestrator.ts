@@ -6,6 +6,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import {
     CONFIG_FIELD_SPECS,
+    DEFAULT_MAX_BLANK_RETRIES,
     DEFAULT_MAX_CODE_ROUNDS,
     DEFAULT_MAX_COMPLETION_TOKENS,
     DEFAULT_MAX_CUMULATIVE_SANDBOX_MS,
@@ -346,6 +347,7 @@ export async function handleUserMessage(
 
     let finalText = "";
     let estimatedBytesPerToken = NOMINAL_BYTES_PER_TOKEN;
+    let blankRetriesUsed = 0;
 
     let round = 0;
     for (; round < maxRounds; round++) {
@@ -398,6 +400,7 @@ export async function handleUserMessage(
             ) ?? estimatedBytesPerToken;
 
         const rawCode = completion.choices?.[0]?.message?.content ?? "";
+        if (rawCode.trim()) blankRetriesUsed = 0;
 
         // Append the assistant response now that we have it
         lastSentMessages = [
@@ -445,7 +448,38 @@ export async function handleUserMessage(
             });
             continue;
         }
-        if (!rawCode.trim()) break;
+        if (!rawCode.trim()) {
+            const blankRetriesRemaining = Math.max(
+                DEFAULT_MAX_BLANK_RETRIES - blankRetriesUsed,
+                0,
+            );
+            const blankResponseMsg =
+                "Code execution result: " +
+                JSON.stringify({
+                    success: false,
+                    error_type: "BlankAssistantResponse",
+                    message:
+                        "The provider returned blank or missing assistant content. Return valid Python source text in the assistant message content.",
+                    finish_reason: finishReason ?? null,
+                    blank_retries_remaining: blankRetriesRemaining,
+                    rounds_remaining: maxRounds - (round + 1),
+                });
+            history.push({
+                role: "user",
+                content: blankResponseMsg,
+                isExecutionResult: true,
+                executionStatus: "error",
+            });
+            lastSentMessages = [
+                ...lastSentMessages,
+                { role: "user", content: blankResponseMsg },
+            ];
+            if (blankRetriesUsed < DEFAULT_MAX_BLANK_RETRIES) {
+                blankRetriesUsed += 1;
+                continue;
+            }
+            break;
+        }
 
         const malformedProtocol = detectMalformedAssistantProtocol(rawCode);
         if (malformedProtocol) {

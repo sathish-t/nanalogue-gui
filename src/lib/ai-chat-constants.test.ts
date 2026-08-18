@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
     CONFIG_FIELD_SPECS,
+    DEFAULT_MAX_BLANK_RETRIES,
     DEFAULT_MAX_COMPLETION_TOKENS,
     MAX_INPUT_CONTEXT_FRACTION,
     MAX_MESSAGE_BYTES,
@@ -77,6 +78,10 @@ describe("ai-chat-constants scalar exports", () => {
 
     it("allows 16,384 completion tokens per LLM request", () => {
         expect(DEFAULT_MAX_COMPLETION_TOKENS).toBe(16_384);
+    });
+
+    it("retries blank assistant responses three times", () => {
+        expect(DEFAULT_MAX_BLANK_RETRIES).toBe(3);
     });
 
     it("allows an optional 1,200-second LLM response timeout", () => {

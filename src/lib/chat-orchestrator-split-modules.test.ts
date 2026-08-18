@@ -63,7 +63,7 @@ describe("chat-orchestrator-execution helpers", () => {
         expect(result).toContain("could not write to file");
     });
 
-    it("detects native tool markup and simulated execution transcripts", () => {
+    it("detects native tool, reasoning, and simulated execution markup", () => {
         expect(
             detectMalformedAssistantProtocol(
                 '<tool_calls>\n<invoke name="ls">\n' +
@@ -72,8 +72,16 @@ describe("chat-orchestrator-execution helpers", () => {
             ),
         ).toBe("native_tool_markup");
         expect(
+            detectMalformedAssistantProtocol("files = ls()\nfiles\n</think>"),
+        ).toBe("reasoning_markup");
+        expect(
             detectMalformedAssistantProtocol(
-                "files = ls()\nfiles</think>Code execution result (get_ai_response):\n['x.bam']",
+                "<think>inspect files</think>\nfiles = ls()\nfiles",
+            ),
+        ).toBe("reasoning_markup");
+        expect(
+            detectMalformedAssistantProtocol(
+                "files = ls()\nCode execution result (get_ai_response):\n['x.bam']",
             ),
         ).toBe("simulated_execution_transcript");
     });
@@ -85,7 +93,8 @@ describe("chat-orchestrator-execution helpers", () => {
         expect(
             detectMalformedAssistantProtocol(
                 '# <tool_calls> is invalid\nprint("Code execution result: example")\n' +
-                    'example = """\n<invoke name="ls">\n</invoke>\n"""\n' +
+                    'example = """\n<think>example</think>\n' +
+                    '<invoke name="ls">\n</invoke>\n"""\n' +
                     "print(example)",
             ),
         ).toBeNull();
@@ -104,6 +113,20 @@ describe("chat-orchestrator-execution helpers", () => {
         expect(payload.protocol).toBe("native_tool_markup");
         expect(payload.message).toContain('files = ls("**/*.bam")\nfiles');
         expect(payload.rounds_remaining).toBe(2);
+    });
+
+    it("builds repair feedback for leaked reasoning markup", () => {
+        const feedback = buildMalformedAssistantProtocolFeedback(
+            "reasoning_markup",
+            2,
+        );
+        const payload = JSON.parse(
+            feedback.replace("Code execution result: ", ""),
+        ) as Record<string, unknown>;
+
+        expect(payload.protocol).toBe("reasoning_markup");
+        expect(payload.message).toContain("<think>");
+        expect(payload.message).toContain("</think>");
     });
 
     it("marks oversized expression values as truncated", () => {
