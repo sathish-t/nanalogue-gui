@@ -67,7 +67,7 @@ describe("/dump_llm_instructions slash command", () => {
             message: "/dump_llm_instructions",
             endpointUrl: "http://localhost:1234/v1",
             apiKey: "",
-            model: "test",
+            model: "selected-model",
             allowedDir: tmpDir,
             config,
             /**
@@ -86,7 +86,7 @@ describe("/dump_llm_instructions slash command", () => {
         expect(history).toHaveLength(0);
     });
 
-    it("writes plain-text sections with message headers", async () => {
+    it("writes transcript headers with the selected model", async () => {
         setLastSentMessages([
             { role: "system", content: "You are a helpful assistant." },
             { role: "user", content: "Hello there." },
@@ -98,7 +98,7 @@ describe("/dump_llm_instructions slash command", () => {
             message: "/dump_llm_instructions",
             endpointUrl: "http://localhost:1234/v1",
             apiKey: "",
-            model: "test",
+            model: "selected-model",
             allowedDir: tmpDir,
             config,
             /**
@@ -127,6 +127,14 @@ describe("/dump_llm_instructions slash command", () => {
         expect(content).toContain("You are a helpful assistant.");
         expect(content).toContain("=== Message 2: user ===");
         expect(content).toContain("Hello there.");
+
+        const htmlFile = files.find((f) => f.endsWith(".html"));
+        expect(htmlFile).toBeDefined();
+        const htmlContent = await readFile(
+            join(outputDir, htmlFile as string),
+            "utf-8",
+        );
+        expect(htmlContent).toContain("selected-model · generated");
     });
 
     it("filename matches nanalogue-chat-{date}-{uuid}.log pattern", async () => {

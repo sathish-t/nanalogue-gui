@@ -109,11 +109,13 @@ export interface DumpLlmInstructionsResult {
  *
  * @param allowedDir - The analysis directory (must be the sandbox root).
  * @param messages - The messages to dump.
+ * @param model - The selected LLM model name for the HTML transcript header.
  * @returns Paths to both output files relative to allowedDir.
  */
 export async function dumpLlmInstructions(
     allowedDir: string,
     messages: LlmMessage[],
+    model: string,
 ): Promise<DumpLlmInstructionsResult | null> {
     const outputDir = join(allowedDir, "ai_chat_output");
     await mkdir(outputDir, { recursive: true });
@@ -133,7 +135,7 @@ export async function dumpLlmInstructions(
         .join("\n\n");
     await writeFile(logFile, logContent, "utf-8");
 
-    const htmlContent = generateChatHtml(messages, uuid);
+    const htmlContent = generateChatHtml(messages, uuid, model);
     await writeFile(htmlFile, htmlContent, "utf-8");
 
     return {
@@ -273,6 +275,7 @@ export async function handleUserMessage(
     const dumpResult = await handleDumpCommand({
         message,
         allowedDir,
+        model,
         config,
         emitEvent,
         history,

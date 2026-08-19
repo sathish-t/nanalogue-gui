@@ -516,7 +516,11 @@ async function main(): Promise<void> {
             try {
                 const lastSentMessages = getLastSentMessages();
                 const dump = lastSentMessages
-                    ? await dumpLlmInstructions(allowedDir, lastSentMessages)
+                    ? await dumpLlmInstructions(
+                          allowedDir,
+                          lastSentMessages,
+                          model,
+                      )
                     : null;
                 if (dump) {
                     console.error(`LLM instructions dumped to ${dump.log}`);

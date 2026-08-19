@@ -64,6 +64,7 @@ describe("handleDumpCommand", () => {
         const result = await handleDumpCommand({
             message: "/dump_llm_instructions",
             allowedDir: tmpDir,
+            model: "test-model",
             config: testConfig,
             /**
              * Collects emitted events.
@@ -94,6 +95,7 @@ describe("handleDumpCommand", () => {
         const result = await handleDumpCommand({
             message: "/dump_system_prompt",
             allowedDir: tmpDir,
+            model: "test-model",
             config: testConfig,
             /**
              * Collects emitted events.
@@ -121,6 +123,7 @@ describe("handleDumpCommand", () => {
         const result = await handleDumpCommand({
             message: "hello",
             allowedDir: tmpDir,
+            model: "test-model",
             config: testConfig,
             /**
              * Collects emitted events.
@@ -146,6 +149,7 @@ describe("handleDumpCommand", () => {
         const result = await handleDumpCommand({
             message: "/dump_system_prompt",
             allowedDir: tmpDir,
+            model: "test-model",
             config: testConfig,
             /**
              * Collects emitted events.

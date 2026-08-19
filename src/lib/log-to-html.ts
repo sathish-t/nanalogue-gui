@@ -362,11 +362,13 @@ function renderAssistantMessage(content: string, renderer: Renderer): string {
  * @param snapshotId - A short identifier shown in the page title and header.
  *   For example, the UUID portion of the dump filename. Note this identifies
  *   a single dump snapshot, not a unique per-session value.
+ * @param model - The selected LLM model name shown in the transcript header.
  * @returns A complete, self-contained HTML document as a string.
  */
 export function generateChatHtml(
     messages: LlmMessage[],
     snapshotId: string,
+    model: string,
 ): string {
     const renderer = buildMarkedRenderer();
 
@@ -418,7 +420,7 @@ ${HLJS_THEME_CSS}
   <!-- page header -->
   <header>
     <h1>nanalogue chat transcript</h1>
-    <div class="meta">${escapeHtml(snapshotId)} · ${msgCount} message${msgCount === 1 ? "" : "s"} · generated ${escapeHtml(date)}</div>
+    <div class="meta">${escapeHtml(snapshotId)} · ${msgCount} message${msgCount === 1 ? "" : "s"} · ${escapeHtml(model)} · generated ${escapeHtml(date)}</div>
   </header>
   <!-- message list -->
   <main>

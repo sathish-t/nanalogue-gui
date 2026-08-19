@@ -28,6 +28,7 @@ export interface DumpableLlmMessage {
 export type DumpLlmInstructionsFn = (
     allowedDir: string,
     messages: DumpableLlmMessage[],
+    model: string,
 ) => Promise<{
     /** Relative path to the plain-text log file. */
     log: string;
@@ -41,6 +42,8 @@ export interface DumpCommandHandlerOptions {
     message: string;
     /** The allowed directory for BAM files. */
     allowedDir: string;
+    /** The selected LLM model name. */
+    model: string;
     /** The orchestrator configuration. */
     config: AiChatConfig;
     /** Callback for emitting events to the renderer. */
@@ -69,6 +72,7 @@ export async function handleDumpCommand(
     const {
         message,
         allowedDir,
+        model,
         config,
         emitEvent,
         history,
@@ -84,7 +88,7 @@ export async function handleDumpCommand(
         emitEvent({ type: "turn_start" });
 
         const dump = lastSentMessages
-            ? await dumpLlmInstructions(allowedDir, lastSentMessages)
+            ? await dumpLlmInstructions(allowedDir, lastSentMessages, model)
             : null;
         const text = dump
             ? `LLM instructions dumped to ${dump.log}\n` +
