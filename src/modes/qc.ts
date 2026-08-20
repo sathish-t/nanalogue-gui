@@ -3,7 +3,10 @@
 import { resolve } from "node:path";
 import { type BrowserWindow, dialog, ipcMain } from "electron";
 import { getFontSize } from "../font-size";
-import { validateIpcFilePath } from "../lib/ipc-path-validation";
+import {
+    validateIpcFilePath,
+    validateIpcRemoteBamUrl,
+} from "../lib/ipc-path-validation";
 import { validateQCRequest } from "../lib/qc-contract";
 import { generateQCData, peekBam } from "../lib/qc-data-loader";
 import type { QCData } from "../lib/types";
@@ -26,8 +29,22 @@ export function setQcMainWindow(window: BrowserWindow | null) {
 export function registerQcIpcHandlers() {
     ipcMain.handle(
         "peek-bam",
-        async (_event, bamPath: string, treatAsUrl: boolean) => {
-            if (!treatAsUrl) await validateIpcFilePath(bamPath, "read");
+        async (_event, bamPath: unknown, treatAsUrl: unknown) => {
+            if (typeof bamPath !== "string" || bamPath.length === 0) {
+                throw new Error(
+                    "Invalid QC peek-bam request: bamPath must be a non-empty string",
+                );
+            }
+            if (typeof treatAsUrl !== "boolean") {
+                throw new Error(
+                    "Invalid QC peek-bam request: treatAsUrl must be a boolean",
+                );
+            }
+            if (treatAsUrl) {
+                validateIpcRemoteBamUrl(bamPath, "QC");
+            } else {
+                await validateIpcFilePath(bamPath, "read");
+            }
             return await peekBam(bamPath, treatAsUrl);
         },
     );

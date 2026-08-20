@@ -19,6 +19,7 @@ import {
 import type { QCConfig, QCData } from "../lib/types";
 import {
     setMockImplementation,
+    setMockRejectedValue,
     setMockResolvedValue,
     setMockReturnValue,
 } from "../test-helpers";
@@ -89,7 +90,9 @@ const { generateQCData, peekBam } = await import("../lib/qc-data-loader");
 const { dialog } = await import("electron");
 const { readFile } = await import("node:fs/promises");
 const { parseReadIds } = await import("../lib/locate-data-loader");
-const { validateIpcFilePath } = await import("../lib/ipc-path-validation");
+const { validateIpcFilePath, validateIpcRemoteBamUrl } = await import(
+    "../lib/ipc-path-validation"
+);
 const { registerQcIpcHandlers, setQcMainWindow } = await import("./qc");
 
 // Register all IPC handlers once; ipcHandlers is populated as a side-effect.
@@ -200,7 +203,28 @@ describe("qc IPC handlers", () => {
             );
         });
 
-        it("skips path validation when treatAsUrl is true", async () => {
+        it("does not peek when local path validation rejects", async () => {
+            setMockRejectedValue(
+                validateIpcFilePath,
+                new Error("Path must be absolute"),
+            );
+
+            try {
+                await expect(
+                    ipcHandlers.get("peek-bam")?.(
+                        undefined,
+                        "relative/sample.bam",
+                        false,
+                    ),
+                ).rejects.toThrow("Path must be absolute");
+
+                expect(vi.mocked(peekBam)).not.toHaveBeenCalled();
+            } finally {
+                vi.mocked(validateIpcFilePath).mockReset();
+            }
+        });
+
+        it("validates remote BAM URLs when treatAsUrl is true", async () => {
             setMockResolvedValue(peekBam, {
                 contigs: [],
                 totalContigs: 0,
@@ -215,6 +239,42 @@ describe("qc IPC handlers", () => {
             );
 
             expect(vi.mocked(validateIpcFilePath)).not.toHaveBeenCalled();
+            expect(vi.mocked(validateIpcRemoteBamUrl)).toHaveBeenCalledWith(
+                "https://example.com/sample.bam",
+                "QC",
+            );
+        });
+
+        it.each([
+            ["", false, "bamPath must be a non-empty string"],
+            [123, false, "bamPath must be a non-empty string"],
+            ["/data/sample.bam", "false", "treatAsUrl must be a boolean"],
+        ])("rejects invalid request arguments (%s, %s)", async (bamPath, treatAsUrl, message) => {
+            await expect(
+                ipcHandlers.get("peek-bam")?.(undefined, bamPath, treatAsUrl),
+            ).rejects.toThrow(message);
+
+            expect(vi.mocked(peekBam)).not.toHaveBeenCalled();
+        });
+
+        it("rejects a local path in URL mode before peeking", async () => {
+            setMockImplementation(validateIpcRemoteBamUrl, () => {
+                throw new Error("Invalid QC BAM URL: expected HTTP or HTTPS");
+            });
+
+            try {
+                await expect(
+                    ipcHandlers.get("peek-bam")?.(
+                        undefined,
+                        "file:///data/sample.bam",
+                        true,
+                    ),
+                ).rejects.toThrow("Invalid QC BAM URL");
+
+                expect(vi.mocked(peekBam)).not.toHaveBeenCalled();
+            } finally {
+                vi.mocked(validateIpcRemoteBamUrl).mockReset();
+            }
         });
     });
 
