@@ -237,4 +237,43 @@ describe("/dump_system_prompt slash command", () => {
             await rm(outsideDir, { recursive: true, force: true });
         }
     });
+
+    it("reports a sandbox-relative path when allowedDir is a symlink", async () => {
+        const linkedDir = `${tmpDir}-link`;
+        await symlink(tmpDir, linkedDir);
+        try {
+            const { config, history, facts, events, signal } =
+                createHandleMessageHarness();
+
+            const result = await handleUserMessage({
+                message: "/dump_system_prompt",
+                endpointUrl: "http://localhost:1234/v1",
+                apiKey: "",
+                model: "test-model",
+                allowedDir: linkedDir,
+                config,
+                /**
+                 * Collects emitted events.
+                 *
+                 * @param event - The event to collect.
+                 */
+                emitEvent: (event: AiChatEvent) => {
+                    events.push(event);
+                },
+                history,
+                facts,
+                signal,
+            });
+
+            const dumpedPath = result.text.match(
+                /^System prompt dumped to (.+)$/m,
+            )?.[1];
+            expect(dumpedPath).toMatch(
+                /^ai_chat_output[/\\]nanalogue-chat-.+\.log$/,
+            );
+            expect(dumpedPath).not.toContain("..");
+        } finally {
+            await rm(linkedDir, { force: true });
+        }
+    });
 });

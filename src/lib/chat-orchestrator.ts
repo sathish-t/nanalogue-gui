@@ -2,8 +2,7 @@
 // Manages conversation history, context transformation, facts, and the code-only LLM loop.
 
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { readFile } from "node:fs/promises";
 import {
     CONFIG_FIELD_SPECS,
     DEFAULT_MAX_BLANK_RETRIES,
@@ -34,6 +33,10 @@ import {
     deriveEstimatedBytesPerToken,
     fetchChatCompletion,
 } from "./chat-orchestrator-llm";
+import {
+    dumpConversationHistory,
+    dumpLlmInstructions,
+} from "./chat-transcript-dump";
 import type {
     AiChatConfig,
     AiChatEvent,
@@ -43,7 +46,6 @@ import type {
     SandboxOptions,
     SandboxResult,
 } from "./chat-types";
-import { generateChatHtml } from "./log-to-html.js";
 import {
     collectDirectExecutionOutput,
     collectTerminalOutput,
@@ -61,6 +63,12 @@ export interface LlmMessage {
     /** The message content. */
     content: string;
 }
+
+export {
+    type ChatTranscriptDumpResult,
+    dumpConversationHistory,
+    dumpLlmInstructions,
+} from "./chat-transcript-dump";
 
 /** Most recent messages array sent (or attempted) to the LLM API. */
 let lastSentMessages: LlmMessage[] | null = null;
@@ -88,60 +96,6 @@ export function getLastSentMessages(): LlmMessage[] | null {
  */
 export function setLastSentMessages(messages: LlmMessage[] | null): void {
     lastSentMessages = messages;
-}
-
-/**
- * Paths produced by a successful dumpLlmInstructions call, both relative to
- * the allowedDir sandbox root.
- */
-export interface DumpLlmInstructionsResult {
-    /** Relative path to the plain-text .log file. */
-    log: string;
-    /** Relative path to the self-contained .html file. */
-    html: string;
-}
-
-/**
- * Writes an LLM message array to a dated log file and a sibling HTML file in
- * ai_chat_output/ inside the given directory. Used by both the
- * /dump_llm_instructions slash command and the --dump-llm-instructions CLI
- * flag.
- *
- * @param allowedDir - The analysis directory (must be the sandbox root).
- * @param messages - The messages to dump.
- * @param model - The selected LLM model name for the HTML transcript header.
- * @returns Paths to both output files relative to allowedDir.
- */
-export async function dumpLlmInstructions(
-    allowedDir: string,
-    messages: LlmMessage[],
-    model: string,
-): Promise<DumpLlmInstructionsResult | null> {
-    const outputDir = join(allowedDir, "ai_chat_output");
-    await mkdir(outputDir, { recursive: true });
-    const safeDir = await resolvePath(allowedDir, "ai_chat_output");
-
-    const date = new Date().toISOString().slice(0, 10);
-    const uuid = randomUUID();
-    const stem = `nanalogue-chat-${date}-${uuid}`;
-    const logFile = join(safeDir, `${stem}.log`);
-    const htmlFile = join(safeDir, `${stem}.html`);
-
-    const logContent = messages
-        .map(
-            (msg, i) =>
-                `=== Message ${i + 1}: ${msg.role} ===\n\n${msg.content}`,
-        )
-        .join("\n\n");
-    await writeFile(logFile, logContent, "utf-8");
-
-    const htmlContent = generateChatHtml(messages, uuid, model);
-    await writeFile(htmlFile, htmlContent, "utf-8");
-
-    return {
-        log: relative(allowedDir, logFile),
-        html: relative(allowedDir, htmlFile),
-    };
 }
 
 export {
@@ -280,6 +234,7 @@ export async function handleUserMessage(
         emitEvent,
         history,
         lastSentMessages,
+        dumpConversationHistory,
         dumpLlmInstructions,
         appendSystemPrompt,
         replaceSystemPrompt,
@@ -703,6 +658,7 @@ export async function handleUserMessage(
             cumulativeSandboxMs >= cumulativeBudgetMs
         ) {
             // Sandbox budget exhausted — push raw response without executing
+            /* c8 ignore next 3 -- requires exhausting the fixed 30-minute sandbox budget */
             finalText =
                 "(Sandbox execution budget exhausted. The model's response could not be executed.)";
             history.push({ role: "assistant", content: finalText });

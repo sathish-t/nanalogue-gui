@@ -71,24 +71,21 @@ describe("preload bridge", () => {
     });
 
     describe("landing page channels", () => {
-        it.each([
-            "setFontSize",
-            "getVersion",
-            "openExternalUrl",
-        ])("exposes %s as a function", (name) => {
-            expect(typeof exposedApi[name]).toBe("function");
-        });
+        it.each(["setFontSize", "getVersion", "openExternalUrl"])(
+            "exposes %s as a function",
+            (name) => {
+                expect(typeof exposedApi[name]).toBe("function");
+            },
+        );
     });
 
     describe("mode launchers", () => {
-        it.each([
-            "launchSwipe",
-            "launchQC",
-            "launchLocate",
-            "launchAiChat",
-        ])("exposes %s as a function", (name) => {
-            expect(typeof exposedApi[name]).toBe("function");
-        });
+        it.each(["launchSwipe", "launchQC", "launchLocate", "launchAiChat"])(
+            "exposes %s as a function",
+            (name) => {
+                expect(typeof exposedApi[name]).toBe("function");
+            },
+        );
     });
 
     describe("swipe channels", () => {

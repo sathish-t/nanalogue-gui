@@ -3,7 +3,7 @@
 
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 import type {
     AiChatConfig,
     AiChatEvent,
@@ -36,6 +36,18 @@ export type DumpLlmInstructionsFn = (
     html: string;
 } | null>;
 
+/** Callback for persisting the complete raw conversation history. */
+export type DumpConversationHistoryFn = (
+    allowedDir: string,
+    history: HistoryEntry[],
+    model: string,
+) => Promise<{
+    /** Relative path to the plain-text log file. */
+    log: string;
+    /** Relative path to the HTML file. */
+    html: string;
+}>;
+
 /** Options for the dump-command handler helper. */
 export interface DumpCommandHandlerOptions {
     /** The user's message text. */
@@ -52,6 +64,8 @@ export interface DumpCommandHandlerOptions {
     history: HistoryEntry[];
     /** Most recent messages sent to the LLM, if any. */
     lastSentMessages: DumpableLlmMessage[] | null;
+    /** Callback for dumping the complete unpruned conversation history. */
+    dumpConversationHistory: DumpConversationHistoryFn;
     /** Callback for dumping last-sent LLM instructions. */
     dumpLlmInstructions: DumpLlmInstructionsFn;
     /** Optional text to append to the default system prompt. */
@@ -77,6 +91,7 @@ export async function handleDumpCommand(
         emitEvent,
         history,
         lastSentMessages,
+        dumpConversationHistory,
         dumpLlmInstructions,
         appendSystemPrompt,
         replaceSystemPrompt,
@@ -95,6 +110,22 @@ export async function handleDumpCommand(
               `HTML view: ${dump.html}\n` +
               "These files are not fed back to the LLM. Do not reference them in conversations."
             : "No LLM call has been made yet, nothing to dump.";
+        emitEvent({ type: "turn_end", text, steps: [] });
+        return { text, steps: [] };
+        // Handle /dump_history — dump the complete raw conversation history.
+    } else if (message.match(/^\/dump_history\s*$/)) {
+        history.pop();
+        emitEvent({ type: "turn_start" });
+
+        const dump =
+            history.length > 0
+                ? await dumpConversationHistory(allowedDir, history, model)
+                : null;
+        const text = dump
+            ? `Conversation history dumped to ${dump.log}\n` +
+              `HTML view: ${dump.html}\n` +
+              "These files are not fed back to the LLM. Do not reference them in conversations."
+            : "No conversation history yet, nothing to dump.";
         emitEvent({ type: "turn_end", text, steps: [] });
         return { text, steps: [] };
         // Handle /dump_system_prompt — dump the static system prompt to file.
@@ -127,7 +158,7 @@ export async function handleDumpCommand(
         const promptContent = joinSystemPromptParts(promptParts);
         await writeFile(outputFile, promptContent, "utf-8");
 
-        const relPath = relative(allowedDir, outputFile);
+        const relPath = join("ai_chat_output", filename);
         const text =
             `System prompt dumped to ${relPath}\n` +
             "This message is not fed back to the LLM. Do not reference this file in conversations.";

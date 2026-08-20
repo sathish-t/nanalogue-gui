@@ -76,6 +76,7 @@ describe("handleDumpCommand", () => {
             },
             history,
             lastSentMessages,
+            dumpConversationHistory: vi.fn(),
             dumpLlmInstructions: vi.fn(async () => ({
                 log: "ai_chat_output/test.log",
                 html: "ai_chat_output/test.html",
@@ -107,6 +108,7 @@ describe("handleDumpCommand", () => {
             },
             history,
             lastSentMessages: null,
+            dumpConversationHistory: vi.fn(),
             dumpLlmInstructions: vi.fn(),
         });
 
@@ -135,6 +137,7 @@ describe("handleDumpCommand", () => {
             },
             history,
             lastSentMessages: null,
+            dumpConversationHistory: vi.fn(),
             dumpLlmInstructions: vi.fn(),
         });
 
@@ -161,6 +164,7 @@ describe("handleDumpCommand", () => {
             },
             history,
             lastSentMessages: null,
+            dumpConversationHistory: vi.fn(),
             dumpLlmInstructions: vi.fn(),
             appendSystemPrompt: "APPENDED DOMAIN CONTEXT",
             replaceSystemPrompt: "BASE PROMPT",

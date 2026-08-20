@@ -166,7 +166,7 @@ const AI_PROVIDERS = [
         name: "openai",
         endpoint: "https://api.openai.com/v1",
         keyEnv: "OPENAI_API_KEY",
-        model: "gpt-5.2-chat-latest",
+        model: "gpt-5.4-mini",
     },
     {
         name: "google",

@@ -155,7 +155,8 @@ outside `allowedDir` or consuming excessive resources. It is **not** a
 hardened sandbox against a determined adversary — it is designed for safe
 accidental use.
 
-The LLM endpoint receives the full conversation, including sandbox results
+The LLM endpoint receives the current conversation context (the pruned
+sliding-window history plus the facts block), including sandbox results
 containing BAM data. This is unavoidable — the LLM needs to see the data to
 answer questions about it. Choosing a trusted endpoint is the user's
 responsibility. A consent modal appears the first time a non-localhost

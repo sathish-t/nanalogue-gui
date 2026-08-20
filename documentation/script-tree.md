@@ -26,6 +26,7 @@ src/
     chat-orchestrator-test-utils.ts                 # Shared mock server infrastructure for chat-orchestrator tests.
     chat-orchestrator.ts                            # Chat orchestrator for AI Chat mode.
     chat-session.ts                                 # Reusable chat session state for the AI Chat feature.
+    chat-transcript-dump.ts                         # Persists LLM request and conversation history transcripts for human review.
     chat-types.ts                                   # Shared types for the AI Chat feature.
     format-utils.ts                                 # Pure formatting and trimming utilities shared across renderer pages.
     histogram-renderer.ts                           # Histogram SVG renderer backed by Vega-Lite.

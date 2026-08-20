@@ -117,15 +117,14 @@ describe("buildQCConfig", () => {
         }
     });
 
-    it.each([
-        "",
-        "0",
-        "100.01",
-    ])("rejects invalid sample fraction %j", (sampleFraction) => {
-        expect(failureMessage(minimalInput({ sampleFraction }))).toBe(
-            "Sample fraction must be a number between 0.01 and 100.",
-        );
-    });
+    it.each(["", "0", "100.01"])(
+        "rejects invalid sample fraction %j",
+        (sampleFraction) => {
+            expect(failureMessage(minimalInput({ sampleFraction }))).toBe(
+                "Sample fraction must be a number between 0.01 and 100.",
+            );
+        },
+    );
 
     it.each(["", "-1"])("rejects invalid seed %j", (sampleSeed) => {
         expect(failureMessage(minimalInput({ sampleSeed }))).toBe(
@@ -149,14 +148,14 @@ describe("buildQCConfig", () => {
         );
     });
 
-    it.each([
-        "0",
-        "invalid",
-    ])("rejects invalid read length granularity %j", (readLengthBinWidth) => {
-        expect(failureMessage(minimalInput({ readLengthBinWidth }))).toBe(
-            "Read length granularity must be a positive integer.",
-        );
-    });
+    it.each(["0", "invalid"])(
+        "rejects invalid read length granularity %j",
+        (readLengthBinWidth) => {
+            expect(failureMessage(minimalInput({ readLengthBinWidth }))).toBe(
+                "Read length granularity must be a positive integer.",
+            );
+        },
+    );
 
     it("reports invalid region syntax", () => {
         expect(failureMessage(minimalInput({ region: "chr1:100" }))).toBe(

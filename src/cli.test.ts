@@ -142,7 +142,7 @@ describe("nanalogue-chat CLI", () => {
         });
     });
 
-    describe("--dump-llm-instructions flag", () => {
+    describe("non-interactive dump flags", () => {
         /** Temp directory created before each integration test and removed after. */
         let tmpDir = "";
         /** Mock HTTP server URL used by integration tests. */
@@ -319,6 +319,72 @@ describe("nanalogue-chat CLI", () => {
             }
             expect(stderr).toContain(
                 "--dump-llm-instructions requires --non-interactive",
+            );
+        });
+
+        it("writes raw history without a system message for --dump-history", async () => {
+            const { stdout, stderr } = await execFileAsync("node", [
+                CLI_PATH,
+                "--endpoint",
+                mockServerUrl,
+                "--model",
+                "test-model",
+                "--dir",
+                tmpDir,
+                "--non-interactive",
+                "What is the average read length?",
+                "--dump-history",
+            ]);
+
+            expect(stdout.trim()).toBe("42bp");
+            expect(stderr).toContain("Conversation history dumped to");
+            expect(stderr).toContain("HTML view:");
+
+            const outputDir = join(tmpDir, "ai_chat_output");
+            const files = await readdir(outputDir);
+            const logFile = files.find((file) => file.endsWith(".log"));
+            const htmlFile = files.find((file) => file.endsWith(".html"));
+            expect(logFile).toMatch(/^nanalogue-history-.+\.log$/);
+            expect(htmlFile).toMatch(/^nanalogue-history-.+\.html$/);
+            if (!logFile) {
+                throw new Error("Expected a conversation history log file");
+            }
+
+            const logContent = await readFile(
+                join(outputDir, logFile),
+                "utf-8",
+            );
+            expect(logContent).toContain("=== Message 1: user ===");
+            expect(logContent).toContain("What is the average read length?");
+            expect(logContent).toContain("=== Message 2: assistant ===");
+            expect(logContent).not.toContain(": system ===");
+            expect(logContent).not.toContain("isExecutionResult");
+            expect(logContent).not.toContain("executionStatus");
+        });
+
+        it("rejects --dump-history without --non-interactive", async () => {
+            let stderr = "";
+            try {
+                await execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--dump-history",
+                ]);
+            } catch (err) {
+                stderr = (
+                    err as NodeJS.ErrnoException & {
+                        /** The stderr output of the failed process. */
+                        stderr: string;
+                    }
+                ).stderr;
+            }
+            expect(stderr).toContain(
+                "--dump-history requires --non-interactive",
             );
         });
 

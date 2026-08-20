@@ -8,6 +8,7 @@ import { version } from "../package.json";
 import { EXTERNAL_FUNCTIONS } from "./lib/ai-chat-constants";
 import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
 import {
+    dumpConversationHistory,
     dumpLlmInstructions,
     getLastSentMessages,
 } from "./lib/chat-orchestrator";
@@ -68,6 +69,7 @@ const argConfig = {
         "non-interactive": { type: "string" as const },
         "system-prompt": { type: "string" as const },
         "rm-tools": { type: "string" as const },
+        "dump-history": { type: "boolean" as const, default: false },
         "dump-llm-instructions": { type: "boolean" as const, default: false },
         "list-models": { type: "boolean" as const, default: false },
         version: { type: "boolean" as const, short: "v", default: false },
@@ -111,6 +113,8 @@ ${BOLD}Advanced options:${RESET}
 
 ${BOLD}Other:${RESET}
   --non-interactive <msg>  Send a single message, print the response, and exit
+  --dump-history           Dump the complete raw conversation history
+                           (only valid with --non-interactive)
   --dump-llm-instructions  Dump the LLM request payload to a log file
                            (only valid with --non-interactive)
   --list-models            List available models and exit
@@ -140,6 +144,7 @@ ${BOLD}Custom system prompt:${RESET}
 ${BOLD}REPL commands:${RESET}
   /new                     Start a new conversation
   /exec <file.py>          Run a Python file directly in the sandbox
+  /dump_history            Dump the complete raw conversation history
   /dump_llm_instructions   Dump the last LLM request payload to a log file
   /dump_system_prompt      Dump the static system prompt to a log file
   /quit                    Exit the CLI
@@ -295,6 +300,13 @@ async function main(): Promise<void> {
         console.error(
             "Error: --dump-llm-instructions requires --non-interactive",
         );
+        process.exitCode = 1;
+        return;
+    }
+
+    // --dump-history is only valid alongside --non-interactive.
+    if (values["dump-history"] && values["non-interactive"] === undefined) {
+        console.error("Error: --dump-history requires --non-interactive");
         process.exitCode = 1;
         return;
     }
@@ -533,6 +545,33 @@ async function main(): Promise<void> {
             } catch (err) {
                 console.error(
                     `Warning: failed to dump LLM instructions: ${err instanceof Error ? err.message : String(err)}`,
+                );
+            }
+        }
+
+        // If --dump-history was requested, write the complete unpruned session
+        // history without the system prompt, facts block, or internal metadata.
+        if (values["dump-history"]) {
+            try {
+                const dump =
+                    session.history.length > 0
+                        ? await dumpConversationHistory(
+                              allowedDir,
+                              session.history,
+                              model,
+                          )
+                        : null;
+                if (dump) {
+                    console.error(`Conversation history dumped to ${dump.log}`);
+                    console.error(`HTML view: ${dump.html}`);
+                } else {
+                    console.error(
+                        "Warning: no conversation history; nothing to dump.",
+                    );
+                }
+            } catch (err) {
+                console.error(
+                    `Warning: failed to dump conversation history: ${err instanceof Error ? err.message : String(err)}`,
                 );
             }
         }
