@@ -36,14 +36,12 @@ describe("validateIpcRemoteBamUrl", () => {
         expect(() => validateIpcRemoteBamUrl(url, "Swipe")).not.toThrow();
     });
 
-    it.each(["/local/sample.bam", "file:///tmp/sample.bam"])(
-        "rejects %s",
-        (url) => {
-            expect(() => validateIpcRemoteBamUrl(url, "Swipe")).toThrow(
-                "BAM URL",
-            );
-        },
-    );
+    it.each([
+        "/local/sample.bam",
+        "file:///tmp/sample.bam",
+    ])("rejects %s", (url) => {
+        expect(() => validateIpcRemoteBamUrl(url, "Swipe")).toThrow("BAM URL");
+    });
 });
 
 describe("validateIpcFilePath – read", () => {

@@ -89,12 +89,16 @@
     "build": {
         "appId": "com.nanalogue.gui",
         "productName": "nanalogue-gui",
+        "executableName": "nanalogue-gui",
         "directories": {
             "output": "out"
         },
+        "npmRebuild": false,
         "files": [
             "dist/**/*",
             "node_modules/**/*",
+            "!node_modules/node-liblzma/**/*",
+            "!node_modules/@mongodb-js/zstd/**/*",
             "package.json"
         ],
         "mac": {
