@@ -73,6 +73,7 @@ vi.mock("node:fs/promises", () => ({
 // Mock ipc-path-validation – filesystem calls are covered by its own test suite.
 vi.mock("../lib/ipc-path-validation", () => ({
     validateIpcFilePath: vi.fn().mockResolvedValue(undefined),
+    validateIpcRemoteBamUrl: vi.fn(),
 }));
 
 // Mock locate-data-loader – parseReadIds is used inside generate-qc.
@@ -482,6 +483,49 @@ describe("qc IPC handlers", () => {
                     readIdFilePath: "/data/read-ids.txt",
                 }),
             ).rejects.toThrow("200,001");
+        });
+    });
+
+    describe("generate-qc – request validation", () => {
+        const baseConfig = {
+            bamPath: "/data/sample.bam",
+            treatAsUrl: false,
+            sampleFraction: 5,
+            sampleSeed: 42,
+            windowSize: 300,
+            readLengthBinWidth: 100,
+            fullRegion: undefined,
+        };
+
+        beforeEach(() => {
+            setQcMainWindow(mockWindow);
+            setMockResolvedValue(
+                mockWindow.loadFile as ReturnType<typeof vi.fn>,
+                undefined,
+            );
+            setMockResolvedValue(generateQCData, {} as QCData);
+        });
+
+        it.each([
+            [null, "expected an object"],
+            [{ ...baseConfig, treatAsUrl: "false" }, "treatAsUrl"],
+            [{ ...baseConfig, sampleFraction: 0 }, "sampleFraction"],
+            [{ ...baseConfig, mapqFilter: 256 }, "mapqFilter"],
+            [
+                { ...baseConfig, rejectModQualNonInclusive: null },
+                "2-element array",
+            ],
+            [
+                { ...baseConfig, rejectModQualNonInclusive: [200, 50] },
+                "less than",
+            ],
+        ])("rejects malformed payload %# before side effects", async (payload, message) => {
+            await expect(
+                ipcHandlers.get("generate-qc")?.(undefined, payload),
+            ).rejects.toThrow(message);
+
+            expect(vi.mocked(validateIpcFilePath)).not.toHaveBeenCalled();
+            expect(vi.mocked(generateQCData)).not.toHaveBeenCalled();
         });
     });
 

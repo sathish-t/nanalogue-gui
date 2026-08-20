@@ -41,6 +41,7 @@ src/
     monty-sandbox-helpers.ts                        # Utility helpers for monty-sandbox: path security, option translation,
     monty-sandbox.ts                                # Monty sandbox wrapper for AI Chat mode.
     qc-config-builder.ts                            # Pure validation and construction of QC configuration form snapshots.
+    qc-contract.ts
     qc-data-loader.ts                               # QC data loader: paginated BAM data retrieval with streaming histograms
     region-parser.ts                                # Parses and validates genomic region strings (e.g. "chr3", "chrI:1000-50000")
     sandbox-cli-args.ts                             # Shared sandbox CLI argument definitions, numeric arg parser, and sandbox

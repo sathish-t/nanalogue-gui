@@ -4,8 +4,9 @@ import { resolve } from "node:path";
 import { type BrowserWindow, dialog, ipcMain } from "electron";
 import { getFontSize } from "../font-size";
 import { validateIpcFilePath } from "../lib/ipc-path-validation";
+import { validateQCRequest } from "../lib/qc-contract";
 import { generateQCData, peekBam } from "../lib/qc-data-loader";
-import type { QCConfig, QCData } from "../lib/types";
+import type { QCData } from "../lib/types";
 
 let qcData: QCData | null = null;
 let mainWindow: BrowserWindow | null = null;
@@ -52,7 +53,9 @@ export function registerQcIpcHandlers() {
         return result.filePaths[0];
     });
 
-    ipcMain.handle("generate-qc", async (_event, config: QCConfig) => {
+    ipcMain.handle("generate-qc", async (_event, payload: unknown) => {
+        const config = validateQCRequest(payload);
+
         console.log("Generating QC with config:", {
             ...config,
             sampleFraction: config.sampleFraction / 100,
