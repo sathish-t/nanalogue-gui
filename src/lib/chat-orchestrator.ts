@@ -72,11 +72,14 @@ export {
 
 /** Most recent messages array sent (or attempted) to the LLM API. */
 let lastSentMessages: LlmMessage[] | null = null;
+/** Request allowed to publish updates to lastSentMessages. */
+let lastSentMessagesOwner: object = {};
 
 /**
  * Clears the stored last-sent messages. Called by ChatSession.reset().
  */
 export function resetLastSentMessages(): void {
+    lastSentMessagesOwner = {};
     lastSentMessages = null;
 }
 
@@ -95,6 +98,7 @@ export function getLastSentMessages(): LlmMessage[] | null {
  * @param messages - The messages to store, or null to clear.
  */
 export function setLastSentMessages(messages: LlmMessage[] | null): void {
+    lastSentMessagesOwner = {};
     lastSentMessages = messages;
 }
 
@@ -141,10 +145,12 @@ export interface HandleMessageOptions {
     /**
      * Optional text to replace the default system prompt entirely. When
      * provided, buildSandboxPrompt() is not used; this text becomes the base
-     * instead. AppendSystemPrompt and the dynamic facts block still stack on
-     * top in the usual order. CLI-only feature.
+     * instead. AppendSystemPrompt and enabled dynamic facts still stack on top
+     * in the usual order.
      */
     replaceSystemPrompt?: string;
+    /** Whether accumulated facts should be appended to the system prompt. */
+    includeFactsInSystemPrompt?: boolean;
     /**
      * Optional set of tool names to omit from the Monty sandbox. Each name
      * must be a member of EXTERNAL_FUNCTIONS. CLI-only feature.
@@ -175,6 +181,7 @@ export async function handleUserMessage(
         signal,
         appendSystemPrompt,
         replaceSystemPrompt,
+        includeFactsInSystemPrompt,
         removedTools,
     } = options;
 
@@ -243,6 +250,21 @@ export async function handleUserMessage(
         return dumpResult;
     }
 
+    const requestDumpOwner = {};
+    lastSentMessagesOwner = requestDumpOwner;
+    let requestLastSentMessages: LlmMessage[] | null = null;
+    /**
+     * Updates this request's dump state and publishes it while this request owns the state.
+     *
+     * @param messages - Complete LLM message list for the current request.
+     */
+    const publishLastSentMessages = (messages: LlmMessage[]): void => {
+        requestLastSentMessages = messages;
+        if (lastSentMessagesOwner === requestDumpOwner) {
+            lastSentMessages = messages;
+        }
+    };
+
     // Build system prompt
     const maxOutputBytes = deriveMaxOutputBytes(config.contextWindowTokens);
     const maxOutputKB = Math.round(maxOutputBytes / 1024);
@@ -254,6 +276,7 @@ export async function handleUserMessage(
         facts,
         appendSystemPrompt,
         replaceSystemPrompt,
+        includeFacts: includeFactsInSystemPrompt,
     });
     const systemPrompt = joinSystemPromptParts(systemPromptParts);
 
@@ -331,10 +354,10 @@ export async function handleUserMessage(
 
         // Store the request payload before the call so it's available
         // even if the LLM call fails (network error, 4xx, etc.)
-        lastSentMessages = [
+        publishLastSentMessages([
             { role: "system", content: systemPrompt },
             ...llmMessages,
-        ];
+        ]);
 
         // Call LLM
         emitEvent({ type: "llm_request_start" });
@@ -361,10 +384,10 @@ export async function handleUserMessage(
         if (rawCode.trim()) blankRetriesUsed = 0;
 
         // Append the assistant response now that we have it
-        lastSentMessages = [
-            ...lastSentMessages,
+        publishLastSentMessages([
+            ...(requestLastSentMessages ?? []),
             { role: "assistant", content: rawCode },
-        ];
+        ]);
 
         // Check finish_reason — "length" means response was truncated by token limit
         const finishReason = completion.choices?.[0]?.finish_reason;
@@ -428,10 +451,10 @@ export async function handleUserMessage(
                 isExecutionResult: true,
                 executionStatus: "error",
             });
-            lastSentMessages = [
-                ...lastSentMessages,
+            publishLastSentMessages([
+                ...(requestLastSentMessages ?? []),
                 { role: "user", content: blankResponseMsg },
-            ];
+            ]);
             if (blankRetriesUsed < DEFAULT_MAX_BLANK_RETRIES) {
                 blankRetriesUsed += 1;
                 continue;
@@ -556,11 +579,11 @@ export async function handleUserMessage(
                     });
                     // Mirror both entries into lastSentMessages so the dump
                     // transcript includes the exec result and final answer.
-                    lastSentMessages = [
-                        ...(lastSentMessages ?? []),
+                    publishLastSentMessages([
+                        ...(requestLastSentMessages ?? []),
                         { role: "user", content: terminalFeedback },
                         { role: "assistant", content: finalText },
-                    ];
+                    ]);
                     break;
                 }
             }
@@ -609,10 +632,10 @@ export async function handleUserMessage(
 
         // Store the request payload before the call so it's available
         // even if the LLM call fails (network error, 4xx, etc.)
-        lastSentMessages = [
+        publishLastSentMessages([
             { role: "system", content: systemPrompt },
             ...llmMessages,
-        ];
+        ]);
 
         emitEvent({ type: "llm_request_start" });
         const completion = await fetchChatCompletion(
@@ -630,10 +653,10 @@ export async function handleUserMessage(
         const rawFinal = completion.choices?.[0]?.message?.content ?? "";
 
         // Append the assistant response now that we have it
-        lastSentMessages = [
-            ...lastSentMessages,
+        publishLastSentMessages([
+            ...(requestLastSentMessages ?? []),
             { role: "assistant", content: rawFinal },
-        ];
+        ]);
         const finalFinishReason = completion.choices?.[0]?.finish_reason;
         const malformedFinalProtocol =
             detectMalformedAssistantProtocol(rawFinal);

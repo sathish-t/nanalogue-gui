@@ -22,6 +22,7 @@ const {
     optMaxSeqTable,
     optMaxWindowReads,
     optMaxWriteMB,
+    optOnlySystemAppend,
     optTemperature,
     optTimeout,
 } = getAiChatElements();
@@ -94,6 +95,7 @@ export function lockSessionConfig(): void {
         input.disabled = true;
     }
     optTemperature.disabled = true;
+    optOnlySystemAppend.disabled = true;
 }
 
 /**
@@ -110,6 +112,7 @@ export function unlockSessionConfig(): void {
         input.disabled = false;
     }
     optTemperature.disabled = false;
+    optOnlySystemAppend.disabled = false;
 }
 
 /**
@@ -131,6 +134,7 @@ export function resetDefaults(): void {
         input.value = String(CONFIG_FIELD_SPECS[key].fallback);
     }
     optTemperature.value = "";
+    optOnlySystemAppend.checked = false;
 }
 
 /**

@@ -68,6 +68,7 @@ const argConfig = {
         temperature: { type: "string" as const },
         "non-interactive": { type: "string" as const },
         "system-prompt": { type: "string" as const },
+        "only-system-append": { type: "boolean" as const, default: false },
         "rm-tools": { type: "string" as const },
         "dump-history": { type: "boolean" as const, default: false },
         "dump-llm-instructions": { type: "boolean" as const, default: false },
@@ -127,6 +128,11 @@ ${BOLD}Custom system prompt:${RESET}
                                --system-prompt "$MY_PROMPT"
                                --system-prompt "$(cat prompt.md)"
                                SYSTEM_APPEND.md and the facts block still apply.
+  --only-system-append         Use SYSTEM_APPEND.md as the full system prompt
+                               without the built-in prompt or facts block.
+                               Requires SYSTEM_APPEND.md to exist and be
+                               non-empty in the analysis directory (--dir).
+                               Cannot be combined with --system-prompt.
                                Run /dump_system_prompt to verify.
 
   Place a SYSTEM_APPEND.md file in the analysis directory (--dir) to append
@@ -135,7 +141,8 @@ ${BOLD}Custom system prompt:${RESET}
   effective prompt.
 
   --rm-tools <t1,t2,...>       Comma-separated (no spaces) list of sandbox tool
-                               names to remove. Requires --system-prompt.
+                               names to remove. Requires --system-prompt or
+                               --only-system-append.
                                Valid names: ${EXTERNAL_FUNCTIONS.slice(0, 4).join(", ")},
                                             ${EXTERNAL_FUNCTIONS.slice(4, 8).join(", ")},
                                             ${EXTERNAL_FUNCTIONS.slice(8).join(", ")}.
@@ -438,18 +445,7 @@ async function main(): Promise<void> {
         return;
     }
 
-    // Load SYSTEM_APPEND.md from the analysis directory if present.
-    // Declared as let so it can be reloaded when the user starts a new
-    // conversation with /new — ensuring any edits to the file take effect
-    // immediately rather than requiring a full process restart.
-    let appendSystemPrompt = await loadSystemAppend(allowedDir);
-
-    // --system-prompt replaces the built-in sandbox prompt entirely.
-    // Declared as const — it is a startup flag, not a per-directory
-    // convention, so it does not reload on /new.
-    // Reject empty or whitespace-only values — most likely an unset shell
-    // variable (`--system-prompt "$UNSET_VAR"`), which would silently wipe
-    // all built-in instructions.
+    const onlySystemAppend = values["only-system-append"] === true;
     if (
         values["system-prompt"] !== undefined &&
         values["system-prompt"].trim() === ""
@@ -458,7 +454,27 @@ async function main(): Promise<void> {
         process.exitCode = 1;
         return;
     }
-    const replaceSystemPrompt: string | undefined = values["system-prompt"];
+    const replaceSystemPrompt = values["system-prompt"];
+    if (onlySystemAppend && replaceSystemPrompt !== undefined) {
+        console.error(
+            "Error: --only-system-append cannot be combined with --system-prompt",
+        );
+        process.exitCode = 1;
+        return;
+    }
+
+    // Load SYSTEM_APPEND.md from the analysis directory if present.
+    // Declared as let so it can be reloaded when the user starts a new
+    // conversation with /new — ensuring any edits to the file take effect
+    // immediately rather than requiring a full process restart.
+    let appendSystemPrompt = await loadSystemAppend(allowedDir);
+    if (onlySystemAppend && appendSystemPrompt === undefined) {
+        console.error(
+            "Error: --only-system-append requires SYSTEM_APPEND.md to exist and be non-empty",
+        );
+        process.exitCode = 1;
+        return;
+    }
 
     // --rm-tools: parse, validate, and build the removal set.
     let removedTools: ReadonlySet<string> | undefined;
@@ -482,9 +498,13 @@ async function main(): Promise<void> {
         removedTools = new Set(names);
     }
 
-    if (removedTools !== undefined && replaceSystemPrompt === undefined) {
+    if (
+        removedTools !== undefined &&
+        !onlySystemAppend &&
+        replaceSystemPrompt === undefined
+    ) {
         console.error(
-            "Error: --rm-tools requires --system-prompt. " +
+            "Error: --rm-tools requires --system-prompt or --only-system-append. " +
                 "Provide a custom system prompt that describes only the tools you are keeping.",
         );
         process.exitCode = 1;
@@ -497,6 +517,12 @@ async function main(): Promise<void> {
     // No banner, no readline, no progress indicators — clean for scripting and piping.
     if (values["non-interactive"] !== undefined) {
         const message = values["non-interactive"];
+        const effectiveAppendSystemPrompt = onlySystemAppend
+            ? undefined
+            : appendSystemPrompt;
+        const effectiveReplaceSystemPrompt = onlySystemAppend
+            ? appendSystemPrompt
+            : replaceSystemPrompt;
         const result = await session.sendMessage({
             endpointUrl,
             apiKey,
@@ -504,8 +530,9 @@ async function main(): Promise<void> {
             message,
             allowedDir,
             config,
-            appendSystemPrompt,
-            replaceSystemPrompt,
+            appendSystemPrompt: effectiveAppendSystemPrompt,
+            replaceSystemPrompt: effectiveReplaceSystemPrompt,
+            includeFactsInSystemPrompt: !onlySystemAppend,
             removedTools,
             /**
              * Suppresses all progress events in non-interactive mode.
@@ -596,7 +623,15 @@ async function main(): Promise<void> {
                 "comfortable sharing.",
         ),
     );
-    if (replaceSystemPrompt !== undefined) {
+    if (onlySystemAppend) {
+        console.log(
+            color(
+                YELLOW,
+                "SYSTEM_APPEND.md is being used as the full system prompt. " +
+                    "Run /dump_system_prompt to verify the full effective prompt.",
+            ),
+        );
+    } else if (replaceSystemPrompt !== undefined) {
         console.log(
             color(
                 YELLOW,
@@ -605,7 +640,7 @@ async function main(): Promise<void> {
             ),
         );
     }
-    if (appendSystemPrompt !== undefined) {
+    if (!onlySystemAppend && appendSystemPrompt !== undefined) {
         console.log(
             color(
                 YELLOW,
@@ -655,16 +690,31 @@ async function main(): Promise<void> {
         }
 
         if (trimmed === "/new") {
-            session.reset();
             // Reload SYSTEM_APPEND.md so any edits since startup are picked up
             // by the fresh session without needing a process restart.
-            appendSystemPrompt = await loadSystemAppend(allowedDir);
+            const reloadedAppend = await loadSystemAppend(allowedDir);
+            if (onlySystemAppend && reloadedAppend === undefined) {
+                console.error(
+                    "Error: SYSTEM_APPEND.md is required when --only-system-append is enabled; keeping the current conversation open",
+                );
+                rl.prompt();
+                continue;
+            }
+
+            session.reset();
+            appendSystemPrompt = reloadedAppend;
             console.log(color(YELLOW, "[new conversation started]"));
             rl.prompt();
             continue;
         }
 
         requestInFlight = true;
+        const effectiveAppendSystemPrompt = onlySystemAppend
+            ? undefined
+            : appendSystemPrompt;
+        const effectiveReplaceSystemPrompt = onlySystemAppend
+            ? appendSystemPrompt
+            : replaceSystemPrompt;
         const result = await session.sendMessage({
             endpointUrl,
             apiKey,
@@ -673,8 +723,9 @@ async function main(): Promise<void> {
             allowedDir,
             config,
             emitEvent,
-            appendSystemPrompt,
-            replaceSystemPrompt,
+            appendSystemPrompt: effectiveAppendSystemPrompt,
+            replaceSystemPrompt: effectiveReplaceSystemPrompt,
+            includeFactsInSystemPrompt: !onlySystemAppend,
             removedTools,
         });
         requestInFlight = false;

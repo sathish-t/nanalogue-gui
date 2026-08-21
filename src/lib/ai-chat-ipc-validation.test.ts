@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { CONFIG_FIELD_SPECS, MAX_MESSAGE_BYTES } from "./ai-chat-constants";
 import {
+    validateGetSystemPrompt,
     validateIpcPayload,
     validateListModels,
     validateSendMessage,
@@ -375,6 +376,7 @@ describe("validateSendMessage", () => {
             validSendPayload({
                 apiKey: "sk-123",
                 config: { timeoutSeconds: 60, maxRetries: 3 },
+                onlySystemAppend: true,
             }),
         );
         expect(result.valid).toBe(true);
@@ -386,7 +388,19 @@ describe("validateSendMessage", () => {
             expect(result.data.allowedDir).toBe("/tmp");
             expect(result.data.config.timeoutSeconds).toBe(60);
             expect(result.data.config.maxRetries).toBe(3);
+            expect(result.data.onlySystemAppend).toBe(true);
         }
+    });
+
+    it("rejects a non-boolean onlySystemAppend value", () => {
+        const result = validateSendMessage(
+            validSendPayload({ onlySystemAppend: "true" }),
+        );
+
+        expect(result).toEqual({
+            valid: false,
+            error: "onlySystemAppend must be a boolean",
+        });
     });
 });
 
@@ -466,6 +480,65 @@ describe("validateSendMessage config validation", () => {
             expect(result.error).toContain("timeout seconds");
             expect(result.error).toContain("max retries");
         }
+    });
+});
+
+describe("validateGetSystemPrompt", () => {
+    it("accepts onlySystemAppend and a valid allowedDir", () => {
+        const result = validateGetSystemPrompt({
+            config: {},
+            allowedDir: "/tmp",
+            onlySystemAppend: true,
+        });
+        expect(result.valid).toBe(true);
+        if (result.valid) {
+            expect(result.data.onlySystemAppend).toBe(true);
+            expect(result.data.allowedDir).toBe("/tmp");
+        }
+    });
+
+    it("rejects missing allowedDir when onlySystemAppend is set", () => {
+        const result = validateGetSystemPrompt({
+            config: {},
+            onlySystemAppend: true,
+        });
+        expect(result.valid).toBe(false);
+    });
+
+    it("rejects a non-boolean onlySystemAppend value", () => {
+        const result = validateGetSystemPrompt({
+            config: {},
+            allowedDir: "/tmp",
+            onlySystemAppend: 1,
+        });
+
+        expect(result).toEqual({
+            valid: false,
+            error: "onlySystemAppend must be a boolean",
+        });
+    });
+
+    it("rejects an empty allowedDir when onlySystemAppend is set", () => {
+        const result = validateGetSystemPrompt({
+            config: {},
+            allowedDir: "",
+            onlySystemAppend: true,
+        });
+        expect(result.valid).toBe(false);
+    });
+
+    it("rejects a relative allowedDir when onlySystemAppend is set", () => {
+        const result = validateGetSystemPrompt({
+            config: {},
+            allowedDir: "tmp/sub",
+            onlySystemAppend: true,
+        });
+        expect(result.valid).toBe(false);
+    });
+
+    it("rejects a null payload", () => {
+        const result = validateGetSystemPrompt(null);
+        expect(result.valid).toBe(false);
     });
 });
 

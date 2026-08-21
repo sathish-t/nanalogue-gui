@@ -1026,9 +1026,9 @@ describe("adversarial/edge-case tests", () => {
         ];
         mockServer = await startMockServer(responses);
 
-        const start = Date.now();
+        const start = performance.now();
         const { result } = await callOrchestrator(mockServer.url);
-        const elapsed = Date.now() - start;
+        const elapsed = performance.now() - start;
 
         expect(result.text).toBe("ok\n");
         // Retry-After: 1 means 1 second delay; 500 ms lower bound gives
@@ -1258,13 +1258,13 @@ describe("startMockServer utility", () => {
                 _delayMs: 50,
             },
         ]);
-        const start = Date.now();
+        const start = performance.now();
         const res = await fetch(`${server.url}/chat/completions`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ messages: [] }),
         });
-        const elapsed = Date.now() - start;
+        const elapsed = performance.now() - start;
         await server.close();
         expect(res.status).toBe(200);
         expect(elapsed).toBeGreaterThanOrEqual(40);

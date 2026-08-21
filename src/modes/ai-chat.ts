@@ -41,6 +41,27 @@ let cachedSystemAppendDir: string | undefined;
  */
 let cachedSystemAppendPromise: Promise<string | undefined> | undefined;
 
+/** System prompt mode fixed for the lifetime of an accepted chat session. */
+interface SessionPromptModeLock {
+    /** Whether SYSTEM_APPEND.md is the complete system prompt. */
+    onlySystemAppend: boolean;
+}
+
+/** Prompt mode fixed for the active session after its first accepted send. */
+let sessionPromptModeLock: SessionPromptModeLock | undefined;
+
+/** Identity of the one send currently allowed to mutate session state. */
+interface ActiveAiChatSend {
+    /** Session generation captured when the send started. */
+    sessionGeneration: number;
+}
+
+/** Monotonic identity incremented whenever the current chat session is reset. */
+let aiChatSessionGeneration = 0;
+
+/** Active send token used to reject overlapping send-message requests. */
+let activeAiChatSend: ActiveAiChatSend | undefined;
+
 /**
  * Returns the SYSTEM_APPEND.md content for the given directory.
  *
@@ -197,8 +218,15 @@ async function sendAiChatMessage(
             isTimeout: false,
         };
     }
-    const { endpointUrl, apiKey, model, message, allowedDir, config } =
-        validation.data;
+    const {
+        endpointUrl,
+        apiKey,
+        model,
+        message,
+        allowedDir,
+        config,
+        onlySystemAppend,
+    } = validation.data;
 
     if (!isLocalhost(endpointUrl)) {
         const origin = getOrigin(endpointUrl);
@@ -212,17 +240,115 @@ async function sendAiChatMessage(
         }
     }
 
-    const appendSystemPrompt = await getCachedSystemAppend(allowedDir);
-    return session.sendMessage({
-        endpointUrl,
-        apiKey,
-        model,
-        message,
-        allowedDir,
-        config,
-        emitEvent,
-        appendSystemPrompt,
-    });
+    if (activeAiChatSend !== undefined) {
+        return {
+            success: false,
+            reason: "error",
+            error: "Another AI chat request is already in progress",
+            isTimeout: false,
+        };
+    }
+
+    const requestedOnlySystemAppend = onlySystemAppend === true;
+    if (
+        sessionPromptModeLock !== undefined &&
+        sessionPromptModeLock.onlySystemAppend !== requestedOnlySystemAppend
+    ) {
+        return {
+            success: false,
+            reason: "error",
+            error: "System prompt mode cannot change during an active chat session",
+            isTimeout: false,
+        };
+    }
+
+    const sendToken: ActiveAiChatSend = {
+        sessionGeneration: aiChatSessionGeneration,
+    };
+    activeAiChatSend = sendToken;
+
+    try {
+        const promptModeLock =
+            sessionPromptModeLock ??
+            ({ onlySystemAppend: requestedOnlySystemAppend } as const);
+        const createdPromptModeLock = sessionPromptModeLock === undefined;
+        sessionPromptModeLock = promptModeLock;
+
+        const appendSystemPrompt = await getCachedSystemAppend(allowedDir);
+        if (sendToken.sessionGeneration !== aiChatSessionGeneration) {
+            return {
+                success: false,
+                reason: "cancelled",
+                error: "Cancelled",
+            };
+        }
+        if (onlySystemAppend && appendSystemPrompt === undefined) {
+            if (
+                createdPromptModeLock &&
+                sessionPromptModeLock === promptModeLock
+            ) {
+                sessionPromptModeLock = undefined;
+                clearSystemAppendCache();
+            }
+            return {
+                success: false,
+                reason: "error",
+                error: "SYSTEM_APPEND.md is required when only-system-append is enabled",
+                isTimeout: false,
+            };
+        }
+        const effectiveAppendSystemPrompt = onlySystemAppend
+            ? undefined
+            : appendSystemPrompt;
+        const effectiveReplaceSystemPrompt = onlySystemAppend
+            ? appendSystemPrompt
+            : undefined;
+        /**
+         * Forwards progress only while this request still owns the active session.
+         *
+         * @param event - Progress event emitted by the chat session.
+         */
+        const emitRequestEvent = (event: AiChatEvent): void => {
+            if (
+                activeAiChatSend === sendToken &&
+                sendToken.sessionGeneration === aiChatSessionGeneration
+            ) {
+                emitEvent(event);
+            }
+        };
+        const result = await session.sendMessage({
+            endpointUrl,
+            apiKey,
+            model,
+            message,
+            allowedDir,
+            config,
+            emitEvent: emitRequestEvent,
+            appendSystemPrompt: effectiveAppendSystemPrompt,
+            replaceSystemPrompt: effectiveReplaceSystemPrompt,
+            includeFactsInSystemPrompt: !requestedOnlySystemAppend,
+        });
+        if (sendToken.sessionGeneration !== aiChatSessionGeneration) {
+            return {
+                success: false,
+                reason: "cancelled",
+                error: "Cancelled",
+            };
+        }
+        if (
+            !result.success &&
+            createdPromptModeLock &&
+            sessionPromptModeLock === promptModeLock
+        ) {
+            sessionPromptModeLock = undefined;
+            clearSystemAppendCache();
+        }
+        return result;
+    } finally {
+        if (activeAiChatSend === sendToken) {
+            activeAiChatSend = undefined;
+        }
+    }
 }
 
 /**
@@ -271,8 +397,11 @@ export function registerAiChatIpcHandlers(): void {
          * re-reads the file (the user may have edited it between sessions).
          */
         () => {
+            aiChatSessionGeneration += 1;
+            activeAiChatSend = undefined;
             session.reset();
             clearSystemAppendCache();
+            sessionPromptModeLock = undefined;
         },
     );
 
@@ -302,8 +431,11 @@ export function registerAiChatIpcHandlers(): void {
          * re-reads the file (the user may have edited it between sessions).
          */
         () => {
+            aiChatSessionGeneration += 1;
+            activeAiChatSend = undefined;
             session.reset();
             clearSystemAppendCache();
+            sessionPromptModeLock = undefined;
         },
     );
 
@@ -340,7 +472,18 @@ export function registerAiChatIpcHandlers(): void {
             if (!validation.valid) {
                 return { success: false, error: validation.error };
             }
-            const { config, allowedDir } = validation.data;
+            const { config, allowedDir, onlySystemAppend } = validation.data;
+            const requestedOnlySystemAppend = onlySystemAppend === true;
+            if (
+                sessionPromptModeLock !== undefined &&
+                sessionPromptModeLock.onlySystemAppend !==
+                    requestedOnlySystemAppend
+            ) {
+                return {
+                    success: false,
+                    error: "System prompt mode cannot change during an active chat session",
+                };
+            }
             const maxOutputBytes = deriveMaxOutputBytes(
                 config.contextWindowTokens,
             );
@@ -364,6 +507,16 @@ export function registerAiChatIpcHandlers(): void {
                 ? await (peekSystemAppendCache(allowedDir) ??
                       loadSystemAppend(allowedDir))
                 : undefined;
+            if (requestedOnlySystemAppend) {
+                if (appendContent === undefined) {
+                    return {
+                        success: false,
+                        error: "SYSTEM_APPEND.md is required when only-system-append is enabled",
+                    };
+                }
+                // onlySystemAppend intentionally returns the append file as the full prompt.
+                return { success: true, prompt: appendContent };
+            }
             const prompt = appendContent
                 ? `${sandboxPrompt}\n\n${appendContent}`
                 : sandboxPrompt;

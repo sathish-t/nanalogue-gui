@@ -453,9 +453,11 @@ nanalogue-chat --endpoint <url> --model <name> --dir <path> \
     --non-interactive "What is the average read length?"
 ```
 
-**System prompt customisation:** use `--system-prompt "<text>"` to replace
-the built-in sandbox prompt (the SYSTEM_APPEND.md file and facts array are
-still appended to the prompt). Use `--dump-llm-instructions --non-interactive "<msg>"`
+**System prompt customisation:** use `--system-prompt "<text>"` to replace the
+built-in sandbox prompt while retaining `SYSTEM_APPEND.md` and conversation
+facts. Alternatively, use `--only-system-append` to make `SYSTEM_APPEND.md`
+the complete system prompt without the built-in prompt or facts block. The two
+flags cannot be combined. Use `--dump-llm-instructions --non-interactive "<msg>"`
 to write the full LLM request payload (system prompt + conversation) to a dated
 `.log` file and a self-contained `.html` viewer in `ai_chat_output/`. Use
 `--dump-history --non-interactive "<msg>"` to write the complete unpruned
@@ -463,7 +465,8 @@ conversation without the system prompt or facts block.
 
 **Remove tools:** use `--rm-tools "tool1,tool2"` to disable specific external
 functions (e.g. `--rm-tools "write_file,read_file"`) — useful for restricting
-sandbox capabilities. This flag requires `--system-prompt`.
+sandbox capabilities. This flag requires `--system-prompt` or
+`--only-system-append`.
 
 **REPL commands:**
 

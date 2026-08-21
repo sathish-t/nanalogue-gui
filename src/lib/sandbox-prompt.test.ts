@@ -317,6 +317,24 @@ describe("system prompt assembly", () => {
         expect(parts.facts).toBe("");
     });
 
+    it("omits accumulated facts for a standalone system prompt", () => {
+        const parts = buildSystemPromptParts({
+            config,
+            facts: [
+                {
+                    type: "file",
+                    filename: "reads.bam",
+                    roundId: "r1",
+                    timestamp: 1,
+                },
+            ],
+            replaceSystemPrompt: "Standalone instructions.",
+            includeFacts: false,
+        });
+
+        expect(joinSystemPromptParts(parts)).toBe("Standalone instructions.");
+    });
+
     it("joins non-empty parts with exactly two newlines", () => {
         const result = joinSystemPromptParts({
             base: "## System\nDo genomics analysis.",

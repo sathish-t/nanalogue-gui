@@ -1,6 +1,6 @@
 filename	%lines
 src/lib/ai-chat-constants.ts	100
-src/lib/ai-chat-ipc-validation.ts	96
+src/lib/ai-chat-ipc-validation.ts	96.59
 src/lib/ai-chat-shared-constants.ts	77.77
 src/lib/ai-external-tools/bam-mods.ts	100
 src/lib/ai-external-tools/bash.ts	100
@@ -25,7 +25,7 @@ src/lib/chat-orchestrator-helpers.ts	100
 src/lib/chat-orchestrator-history.ts	100
 src/lib/chat-orchestrator-llm.ts	100
 src/lib/chat-orchestrator-test-utils.ts	100
-src/lib/chat-orchestrator.ts	99.38
+src/lib/chat-orchestrator.ts	99.41
 src/lib/chat-provider-payload-adjustments.ts	100
 src/lib/chat-session.ts	100
 src/lib/chat-transcript-dump.ts	100
@@ -53,7 +53,7 @@ src/lib/swipe-contract.ts	100
 src/lib/swipe-data-loader.ts	100
 src/lib/system-append.ts	100
 src/lib/xy-renderer.ts	100
-src/modes/ai-chat.ts	97.05
+src/modes/ai-chat.ts	97.34
 src/modes/locate.ts	100
 src/modes/qc.ts	100
 src/modes/swipe.ts	100
@@ -62,7 +62,7 @@ src/renderer/ai-chat/ai-chat-config.ts	100
 src/renderer/ai-chat/ai-chat-consent.ts	100
 src/renderer/ai-chat/ai-chat-elements.ts	100
 src/renderer/ai-chat/ai-chat-ui.ts	100
-src/renderer/ai-chat/ai-chat.ts	83.26
+src/renderer/ai-chat/ai-chat.ts	87.23
 src/renderer/qc/seq-mini-charts.ts	100
 src/renderer/shared/apply-font-size.ts	100
 src/renderer/shared/bam-resource-input.ts	100

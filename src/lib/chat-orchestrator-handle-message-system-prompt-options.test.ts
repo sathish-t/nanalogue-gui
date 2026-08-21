@@ -479,6 +479,68 @@ describe("replaceSystemPrompt", () => {
         expect(systemContent).not.toContain("continue_thinking");
     });
 
+    it("keeps a standalone prompt exact across turns with accumulated facts", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: { role: "assistant", content: "print('one')" },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: { role: "assistant", content: "print('two')" },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+        const history: HistoryEntry[] = [];
+        const facts: Fact[] = [
+            {
+                type: "filter",
+                description: "mapped reads only",
+                roundId: "round-1",
+                timestamp: Date.now(),
+            },
+        ];
+        const standalonePrompt = "Use only these standalone instructions.";
+
+        for (const message of ["first turn", "second turn"]) {
+            await handleUserMessage({
+                message,
+                endpointUrl: mockServer.url,
+                apiKey: "",
+                model: "test-model",
+                allowedDir: tmpDir,
+                config: cfg,
+                /** No-op event handler for test isolation. */
+                emitEvent: () => {
+                    /* no-op */
+                },
+                history,
+                facts,
+                signal: new AbortController().signal,
+                replaceSystemPrompt: standalonePrompt,
+                includeFactsInSystemPrompt: false,
+            });
+        }
+
+        const systemMessages = mockServer.requestBodies().map((body) => {
+            const messages = body.messages as Array<{
+                /** Message role. */
+                role: string;
+                /** Message content. */
+                content: string;
+            }>;
+            return messages.find((entry) => entry.role === "system")?.content;
+        });
+        expect(systemMessages).toEqual([standalonePrompt, standalonePrompt]);
+    });
+
     it("when replaceSystemPrompt is undefined the default prompt is used", async () => {
         mockServer = await startMockServer([
             {

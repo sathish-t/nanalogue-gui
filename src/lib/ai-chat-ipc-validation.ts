@@ -64,6 +64,8 @@ export interface GetSystemPromptPayload {
      * Optional — when absent the prompt is shown without any custom append.
      */
     allowedDir?: string;
+    /** Whether SYSTEM_APPEND.md should replace the built-in sandbox prompt. */
+    onlySystemAppend?: boolean;
 }
 
 /** Validated payload for ai-chat-send-message. */
@@ -80,6 +82,8 @@ export interface SendMessagePayload {
     allowedDir: string;
     /** The orchestrator configuration. */
     config: AiChatConfig;
+    /** Whether SYSTEM_APPEND.md should replace the built-in sandbox prompt. */
+    onlySystemAppend?: boolean;
 }
 
 /**
@@ -108,6 +112,24 @@ function validateUrl(url: string): UrlValidationResult {
         };
     }
     return { ok: true, url: parsed };
+}
+
+/**
+ * Validates the optional SYSTEM_APPEND-only prompt mode flag.
+ *
+ * @param value - The untrusted onlySystemAppend field value.
+ * @returns The boolean or undefined when valid, otherwise an error.
+ */
+function validateOnlySystemAppend(
+    value: unknown,
+): ValidationResult<boolean | undefined> {
+    if (value !== undefined && typeof value !== "boolean") {
+        return {
+            valid: false,
+            error: "onlySystemAppend must be a boolean",
+        };
+    }
+    return { valid: true, data: value as boolean | undefined };
 }
 
 /**
@@ -202,10 +224,10 @@ function validateConfig(raw: Record<string, unknown>): AiChatConfig | string {
 export function validateGetSystemPrompt(
     payload: unknown,
 ): ValidationResult<GetSystemPromptPayload> {
-    const p =
-        typeof payload === "object" && payload !== null
-            ? (payload as Record<string, unknown>)
-            : {};
+    if (typeof payload !== "object" || payload === null) {
+        return { valid: false, error: "Payload must be an object" };
+    }
+    const p = payload as Record<string, unknown>;
 
     const rawConfig =
         typeof p.config === "object" && p.config !== null
@@ -217,16 +239,29 @@ export function validateGetSystemPrompt(
         return { valid: false, error: configResult };
     }
 
-    // allowedDir is optional — accept a non-empty absolute path only,
-    // matching the same constraint enforced by ai-chat-send-message.
+    const onlySystemAppendResult = validateOnlySystemAppend(p.onlySystemAppend);
+    if (!onlySystemAppendResult.valid) return onlySystemAppendResult;
+    const onlySystemAppend = onlySystemAppendResult.data;
+
+    // allowedDir is optional unless onlySystemAppend is requested — that mode
+    // requires SYSTEM_APPEND.md to be looked up in a real analysis directory.
     const allowedDir =
         typeof p.allowedDir === "string" &&
         p.allowedDir.length > 0 &&
         isAbsolute(p.allowedDir)
             ? p.allowedDir
             : undefined;
+    if (onlySystemAppend && allowedDir === undefined) {
+        return {
+            valid: false,
+            error: "allowedDir is required when only-system-append is enabled",
+        };
+    }
 
-    return { valid: true, data: { config: configResult, allowedDir } };
+    return {
+        valid: true,
+        data: { config: configResult, allowedDir, onlySystemAppend },
+    };
 }
 
 /**
@@ -307,6 +342,10 @@ export function validateSendMessage(
         return { valid: false, error: configResult };
     }
 
+    const onlySystemAppendResult = validateOnlySystemAppend(p.onlySystemAppend);
+    if (!onlySystemAppendResult.valid) return onlySystemAppendResult;
+    const onlySystemAppend = onlySystemAppendResult.data;
+
     return {
         valid: true,
         data: {
@@ -316,6 +355,7 @@ export function validateSendMessage(
             message: p.message,
             allowedDir: p.allowedDir,
             config: configResult,
+            onlySystemAppend,
         },
     };
 }

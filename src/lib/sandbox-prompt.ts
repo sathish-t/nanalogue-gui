@@ -79,6 +79,8 @@ export interface BuildSystemPromptPartsOptions
     extends BuildStaticSystemPromptPartsOptions {
     /** Dynamic facts to render into the trailing facts block. */
     facts: Fact[];
+    /** Whether accumulated conversation facts belong in the system prompt. */
+    includeFacts?: boolean;
 }
 
 /**
@@ -122,7 +124,10 @@ export function buildSystemPromptParts(
 ): SystemPromptParts {
     return {
         ...buildStaticSystemPromptParts(options),
-        facts: renderFactsBlock(options.facts),
+        facts:
+            options.includeFacts === false
+                ? ""
+                : renderFactsBlock(options.facts),
     };
 }
 

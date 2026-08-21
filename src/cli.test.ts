@@ -3,7 +3,7 @@
 // interactive REPL mode via stdin/stdout.
 
 import { execFile, spawn } from "node:child_process";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import {
     createServer,
     type IncomingMessage,
@@ -149,9 +149,12 @@ describe("nanalogue-chat CLI", () => {
         let mockServerUrl = "";
         /** Close function for the mock HTTP server. */
         let closeMockServer: (() => Promise<void>) | null = null;
+        /** Captured JSON request bodies sent to the mock HTTP server. */
+        let requestBodies: Array<Record<string, unknown>> = [];
 
         beforeEach(async () => {
             tmpDir = await mkdtemp(join(tmpdir(), "nanalogue-cli-test-"));
+            requestBodies = [];
 
             // Start a minimal OpenAI-compatible mock server that returns a
             // plain text response (no code execution) so the dump has content.
@@ -170,9 +173,16 @@ describe("nanalogue-chat CLI", () => {
                         req.method === "POST" &&
                         req.url?.endsWith("/chat/completions")
                     ) {
-                        // Drain the request body before responding.
-                        req.resume();
+                        const chunks: Buffer[] = [];
+                        req.on("data", (chunk: Buffer) => {
+                            chunks.push(chunk);
+                        });
                         req.on("end", () => {
+                            const rawBody =
+                                Buffer.concat(chunks).toString("utf-8");
+                            if (rawBody.trim()) {
+                                requestBodies.push(JSON.parse(rawBody));
+                            }
                             res.writeHead(200, {
                                 "Content-Type": "application/json",
                             });
@@ -423,6 +433,66 @@ describe("nanalogue-chat CLI", () => {
                 ]),
             ).resolves.toBeDefined();
         });
+
+        /** Request body shape used by the mock chat server. */
+        interface MockChatRequestBody {
+            /** Chat messages sent to the LLM. */
+            messages?: Array<{
+                /** Message role. */
+                role?: string;
+                /** Message content. */
+                content?: string;
+            }>;
+        }
+
+        it("supports --only-system-append on a directory with SYSTEM_APPEND.md", async () => {
+            await writeFile(
+                join(tmpDir, "SYSTEM_APPEND.md"),
+                "## Domain context\nFocus on CpG methylation.",
+                "utf-8",
+            );
+            const { stdout } = await execFileAsync("node", [
+                CLI_PATH,
+                "--endpoint",
+                mockServerUrl,
+                "--model",
+                "test-model",
+                "--dir",
+                tmpDir,
+                "--only-system-append",
+                "--non-interactive",
+                "hello",
+            ]);
+            expect(stdout.trim()).toBe("42bp");
+
+            const firstBody = requestBodies[0] as MockChatRequestBody;
+            expect(firstBody.messages?.[0]?.role).toBe("system");
+            expect(firstBody.messages?.[0]?.content).toBe(
+                "## Domain context\nFocus on CpG methylation.",
+            );
+        });
+
+        it("continues to support --system-prompt", async () => {
+            const { stdout } = await execFileAsync("node", [
+                CLI_PATH,
+                "--endpoint",
+                mockServerUrl,
+                "--model",
+                "test-model",
+                "--dir",
+                tmpDir,
+                "--system-prompt",
+                "You are a custom assistant.",
+                "--non-interactive",
+                "hello",
+            ]);
+            expect(stdout.trim()).toBe("42bp");
+
+            const firstBody = requestBodies[0] as MockChatRequestBody;
+            expect(firstBody.messages?.[0]?.content).toBe(
+                "You are a custom assistant.",
+            );
+        });
     });
 
     describe("--rm-tools flag", () => {
@@ -509,94 +579,127 @@ describe("nanalogue-chat CLI", () => {
         });
 
         it("exits 1 when --rm-tools value contains a space after a comma", async () => {
-            await expect(
-                execFileAsync("node", [
-                    CLI_PATH,
-                    "--endpoint",
-                    "http://localhost:11434/v1",
-                    "--model",
-                    "llama3",
-                    "--dir",
-                    ".",
-                    "--system-prompt",
-                    "my prompt",
-                    "--rm-tools",
-                    "peek, ls",
-                ]),
-            ).rejects.toMatchObject({ code: 1 });
+            const tmpDir = await mkdtemp(join(tmpdir(), "rm-tools-"));
+            try {
+                await writeFile(
+                    join(tmpDir, "SYSTEM_APPEND.md"),
+                    "## Prompt base",
+                    "utf-8",
+                );
+                await expect(
+                    execFileAsync("node", [
+                        CLI_PATH,
+                        "--endpoint",
+                        "http://localhost:11434/v1",
+                        "--model",
+                        "llama3",
+                        "--dir",
+                        tmpDir,
+                        "--only-system-append",
+                        "--rm-tools",
+                        "peek, ls",
+                    ]),
+                ).rejects.toMatchObject({ code: 1 });
+            } finally {
+                await rm(tmpDir, { recursive: true, force: true });
+            }
         });
 
         it("prints error naming the space-padded tool when --rm-tools has a space after comma", async () => {
-            let stderr = "";
+            const tmpDir = await mkdtemp(join(tmpdir(), "rm-tools-"));
             try {
-                await execFileAsync("node", [
-                    CLI_PATH,
-                    "--endpoint",
-                    "http://localhost:11434/v1",
-                    "--model",
-                    "llama3",
-                    "--dir",
-                    ".",
-                    "--system-prompt",
-                    "my prompt",
-                    "--rm-tools",
-                    "peek, ls",
-                ]);
-            } catch (err) {
-                stderr = (
-                    err as NodeJS.ErrnoException & {
-                        /** The stderr output of the failed process. */
-                        stderr: string;
-                    }
-                ).stderr;
+                await writeFile(
+                    join(tmpDir, "SYSTEM_APPEND.md"),
+                    "## Prompt base",
+                    "utf-8",
+                );
+                let stderr = "";
+                try {
+                    await execFileAsync("node", [
+                        CLI_PATH,
+                        "--endpoint",
+                        "http://localhost:11434/v1",
+                        "--model",
+                        "llama3",
+                        "--dir",
+                        tmpDir,
+                        "--only-system-append",
+                        "--rm-tools",
+                        "peek, ls",
+                    ]);
+                } catch (err) {
+                    stderr = (
+                        err as NodeJS.ErrnoException & {
+                            /** The stderr output of the failed process. */
+                            stderr: string;
+                        }
+                    ).stderr;
+                }
+                expect(stderr).toContain('" ls"');
+            } finally {
+                await rm(tmpDir, { recursive: true, force: true });
             }
-            expect(stderr).toContain('" ls"');
         });
 
-        it("exits 1 when --rm-tools is used without --system-prompt", async () => {
-            await expect(
-                execFileAsync("node", [
-                    CLI_PATH,
-                    "--endpoint",
-                    "http://localhost:11434/v1",
-                    "--model",
-                    "llama3",
-                    "--dir",
-                    ".",
-                    "--rm-tools",
-                    "peek",
-                ]),
-            ).rejects.toMatchObject({ code: 1 });
+        it("exits 1 when --rm-tools is used without a replacement prompt", async () => {
+            const tmpDir = await mkdtemp(join(tmpdir(), "rm-tools-"));
+            try {
+                await expect(
+                    execFileAsync("node", [
+                        CLI_PATH,
+                        "--endpoint",
+                        "http://localhost:11434/v1",
+                        "--model",
+                        "llama3",
+                        "--dir",
+                        tmpDir,
+                        "--rm-tools",
+                        "peek",
+                    ]),
+                ).rejects.toMatchObject({ code: 1 });
+            } finally {
+                await rm(tmpDir, { recursive: true, force: true });
+            }
         });
 
-        it("prints error when --rm-tools is used without --system-prompt", async () => {
-            let stderr = "";
+        it("prints error when --rm-tools is used without a replacement prompt", async () => {
+            const tmpDir = await mkdtemp(join(tmpdir(), "rm-tools-"));
             try {
-                await execFileAsync("node", [
-                    CLI_PATH,
-                    "--endpoint",
-                    "http://localhost:11434/v1",
-                    "--model",
-                    "llama3",
-                    "--dir",
-                    ".",
-                    "--rm-tools",
-                    "peek",
-                ]);
-            } catch (err) {
-                stderr = (
-                    err as NodeJS.ErrnoException & {
-                        /** The stderr output of the failed process. */
-                        stderr: string;
-                    }
-                ).stderr;
+                let stderr = "";
+                try {
+                    await execFileAsync("node", [
+                        CLI_PATH,
+                        "--endpoint",
+                        "http://localhost:11434/v1",
+                        "--model",
+                        "llama3",
+                        "--dir",
+                        tmpDir,
+                        "--rm-tools",
+                        "peek",
+                    ]);
+                } catch (err) {
+                    stderr = (
+                        err as NodeJS.ErrnoException & {
+                            /** The stderr output of the failed process. */
+                            stderr: string;
+                        }
+                    ).stderr;
+                }
+                expect(stderr).toContain(
+                    "--rm-tools requires --system-prompt or --only-system-append",
+                );
+            } finally {
+                await rm(tmpDir, { recursive: true, force: true });
             }
-            expect(stderr).toContain("--rm-tools requires --system-prompt");
         });
     });
 
     describe("--system-prompt flag", () => {
-        it("exits 1 when --system-prompt is empty", async () => {
+        it.each([
+            "",
+            "   ",
+        ])("rejects an empty or whitespace-only value %#", async (systemPrompt) => {
             await expect(
                 execFileAsync("node", [
                     CLI_PATH,
@@ -607,37 +710,19 @@ describe("nanalogue-chat CLI", () => {
                     "--dir",
                     ".",
                     "--system-prompt",
-                    "",
+                    systemPrompt,
                 ]),
-            ).rejects.toMatchObject({ code: 1 });
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringContaining(
+                    "--system-prompt value cannot be empty",
+                ),
+            });
         });
+    });
 
-        it("prints an error message when --system-prompt is empty", async () => {
-            let stderr = "";
-            try {
-                await execFileAsync("node", [
-                    CLI_PATH,
-                    "--endpoint",
-                    "http://localhost:11434/v1",
-                    "--model",
-                    "llama3",
-                    "--dir",
-                    ".",
-                    "--system-prompt",
-                    "",
-                ]);
-            } catch (err) {
-                stderr = (
-                    err as NodeJS.ErrnoException & {
-                        /** The stderr output of the failed process. */
-                        stderr: string;
-                    }
-                ).stderr;
-            }
-            expect(stderr).toContain("--system-prompt value cannot be empty");
-        });
-
-        it("exits 1 when --system-prompt is whitespace-only", async () => {
+    describe("--only-system-append flag", () => {
+        it("rejects combining --only-system-append with --system-prompt", async () => {
             await expect(
                 execFileAsync("node", [
                     CLI_PATH,
@@ -648,34 +733,61 @@ describe("nanalogue-chat CLI", () => {
                     "--dir",
                     ".",
                     "--system-prompt",
-                    "   ",
+                    "custom",
+                    "--only-system-append",
                 ]),
             ).rejects.toMatchObject({ code: 1 });
         });
 
-        it("prints an error message when --system-prompt is whitespace-only", async () => {
-            let stderr = "";
+        it("exits 1 when --only-system-append is used without SYSTEM_APPEND.md", async () => {
+            const tmpDir = await mkdtemp(join(tmpdir(), "only-system-append-"));
             try {
-                await execFileAsync("node", [
-                    CLI_PATH,
-                    "--endpoint",
-                    "http://localhost:11434/v1",
-                    "--model",
-                    "llama3",
-                    "--dir",
-                    ".",
-                    "--system-prompt",
-                    "   ",
-                ]);
-            } catch (err) {
-                stderr = (
-                    err as NodeJS.ErrnoException & {
-                        /** The stderr output of the failed process. */
-                        stderr: string;
-                    }
-                ).stderr;
+                await expect(
+                    execFileAsync("node", [
+                        CLI_PATH,
+                        "--endpoint",
+                        "http://localhost:11434/v1",
+                        "--model",
+                        "llama3",
+                        "--dir",
+                        tmpDir,
+                        "--only-system-append",
+                    ]),
+                ).rejects.toMatchObject({ code: 1 });
+            } finally {
+                await rm(tmpDir, { recursive: true, force: true });
             }
-            expect(stderr).toContain("--system-prompt value cannot be empty");
+        });
+
+        it("prints an error message when --only-system-append is used without SYSTEM_APPEND.md", async () => {
+            const tmpDir = await mkdtemp(join(tmpdir(), "only-system-append-"));
+            try {
+                let stderr = "";
+                try {
+                    await execFileAsync("node", [
+                        CLI_PATH,
+                        "--endpoint",
+                        "http://localhost:11434/v1",
+                        "--model",
+                        "llama3",
+                        "--dir",
+                        tmpDir,
+                        "--only-system-append",
+                    ]);
+                } catch (err) {
+                    stderr = (
+                        err as NodeJS.ErrnoException & {
+                            /** The stderr output of the failed process. */
+                            stderr: string;
+                        }
+                    ).stderr;
+                }
+                expect(stderr).toContain(
+                    "--only-system-append requires SYSTEM_APPEND.md to exist and be non-empty",
+                );
+            } finally {
+                await rm(tmpDir, { recursive: true, force: true });
+            }
         });
     });
 

@@ -164,7 +164,9 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
 
     beforeEach(async () => {
         // Fresh vi.fn() objects so each test starts from a clean slate.
-        mockSendMessage = vi.fn().mockResolvedValue({ text: "ok", steps: [] });
+        mockSendMessage = vi
+            .fn()
+            .mockResolvedValue({ success: true, text: "ok", steps: [] });
         mockReset = vi.fn();
         mockCancel = vi.fn();
 
@@ -229,6 +231,82 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         );
     });
 
+    it("uses SYSTEM_APPEND.md as the replacement prompt when onlySystemAppend is set", async () => {
+        vi.mocked(loadSystemAppend).mockResolvedValue(
+            "## Domain context\nFocus on CpG methylation.",
+        );
+
+        await invokeSendMessage({ onlySystemAppend: true });
+
+        expect(mockSendMessage).toHaveBeenCalledOnce();
+        expect(mockSendMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+                appendSystemPrompt: undefined,
+                replaceSystemPrompt:
+                    "## Domain context\nFocus on CpG methylation.",
+                includeFactsInSystemPrompt: false,
+            }),
+        );
+    });
+
+    it("returns an error when onlySystemAppend is set but SYSTEM_APPEND.md is absent", async () => {
+        vi.mocked(loadSystemAppend).mockResolvedValue(undefined);
+
+        const result = await invokeSendMessage({ onlySystemAppend: true });
+
+        expect(result).toMatchObject({
+            success: false,
+            error: "SYSTEM_APPEND.md is required when only-system-append is enabled",
+        });
+        expect(mockSendMessage).not.toHaveBeenCalled();
+    });
+
+    it("re-reads SYSTEM_APPEND.md after a failed first send", async () => {
+        setMockResolvedValueOnce(loadSystemAppend, undefined);
+        mockSendMessage.mockResolvedValueOnce({
+            success: false,
+            reason: "error",
+            error: "connection refused",
+        });
+
+        await invokeSendMessage();
+
+        setMockResolvedValueOnce(loadSystemAppend, "## Added after failure");
+        await invokeSendMessage({ onlySystemAppend: true });
+
+        expect(loadSystemAppend).toHaveBeenCalledTimes(2);
+        expect(mockSendMessage).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                replaceSystemPrompt: "## Added after failure",
+                includeFactsInSystemPrompt: false,
+            }),
+        );
+    });
+
+    it("rejects changing prompt mode after the first successful send", async () => {
+        setMockResolvedValue(loadSystemAppend, "## Session prompt");
+
+        await invokeSendMessage();
+        const result = await invokeSendMessage({ onlySystemAppend: true });
+
+        expect(result).toMatchObject({
+            success: false,
+            error: "System prompt mode cannot change during an active chat session",
+        });
+        expect(mockSendMessage).toHaveBeenCalledOnce();
+    });
+
+    it("allows changing prompt mode after starting a new chat", async () => {
+        setMockResolvedValue(loadSystemAppend, "## Session prompt");
+
+        await invokeSendMessage();
+        await ipcHandlers.get("ai-chat-new-chat")?.();
+        const result = await invokeSendMessage({ onlySystemAppend: true });
+
+        expect(result).toMatchObject({ success: true });
+        expect(mockSendMessage).toHaveBeenCalledTimes(2);
+    });
+
     it("calls loadSystemAppend with the correct allowedDir", async () => {
         await invokeSendMessage({ allowedDir: "/tmp/my-bam-data" });
 
@@ -288,9 +366,7 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         });
     });
 
-    it("concurrent sends for the same allowedDir trigger only one file read", async () => {
-        // Simulate a slow file read so the second send arrives while the
-        // first is still in-flight — both should share the same Promise.
+    it("rejects a concurrent send while the first is loading SYSTEM_APPEND.md", async () => {
         let resolveLoad!: (value: string | undefined) => void;
         setMockImplementation(
             loadSystemAppend,
@@ -300,22 +376,59 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
                 }),
         );
 
-        // Fire two sends without awaiting — both hit a cold cache.
-        const p1 = invokeSendMessage();
-        const p2 = invokeSendMessage();
+        const firstSend = invokeSendMessage();
+        const secondResult = await invokeSendMessage();
 
-        // Resolve the single in-flight read and let both sends complete.
+        expect(secondResult).toMatchObject({
+            success: false,
+            error: "Another AI chat request is already in progress",
+        });
         resolveLoad("## Shared context");
-        await Promise.all([p1, p2]);
+        await firstSend;
 
-        // loadSystemAppend must have been called exactly once.
         expect(loadSystemAppend).toHaveBeenCalledOnce();
-        // Both sends must have received the content.
-        for (const call of vi.mocked(mockSendMessage).mock.calls) {
-            expect(call[0]).toMatchObject({
+        expect(mockSendMessage).toHaveBeenCalledOnce();
+        expect(mockSendMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
                 appendSystemPrompt: "## Shared context",
-            });
-        }
+            }),
+        );
+    });
+
+    it("does not let a stale pre-reset send clear the new session guard", async () => {
+        const resolveLoads: Array<(value: string | undefined) => void> = [];
+        setMockImplementation(
+            loadSystemAppend,
+            () =>
+                new Promise<string | undefined>((resolve) => {
+                    resolveLoads.push(resolve);
+                }),
+        );
+
+        const staleSend = invokeSendMessage();
+        await ipcHandlers.get("ai-chat-new-chat")?.();
+        const currentSend = invokeSendMessage();
+
+        resolveLoads[0]("## Stale session context");
+        await expect(staleSend).resolves.toMatchObject({
+            success: false,
+            reason: "cancelled",
+        });
+
+        const overlappingResult = await invokeSendMessage();
+        expect(overlappingResult).toMatchObject({
+            success: false,
+            error: "Another AI chat request is already in progress",
+        });
+
+        resolveLoads[1]("## Current session context");
+        await expect(currentSend).resolves.toMatchObject({ success: true });
+        expect(mockSendMessage).toHaveBeenCalledOnce();
+        expect(mockSendMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+                appendSystemPrompt: "## Current session context",
+            }),
+        );
     });
 
     it("clears the cache and re-reads the file after ai-chat-go-back", async () => {
@@ -365,6 +478,46 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         );
     });
 
+    it("prompt preview uses SYSTEM_APPEND.md as the base when onlySystemAppend is set", async () => {
+        vi.mocked(loadSystemAppend).mockResolvedValue("## Base content");
+        const previewHandler = ipcHandlers.get("ai-chat-get-system-prompt");
+        if (!previewHandler)
+            throw new Error("ai-chat-get-system-prompt handler not registered");
+        const result = await previewHandler(null, {
+            config: {},
+            allowedDir: BASE_PAYLOAD.allowedDir,
+            onlySystemAppend: true,
+        });
+
+        expect(result).toMatchObject({
+            success: true,
+            prompt: expect.stringContaining("## Base content"),
+        });
+        expect(result).toMatchObject({
+            success: true,
+            prompt: expect.not.stringContaining("Python REPL"),
+        });
+    });
+
+    it("prompt preview rejects standalone mode when SYSTEM_APPEND.md is absent", async () => {
+        setMockResolvedValue(loadSystemAppend, undefined);
+        const previewHandler = ipcHandlers.get("ai-chat-get-system-prompt");
+        if (!previewHandler) {
+            throw new Error("ai-chat-get-system-prompt handler not registered");
+        }
+
+        const result = await previewHandler(null, {
+            config: {},
+            allowedDir: BASE_PAYLOAD.allowedDir,
+            onlySystemAppend: true,
+        });
+
+        expect(result).toEqual({
+            success: false,
+            error: "SYSTEM_APPEND.md is required when only-system-append is enabled",
+        });
+    });
+
     it("prompt preview uses the session cache mid-session", async () => {
         // Send the first message — this populates the cache.
         setMockResolvedValue(loadSystemAppend, "## Session content");
@@ -401,7 +554,9 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
 describe("ai-chat IPC handlers — additional coverage", () => {
     beforeEach(async () => {
         // Re-initialise all mock functions for a clean slate.
-        mockSendMessage = vi.fn().mockResolvedValue({ text: "ok", steps: [] });
+        mockSendMessage = vi
+            .fn()
+            .mockResolvedValue({ success: true, text: "ok", steps: [] });
         mockReset = vi.fn();
         mockCancel = vi.fn();
 
@@ -471,16 +626,24 @@ describe("ai-chat IPC handlers — additional coverage", () => {
             /** Event emitter callback forwarded from the send-message handler. */
             emitEvent: (event: AiChatEvent) => void;
         };
+        let resolveSend!: () => void;
         mockSendMessage = vi.fn().mockImplementation((args: SendArgs) => {
             capturedEmitEvent = args.emitEvent;
-            return Promise.resolve({ text: "ok", steps: [] });
+            return new Promise((resolve) => {
+                /**
+                 * Resolves the mocked in-flight send.
+                 *
+                 * @returns Nothing.
+                 */
+                resolveSend = () => resolve({ success: true, text: "ok" });
+            });
         });
 
         const handler = ipcHandlers.get("ai-chat-send-message");
         if (!handler) throw new Error("ai-chat-send-message not registered");
-        await handler(null, { ...BASE_PAYLOAD });
+        const send = handler(null, { ...BASE_PAYLOAD });
+        await vi.waitFor(() => expect(capturedEmitEvent).toBeDefined());
 
-        expect(capturedEmitEvent).toBeDefined();
         if (capturedEmitEvent) {
             capturedEmitEvent({ type: "turn_start" });
         }
@@ -488,6 +651,50 @@ describe("ai-chat IPC handlers — additional coverage", () => {
         expect(mockSend).toHaveBeenCalledWith("ai-chat-event", {
             type: "turn_start",
         });
+        resolveSend();
+        await send;
+    });
+
+    it.each([
+        "ai-chat-new-chat",
+        "ai-chat-go-back",
+    ])("suppresses stale send events after %s", async (resetChannel) => {
+        const mockSend = vi.fn();
+        setMainWindow({
+            webContents: { send: mockSend },
+        } as unknown as import("electron").BrowserWindow);
+
+        /** Args shape accepted by session.sendMessage in the mock. */
+        type StaleSendArgs = {
+            /** Event emitter callback forwarded from the send-message handler. */
+            emitEvent: (event: AiChatEvent) => void;
+        };
+        let capturedEmitEvent: ((event: AiChatEvent) => void) | undefined;
+        let resolveSend!: () => void;
+        mockSendMessage = vi.fn().mockImplementation((args: StaleSendArgs) => {
+            capturedEmitEvent = args.emitEvent;
+            return new Promise((resolve) => {
+                /**
+                 * Resolves the mocked stale send.
+                 *
+                 * @returns Nothing.
+                 */
+                resolveSend = () => resolve({ success: true, text: "stale" });
+            });
+        });
+
+        const sendHandler = ipcHandlers.get("ai-chat-send-message");
+        if (!sendHandler) {
+            throw new Error("ai-chat-send-message not registered");
+        }
+        const staleSend = sendHandler(null, { ...BASE_PAYLOAD });
+        await vi.waitFor(() => expect(capturedEmitEvent).toBeDefined());
+        await ipcHandlers.get(resetChannel)?.();
+        capturedEmitEvent?.({ type: "turn_cancelled" });
+
+        expect(mockSend).not.toHaveBeenCalled();
+        resolveSend();
+        await staleSend;
     });
 
     // -------------------------------------------------------------------------

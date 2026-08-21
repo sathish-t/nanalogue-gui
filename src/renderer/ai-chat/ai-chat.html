@@ -151,6 +151,12 @@
       <input type="number" id="opt-temperature" value="" min="0" max="2" step="0.1" placeholder="(provider default)">
     </div>
 
+    <!-- Checkbox that makes SYSTEM_APPEND.md replace the built-in sandbox prompt. -->
+    <div class="dialog-row dialog-checkbox-row">
+      <label for="opt-only-system-append">Use only SYSTEM_APPEND prompt</label>
+      <input type="checkbox" id="opt-only-system-append">
+    </div>
+
     <!-- Warning for sandbox limit fields. -->
     <p class="dialog-warning">Sandbox limits — change with caution</p>
 
@@ -248,7 +254,7 @@
   <dialog id="system-prompt-dialog">
     <h2>System Prompt</h2>
     <!-- Explanatory note: what the prompt is and what is excluded. -->
-    <p class="system-prompt-info">This is the static initial prompt sent to the LLM. During a session, structured facts from code execution are appended, but the content below never changes.</p>
+    <p class="system-prompt-info">This is the static initial prompt sent to the LLM. During a standard session, structured facts from code execution are appended; SYSTEM_APPEND-only mode keeps the displayed prompt unchanged.</p>
     <!-- Dynamic note indicating which config settings the prompt reflects. -->
     <p id="system-prompt-config-note" class="system-prompt-config-note"></p>
     <!-- Scrollable block containing the prompt text. -->

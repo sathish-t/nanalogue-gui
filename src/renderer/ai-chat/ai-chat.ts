@@ -51,6 +51,7 @@ const {
     inputMessage,
     inputModel,
     modelDropdown,
+    optOnlySystemAppend,
     systemPromptConfigNote,
     systemPromptDialog,
     systemPromptPre,
@@ -80,6 +81,14 @@ let chatStarted = false;
  * response (when chatStarted is still false but inputs are temporarily locked).
  */
 let sessionLockedConfig: Record<string, unknown> | null = null;
+/**
+ * Snapshot of the SYSTEM_APPEND-only checkbox captured with sessionLockedConfig.
+ * Keeps the prompt preview consistent with the prompt actually sent while the
+ * first request is in flight.
+ */
+let sessionLockedOnlySystemAppend: boolean | null = null;
+/** Send request that owns the current first-send config snapshots. */
+let sessionSnapshotOwner: object | null = null;
 /** Fetched model IDs for filtering in the custom dropdown. */
 let fetchedModels: string[] = [];
 /** Origin of the last successfully connected endpoint, or null. */
@@ -88,6 +97,8 @@ let connectedOrigin: string | null = null;
 let chatGeneration = 0;
 /** Generation counter incremented on each prompt preview open to discard stale IPC responses. */
 let systemPromptGeneration = 0;
+/** Whether the Advanced Options checkbox uses SYSTEM_APPEND.md as the base prompt. */
+let onlySystemAppend = false;
 
 /**
  * Temporarily disables or re-enables the config fields during in-flight requests.
@@ -103,6 +114,8 @@ function setConfigFieldsDisabled(disabled: boolean): void {
     inputApiKey.disabled = disabled;
     inputModel.disabled = disabled;
     btnFetchModels.disabled = disabled;
+    optOnlySystemAppend.disabled = disabled;
+    if (btnDefaults) btnDefaults.disabled = disabled;
 }
 
 /**
@@ -124,7 +137,13 @@ function setProcessing(processing: boolean): void {
 // Browse button — open directory picker
 btnBrowse.addEventListener("click", async () => {
     const dir = await api.aiChatPickDirectory();
-    if (dir) inputDir.value = dir;
+    if (dir) {
+        inputDir.value = dir;
+        if (optOnlySystemAppend.checked) {
+            optOnlySystemAppend.checked = false;
+            onlySystemAppend = false;
+        }
+    }
 });
 
 // Endpoint input — update connection status and reset if origin changed
@@ -249,22 +268,28 @@ inputModel.addEventListener("blur", () => {
  *
  * @param message - The user's chat message text.
  * @param showBubble - Whether to append the user message as a chat bubble.
+ * @param requestToken - Identity shared by an initial send and its consent retry.
  */
 async function sendUserMessage(
     message: string,
     showBubble: boolean,
+    requestToken: object = {},
 ): Promise<void> {
     if (showBubble) {
         appendMessage("user", message);
     }
     if (!chatStarted && sessionLockedConfig === null) {
         sessionLockedConfig = getConfig();
+        sessionLockedOnlySystemAppend = onlySystemAppend;
+        sessionSnapshotOwner = requestToken;
     }
     setProcessing(true);
     setSpinner(true, "Waiting for LLM...");
 
     const requestedEndpoint = inputEndpoint.value.trim();
     const generation = chatGeneration;
+    const requestedOnlySystemAppend =
+        sessionLockedOnlySystemAppend ?? onlySystemAppend;
     try {
         const result = await api.aiChatSendMessage({
             endpointUrl: inputEndpoint.value,
@@ -273,6 +298,7 @@ async function sendUserMessage(
             message,
             allowedDir: inputDir.value,
             config: getConfig(),
+            onlySystemAppend: requestedOnlySystemAppend,
         });
 
         if (generation !== chatGeneration) return;
@@ -282,6 +308,8 @@ async function sendUserMessage(
 
         if (result.success) {
             if (!chatStarted) {
+                onlySystemAppend = requestedOnlySystemAppend;
+                optOnlySystemAppend.checked = requestedOnlySystemAppend;
                 chatStarted = true;
                 lockSessionConfig();
                 hideModelDropdown();
@@ -306,7 +334,7 @@ async function sendUserMessage(
             if (accepted) {
                 if (generation !== chatGeneration) return;
                 await api.aiChatConsent(result.origin);
-                await sendUserMessage(message, false);
+                await sendUserMessage(message, false, requestToken);
             } else if (generation === chatGeneration) {
                 appendMessage(
                     "error",
@@ -331,8 +359,10 @@ async function sendUserMessage(
             appendMessage("error", `Unexpected error: ${msg}`);
         }
     } finally {
-        if (!chatStarted) {
+        if (!chatStarted && sessionSnapshotOwner === requestToken) {
             sessionLockedConfig = null;
+            sessionLockedOnlySystemAppend = null;
+            sessionSnapshotOwner = null;
         }
         if (generation === chatGeneration) {
             setProcessing(false);
@@ -374,15 +404,18 @@ btnCancel.addEventListener("click", async () => {
 // New Chat button — full reset of conversation and connection state
 btnNewChat.addEventListener("click", async () => {
     chatGeneration++;
+    systemPromptGeneration++;
     sessionLockedConfig = null;
+    sessionLockedOnlySystemAppend = null;
+    sessionSnapshotOwner = null;
 
     await api.aiChatNewChat();
     chatMessages.innerHTML = "";
     codeSteps = [];
     currentCodePage = showCodePage(codeSteps, 0);
     setSpinner(false);
-    setProcessing(false);
     chatStarted = false;
+    setProcessing(false);
     unlockSessionConfig();
 
     fetchedModels = [];
@@ -395,6 +428,11 @@ btnNewChat.addEventListener("click", async () => {
 
 // Back button — return to landing page
 btnBack.addEventListener("click", async () => {
+    chatGeneration++;
+    systemPromptGeneration++;
+    sessionLockedConfig = null;
+    sessionLockedOnlySystemAppend = null;
+    sessionSnapshotOwner = null;
     await api.aiChatGoBack();
 });
 
@@ -440,12 +478,30 @@ btnAdvanced.addEventListener("click", () => {
     advancedDialog.showModal();
 });
 
+// SYSTEM_APPEND-only checkbox — file contents are validated by the send handler.
+optOnlySystemAppend.addEventListener("change", () => {
+    if (!optOnlySystemAppend.checked) {
+        onlySystemAppend = false;
+        return;
+    }
+    if (!inputDir.value) {
+        window.alert("Please select a BAM directory first.");
+        optOnlySystemAppend.checked = false;
+        onlySystemAppend = false;
+        return;
+    }
+    onlySystemAppend = true;
+});
+
 btnCloseAdvanced?.addEventListener("click", () => {
     advancedDialog.close();
 });
 
 btnDefaults?.addEventListener("click", () => {
-    if (!chatStarted) resetDefaults();
+    if (!chatStarted) {
+        resetDefaults();
+        onlySystemAppend = false;
+    }
 });
 
 // View System Prompt button — fetch and display the static system prompt
@@ -453,15 +509,25 @@ btnViewSystemPrompt.addEventListener("click", async () => {
     const generation = ++systemPromptGeneration;
     systemPromptPre.textContent = "Loading…";
     systemPromptTokenEstimate.textContent = "";
+    // Once the first send has been initiated, sessionLockedConfig holds the
+    // config that was (or will be) sent to the LLM. Use it so the preview
+    // matches the actual session prompt even before chatStarted is set.
+    const promptModeOnlySystemAppend =
+        sessionLockedOnlySystemAppend ?? onlySystemAppend;
     systemPromptConfigNote.textContent =
         sessionLockedConfig !== null
-            ? "Based on the settings for this session."
-            : "Based on your current Advanced Options settings.";
+            ? promptModeOnlySystemAppend
+                ? "Using SYSTEM_APPEND.md as the full prompt for this session."
+                : "Based on the settings for this session."
+            : promptModeOnlySystemAppend
+              ? "Using SYSTEM_APPEND.md as the full prompt."
+              : "Based on your current Advanced Options settings.";
     systemPromptDialog.showModal();
 
     const result = await api.aiChatGetSystemPrompt({
         config: sessionLockedConfig ?? getConfig(),
         allowedDir: inputDir.value || undefined,
+        onlySystemAppend: promptModeOnlySystemAppend,
     });
     if (generation !== systemPromptGeneration) return;
     if (result.success) {

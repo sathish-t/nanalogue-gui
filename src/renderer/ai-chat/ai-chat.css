@@ -530,6 +530,23 @@
     width: 120px;
 }
 
+/* Checkbox row for prompt mode selection. */
+.dialog-checkbox-row {
+    justify-content: space-between;
+}
+
+/* Checkbox label for prompt mode selection. */
+.dialog-checkbox-row label {
+    min-width: 0;
+}
+
+/* Checkbox input for prompt mode selection. */
+.dialog-checkbox-row input[type="checkbox"] {
+    height: 16px;
+    margin: 0;
+    width: 16px;
+}
+
 /* Warning text for sandbox limit fields. */
 .dialog-warning {
     color: #f57c00;

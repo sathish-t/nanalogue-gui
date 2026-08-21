@@ -31,11 +31,18 @@ describe("loadSystemAppend", () => {
         expect(result).toBe(content);
     });
 
-    it("returns empty string for an empty SYSTEM_APPEND.md", async () => {
+    it("returns undefined for an empty SYSTEM_APPEND.md", async () => {
         await writeFile(join(tmpDir, "SYSTEM_APPEND.md"), "", "utf-8");
 
         const result = await loadSystemAppend(tmpDir);
-        expect(result).toBe("");
+        expect(result).toBeUndefined();
+    });
+
+    it("returns undefined for a whitespace-only SYSTEM_APPEND.md", async () => {
+        await writeFile(join(tmpDir, "SYSTEM_APPEND.md"), "   \n\t", "utf-8");
+
+        const result = await loadSystemAppend(tmpDir);
+        expect(result).toBeUndefined();
     });
 
     it("returns undefined when SYSTEM_APPEND.md is a symlink pointing outside the directory", async () => {

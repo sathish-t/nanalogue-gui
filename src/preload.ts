@@ -315,6 +315,7 @@ contextBridge.exposeInMainWorld("api", {
      * @param payload.message - The user's chat message text.
      * @param payload.allowedDir - The directory the sandbox may access.
      * @param payload.config - Advanced configuration options.
+     * @param payload.onlySystemAppend - Whether to replace the built-in prompt with SYSTEM_APPEND.md.
      * @returns A promise with the assistant response.
      */
     aiChatSendMessage: (payload: {
@@ -330,6 +331,8 @@ contextBridge.exposeInMainWorld("api", {
         allowedDir: string;
         /** Advanced configuration options. */
         config: Record<string, unknown>;
+        /** Whether to replace the built-in prompt with SYSTEM_APPEND.md. */
+        onlySystemAppend?: boolean;
     }): Promise<AiChatSendMessageResult> =>
         ipcRenderer.invoke("ai-chat-send-message", payload),
 
@@ -382,6 +385,7 @@ contextBridge.exposeInMainWorld("api", {
      * @param payload - The config and optional directory to build the prompt from.
      * @param payload.config - The advanced configuration options.
      * @param payload.allowedDir - The analysis directory for SYSTEM_APPEND.md lookup.
+     * @param payload.onlySystemAppend - Whether to replace the built-in prompt with SYSTEM_APPEND.md.
      * @returns A promise with the prompt string or an error.
      */
     aiChatGetSystemPrompt: (payload: {
@@ -389,6 +393,8 @@ contextBridge.exposeInMainWorld("api", {
         config: Record<string, unknown>;
         /** The analysis directory for SYSTEM_APPEND.md lookup (optional). */
         allowedDir?: string;
+        /** Whether to replace the built-in prompt with SYSTEM_APPEND.md. */
+        onlySystemAppend?: boolean;
     }) => ipcRenderer.invoke("ai-chat-get-system-prompt", payload),
 
     /**

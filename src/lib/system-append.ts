@@ -16,9 +16,9 @@ export const /** Maximum permitted size in bytes for SYSTEM_APPEND.md. */ MAX_SY
  * Loads the content of SYSTEM_APPEND.md from the analysis directory if present.
  *
  * Uses resolvePath to guard against symlinks pointing outside allowedDir.
- * Returns undefined if the file is absent, outside the allowed directory,
- * larger than MAX_SYSTEM_APPEND_BYTES, or otherwise unreadable — callers
- * always proceed without a custom append.
+ * Returns undefined if the file is absent, empty, outside the allowed
+ * directory, larger than MAX_SYSTEM_APPEND_BYTES, or otherwise unreadable —
+ * callers always proceed without a custom append.
  *
  * Case-sensitivity note: the filename "SYSTEM_APPEND.md" is matched exactly.
  * On case-sensitive filesystems (Linux, macOS) only the correct casing is
@@ -35,10 +35,14 @@ export async function loadSystemAppend(
     try {
         const safePath = await resolvePath(allowedDir, "SYSTEM_APPEND.md");
         const fileStat = await stat(safePath);
-        if (fileStat.size > MAX_SYSTEM_APPEND_BYTES) {
+        if (fileStat.size === 0 || fileStat.size > MAX_SYSTEM_APPEND_BYTES) {
             return undefined;
         }
-        return await readFile(safePath, "utf-8");
+        const content = await readFile(safePath, "utf-8");
+        if (content.trim().length === 0) {
+            return undefined;
+        }
+        return content;
     } catch {
         // File absent, symlink escapes the directory, or unreadable —
         // treat all of these identically: no custom append.
