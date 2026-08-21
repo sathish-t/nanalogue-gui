@@ -25,7 +25,7 @@ describe("/dump_llm_instructions slash command", () => {
     });
 
     it("returns nothing-to-dump when no LLM call has been attempted", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -44,7 +44,6 @@ describe("/dump_llm_instructions slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -60,7 +59,7 @@ describe("/dump_llm_instructions slash command", () => {
 
     it("does not add command to conversation history", async () => {
         setLastSentMessages([{ role: "system", content: "test prompt" }]);
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await handleUserMessage({
@@ -79,7 +78,6 @@ describe("/dump_llm_instructions slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -91,7 +89,7 @@ describe("/dump_llm_instructions slash command", () => {
             { role: "system", content: "You are a helpful assistant." },
             { role: "user", content: "Hello there." },
         ]);
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await handleUserMessage({
@@ -110,7 +108,6 @@ describe("/dump_llm_instructions slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -139,7 +136,7 @@ describe("/dump_llm_instructions slash command", () => {
 
     it("filename matches nanalogue-chat-{date}-{uuid}.log pattern", async () => {
         setLastSentMessages([{ role: "system", content: "test prompt" }]);
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await handleUserMessage({
@@ -158,7 +155,6 @@ describe("/dump_llm_instructions slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -177,7 +173,7 @@ describe("/dump_llm_instructions slash command", () => {
 
     it("produces unique files on repeated invocations", async () => {
         setLastSentMessages([{ role: "system", content: "test prompt" }]);
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
         const opts = {
             message: "/dump_llm_instructions",
@@ -195,7 +191,6 @@ describe("/dump_llm_instructions slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         };
 
@@ -214,7 +209,7 @@ describe("/dump_llm_instructions slash command", () => {
 
     it("handles trailing whitespace in command", async () => {
         setLastSentMessages([{ role: "system", content: "test prompt" }]);
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -233,7 +228,6 @@ describe("/dump_llm_instructions slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -251,7 +245,7 @@ describe("/dump_llm_instructions slash command", () => {
         try {
             await symlink(outsideDir, join(tmpDir, "ai_chat_output"));
 
-            const { config, history, facts, events, signal } =
+            const { config, history, events, signal } =
                 createHandleMessageHarness();
 
             await expect(
@@ -271,7 +265,6 @@ describe("/dump_llm_instructions slash command", () => {
                         events.push(e);
                     },
                     history,
-                    facts,
                     signal,
                 }),
             ).rejects.toThrow();

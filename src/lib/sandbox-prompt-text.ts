@@ -33,8 +33,8 @@ export interface SandboxPromptOptions {
  * @param options - The template options with runtime limits.
  * @returns The complete static system prompt for the LLM, including the
  *   Python REPL preamble and the full sandbox reference with all limits
- *   interpolated. Dynamic append/facts blocks are not included here; they are
- *   assembled separately by buildSystemPromptParts() and joinSystemPromptParts().
+ *   interpolated. Appended instructions are assembled separately by
+ *   buildSystemPromptParts() and joinSystemPromptParts().
  */
 export function buildSandboxPrompt(options: SandboxPromptOptions): string {
     const {

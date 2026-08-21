@@ -1,15 +1,14 @@
-// Tests for buildSandboxPrompt, renderFactsBlock, and system prompt assembly.
-// Verifies that all external function docs, dynamic limits, facts JSON,
-// and SYSTEM_APPEND assembly are correctly reflected in the system prompt.
+// Tests for buildSandboxPrompt and system prompt assembly.
+// Verifies that all external function docs, dynamic limits, and
+// SYSTEM_APPEND assembly are correctly reflected in the system prompt.
 
 import { describe, expect, it } from "vitest";
 import { EXTERNAL_FUNCTIONS } from "./ai-chat-constants";
-import type { AiChatConfig, Fact } from "./chat-types";
+import type { AiChatConfig } from "./chat-types";
 import {
     buildSandboxPrompt,
     buildSystemPromptParts,
     joinSystemPromptParts,
-    renderFactsBlock,
     type SandboxPromptOptions,
 } from "./sandbox-prompt";
 
@@ -168,98 +167,7 @@ describe("buildSandboxPrompt — dynamic limits", () => {
 });
 
 // ---------------------------------------------------------------------------
-// renderFactsBlock
-// ---------------------------------------------------------------------------
-
-describe("renderFactsBlock", () => {
-    it("returns empty string for an empty facts array", () => {
-        expect(renderFactsBlock([])).toBe("");
-    });
-
-    it("produces a JSON fenced block containing the fact type", () => {
-        const fact: Fact = {
-            type: "file",
-            filename: "sample.bam",
-            roundId: "r1",
-            timestamp: 1_700_000_000_000,
-        };
-        const block = renderFactsBlock([fact]);
-        const match = /```json\n([\s\S]*?)\n```/.exec(block);
-        expect(match, "expected a ```json fenced block").not.toBeNull();
-        const parsed = JSON.parse(match?.[1] ?? "") as unknown[];
-        expect(Array.isArray(parsed)).toBe(true);
-        expect(parsed).toHaveLength(1);
-        const entry = parsed[0] as Record<string, unknown>;
-        expect(entry.type).toBe("file");
-        expect(entry.filename).toBe("sample.bam");
-    });
-
-    it("strips timestamp from the serialised output", () => {
-        const fact: Fact = {
-            type: "filter",
-            description: "primary only",
-            roundId: "r2",
-            timestamp: 1_700_000_000_001,
-        };
-        const block = renderFactsBlock([fact]);
-        expect(block).not.toContain("timestamp");
-        expect(block).toContain("primary only");
-    });
-
-    it("strips roundId from the serialised output", () => {
-        const fact: Fact = {
-            type: "file",
-            filename: "reads.bam",
-            roundId: "round-xyz",
-            timestamp: 1,
-        };
-        const block = renderFactsBlock([fact]);
-        expect(block).not.toContain("roundId");
-        expect(block).not.toContain("round-xyz");
-    });
-
-    it("includes all facts in a mixed array and the JSON is valid", () => {
-        const facts: Fact[] = [
-            { type: "file", filename: "a.bam", roundId: "r1", timestamp: 1 },
-            {
-                type: "filter",
-                description: "q>20",
-                roundId: "r2",
-                timestamp: 2,
-            },
-        ];
-        const block = renderFactsBlock(facts);
-        const match = /```json\n([\s\S]*?)\n```/.exec(block);
-        expect(match).not.toBeNull();
-        const parsed = JSON.parse(match?.[1] ?? "") as unknown[];
-        expect(parsed).toHaveLength(2);
-    });
-
-    it("preserves fact content fields in the output", () => {
-        const fact: Fact = {
-            type: "filter",
-            description: "min_seq_len=5000",
-            roundId: "r3",
-            timestamp: 42,
-        };
-        const block = renderFactsBlock([fact]);
-        expect(block).toContain("min_seq_len=5000");
-    });
-
-    it("includes a 'Conversation facts' heading in the block", () => {
-        const fact: Fact = {
-            type: "file",
-            filename: "data.bam",
-            roundId: "r1",
-            timestamp: 0,
-        };
-        const block = renderFactsBlock([fact]);
-        expect(block).toContain("Conversation facts");
-    });
-});
-
-// ---------------------------------------------------------------------------
-// System prompt assembly — base/append/facts block handling
+// System prompt assembly — base/append block handling
 // ---------------------------------------------------------------------------
 
 describe("system prompt assembly", () => {
@@ -280,17 +188,10 @@ describe("system prompt assembly", () => {
         maxWriteMB: BASE_OPTIONS.maxWriteMB,
     };
 
-    it("returns non-overlapping base, append, and facts parts", () => {
+    it("returns non-overlapping base and append parts", () => {
         const parts = buildSystemPromptParts({
             config,
-            facts: [
-                {
-                    type: "file",
-                    filename: "reads.bam",
-                    roundId: "r1",
-                    timestamp: 1,
-                },
-            ],
+            maxOutputKB: BASE_OPTIONS.maxOutputKB,
             appendSystemPrompt:
                 "## Domain context\nFocus on CpG methylation only.",
             replaceSystemPrompt: "## Replacement base\nCustom instructions.",
@@ -300,55 +201,33 @@ describe("system prompt assembly", () => {
         expect(parts.append).toBe(
             "## Domain context\nFocus on CpG methylation only.",
         );
-        expect(parts.facts).toContain("Conversation facts");
-        expect(parts.facts).toContain("reads.bam");
     });
 
     it("builds the default sandbox prompt in the base part when no replacement is provided", () => {
         const parts = buildSystemPromptParts({
             config,
-            facts: [],
+            maxOutputKB: BASE_OPTIONS.maxOutputKB,
         });
 
         expect(parts.base).toContain(
             "You are a Python REPL for bioinformatics analysis.",
         );
         expect(parts.append).toBe("");
-        expect(parts.facts).toBe("");
-    });
-
-    it("omits accumulated facts for a standalone system prompt", () => {
-        const parts = buildSystemPromptParts({
-            config,
-            facts: [
-                {
-                    type: "file",
-                    filename: "reads.bam",
-                    roundId: "r1",
-                    timestamp: 1,
-                },
-            ],
-            replaceSystemPrompt: "Standalone instructions.",
-            includeFacts: false,
-        });
-
-        expect(joinSystemPromptParts(parts)).toBe("Standalone instructions.");
     });
 
     it("joins non-empty parts with exactly two newlines", () => {
         const result = joinSystemPromptParts({
             base: "## System\nDo genomics analysis.",
             append: "## Domain context\nFocus on CpG methylation only.",
-            facts: "## Facts\n```json\n[]\n```",
         });
         expect(result).toBe(
-            "## System\nDo genomics analysis.\n\n## Domain context\nFocus on CpG methylation only.\n\n## Facts\n```json\n[]\n```",
+            "## System\nDo genomics analysis.\n\n## Domain context\nFocus on CpG methylation only.",
         );
     });
 
     it("skips empty parts when joining", () => {
-        expect(
-            joinSystemPromptParts({ base: "## System", facts: "## Facts" }),
-        ).toBe("## System\n\n## Facts");
+        expect(joinSystemPromptParts({ base: "## System", append: "" })).toBe(
+            "## System",
+        );
     });
 });

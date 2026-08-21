@@ -371,8 +371,8 @@ will produce output.
 
 To inspect the complete raw conversation instead, use `/dump_history`. Unlike
 `/dump_llm_instructions`, this includes messages removed from the LLM context
-by failed-round pruning or the sliding window, and excludes the system prompt
-and facts block. It produces the same `.log` and `.html` transcript formats.
+by failed-round pruning or the sliding window, and excludes the system prompt.
+It produces the same `.log` and `.html` transcript formats.
 
 The HTML viewer was inspired by
 [claude-code-transcripts](https://github.com/simonw/claude-code-transcripts)
@@ -381,7 +381,7 @@ and uses the atom-one-dark syntax theme — see
 
 **Inspect the system prompt:**
 
-You can dump the static system prompt (the portion of the LLM instructions
+You can dump the effective system prompt (the portion of the LLM instructions
 that describes the sandbox capabilities, without the dynamic conversation
 history) by clicking the **View System Prompt** button in the GUI, or by
 typing `/dump_system_prompt` in the CLI REPL. The output is written to
@@ -454,14 +454,14 @@ nanalogue-chat --endpoint <url> --model <name> --dir <path> \
 ```
 
 **System prompt customisation:** use `--system-prompt "<text>"` to replace the
-built-in sandbox prompt while retaining `SYSTEM_APPEND.md` and conversation
-facts. Alternatively, use `--only-system-append` to make `SYSTEM_APPEND.md`
-the complete system prompt without the built-in prompt or facts block. The two
+built-in sandbox prompt while retaining `SYSTEM_APPEND.md`. Alternatively, use
+`--only-system-append` to make `SYSTEM_APPEND.md` the complete system prompt
+without the built-in prompt. The two
 flags cannot be combined. Use `--dump-llm-instructions --non-interactive "<msg>"`
 to write the full LLM request payload (system prompt + conversation) to a dated
 `.log` file and a self-contained `.html` viewer in `ai_chat_output/`. Use
 `--dump-history --non-interactive "<msg>"` to write the complete unpruned
-conversation without the system prompt or facts block.
+conversation without the system prompt.
 
 **Remove tools:** use `--rm-tools "tool1,tool2"` to disable specific external
 functions (e.g. `--rm-tools "write_file,read_file"`) — useful for restricting

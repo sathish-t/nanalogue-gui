@@ -1,7 +1,6 @@
 // Chat orchestrator for AI Chat mode.
-// Manages conversation history, context transformation, facts, and the code-only LLM loop.
+// Manages conversation history, context transformation, and the code-only LLM loop.
 
-import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import {
     CONFIG_FIELD_SPECS,
@@ -20,7 +19,6 @@ import {
     handleTerminalOverflow,
     runSandboxGuarded,
 } from "./chat-orchestrator-execution";
-import { addFact, evictFacts, extractFacts } from "./chat-orchestrator-facts";
 import { handleDumpCommand } from "./chat-orchestrator-helpers";
 import {
     applySlidingWindow,
@@ -40,7 +38,6 @@ import {
 import type {
     AiChatConfig,
     AiChatEvent,
-    Fact,
     HandleMessageResult,
     HistoryEntry,
     SandboxOptions,
@@ -103,12 +100,9 @@ export function setLastSentMessages(messages: LlmMessage[] | null): void {
 }
 
 export {
-    addFact,
     applySlidingWindow,
     deriveHistoryBudgetTokens,
-    evictFacts,
     extractCodeFromFences,
-    extractFacts,
     pruneFailedRounds,
     runSandboxGuarded,
     transformContext,
@@ -132,25 +126,20 @@ export interface HandleMessageOptions {
     emitEvent: (event: AiChatEvent) => void;
     /** The conversation history (mutated in place). */
     history: HistoryEntry[];
-    /** The facts array (mutated in place). */
-    facts: Fact[];
     /** AbortSignal for cancellation. */
     signal: AbortSignal;
     /**
      * Optional text to append to the default system prompt, loaded from
      * SYSTEM_APPEND.md in the analysis directory. When present, it is
-     * inserted between the sandbox prompt and the dynamic facts block.
+     * inserted after the sandbox prompt.
      */
     appendSystemPrompt?: string;
     /**
      * Optional text to replace the default system prompt entirely. When
      * provided, buildSandboxPrompt() is not used; this text becomes the base
-     * instead. AppendSystemPrompt and enabled dynamic facts still stack on top
-     * in the usual order.
+     * instead. AppendSystemPrompt still follows it when provided.
      */
     replaceSystemPrompt?: string;
-    /** Whether accumulated facts should be appended to the system prompt. */
-    includeFactsInSystemPrompt?: boolean;
     /**
      * Optional set of tool names to omit from the Monty sandbox. Each name
      * must be a member of EXTERNAL_FUNCTIONS. CLI-only feature.
@@ -177,11 +166,9 @@ export async function handleUserMessage(
         config,
         emitEvent,
         history,
-        facts,
         signal,
         appendSystemPrompt,
         replaceSystemPrompt,
-        includeFactsInSystemPrompt,
         removedTools,
     } = options;
 
@@ -273,10 +260,8 @@ export async function handleUserMessage(
     const systemPromptParts = buildSystemPromptParts({
         config,
         maxOutputKB,
-        facts,
         appendSystemPrompt,
         replaceSystemPrompt,
-        includeFacts: includeFactsInSystemPrompt,
     });
     const systemPrompt = joinSystemPromptParts(systemPromptParts);
 
@@ -510,12 +495,9 @@ export async function handleUserMessage(
         emitEvent({ type: "code_execution_end", result: sandboxResult });
 
         steps.push({ code, result: sandboxResult });
-        const roundId = `round-${randomUUID().slice(0, 8)}`;
         const roundsRemaining = maxRounds - (round + 1);
 
         if (sandboxResult.success) {
-            extractFacts(sandboxResult, { code }, roundId, facts);
-
             const automaticContinuation =
                 !sandboxResult.continueThinkingCalled &&
                 (sandboxResult.sandboxToolCalled ||
@@ -681,7 +663,6 @@ export async function handleUserMessage(
             cumulativeSandboxMs >= cumulativeBudgetMs
         ) {
             // Sandbox budget exhausted — push raw response without executing
-            /* c8 ignore next 3 -- requires exhausting the fixed 30-minute sandbox budget */
             finalText =
                 "(Sandbox execution budget exhausted. The model's response could not be executed.)";
             history.push({ role: "assistant", content: finalText });
@@ -712,12 +693,6 @@ export async function handleUserMessage(
             steps.push({ code: codeToRun, result });
             // Forced round: ignore continueThinkingCalled — always treat as terminal
             if (result.success) {
-                extractFacts(
-                    result,
-                    { code: codeToRun },
-                    "forced-final",
-                    facts,
-                );
                 finalText = collectTerminalOutput(result);
                 finalText = await handleTerminalOverflow(finalText, allowedDir);
             }

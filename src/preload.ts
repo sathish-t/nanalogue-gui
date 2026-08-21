@@ -380,7 +380,6 @@ contextBridge.exposeInMainWorld("api", {
      * Retrieve the effective system prompt for the given config.
      *
      * Includes SYSTEM_APPEND.md content when allowedDir is provided.
-     * The dynamic facts block appended during a live session is not included.
      *
      * @param payload - The config and optional directory to build the prompt from.
      * @param payload.config - The advanced configuration options.

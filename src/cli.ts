@@ -127,9 +127,9 @@ ${BOLD}Custom system prompt:${RESET}
                                directly or via a shell variable:
                                --system-prompt "$MY_PROMPT"
                                --system-prompt "$(cat prompt.md)"
-                               SYSTEM_APPEND.md and the facts block still apply.
+                               SYSTEM_APPEND.md still applies.
   --only-system-append         Use SYSTEM_APPEND.md as the full system prompt
-                               without the built-in prompt or facts block.
+                               without the built-in prompt.
                                Requires SYSTEM_APPEND.md to exist and be
                                non-empty in the analysis directory (--dir).
                                Cannot be combined with --system-prompt.
@@ -532,7 +532,6 @@ async function main(): Promise<void> {
             config,
             appendSystemPrompt: effectiveAppendSystemPrompt,
             replaceSystemPrompt: effectiveReplaceSystemPrompt,
-            includeFactsInSystemPrompt: !onlySystemAppend,
             removedTools,
             /**
              * Suppresses all progress events in non-interactive mode.
@@ -577,7 +576,7 @@ async function main(): Promise<void> {
         }
 
         // If --dump-history was requested, write the complete unpruned session
-        // history without the system prompt, facts block, or internal metadata.
+        // history without the system prompt or internal metadata.
         if (values["dump-history"]) {
             try {
                 const dump =
@@ -725,7 +724,6 @@ async function main(): Promise<void> {
             emitEvent,
             appendSystemPrompt: effectiveAppendSystemPrompt,
             replaceSystemPrompt: effectiveReplaceSystemPrompt,
-            includeFactsInSystemPrompt: !onlySystemAppend,
             removedTools,
         });
         requestInFlight = false;

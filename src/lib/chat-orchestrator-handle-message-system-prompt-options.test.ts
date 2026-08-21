@@ -10,7 +10,7 @@ import {
     type MockServer,
     startMockServer,
 } from "./chat-orchestrator-test-utils";
-import type { Fact, HistoryEntry } from "./chat-types";
+import type { HistoryEntry } from "./chat-types";
 
 describe("appendSystemPrompt", () => {
     let tmpDir: string;
@@ -45,7 +45,6 @@ describe("appendSystemPrompt", () => {
         serverUrl: string,
     ): Promise<Array<Record<string, unknown>>> {
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         await handleUserMessage({
             message: "test",
             endpointUrl: serverUrl,
@@ -58,7 +57,6 @@ describe("appendSystemPrompt", () => {
                 /* no-op */
             },
             history,
-            facts,
             signal: new AbortController().signal,
             appendSystemPrompt: appendText,
         });
@@ -135,69 +133,6 @@ describe("appendSystemPrompt", () => {
         expect(appendStart).toBeGreaterThan(sandboxEnd);
     });
 
-    it("appended text appears before the facts block", async () => {
-        // Pre-seed one fact so that buildSystemPrompt appends a facts block.
-        // The expected ordering is: sandbox prompt → append → facts block.
-        mockServer = await startMockServer([
-            {
-                choices: [
-                    {
-                        message: {
-                            role: "assistant",
-                            content: "print('ok')",
-                        },
-                        finish_reason: "stop",
-                    },
-                ],
-            },
-        ]);
-
-        const history: HistoryEntry[] = [];
-        const facts: Fact[] = [
-            {
-                type: "filter",
-                description: "mapped reads only",
-                roundId: "round-1",
-                timestamp: Date.now(),
-            },
-        ];
-        const appendText =
-            "## Custom instructions\nAlways use read_info first.";
-
-        await handleUserMessage({
-            message: "test",
-            endpointUrl: mockServer.url,
-            apiKey: "",
-            model: "test-model",
-            allowedDir: tmpDir,
-            config: cfg,
-            /** No-op event handler for test isolation. */
-            emitEvent: () => {
-                /* no-op */
-            },
-            history,
-            facts,
-            signal: new AbortController().signal,
-            appendSystemPrompt: appendText,
-        });
-
-        const bodies = mockServer.requestBodies();
-        const messages = bodies[0].messages as Array<{
-            /** Message role. */
-            role: string;
-            /** Message content. */
-            content: string;
-        }>;
-        const systemContent =
-            messages.find((m) => m.role === "system")?.content ?? "";
-
-        const appendStart = systemContent.indexOf("## Custom instructions");
-        const factsStart = systemContent.indexOf("## Conversation facts");
-        expect(appendStart).toBeGreaterThan(-1);
-        expect(factsStart).toBeGreaterThan(-1);
-        expect(appendStart).toBeLessThan(factsStart);
-    });
-
     it("system message is unchanged when appendSystemPrompt is undefined", async () => {
         // Capture system content WITH append.
         // Assign to mockServer so callWithAppend can access requestBodies().
@@ -260,7 +195,6 @@ describe("appendSystemPrompt", () => {
 
     it("/dump_system_prompt includes appendSystemPrompt content in the dump file", async () => {
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
 
         const result = await handleUserMessage({
             message: "/dump_system_prompt",
@@ -274,7 +208,6 @@ describe("appendSystemPrompt", () => {
                 /* no-op */
             },
             history,
-            facts,
             signal: new AbortController().signal,
             appendSystemPrompt:
                 "## Experiment notes\nSample is from patient cohort A.",
@@ -294,7 +227,6 @@ describe("appendSystemPrompt", () => {
 
     it("/dump_system_prompt without appendSystemPrompt does not include appended content", async () => {
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
 
         await handleUserMessage({
             message: "/dump_system_prompt",
@@ -308,7 +240,6 @@ describe("appendSystemPrompt", () => {
                 /* no-op */
             },
             history,
-            facts,
             signal: new AbortController().signal,
         });
 
@@ -356,7 +287,6 @@ describe("replaceSystemPrompt", () => {
         appendText?: string,
     ): Promise<Array<Record<string, unknown>>> {
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         await handleUserMessage({
             message: "test",
             endpointUrl: serverUrl,
@@ -369,7 +299,6 @@ describe("replaceSystemPrompt", () => {
                 /* no-op */
             },
             history,
-            facts,
             signal: new AbortController().signal,
             replaceSystemPrompt: replaceText,
             appendSystemPrompt: appendText,
@@ -479,68 +408,6 @@ describe("replaceSystemPrompt", () => {
         expect(systemContent).not.toContain("continue_thinking");
     });
 
-    it("keeps a standalone prompt exact across turns with accumulated facts", async () => {
-        mockServer = await startMockServer([
-            {
-                choices: [
-                    {
-                        message: { role: "assistant", content: "print('one')" },
-                        finish_reason: "stop",
-                    },
-                ],
-            },
-            {
-                choices: [
-                    {
-                        message: { role: "assistant", content: "print('two')" },
-                        finish_reason: "stop",
-                    },
-                ],
-            },
-        ]);
-        const history: HistoryEntry[] = [];
-        const facts: Fact[] = [
-            {
-                type: "filter",
-                description: "mapped reads only",
-                roundId: "round-1",
-                timestamp: Date.now(),
-            },
-        ];
-        const standalonePrompt = "Use only these standalone instructions.";
-
-        for (const message of ["first turn", "second turn"]) {
-            await handleUserMessage({
-                message,
-                endpointUrl: mockServer.url,
-                apiKey: "",
-                model: "test-model",
-                allowedDir: tmpDir,
-                config: cfg,
-                /** No-op event handler for test isolation. */
-                emitEvent: () => {
-                    /* no-op */
-                },
-                history,
-                facts,
-                signal: new AbortController().signal,
-                replaceSystemPrompt: standalonePrompt,
-                includeFactsInSystemPrompt: false,
-            });
-        }
-
-        const systemMessages = mockServer.requestBodies().map((body) => {
-            const messages = body.messages as Array<{
-                /** Message role. */
-                role: string;
-                /** Message content. */
-                content: string;
-            }>;
-            return messages.find((entry) => entry.role === "system")?.content;
-        });
-        expect(systemMessages).toEqual([standalonePrompt, standalonePrompt]);
-    });
-
     it("when replaceSystemPrompt is undefined the default prompt is used", async () => {
         mockServer = await startMockServer([
             {
@@ -571,7 +438,6 @@ describe("replaceSystemPrompt", () => {
 
     it("/dump_system_prompt writes replacement content, not the default sandbox prompt", async () => {
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
 
         const result = await handleUserMessage({
             message: "/dump_system_prompt",
@@ -585,7 +451,6 @@ describe("replaceSystemPrompt", () => {
                 /* no-op */
             },
             history,
-            facts,
             signal: new AbortController().signal,
             replaceSystemPrompt: "Custom prompt for dump test.",
         });
@@ -603,7 +468,6 @@ describe("replaceSystemPrompt", () => {
 
     it("/dump_system_prompt includes both replacement and appended content", async () => {
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
 
         await handleUserMessage({
             message: "/dump_system_prompt",
@@ -617,7 +481,6 @@ describe("replaceSystemPrompt", () => {
                 /* no-op */
             },
             history,
-            facts,
             signal: new AbortController().signal,
             replaceSystemPrompt: "Replacement base.",
             appendSystemPrompt: "Appended section.",

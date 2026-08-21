@@ -250,11 +250,11 @@
     </div>
   </dialog>
 
-  <!-- System prompt preview dialog showing the static initial LLM prompt. -->
+  <!-- System prompt preview dialog showing the effective LLM prompt. -->
   <dialog id="system-prompt-dialog">
     <h2>System Prompt</h2>
-    <!-- Explanatory note: what the prompt is and what is excluded. -->
-    <p class="system-prompt-info">This is the static initial prompt sent to the LLM. During a standard session, structured facts from code execution are appended; SYSTEM_APPEND-only mode keeps the displayed prompt unchanged.</p>
+    <!-- Explanatory note describing the displayed prompt. -->
+    <p class="system-prompt-info">This is the system prompt sent to the LLM.</p>
     <!-- Dynamic note indicating which config settings the prompt reflects. -->
     <p id="system-prompt-config-note" class="system-prompt-config-note"></p>
     <!-- Scrollable block containing the prompt text. -->

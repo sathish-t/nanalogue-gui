@@ -18,7 +18,6 @@ src/
     ai-chat-shared-constants.ts                     # Config field specs and shared constants for the AI Chat feature.
     bed-parser.ts                                   # BED file parser for nanalogue-swipe
     chat-orchestrator-execution.ts                  # Sandbox execution and feedback helpers for AI chat orchestration.
-    chat-orchestrator-facts.ts                      # Fact extraction and eviction helpers for AI chat orchestration.
     chat-orchestrator-handle-message-test-utils.ts  # Shared helpers for handleUserMessage integration tests.
     chat-orchestrator-helpers.ts                    # Helper utilities for chat-orchestrator.
     chat-orchestrator-history.ts                    # History and context helpers for AI chat orchestration.

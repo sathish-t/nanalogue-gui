@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Conversation facts extraction, session storage, eviction, and system-prompt injection from AI Chat; conversation context now comes exclusively from retained message history.
+
 ## [0.2.7] - 2026-03-18
 
 ### Added

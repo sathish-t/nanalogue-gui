@@ -11,7 +11,7 @@ import {
     type MockServer,
     startMockServer,
 } from "./chat-orchestrator-test-utils";
-import type { AiChatEvent, Fact, HistoryEntry } from "./chat-types";
+import type { AiChatEvent, HistoryEntry } from "./chat-types";
 
 describe("main-loop recovery paths", () => {
     let tmpDir: string;
@@ -60,7 +60,6 @@ describe("main-loop recovery paths", () => {
         ]);
 
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         const events: AiChatEvent[] = [];
         const result = await handleUserMessage({
             message: "test",
@@ -78,7 +77,6 @@ describe("main-loop recovery paths", () => {
                 events.push(event);
             },
             history,
-            facts,
             signal: new AbortController().signal,
         });
 
@@ -140,7 +138,6 @@ describe("main-loop recovery paths", () => {
                 /* no-op */
             },
             history,
-            facts: [],
             signal: new AbortController().signal,
         });
 
@@ -202,7 +199,6 @@ describe("main-loop recovery paths", () => {
                 /* no-op */
             },
             history,
-            facts: [],
             signal: new AbortController().signal,
         });
 
@@ -272,7 +268,6 @@ describe("main-loop recovery paths", () => {
                 /* no-op */
             },
             history,
-            facts: [],
             signal: new AbortController().signal,
         });
 
@@ -327,7 +322,6 @@ describe("main-loop recovery paths", () => {
                 /* no-op */
             },
             history,
-            facts: [],
             signal: new AbortController().signal,
         });
 
@@ -388,7 +382,6 @@ describe("main-loop recovery paths", () => {
                 events.push(event);
             },
             history,
-            facts: [],
             signal: new AbortController().signal,
         });
 
@@ -455,7 +448,6 @@ describe("main-loop recovery paths", () => {
                 events.push(event);
             },
             history,
-            facts: [],
             signal: new AbortController().signal,
         });
 
@@ -502,7 +494,6 @@ describe("main-loop recovery paths", () => {
         ]);
 
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         const result = await handleUserMessage({
             message: "test",
             endpointUrl: mockServer.url,
@@ -515,7 +506,6 @@ describe("main-loop recovery paths", () => {
                 /* no-op */
             },
             history,
-            facts,
             signal: new AbortController().signal,
         });
 
@@ -571,7 +561,6 @@ describe("main-loop recovery paths", () => {
                 /* no-op */
             },
             history,
-            facts: [],
             signal: new AbortController().signal,
         });
 
@@ -626,7 +615,6 @@ describe("main-loop recovery paths", () => {
                 /* no-op */
             },
             history: [],
-            facts: [],
             signal: new AbortController().signal,
         });
 

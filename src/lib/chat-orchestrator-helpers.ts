@@ -12,7 +12,7 @@ import type {
 } from "./chat-types";
 import { deriveMaxOutputBytes, resolvePath } from "./monty-sandbox-helpers";
 import {
-    buildStaticSystemPromptParts,
+    buildSystemPromptParts,
     joinSystemPromptParts,
 } from "./sandbox-prompt";
 
@@ -145,11 +145,8 @@ export async function handleDumpCommand(
         const maxOutputBytes = deriveMaxOutputBytes(config.contextWindowTokens);
         const maxOutputKB = Math.round(maxOutputBytes / 1024);
         // Include SYSTEM_APPEND.md content in the dump so it accurately
-        // reflects the reusable static system prompt sent on every turn.
-        // Dynamic per-conversation facts are intentionally excluded from this
-        // dump because they vary across turns and are not part of the shared
-        // base prompt template.
-        const promptParts = buildStaticSystemPromptParts({
+        // reflects the system prompt sent on every turn.
+        const promptParts = buildSystemPromptParts({
             config,
             maxOutputKB,
             appendSystemPrompt,

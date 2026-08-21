@@ -244,7 +244,6 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
                 appendSystemPrompt: undefined,
                 replaceSystemPrompt:
                     "## Domain context\nFocus on CpG methylation.",
-                includeFactsInSystemPrompt: false,
             }),
         );
     });
@@ -278,7 +277,6 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         expect(mockSendMessage).toHaveBeenLastCalledWith(
             expect.objectContaining({
                 replaceSystemPrompt: "## Added after failure",
-                includeFactsInSystemPrompt: false,
             }),
         );
     });

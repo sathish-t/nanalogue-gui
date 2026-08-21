@@ -90,42 +90,6 @@ export interface UserMessage {
 export type HistoryEntry = UserMessage | AssistantMessage;
 
 /**
- * A typed fact recording key information from successful code execution results.
- * Facts are extracted by pattern matching, not LLM summarization.
- */
-export type Fact =
-    | {
-          /** The fact kind discriminator. */
-          type: "file";
-          /** The file that was referenced. */
-          filename: string;
-          /** The execution round that produced this fact. */
-          roundId: string;
-          /** When this fact was extracted (epoch ms). */
-          timestamp: number;
-      }
-    | {
-          /** The fact kind discriminator. */
-          type: "filter";
-          /** Human-readable description of the filter. */
-          description: string;
-          /** The execution round that produced this fact. */
-          roundId: string;
-          /** When this fact was extracted (epoch ms). */
-          timestamp: number;
-      }
-    | {
-          /** The fact kind discriminator. */
-          type: "output";
-          /** The filesystem path of the output file. */
-          path: string;
-          /** The execution round that produced this fact. */
-          roundId: string;
-          /** When this fact was extracted (epoch ms). */
-          timestamp: number;
-      };
-
-/**
  * Events sent from main process to renderer for AI Chat progress.
  * The renderer listens on a single channel and switches on event.type.
  */

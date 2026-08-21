@@ -326,7 +326,6 @@ async function sendAiChatMessage(
             emitEvent: emitRequestEvent,
             appendSystemPrompt: effectiveAppendSystemPrompt,
             replaceSystemPrompt: effectiveReplaceSystemPrompt,
-            includeFactsInSystemPrompt: !requestedOnlySystemAppend,
         });
         if (sendToken.sessionGeneration !== aiChatSessionGeneration) {
             return {
@@ -461,7 +460,6 @@ export function registerAiChatIpcHandlers(): void {
          * that previewing the prompt never freezes stale content into the
          * cache before the first message is sent. The send-message handler
          * maintains its own cache independently.
-         * The dynamic facts block is not included (it changes each turn).
          *
          * @param _event - The IPC event (unused).
          * @param payload - The config and optional allowedDir from the renderer.

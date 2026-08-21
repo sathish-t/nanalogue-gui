@@ -21,7 +21,7 @@ describe("/dump_system_prompt slash command", () => {
     });
 
     it("dumps system prompt even when no LLM call has been made yet", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -40,7 +40,6 @@ describe("/dump_system_prompt slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -53,7 +52,7 @@ describe("/dump_system_prompt slash command", () => {
     });
 
     it("does not add command to conversation history", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await handleUserMessage({
@@ -72,7 +71,6 @@ describe("/dump_system_prompt slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -80,7 +78,7 @@ describe("/dump_system_prompt slash command", () => {
     });
 
     it("writes non-empty content to the dump file", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await handleUserMessage({
@@ -99,7 +97,6 @@ describe("/dump_system_prompt slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -110,7 +107,7 @@ describe("/dump_system_prompt slash command", () => {
     });
 
     it("filename matches nanalogue-chat-{date}-{uuid}.log pattern", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await handleUserMessage({
@@ -129,7 +126,6 @@ describe("/dump_system_prompt slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -140,7 +136,7 @@ describe("/dump_system_prompt slash command", () => {
     });
 
     it("writes a new file each invocation rather than overwriting", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
         const opts = {
             message: "/dump_system_prompt",
@@ -158,7 +154,6 @@ describe("/dump_system_prompt slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         };
 
@@ -171,7 +166,7 @@ describe("/dump_system_prompt slash command", () => {
     });
 
     it("handles trailing whitespace in command", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -190,7 +185,6 @@ describe("/dump_system_prompt slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -205,7 +199,7 @@ describe("/dump_system_prompt slash command", () => {
         try {
             await symlink(outsideDir, join(tmpDir, "ai_chat_output"));
 
-            const { config, history, facts, events, signal } =
+            const { config, history, events, signal } =
                 createHandleMessageHarness();
 
             await expect(
@@ -225,7 +219,6 @@ describe("/dump_system_prompt slash command", () => {
                         events.push(e);
                     },
                     history,
-                    facts,
                     signal,
                 }),
             ).rejects.toThrow();
@@ -242,7 +235,7 @@ describe("/dump_system_prompt slash command", () => {
         const linkedDir = `${tmpDir}-link`;
         await symlink(tmpDir, linkedDir);
         try {
-            const { config, history, facts, events, signal } =
+            const { config, history, events, signal } =
                 createHandleMessageHarness();
 
             const result = await handleUserMessage({
@@ -261,7 +254,6 @@ describe("/dump_system_prompt slash command", () => {
                     events.push(event);
                 },
                 history,
-                facts,
                 signal,
             });
 

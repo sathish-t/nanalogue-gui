@@ -12,12 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { handleUserMessage } from "./chat-orchestrator";
-import type {
-    AiChatConfig,
-    AiChatEvent,
-    Fact,
-    HistoryEntry,
-} from "./chat-types";
+import type { AiChatConfig, AiChatEvent, HistoryEntry } from "./chat-types";
 
 /** Directory containing cross-endpoint test fixture JSON files. */
 const FIXTURES_DIR = join(__dirname, "../../tests/fixtures/mock-llm-responses");
@@ -235,8 +230,6 @@ interface OrchestratorTestResult {
     result: Awaited<ReturnType<typeof handleUserMessage>>;
     /** The conversation history after the call. */
     history: HistoryEntry[];
-    /** The facts array after the call. */
-    facts: Fact[];
     /** The events emitted during the call. */
     events: AiChatEvent[];
 }
@@ -263,7 +256,7 @@ describe("cross-endpoint compatibility", () => {
      * @param serverUrl - The mock server base URL.
      * @param message - The user message to send.
      * @param externalSignal - Optional abort signal for cancellation tests.
-     * @returns The orchestrator result, history, facts, and events.
+     * @returns The orchestrator result, history, and events.
      */
     async function callOrchestrator(
         serverUrl: string,
@@ -271,7 +264,6 @@ describe("cross-endpoint compatibility", () => {
         externalSignal?: AbortSignal,
     ): Promise<OrchestratorTestResult> {
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         const events: AiChatEvent[] = [];
         const controller = new AbortController();
 
@@ -291,11 +283,10 @@ describe("cross-endpoint compatibility", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal: externalSignal ?? controller.signal,
         });
 
-        return { result, history, facts, events };
+        return { result, history, events };
     }
 
     /**
@@ -434,7 +425,6 @@ describe("cross-endpoint compatibility", () => {
         mockServer = await startMockServer([delayedResponse]);
 
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         const events: AiChatEvent[] = [];
         const controller = new AbortController();
         setTimeout(() => controller.abort(), 100);
@@ -456,7 +446,6 @@ describe("cross-endpoint compatibility", () => {
                     events.push(e);
                 },
                 history,
-                facts,
                 signal: controller.signal,
             });
         } catch {
@@ -525,7 +514,6 @@ describe("cross-endpoint compatibility", () => {
         mockServer = await startMockServer(responses);
 
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         const events: AiChatEvent[] = [];
         const configWithTemp: AiChatConfig = {
             ...minimalConfig,
@@ -548,7 +536,6 @@ describe("cross-endpoint compatibility", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal: new AbortController().signal,
         });
 
@@ -574,7 +561,6 @@ describe("cross-endpoint compatibility", () => {
         mockServer = await startMockServer(responses);
 
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         const result = await handleUserMessage({
             message: "compute 1+1",
             endpointUrl: mockServer.url,
@@ -585,7 +571,6 @@ describe("cross-endpoint compatibility", () => {
             /** Discards events (unused in this test). */
             emitEvent: () => {},
             history,
-            facts,
             signal: new AbortController().signal,
         });
 
@@ -641,7 +626,6 @@ describe("cross-endpoint compatibility", () => {
         mockServer = await startMockServer(responses);
 
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         await handleUserMessage({
             message: "test",
             endpointUrl: mockServer.url,
@@ -652,7 +636,6 @@ describe("cross-endpoint compatibility", () => {
             /** Discards events (unused in this test). */
             emitEvent: () => {},
             history,
-            facts,
             signal: new AbortController().signal,
         });
 
@@ -700,7 +683,6 @@ describe("cross-endpoint compatibility", () => {
         mockServer = await startMockServer(responses);
 
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         const events: AiChatEvent[] = [];
         const result = await handleUserMessage({
             message: "test",
@@ -718,7 +700,6 @@ describe("cross-endpoint compatibility", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal: new AbortController().signal,
         });
 
@@ -766,7 +747,6 @@ describe("cross-endpoint compatibility", () => {
         mockServer = await startMockServer(responses);
 
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         await handleUserMessage({
             message: "test",
             endpointUrl: mockServer.url,
@@ -777,7 +757,6 @@ describe("cross-endpoint compatibility", () => {
             /** Discards events (unused in this test). */
             emitEvent: () => {},
             history,
-            facts,
             signal: new AbortController().signal,
         });
 
@@ -828,7 +807,6 @@ describe("cross-endpoint compatibility", () => {
         mockServer = await startMockServer(responses);
 
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         await handleUserMessage({
             message: "test",
             endpointUrl: mockServer.url,
@@ -839,7 +817,6 @@ describe("cross-endpoint compatibility", () => {
             /** Discards events (unused in this test). */
             emitEvent: () => {},
             history,
-            facts,
             signal: new AbortController().signal,
         });
 
@@ -962,7 +939,6 @@ describe("cross-endpoint compatibility", () => {
         mockServer = await startMockServer(responses);
 
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         await handleUserMessage({
             message: "test",
             endpointUrl: mockServer.url,
@@ -973,7 +949,6 @@ describe("cross-endpoint compatibility", () => {
             /** Discards events (unused in this test). */
             emitEvent: () => {},
             history,
-            facts,
             signal: new AbortController().signal,
         });
 
@@ -1031,7 +1006,6 @@ describe("cross-endpoint compatibility", () => {
         mockServer = await startMockServer(responses);
 
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         const events: AiChatEvent[] = [];
         const result = await handleUserMessage({
             message: "test",
@@ -1049,7 +1023,6 @@ describe("cross-endpoint compatibility", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal: new AbortController().signal,
         });
 

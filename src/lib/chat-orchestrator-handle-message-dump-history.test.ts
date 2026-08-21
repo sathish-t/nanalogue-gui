@@ -20,7 +20,7 @@ describe("/dump_history slash command", () => {
     });
 
     it("returns nothing-to-dump and removes the command when history is empty", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -39,7 +39,6 @@ describe("/dump_history slash command", () => {
                 events.push(event);
             },
             history,
-            facts,
             signal,
         });
 
@@ -51,7 +50,7 @@ describe("/dump_history slash command", () => {
     });
 
     it("dumps every raw history message without system prompt or metadata", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
         history.push(
             { role: "user", content: "Original question" },
@@ -81,7 +80,6 @@ describe("/dump_history slash command", () => {
                 events.push(event);
             },
             history,
-            facts,
             signal,
         });
 
@@ -132,7 +130,7 @@ describe("/dump_history slash command", () => {
         const linkedDir = `${tmpDir}-link`;
         await symlink(tmpDir, linkedDir);
         try {
-            const { config, history, facts, events, signal } =
+            const { config, history, events, signal } =
                 createHandleMessageHarness();
             history.push({ role: "user", content: "Original question" });
 
@@ -152,7 +150,6 @@ describe("/dump_history slash command", () => {
                     events.push(event);
                 },
                 history,
-                facts,
                 signal,
             });
 
