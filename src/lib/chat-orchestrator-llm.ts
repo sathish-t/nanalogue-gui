@@ -2,6 +2,10 @@
 // Keeps API retries and prompt-token calibration separate from the main turn loop.
 
 import { DEFAULT_MAX_COMPLETION_TOKENS } from "./ai-chat-constants";
+import {
+    adjustChatCompletionPayloadForProvider,
+    type ChatCompletionPayload,
+} from "./chat-provider-payload-adjustments";
 
 /** Response from the /chat/completions endpoint. */
 export interface ChatCompletionResponse {
@@ -94,46 +98,20 @@ export async function fetchChatCompletion(
 ): Promise<ChatCompletionResponse> {
     const base = endpointUrl.endsWith("/") ? endpointUrl : `${endpointUrl}/`;
     const url = new URL("chat/completions", base).href;
-    // Mistral, chutes.ai, and Ollama's OpenAI-compatible API use the older
-    // max_tokens field; many other OpenAI-compatible providers expect
-    // max_completion_tokens instead. Sending both causes errors on providers
-    // that validate for unknown fields, so we pick one based on the endpoint
-    // URL — same approach as pi-mono's openai-completions provider.
-    const endpointUrlObject = new URL(base);
-    const endpointHostname = endpointUrlObject.hostname;
-    const endpointPort = endpointUrlObject.port;
-    // TODO: This Ollama heuristic breaks if users run Ollama on a
-    // non-11434 port; replace it with real provider detection later.
-    const usesLegacyMaxTokensField =
-        endpointUrl.includes("mistral.ai") ||
-        endpointUrl.includes("chutes.ai") ||
-        endpointHostname === "ollama.com" ||
-        ((endpointHostname === "localhost" ||
-            endpointHostname === "127.0.0.1") &&
-            endpointPort === "11434");
-    const maxTokensField = usesLegacyMaxTokensField
-        ? "max_tokens"
-        : "max_completion_tokens";
-    const payload: Record<string, unknown> = {
+    const providerNeutralPayload: ChatCompletionPayload = {
         model,
-        [maxTokensField]: DEFAULT_MAX_COMPLETION_TOKENS,
+        max_completion_tokens: DEFAULT_MAX_COMPLETION_TOKENS,
         messages: [{ role: "system", content: systemPrompt }, ...messages],
     };
-    // Gemini 3.1 Pro defaults to high reasoning, which can consume the entire
-    // completion budget before producing executable code. Google's
-    // OpenAI-compatible API maps medium reasoning effort to the model's medium
-    // thinking level, leaving room for the visible response.
-    if (
-        endpointHostname === "generativelanguage.googleapis.com" &&
-        model.startsWith("gemini-3.1-pro")
-    ) {
-        payload.reasoning_effort = "medium";
-    }
     // Only include temperature when explicitly set — omitting lets the
     // provider choose its own default, which is the safest universal behavior.
     if (temperature !== undefined) {
-        payload.temperature = temperature;
+        providerNeutralPayload.temperature = temperature;
     }
+    const payload = adjustChatCompletionPayloadForProvider(
+        providerNeutralPayload,
+        endpointUrl,
+    );
     const body = JSON.stringify(payload);
 
     let lastError: Error | undefined;
