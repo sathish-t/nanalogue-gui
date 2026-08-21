@@ -70,4 +70,80 @@ describe("adjustChatCompletionPayloadForProvider", () => {
         );
         expect(adjustedPayload.max_tokens).toBeUndefined();
     });
+
+    it("uses max_tokens for OpenRouter", () => {
+        const adjustedPayload = adjustChatCompletionPayloadForProvider(
+            BASE_PAYLOAD,
+            "https://openrouter.ai/api/v1/",
+        );
+
+        expect(adjustedPayload.max_tokens).toBe(DEFAULT_MAX_COMPLETION_TOKENS);
+        expect(adjustedPayload.max_completion_tokens).toBeUndefined();
+    });
+
+    it("includes reasoning details in OpenRouter responses", () => {
+        const adjustedPayload = adjustChatCompletionPayloadForProvider(
+            BASE_PAYLOAD,
+            "https://openrouter.ai/api/v1/",
+        );
+
+        expect(adjustedPayload.reasoning).toEqual({ exclude: false });
+    });
+
+    it.each([
+        "anthropic/claude-opus-5",
+        "anthropic/claude-sonnet-5",
+        "anthropic/claude-opus-4.8",
+    ])("enables automatic prompt caching for %s on OpenRouter", (model) => {
+        const adjustedPayload = adjustChatCompletionPayloadForProvider(
+            { ...BASE_PAYLOAD, model },
+            "https://openrouter.ai/api/v1/",
+        );
+
+        expect(adjustedPayload.cache_control).toEqual({ type: "ephemeral" });
+    });
+
+    it.each([
+        ["anthropic/claude-opus-5", "medium"],
+        ["anthropic/claude-sonnet-5", "medium"],
+        ["qwen/qwen3.8-27b", "medium"],
+        ["qwen/qwen3.8-2.4t-a95b", "medium"],
+        ["moonshotai/kimi-k3", "high"],
+        ["z-ai/glm-5.3", "high"],
+    ] as const)("sets %s reasoning effort to %s on OpenRouter", (model, effort) => {
+        const adjustedPayload = adjustChatCompletionPayloadForProvider(
+            { ...BASE_PAYLOAD, model },
+            "https://openrouter.ai/api/v1/",
+        );
+
+        expect(adjustedPayload.reasoning_effort).toBe(effort);
+    });
+
+    it.each([
+        "openai/gpt-5.4",
+        "openai/gpt-5.4-mini",
+        "anthropic/claude-sonnet-5",
+        "deepseek/deepseek-v4-pro",
+        "deepseek/deepseek-v4-flash",
+    ])("removes ineffective temperature for %s on OpenRouter", (model) => {
+        const adjustedPayload = adjustChatCompletionPayloadForProvider(
+            { ...BASE_PAYLOAD, model, temperature: 0.7 },
+            "https://openrouter.ai/api/v1/",
+        );
+
+        expect(adjustedPayload.temperature).toBeUndefined();
+    });
+
+    it("keeps supported temperature values on OpenRouter", () => {
+        const adjustedPayload = adjustChatCompletionPayloadForProvider(
+            {
+                ...BASE_PAYLOAD,
+                model: "anthropic/claude-opus-5",
+                temperature: 0.7,
+            },
+            "https://openrouter.ai/api/v1/",
+        );
+
+        expect(adjustedPayload.temperature).toBe(0.7);
+    });
 });
