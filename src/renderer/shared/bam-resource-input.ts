@@ -1,37 +1,19 @@
-// Reusable custom element for BAM file/URL source selection
-// Renders a radio toggle (file vs URL) and a text input with optional Browse button
-
-/** Monotonically increasing counter to generate unique radio group names. */
-let instanceCounter = 0;
+// Reusable custom element for local BAM file selection.
 
 /**
  * Detail payload for the "bam-selected" custom event.
  */
 export interface BamSelectedDetail {
-    /** The selected BAM path or URL. */
+    /** The selected local BAM path. */
     value: string;
-    /** Whether the value is a URL rather than a local file path. */
-    isUrl: boolean;
 }
 
 /**
- * Custom element providing a BAM source input with file/URL radio toggle.
- *
- * Renders a source-toggle radio group and a file-input-row with a text input
- * and Browse button. In file mode the input is readonly and Browse is visible;
- * in URL mode the input is editable and Browse is hidden.
- *
- * Fires "bam-selected" when a file is chosen or a URL is confirmed, and
- * "source-type-changed" when the user switches between file and URL mode.
+ * Custom element providing a read-only local BAM path and native Browse button.
+ * Fires "bam-selected" when a file is chosen.
  */
 export class BamResourceInput extends HTMLElement {
-    /** Radio button for selecting local file mode. */
-    private fileRadio!: HTMLInputElement;
-
-    /** Radio button for selecting URL mode. */
-    private urlRadio!: HTMLInputElement;
-
-    /** Text input for the BAM path or URL. */
+    /** Text input for the local BAM path. */
     private textInput!: HTMLInputElement;
 
     /** Browse button for opening a native file dialog. */
@@ -49,31 +31,6 @@ export class BamResourceInput extends HTMLElement {
     connectedCallback(): void {
         if (this.initialized) return;
         this.initialized = true;
-
-        const id = instanceCounter++;
-
-        // Source toggle radios
-        const toggle = document.createElement("div");
-        toggle.className = "source-toggle";
-
-        const fileLabel = document.createElement("label");
-        this.fileRadio = document.createElement("input");
-        this.fileRadio.type = "radio";
-        this.fileRadio.name = `source-type-${id}`;
-        this.fileRadio.value = "file";
-        this.fileRadio.checked = true;
-        fileLabel.appendChild(this.fileRadio);
-        fileLabel.appendChild(document.createTextNode(" Local file"));
-        toggle.appendChild(fileLabel);
-
-        const urlLabel = document.createElement("label");
-        this.urlRadio = document.createElement("input");
-        this.urlRadio.type = "radio";
-        this.urlRadio.name = `source-type-${id}`;
-        this.urlRadio.value = "url";
-        urlLabel.appendChild(this.urlRadio);
-        urlLabel.appendChild(document.createTextNode(" URL"));
-        toggle.appendChild(urlLabel);
 
         // File input row
         const row = document.createElement("div");
@@ -95,48 +52,26 @@ export class BamResourceInput extends HTMLElement {
         this.browseBtn.textContent = "Browse";
         row.appendChild(this.browseBtn);
 
-        this.appendChild(toggle);
         this.appendChild(row);
 
         // Wire up event listeners
-        this.fileRadio.addEventListener("change", () =>
-            this.handleSourceChange(),
-        );
-        this.urlRadio.addEventListener("change", () =>
-            this.handleSourceChange(),
-        );
         this.browseBtn.addEventListener("click", () => this.handleBrowse());
-        this.textInput.addEventListener("change", () =>
-            this.handleTextChange(),
-        );
-        this.textInput.addEventListener("keypress", (e) =>
-            this.handleKeypress(e),
-        );
     }
 
     /**
-     * Returns the current BAM path or URL value.
+     * Returns the current local BAM path.
      *
-     * @returns The current BAM path or URL string.
+     * @returns The current local BAM path.
      */
     get value(): string {
         return this.textInput.value;
     }
 
     /**
-     * Sets the current BAM path or URL value.
+     * Sets the current local BAM path.
      */
     set value(val: string) {
         this.textInput.value = val;
-    }
-
-    /**
-     * Returns whether the element is in URL mode.
-     *
-     * @returns True if URL mode is active, false for file mode.
-     */
-    get isUrl(): boolean {
-        return this.urlRadio.checked;
     }
 
     /**
@@ -154,25 +89,6 @@ export class BamResourceInput extends HTMLElement {
     set disabled(val: boolean) {
         this.textInput.disabled = val;
         this.browseBtn.disabled = val;
-        this.fileRadio.disabled = val;
-        this.urlRadio.disabled = val;
-    }
-
-    /**
-     * Handles switching between file and URL radio modes.
-     */
-    private handleSourceChange(): void {
-        const urlMode = this.urlRadio.checked;
-        this.textInput.readOnly = !urlMode;
-        this.browseBtn.style.display = urlMode ? "none" : "block";
-        this.textInput.placeholder = urlMode
-            ? "Enter BAM/CRAM URL"
-            : "Select BAM/CRAM file";
-        this.textInput.value = "";
-
-        this.dispatchEvent(
-            new CustomEvent("source-type-changed", { bubbles: true }),
-        );
     }
 
     /**
@@ -187,36 +103,13 @@ export class BamResourceInput extends HTMLElement {
         }
     }
 
-    /**
-     * Handles the text input change event in URL mode.
-     */
-    private handleTextChange(): void {
-        if (this.isUrl && this.textInput.value.trim()) {
-            this.fireBamSelected();
-        }
-    }
-
-    /**
-     * Handles keypress on the text input, firing bam-selected on Enter in URL mode.
-     *
-     * @param e - The keyboard event from the text input.
-     */
-    private handleKeypress(e: KeyboardEvent): void {
-        if (e.key === "Enter" && this.isUrl) {
-            this.fireBamSelected();
-        }
-    }
-
-    /**
-     * Dispatches the "bam-selected" custom event with the current value and mode.
-     */
+    /** Dispatches the "bam-selected" custom event with the selected local path. */
     private fireBamSelected(): void {
         this.dispatchEvent(
             new CustomEvent<BamSelectedDetail>("bam-selected", {
                 bubbles: true,
                 detail: {
                     value: this.textInput.value,
-                    isUrl: this.isUrl,
                 },
             }),
         );

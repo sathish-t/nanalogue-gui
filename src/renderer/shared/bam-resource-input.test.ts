@@ -1,5 +1,4 @@
-// Tests for the bam-resource-input custom element.
-// Verifies DOM structure, default state, mode switching, and event dispatch.
+// Tests for the local BAM file input custom element.
 
 // @vitest-environment jsdom
 
@@ -8,370 +7,95 @@ import { resolvingFn } from "../../test-helpers";
 import { BamResourceInput } from "./bam-resource-input";
 
 /**
- * Creates a BamResourceInput, appends it to the body, and triggers connectedCallback.
- * Uses direct instantiation because vitest module caching prevents
- * customElements.define from running in this jsdom window.
+ * Creates and connects a local BAM file input.
  *
- * @returns The connected BamResourceInput element.
+ * @returns The connected BAM file input.
  */
 function createElement(): BamResourceInput {
-    const el = new BamResourceInput();
-    document.body.appendChild(el);
-    el.connectedCallback();
-    return el;
+    const element = new BamResourceInput();
+    document.body.appendChild(element);
+    element.connectedCallback();
+    return element;
 }
 
 describe("BamResourceInput", () => {
-    /** Reference to the element under test. */
-    let el: BamResourceInput;
+    let element: BamResourceInput;
 
     beforeEach(() => {
-        el = createElement();
+        element = createElement();
     });
 
     afterEach(() => {
         document.body.innerHTML = "";
     });
 
-    describe("rendered DOM", () => {
-        it("renders two radio buttons in a source-toggle container", () => {
-            const toggle = el.querySelector(".source-toggle");
-            expect(toggle).not.toBeNull();
-            const radios = toggle?.querySelectorAll<HTMLInputElement>(
-                'input[type="radio"]',
-            );
-            expect(radios).toHaveLength(2);
-        });
+    it("renders only a read-only path input and Browse button", () => {
+        const input =
+            element.querySelector<HTMLInputElement>('input[type="text"]');
+        const button = element.querySelector<HTMLButtonElement>("button");
 
-        it("has file radio checked by default", () => {
-            const radios = el.querySelectorAll<HTMLInputElement>(
-                'input[type="radio"]',
-            );
-            const fileRadio = Array.from(radios).find(
-                (r) => r.value === "file",
-            );
-            const urlRadio = Array.from(radios).find((r) => r.value === "url");
-            expect(fileRadio?.checked).toBe(true);
-            expect(urlRadio?.checked).toBe(false);
-        });
+        expect(element.querySelectorAll('input[type="radio"]')).toHaveLength(0);
+        expect(input?.readOnly).toBe(true);
+        expect(input?.placeholder).toBe("Select BAM/CRAM file");
+        expect(button?.type).toBe("button");
+        expect(button?.textContent).toBe("Browse");
+    });
 
-        it("renders a text input", () => {
-            const input =
-                el.querySelector<HTMLInputElement>('input[type="text"]');
-            expect(input).not.toBeNull();
-            expect(input?.type).toBe("text");
-        });
+    it("gets and sets the selected path", () => {
+        element.value = "/path/to/file.bam";
+        expect(element.value).toBe("/path/to/file.bam");
+    });
 
-        it("renders a Browse button", () => {
-            const btn = el.querySelector<HTMLButtonElement>("button");
-            expect(btn).not.toBeNull();
-            expect(btn?.type).toBe("button");
-            expect(btn?.textContent).toBe("Browse");
-        });
+    it("disables and re-enables the path input and Browse button", () => {
+        const input =
+            element.querySelector<HTMLInputElement>('input[type="text"]');
+        const button = element.querySelector<HTMLButtonElement>("button");
 
-        it("renders an accessible label", () => {
-            const label = el.querySelector("label.visually-hidden");
-            expect(label).not.toBeNull();
-            expect(label?.textContent).toBe("BAM path");
+        element.disabled = true;
+        expect(element.disabled).toBe(true);
+        expect(input?.disabled).toBe(true);
+        expect(button?.disabled).toBe(true);
+
+        element.disabled = false;
+        expect(element.disabled).toBe(false);
+        expect(input?.disabled).toBe(false);
+        expect(button?.disabled).toBe(false);
+    });
+
+    it("sets the path and emits bam-selected after file selection", async () => {
+        element.selectFileFn = resolvingFn("/picked/file.bam");
+        const handler = vi.fn();
+        element.addEventListener("bam-selected", handler);
+
+        element.querySelector<HTMLButtonElement>("button")?.click();
+        await vi.waitFor(() => expect(handler).toHaveBeenCalledOnce());
+
+        expect(element.value).toBe("/picked/file.bam");
+        expect(handler.mock.calls[0][0].detail).toEqual({
+            value: "/picked/file.bam",
         });
     });
 
-    describe("default state", () => {
-        it("starts with empty value", () => {
-            expect(el.value).toBe("");
-        });
+    it("does not emit when file selection is cancelled", async () => {
+        element.selectFileFn = resolvingFn(null);
+        const handler = vi.fn();
+        element.addEventListener("bam-selected", handler);
 
-        it("starts in file mode (not URL)", () => {
-            expect(el.isUrl).toBe(false);
-        });
+        element.querySelector<HTMLButtonElement>("button")?.click();
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
-        it("starts not disabled", () => {
-            expect(el.disabled).toBe(false);
-        });
-
-        it("has readonly text input in file mode", () => {
-            const input =
-                el.querySelector<HTMLInputElement>('input[type="text"]');
-            expect(input?.readOnly).toBe(true);
-        });
-
-        it("shows file placeholder by default", () => {
-            const input =
-                el.querySelector<HTMLInputElement>('input[type="text"]');
-            expect(input?.placeholder).toBe("Select BAM/CRAM file");
-        });
+        expect(handler).not.toHaveBeenCalled();
+        expect(element.value).toBe("");
     });
 
-    describe("value property", () => {
-        it("gets and sets the text input value", () => {
-            el.value = "/path/to/file.bam";
-            expect(el.value).toBe("/path/to/file.bam");
-        });
+    it("does nothing when no file selector is configured", () => {
+        element.querySelector<HTMLButtonElement>("button")?.click();
+        expect(element.value).toBe("");
     });
 
-    describe("disabled property", () => {
-        it("disables all interactive children", () => {
-            el.disabled = true;
-            const textInput =
-                el.querySelector<HTMLInputElement>('input[type="text"]');
-            const btn = el.querySelector<HTMLButtonElement>("button");
-            const radios = el.querySelectorAll<HTMLInputElement>(
-                'input[type="radio"]',
-            );
-            expect(textInput?.disabled).toBe(true);
-            expect(btn?.disabled).toBe(true);
-            for (const radio of radios) {
-                expect(radio.disabled).toBe(true);
-            }
-        });
-
-        it("re-enables all interactive children", () => {
-            el.disabled = true;
-            el.disabled = false;
-            const textInput =
-                el.querySelector<HTMLInputElement>('input[type="text"]');
-            const btn = el.querySelector<HTMLButtonElement>("button");
-            const radios = el.querySelectorAll<HTMLInputElement>(
-                'input[type="radio"]',
-            );
-            expect(textInput?.disabled).toBe(false);
-            expect(btn?.disabled).toBe(false);
-            for (const radio of radios) {
-                expect(radio.disabled).toBe(false);
-            }
-        });
-    });
-
-    describe("URL mode switching", () => {
-        /**
-         * Switches the element to URL mode by checking the URL radio.
-         */
-        function switchToUrlMode(): void {
-            const urlRadio = Array.from(
-                el.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
-            ).find((r) => r.value === "url");
-            if (urlRadio) {
-                urlRadio.checked = true;
-                urlRadio.dispatchEvent(new Event("change"));
-            }
-        }
-
-        it("sets isUrl to true when URL radio is selected", () => {
-            switchToUrlMode();
-            expect(el.isUrl).toBe(true);
-        });
-
-        it("makes text input editable in URL mode", () => {
-            switchToUrlMode();
-            const input =
-                el.querySelector<HTMLInputElement>('input[type="text"]');
-            expect(input?.readOnly).toBe(false);
-        });
-
-        it("hides Browse button in URL mode", () => {
-            switchToUrlMode();
-            const btn = el.querySelector<HTMLButtonElement>("button");
-            expect(btn?.style.display).toBe("none");
-        });
-
-        it("updates placeholder in URL mode", () => {
-            switchToUrlMode();
-            const input =
-                el.querySelector<HTMLInputElement>('input[type="text"]');
-            expect(input?.placeholder).toBe("Enter BAM/CRAM URL");
-        });
-
-        it("clears value on mode switch", () => {
-            el.value = "/path/to/file.bam";
-            switchToUrlMode();
-            expect(el.value).toBe("");
-        });
-
-        it("dispatches source-type-changed event", () => {
-            const handler = vi.fn();
-            el.addEventListener("source-type-changed", handler);
-            switchToUrlMode();
-            expect(handler).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe("Browse button", () => {
-        it("does nothing when selectFileFn is null", () => {
-            const btn = el.querySelector<HTMLButtonElement>("button");
-            btn?.click();
-            expect(el.value).toBe("");
-        });
-
-        it("sets value and fires bam-selected when file is picked", async () => {
-            el.selectFileFn = resolvingFn("/picked/file.bam");
-            const handler = vi.fn();
-            el.addEventListener("bam-selected", handler);
-
-            const btn = el.querySelector<HTMLButtonElement>("button");
-            btn?.click();
-            await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(1));
-
-            expect(el.value).toBe("/picked/file.bam");
-            const detail = handler.mock.calls[0][0].detail;
-            expect(detail.value).toBe("/picked/file.bam");
-            expect(detail.isUrl).toBe(false);
-        });
-
-        it("does not fire bam-selected when file dialog is cancelled", async () => {
-            el.selectFileFn = resolvingFn(null);
-            const handler = vi.fn();
-            el.addEventListener("bam-selected", handler);
-
-            const btn = el.querySelector<HTMLButtonElement>("button");
-            btn?.click();
-            // Allow the promise to settle
-            await new Promise((resolve) => {
-                setTimeout(resolve, 10);
-            });
-            expect(handler).not.toHaveBeenCalled();
-            expect(el.value).toBe("");
-        });
-    });
-
-    describe("file radio change (switch back to file mode)", () => {
-        it("calls handleSourceChange and restores file mode", () => {
-            // Switch to URL mode first.
-            const radios = Array.from(
-                el.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
-            );
-            const urlRadio = radios.find((r) => r.value === "url");
-            const fileRadio = radios.find((r) => r.value === "file");
-            if (!urlRadio || !fileRadio)
-                throw new Error("radio buttons not found");
-            urlRadio.checked = true;
-            urlRadio.dispatchEvent(new Event("change"));
-            expect(el.isUrl).toBe(true);
-
-            // Now fire change on the fileRadio (covers the fileRadio listener body).
-            fileRadio.checked = true;
-            fileRadio.dispatchEvent(new Event("change"));
-            expect(el.isUrl).toBe(false);
-
-            // Browse button should be visible again in file mode.
-            const btn = el.querySelector<HTMLButtonElement>("button");
-            expect(btn?.style.display).toBe("block");
-        });
-    });
-
-    describe("text input change event", () => {
-        /**
-         * Switches to URL mode and returns the text input element.
-         *
-         * @returns The text input element.
-         */
-        function goUrlMode(): HTMLInputElement {
-            const urlRadio = Array.from(
-                el.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
-            ).find((r) => r.value === "url");
-            if (!urlRadio) throw new Error("url radio not found");
-            urlRadio.checked = true;
-            urlRadio.dispatchEvent(new Event("change"));
-            const textInput =
-                el.querySelector<HTMLInputElement>('input[type="text"]');
-            if (!textInput) throw new Error("text input not found");
-            return textInput;
-        }
-
-        it("fires bam-selected in URL mode with a non-empty value", () => {
-            const textInput = goUrlMode();
-            textInput.value = "https://example.com/file.bam";
-            const handler = vi.fn();
-            el.addEventListener("bam-selected", handler);
-            textInput.dispatchEvent(new Event("change"));
-            expect(handler).toHaveBeenCalledTimes(1);
-            expect(handler.mock.calls[0][0].detail.value).toBe(
-                "https://example.com/file.bam",
-            );
-            expect(handler.mock.calls[0][0].detail.isUrl).toBe(true);
-        });
-
-        it("does not fire bam-selected in URL mode when value is empty", () => {
-            const textInput = goUrlMode();
-            // handleSourceChange cleared the value on mode switch.
-            const handler = vi.fn();
-            el.addEventListener("bam-selected", handler);
-            textInput.dispatchEvent(new Event("change"));
-            expect(handler).not.toHaveBeenCalled();
-        });
-
-        it("does not fire bam-selected in file mode", () => {
-            const textInput =
-                el.querySelector<HTMLInputElement>('input[type="text"]');
-            if (!textInput) throw new Error("text input not found");
-            const handler = vi.fn();
-            el.addEventListener("bam-selected", handler);
-            textInput.dispatchEvent(new Event("change"));
-            expect(handler).not.toHaveBeenCalled();
-        });
-    });
-
-    describe("text input keypress event", () => {
-        /**
-         * Switches to URL mode, sets a value, and returns the text input.
-         *
-         * @returns The text input element.
-         */
-        function goUrlModeWithValue(): HTMLInputElement {
-            const urlRadio = Array.from(
-                el.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
-            ).find((r) => r.value === "url");
-            if (!urlRadio) throw new Error("url radio not found");
-            urlRadio.checked = true;
-            urlRadio.dispatchEvent(new Event("change"));
-            const textInput =
-                el.querySelector<HTMLInputElement>('input[type="text"]');
-            if (!textInput) throw new Error("text input not found");
-            textInput.value = "https://example.com/file.bam";
-            return textInput;
-        }
-
-        it("fires bam-selected on Enter in URL mode", () => {
-            const textInput = goUrlModeWithValue();
-            const handler = vi.fn();
-            el.addEventListener("bam-selected", handler);
-            textInput.dispatchEvent(
-                new KeyboardEvent("keypress", { key: "Enter" }),
-            );
-            expect(handler).toHaveBeenCalledTimes(1);
-        });
-
-        it("does not fire bam-selected on a non-Enter key in URL mode", () => {
-            const textInput = goUrlModeWithValue();
-            const handler = vi.fn();
-            el.addEventListener("bam-selected", handler);
-            textInput.dispatchEvent(
-                new KeyboardEvent("keypress", { key: "a" }),
-            );
-            expect(handler).not.toHaveBeenCalled();
-        });
-
-        it("does not fire bam-selected on Enter in file mode", () => {
-            const textInput =
-                el.querySelector<HTMLInputElement>('input[type="text"]');
-            if (!textInput) throw new Error("text input not found");
-            const handler = vi.fn();
-            el.addEventListener("bam-selected", handler);
-            textInput.dispatchEvent(
-                new KeyboardEvent("keypress", { key: "Enter" }),
-            );
-            expect(handler).not.toHaveBeenCalled();
-        });
-    });
-
-    describe("connectedCallback idempotency", () => {
-        it("does not duplicate DOM on repeated connectedCallback calls", () => {
-            el.connectedCallback();
-            const radios = el.querySelectorAll<HTMLInputElement>(
-                'input[type="radio"]',
-            );
-            expect(radios).toHaveLength(2);
-            const buttons = el.querySelectorAll("button");
-            expect(buttons).toHaveLength(1);
-        });
+    it("does not duplicate its DOM when reconnected", () => {
+        element.connectedCallback();
+        expect(element.querySelectorAll('input[type="text"]')).toHaveLength(1);
+        expect(element.querySelectorAll("button")).toHaveLength(1);
     });
 });

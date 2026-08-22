@@ -111,7 +111,7 @@ src/
       seq-mini-charts.ts       # Mini sparkline histograms for the QC Sequences tab.
     shared/
       apply-font-size.ts     # Reads the fontSize URL query parameter and applies the matching CSS class
-      bam-resource-input.ts  # Reusable custom element for BAM file/URL source selection
+      bam-resource-input.ts  # Reusable custom element for local BAM file selection.
       chart-font-size.ts     # Reads the font-size CSS class applied to <html> by applyFontSize() and
       mod-filter-input.ts    # Reusable custom element for modification filter input with validation.
       output-file-input.ts   # Reusable custom element for output file selection with overwrite confirmation.

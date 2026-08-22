@@ -18,8 +18,8 @@ import "../shared/window-size-input";
  * API surface exposed to the QC config renderer via the preload bridge.
  */
 interface QCApi {
-    /** Peeks into a BAM file or URL and returns contig and modification information. */
-    peekBam: (bamPath: string, treatAsUrl: boolean) => Promise<PeekResult>;
+    /** Peeks into a local BAM file and returns contig and modification information. */
+    peekBam: (bamPath: string) => Promise<PeekResult>;
 
     /** Generates a QC report from the given configuration options. */
     generateQC: (options: QCConfig) => Promise<void>;
@@ -173,7 +173,7 @@ function updateGenerateButton(): void {
 }
 
 /**
- * Loads and displays peek information from the specified BAM file or URL.
+ * Loads and displays peek information from the specified local BAM file.
  *
  * @returns A promise that resolves when the peek information has been loaded and displayed.
  */
@@ -189,7 +189,7 @@ async function loadPeekInfo() {
     bamSource.disabled = true;
 
     try {
-        const result = await api.peekBam(bamPath, bamSource.isUrl);
+        const result = await api.peekBam(bamPath);
 
         // Discard stale response if a newer request was issued
         if (currentRequestId !== peekRequestId) return;
@@ -409,7 +409,6 @@ async function generateQC() {
     const regionInput = elements.region.value.trim();
     const result = buildQCConfig({
         bamPath,
-        treatAsUrl: bamSource.isUrl,
         tag,
         modStrand,
         sampleFraction: elements.sampleFraction.value,
@@ -506,15 +505,6 @@ bamSource.addEventListener("bam-selected", async (e) => {
     if (value.trim()) {
         await loadPeekInfo();
     }
-});
-
-bamSource.addEventListener("source-type-changed", () => {
-    peekRequestId++;
-    bamSource.disabled = false;
-    elements.fileInfoContent.innerHTML =
-        '<p class="placeholder-text">Will load upon BAM file specification</p>';
-    elements.btnGenerate.disabled = true;
-    peekResult = null;
 });
 
 modFilter.addEventListener("mod-filter-changed", () => {

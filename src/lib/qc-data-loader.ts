@@ -33,15 +33,11 @@ export function maxReadLengthForBinWidth(binWidth: number): number {
 /**
  * Peeks at a BAM file to retrieve contig names and available modification types.
  *
- * @param bamPath - The filesystem path or URL to the BAM file.
- * @param treatAsUrl - Whether to treat the bamPath as a remote URL rather than a local file.
+ * @param bamPath - The local filesystem path to the BAM file.
  * @returns A promise that resolves to a summary of contigs and modifications found in the BAM file.
  */
-export async function peekBam(
-    bamPath: string,
-    treatAsUrl: boolean,
-): Promise<PeekResult> {
-    const result = await peek({ bamPath, treatAsUrl });
+export async function peekBam(bamPath: string): Promise<PeekResult> {
+    const result = await peek({ bamPath });
 
     const contigNames = Object.keys(result.contigs);
     const exampleContigs = contigNames.slice(0, 3);
@@ -555,7 +551,6 @@ export async function generateQCData(
 
     const sharedOptions = {
         bamPath: config.bamPath,
-        treatAsUrl: config.treatAsUrl,
         sampleFraction: config.sampleFraction / 100, // Convert percentage to fraction
         tag: config.tag,
         modStrand: config.modStrand,

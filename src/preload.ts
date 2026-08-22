@@ -147,12 +147,10 @@ contextBridge.exposeInMainWorld("api", {
     /**
      * Peek at a BAM file to extract header and reference information.
      *
-     * @param bamPath - The file system path or URL pointing to the BAM file.
-     * @param treatAsUrl - Whether to treat the path as a remote URL rather than a local file.
+     * @param bamPath - The local file system path pointing to the BAM file.
      * @returns A promise that resolves with the extracted BAM metadata.
      */
-    peekBam: (bamPath: string, treatAsUrl: boolean) =>
-        ipcRenderer.invoke("peek-bam", bamPath, treatAsUrl),
+    peekBam: (bamPath: string) => ipcRenderer.invoke("peek-bam", bamPath),
 
     /**
      * Generate a QC report with the provided configuration options.

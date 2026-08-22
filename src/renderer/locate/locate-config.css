@@ -34,7 +34,7 @@
     width: 100%;
 }
 
-/* Info banner about performance considerations for large or remote BAM files. */
+/* Info banner about performance considerations for large BAM files. */
 .disclaimer-info {
     background: #fff3e0;
     border: 1px solid #ffcc80;

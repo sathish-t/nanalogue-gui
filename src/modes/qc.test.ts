@@ -74,7 +74,6 @@ vi.mock("node:fs/promises", () => ({
 // Mock ipc-path-validation – filesystem calls are covered by its own test suite.
 vi.mock("../lib/ipc-path-validation", () => ({
     validateIpcFilePath: vi.fn().mockResolvedValue(undefined),
-    validateIpcRemoteBamUrl: vi.fn(),
 }));
 
 // Mock locate-data-loader – parseReadIds is used inside generate-qc.
@@ -90,9 +89,7 @@ const { generateQCData, peekBam } = await import("../lib/qc-data-loader");
 const { dialog } = await import("electron");
 const { readFile } = await import("node:fs/promises");
 const { parseReadIds } = await import("../lib/locate-data-loader");
-const { validateIpcFilePath, validateIpcRemoteBamUrl } = await import(
-    "../lib/ipc-path-validation"
-);
+const { validateIpcFilePath } = await import("../lib/ipc-path-validation");
 const { registerQcIpcHandlers, setQcMainWindow } = await import("./qc");
 
 // Register all IPC handlers once; ipcHandlers is populated as a side-effect.
@@ -144,7 +141,7 @@ describe("qc IPC handlers", () => {
     // -------------------------------------------------------------------------
 
     describe("peek-bam", () => {
-        it("delegates to peekBam with the supplied arguments", async () => {
+        it("delegates to peekBam with the local BAM path", async () => {
             setMockResolvedValue(peekBam, {
                 contigs: ["chr1"],
                 totalContigs: 1,
@@ -152,17 +149,10 @@ describe("qc IPC handlers", () => {
                 allContigs: { chr1: 1000 },
             });
 
-            await ipcHandlers.get("peek-bam")?.(
-                undefined,
-                "/data/sample.bam",
-                false,
-            );
+            await ipcHandlers.get("peek-bam")?.(undefined, "/data/sample.bam");
 
             expect(vi.mocked(peekBam)).toHaveBeenCalledOnce();
-            expect(vi.mocked(peekBam)).toHaveBeenCalledWith(
-                "/data/sample.bam",
-                false,
-            );
+            expect(vi.mocked(peekBam)).toHaveBeenCalledWith("/data/sample.bam");
         });
 
         it("returns the result from peekBam", async () => {
@@ -177,13 +167,12 @@ describe("qc IPC handlers", () => {
             const result = await ipcHandlers.get("peek-bam")?.(
                 undefined,
                 "/data/sample.bam",
-                true,
             );
 
             expect(result).toEqual(mockResult);
         });
 
-        it("validates the bam path when treatAsUrl is false", async () => {
+        it("validates the BAM as a local read path", async () => {
             setMockResolvedValue(peekBam, {
                 contigs: [],
                 totalContigs: 0,
@@ -191,11 +180,7 @@ describe("qc IPC handlers", () => {
                 allContigs: {},
             });
 
-            await ipcHandlers.get("peek-bam")?.(
-                undefined,
-                "/data/sample.bam",
-                false,
-            );
+            await ipcHandlers.get("peek-bam")?.(undefined, "/data/sample.bam");
 
             expect(vi.mocked(validateIpcFilePath)).toHaveBeenCalledWith(
                 "/data/sample.bam",
@@ -214,7 +199,6 @@ describe("qc IPC handlers", () => {
                     ipcHandlers.get("peek-bam")?.(
                         undefined,
                         "relative/sample.bam",
-                        false,
                     ),
                 ).rejects.toThrow("Path must be absolute");
 
@@ -224,57 +208,15 @@ describe("qc IPC handlers", () => {
             }
         });
 
-        it("validates remote BAM URLs when treatAsUrl is true", async () => {
-            setMockResolvedValue(peekBam, {
-                contigs: [],
-                totalContigs: 0,
-                modifications: [],
-                allContigs: {},
-            });
-
-            await ipcHandlers.get("peek-bam")?.(
-                undefined,
-                "https://example.com/sample.bam",
-                true,
-            );
-
-            expect(vi.mocked(validateIpcFilePath)).not.toHaveBeenCalled();
-            expect(vi.mocked(validateIpcRemoteBamUrl)).toHaveBeenCalledWith(
-                "https://example.com/sample.bam",
-                "QC",
-            );
-        });
-
         it.each([
-            ["", false, "bamPath must be a non-empty string"],
-            [123, false, "bamPath must be a non-empty string"],
-            ["/data/sample.bam", "false", "treatAsUrl must be a boolean"],
-        ])("rejects invalid request arguments (%s, %s)", async (bamPath, treatAsUrl, message) => {
+            ["", "bamPath must be a non-empty string"],
+            [123, "bamPath must be a non-empty string"],
+        ])("rejects invalid request argument %s", async (bamPath, message) => {
             await expect(
-                ipcHandlers.get("peek-bam")?.(undefined, bamPath, treatAsUrl),
+                ipcHandlers.get("peek-bam")?.(undefined, bamPath),
             ).rejects.toThrow(message);
 
             expect(vi.mocked(peekBam)).not.toHaveBeenCalled();
-        });
-
-        it("rejects a local path in URL mode before peeking", async () => {
-            setMockImplementation(validateIpcRemoteBamUrl, () => {
-                throw new Error("Invalid QC BAM URL: expected HTTP or HTTPS");
-            });
-
-            try {
-                await expect(
-                    ipcHandlers.get("peek-bam")?.(
-                        undefined,
-                        "file:///data/sample.bam",
-                        true,
-                    ),
-                ).rejects.toThrow("Invalid QC BAM URL");
-
-                expect(vi.mocked(peekBam)).not.toHaveBeenCalled();
-            } finally {
-                vi.mocked(validateIpcRemoteBamUrl).mockReset();
-            }
         });
     });
 
@@ -348,7 +290,6 @@ describe("qc IPC handlers", () => {
         /** Minimal valid QCConfig without a readIdFilePath. */
         const baseConfig = {
             bamPath: "/data/sample.bam",
-            treatAsUrl: false,
             sampleFraction: 5,
             sampleSeed: 42,
             windowSize: 300,
@@ -482,29 +423,15 @@ describe("qc IPC handlers", () => {
             ]);
         });
 
-        it("validates bamPath as a local read path when treatAsUrl is false", async () => {
+        it("validates bamPath as a local read path", async () => {
             await ipcHandlers.get("generate-qc")?.(undefined, {
                 ...baseConfig,
-                treatAsUrl: false,
             });
 
             expect(vi.mocked(validateIpcFilePath)).toHaveBeenCalledWith(
                 "/data/sample.bam",
                 "read",
             );
-        });
-
-        it("skips bamPath validation when treatAsUrl is true", async () => {
-            await ipcHandlers.get("generate-qc")?.(undefined, {
-                ...baseConfig,
-                bamPath: "https://example.com/sample.bam",
-                treatAsUrl: true,
-            });
-
-            const calls = vi
-                .mocked(validateIpcFilePath)
-                .mock.calls.map((c) => c[0]);
-            expect(calls).not.toContain("https://example.com/sample.bam");
         });
 
         it("validates readIdFilePath", async () => {
@@ -549,7 +476,6 @@ describe("qc IPC handlers", () => {
     describe("generate-qc – request validation", () => {
         const baseConfig = {
             bamPath: "/data/sample.bam",
-            treatAsUrl: false,
             sampleFraction: 5,
             sampleSeed: 42,
             windowSize: 300,
@@ -568,7 +494,6 @@ describe("qc IPC handlers", () => {
 
         it.each([
             [null, "expected an object"],
-            [{ ...baseConfig, treatAsUrl: "false" }, "treatAsUrl"],
             [{ ...baseConfig, sampleFraction: 0 }, "sampleFraction"],
             [{ ...baseConfig, mapqFilter: 256 }, "mapqFilter"],
             [
@@ -601,7 +526,6 @@ describe("qc IPC handlers", () => {
 
             await ipcHandlers.get("generate-qc")?.(undefined, {
                 bamPath: "/data/sample.bam",
-                treatAsUrl: false,
                 sampleFraction: 5,
                 sampleSeed: 99,
                 windowSize: 300,

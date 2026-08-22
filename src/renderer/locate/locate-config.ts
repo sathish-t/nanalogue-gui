@@ -42,7 +42,7 @@ interface LocateConfigApi {
         request: LocateGenerateBedRequest,
     ) => Promise<LocateResult>;
     /** Peeks at a BAM file to extract header metadata. */
-    peekBam: (bamPath: string, treatAsUrl: boolean) => Promise<PeekResult>;
+    peekBam: (bamPath: string) => Promise<PeekResult>;
     /** Navigates back to the landing page. */
     locateGoBack: () => Promise<void>;
 }
@@ -278,14 +278,13 @@ function updateGenerateButton(): void {
     const allFilled =
         bamValue.length > 0 && readIdValue.length > 0 && outputValue.length > 0;
 
-    // Check for path collisions (only local paths can collide)
+    // Check for path collisions.
     let hasCollision = false;
     if (allFilled) {
-        const localBam = !bamSource.isUrl ? bamValue : null;
-        if (localBam && localBam === readIdValue) {
+        if (bamValue === readIdValue) {
             hasCollision = true;
         }
-        if (localBam && localBam === outputValue) {
+        if (bamValue === outputValue) {
             hasCollision = true;
         }
         if (readIdValue === outputValue) {
@@ -336,14 +335,14 @@ outputSource.checkExistsFn = (p) => api.locateCheckFileExists(p);
 
 // BAM selected
 bamSource.addEventListener("bam-selected", async (e) => {
-    const { value, isUrl } = (e as CustomEvent<BamSelectedDetail>).detail;
+    const { value } = (e as CustomEvent<BamSelectedDetail>).detail;
     if (!value.trim()) return;
 
     const currentRequestId = ++peekRequestId;
     updateGenerateButton();
 
     try {
-        bamPeekResult = await api.peekBam(value, isUrl);
+        bamPeekResult = await api.peekBam(value);
     } catch (error) {
         console.error("Failed to peek BAM:", error);
         bamPeekResult = null;
@@ -352,13 +351,6 @@ bamSource.addEventListener("bam-selected", async (e) => {
     if (currentRequestId !== peekRequestId) return;
     if (value !== bamSource.value) return;
 
-    updateSummary();
-});
-
-bamSource.addEventListener("source-type-changed", () => {
-    peekRequestId++;
-    bamPeekResult = null;
-    updateGenerateButton();
     updateSummary();
 });
 
@@ -415,8 +407,6 @@ elements.btnGenerate.addEventListener("click", async () => {
 
     const region = regionInput || undefined;
     const fullRegion = region ? elements.fullRegion.checked : undefined;
-    const treatAsUrl = bamSource.isUrl;
-
     elements.btnGenerate.disabled = true;
     elements.btnBack.disabled = true;
     bamSource.disabled = true;
@@ -430,11 +420,10 @@ elements.btnGenerate.addEventListener("click", async () => {
                   bamPath,
                   readIdPath,
                   outputPath,
-                  treatAsUrl,
                   region,
                   fullRegion,
               }
-            : { bamPath, readIdPath, outputPath, treatAsUrl };
+            : { bamPath, readIdPath, outputPath };
         const result = await api.locateGenerateBed(request);
 
         elements.loadingOverlay.classList.add("hidden");

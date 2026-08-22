@@ -5,7 +5,6 @@ import type { QCConfig } from "./types";
 /** Valid QC request used by contract tests. */
 const VALID_REQUEST: QCConfig = {
     bamPath: "/data/sample.bam",
-    treatAsUrl: false,
     sampleFraction: 5,
     sampleSeed: 42,
     windowSize: 300,
@@ -100,7 +99,6 @@ describe("validateQCRequest", () => {
         [null, "expected an object"],
         [[], "expected an object"],
         [{ ...VALID_REQUEST, bamPath: "" }, "bamPath"],
-        [{ ...VALID_REQUEST, treatAsUrl: "false" }, "treatAsUrl"],
         [{ ...VALID_REQUEST, tag: null }, "tag"],
         [{ ...VALID_REQUEST, modStrand: "invalid" }, "modStrand"],
         [{ ...VALID_REQUEST, region: 42 }, "region"],
@@ -112,14 +110,6 @@ describe("validateQCRequest", () => {
         [{ ...VALID_REQUEST, excludeMapqUnavail: 1 }, "excludeMapqUnavail"],
         [{ ...VALID_REQUEST, readFilter: "" }, "readFilter"],
         [{ ...VALID_REQUEST, readIdFilePath: null }, "readIdFilePath"],
-        [
-            {
-                ...VALID_REQUEST,
-                bamPath: "/local/sample.bam",
-                treatAsUrl: true,
-            },
-            "BAM URL",
-        ],
     ])("rejects malformed non-numeric payload %#", (payload, message) => {
         expect(() => validateQCRequest(payload)).toThrow(message);
     });

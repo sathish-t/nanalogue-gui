@@ -6,10 +6,8 @@ import type { QCConfig } from "./types";
 
 /** Primitive values read from the QC form and its custom elements. */
 export interface QCConfigInputSnapshot {
-    /** BAM file path or URL. */
+    /** Local BAM file path. */
     bamPath: string;
-    /** Whether the BAM value is a URL. */
-    treatAsUrl: boolean;
     /** Parsed modification tag. */
     tag: string;
     /** Parsed modification strand. */
@@ -186,7 +184,6 @@ export function buildQCConfig(
         success: true,
         config: {
             bamPath: input.bamPath,
-            treatAsUrl: input.treatAsUrl,
             tag: input.tag,
             modStrand: input.modStrand,
             region,

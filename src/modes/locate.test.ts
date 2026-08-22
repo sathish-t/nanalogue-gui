@@ -66,7 +66,6 @@ describe("Locate IPC handlers", () => {
                     bamPath: "/a.bam",
                     readIdPath: "/ids",
                     outputPath: "/out",
-                    treatAsUrl: false,
                     fullRegion: true,
                 },
             ),
@@ -83,7 +82,6 @@ describe("Locate IPC handlers", () => {
                 bamPath: "/a.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
-                treatAsUrl: false,
             },
         );
         expect(validateIpcFilePath).toHaveBeenNthCalledWith(
@@ -105,10 +103,9 @@ describe("Locate IPC handlers", () => {
             generate(
                 {},
                 {
-                    bamPath: "https://x",
+                    bamPath: "/a.bam",
                     readIdPath: "/ids",
                     outputPath: "/out",
-                    treatAsUrl: true,
                 },
             ),
         ).rejects.toThrow("200,000");
@@ -129,10 +126,9 @@ describe("Locate IPC handlers", () => {
         const result = await generate(
             {},
             {
-                bamPath: "https://x",
+                bamPath: "/a.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
-                treatAsUrl: true,
             },
         );
         expect(writeFileSync).toHaveBeenCalledWith(
@@ -189,17 +185,15 @@ describe("Locate IPC handlers", () => {
         await generate(
             {},
             {
-                bamPath: "https://example.com/sample.bam",
+                bamPath: "/data/sample.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
-                treatAsUrl: true,
                 region: "chr1:10-20",
                 fullRegion: true,
             },
         );
         expect(readInfo).toHaveBeenCalledWith({
-            bamPath: "https://example.com/sample.bam",
-            treatAsUrl: true,
+            bamPath: "/data/sample.bam",
             readIdSet: ["read-1"],
             region: "chr1:10-20",
             fullRegion: true,

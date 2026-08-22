@@ -37,7 +37,7 @@ interface SwipeConfigApi {
     /** Checks whether a file exists at the given path. */
     swipeCheckFileExists: (filePath: string) => Promise<boolean>;
     /** Peeks at a BAM file to extract header metadata. */
-    peekBam: (bamPath: string, treatAsUrl: boolean) => Promise<PeekResult>;
+    peekBam: (bamPath: string) => Promise<PeekResult>;
     /** Initializes swipe mode and navigates to the review interface. */
     swipeStart: (request: SwipeStartRequest) => Promise<SwipeLaunchResult>;
     /** Navigates back to the landing page. */
@@ -362,14 +362,14 @@ outputSource.selectFileFn = () => api.swipePickOutput();
 outputSource.checkExistsFn = (p) => api.swipeCheckFileExists(p);
 
 bamSource.addEventListener("bam-selected", async (e) => {
-    const { value, isUrl } = (e as CustomEvent<BamSelectedDetail>).detail;
+    const { value } = (e as CustomEvent<BamSelectedDetail>).detail;
     if (!value.trim()) return;
 
     updateStartButton();
 
     // Peek at BAM for summary
     try {
-        bamPeekResult = await api.peekBam(value, isUrl);
+        bamPeekResult = await api.peekBam(value);
     } catch (error) {
         console.error("Failed to peek BAM:", error);
         bamPeekResult = null;
@@ -381,12 +381,6 @@ bamSource.addEventListener("bam-selected", async (e) => {
         modFilter.autoPopulate(bamPeekResult.modifications);
     }
 
-    updateSummary();
-});
-
-bamSource.addEventListener("source-type-changed", () => {
-    bamPeekResult = null;
-    updateStartButton();
     updateSummary();
 });
 
@@ -441,8 +435,6 @@ elements.btnStart.addEventListener("click", async () => {
     }
     const regionExpansion = rawExpansion;
     const showAnnotationHighlight = elements.showAnnotationHighlight.checked;
-    const treatAsUrl = bamSource.isUrl;
-
     elements.btnStart.disabled = true;
     elements.btnBack.disabled = true;
     elements.loadingOverlay.classList.remove("hidden");
@@ -457,7 +449,6 @@ elements.btnStart.addEventListener("click", async () => {
             modStrand,
             regionExpansion,
             showAnnotationHighlight,
-            treatAsUrl,
         });
         if (!result.success) {
             elements.loadingOverlay.classList.add("hidden");

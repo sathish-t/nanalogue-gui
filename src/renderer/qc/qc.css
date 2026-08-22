@@ -97,23 +97,6 @@
     margin-top: 8px;
 }
 
-/* Horizontal radio button group for toggling between file and URL source. */
-.source-toggle {
-    display: flex;
-    gap: 24px;
-    margin-bottom: 12px;
-}
-
-/* Individual radio label with inline icon-text layout. */
-.source-toggle label {
-    align-items: center;
-    color: #666;
-    cursor: pointer;
-    display: flex;
-    font-size: 1rem;
-    gap: 6px;
-}
-
 /* Row containing a text input and a browse button side by side. */
 .file-input-row {
     display: flex;

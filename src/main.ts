@@ -430,8 +430,7 @@ ipcMain.handle(
      */
     async (_event, payload: unknown) => {
         const swipeArgs = validateSwipeStartRequest(payload);
-        if (!swipeArgs.treatAsUrl)
-            await validateIpcFilePath(swipeArgs.bamPath, "read");
+        await validateIpcFilePath(swipeArgs.bamPath, "read");
         await validateIpcFilePath(swipeArgs.bedPath, "read");
         await validateIpcFilePath(swipeArgs.outputPath, "write");
 

@@ -1,4 +1,3 @@
-import { validateIpcRemoteBamUrl } from "./ipc-path-validation";
 import type { QCConfig } from "./types";
 
 /** Numeric constraints for one QC request field. */
@@ -115,10 +114,6 @@ export function validateQCRequest(value: unknown): QCConfig {
             "Invalid QC request: bamPath must be a non-empty string",
         );
     }
-    if (typeof request.treatAsUrl !== "boolean") {
-        throw new Error("Invalid QC request: treatAsUrl must be a boolean");
-    }
-
     const tag = validateOptionalQCString(request.tag, "tag");
     if (
         request.modStrand !== undefined &&
@@ -166,13 +161,8 @@ export function validateQCRequest(value: unknown): QCConfig {
         rejectModQualNonInclusive = [low, high];
     }
 
-    if (request.treatAsUrl) {
-        validateIpcRemoteBamUrl(request.bamPath, "QC");
-    }
-
     return {
         bamPath: request.bamPath,
-        treatAsUrl: request.treatAsUrl,
         tag,
         modStrand: request.modStrand as "bc" | "bc_comp" | undefined,
         region,
