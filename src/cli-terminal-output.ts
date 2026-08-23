@@ -34,6 +34,13 @@ export function color(code: string, text: string): string {
  * Prints CLI usage information and exits.
  */
 export function printUsage(): void {
+    for (const [fieldName, spec] of Object.entries(CONFIG_FIELD_SPECS)) {
+        assert(
+            Number.isSafeInteger(spec.fallback),
+            `CLI usage fallback for ${fieldName} is not a safe integer!`,
+        );
+    }
+
     console.log(`${TERMINAL_BOLD}nanalogue-chat${TERMINAL_RESET} — AI-powered BAM analysis from the terminal
 
 ${TERMINAL_BOLD}Usage:${TERMINAL_RESET}

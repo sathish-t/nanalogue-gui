@@ -11,6 +11,7 @@ import {
     TERMINAL_YELLOW,
 } from "./cli-terminal-formatting";
 import { color, emitEvent, printUsage } from "./cli-terminal-output";
+import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
 import type { SandboxResult } from "./lib/chat-types";
 
 /** Whether NO_COLOR existed before the current test. */
@@ -81,6 +82,23 @@ describe("CLI terminal formatting", () => {
         expect(usage).toContain("--endpoint <url>");
         expect(usage).toContain("--max-duration-secs <n>");
         expect(usage).toContain("/dump_system_prompt");
+    });
+
+    it("rejects non-integer usage fallbacks before printing", () => {
+        const log = vi
+            .spyOn(console, "log")
+            .mockImplementation(() => undefined);
+        const originalFallback = CONFIG_FIELD_SPECS.maxRetries.fallback;
+        CONFIG_FIELD_SPECS.maxRetries.fallback = Number.NaN;
+
+        try {
+            expect(() => printUsage()).toThrow(
+                "CLI usage fallback for maxRetries is not a safe integer!",
+            );
+            expect(log).not.toHaveBeenCalled();
+        } finally {
+            CONFIG_FIELD_SPECS.maxRetries.fallback = originalFallback;
+        }
     });
 });
 
