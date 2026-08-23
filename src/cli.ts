@@ -20,6 +20,11 @@ import {
     dumpLlmInstructions,
     getLastSentMessages,
 } from "./lib/chat-orchestrator";
+import {
+    isValidApiKey,
+    isValidEndpointUrl,
+    isValidModel,
+} from "./lib/chat-provider-input-checks";
 import { ChatSession } from "./lib/chat-session";
 import type { AiChatConfig } from "./lib/chat-types";
 import { fetchModels } from "./lib/model-listing";
@@ -102,24 +107,11 @@ async function main(): Promise<void> {
         console.error(color(TERMINAL_RED, "Error: --endpoint is required"));
         process.exit(1);
     } else {
-        assert(
-            endpointUrl.length <= 3000,
-            "pathological endpoint URL detected (length > 3000)!",
-        );
-        assert(
-            endpointUrl === endpointUrl.trim(),
-            "endpointUrl has spurious whitespaces!",
-        );
+        assert(isValidEndpointUrl(endpointUrl), "Invalid endpoint URL!");
     }
 
     // check api key
-    if (apiKey.length > 0) {
-        assert(
-            apiKey.length <= 200,
-            "pathologically long api key found (length > 200)!",
-        );
-        assert(apiKey === apiKey.trim(), "apiKey has spurious whitespaces!");
-    }
+    assert(isValidApiKey(apiKey), "Invalid API key!");
 
     // --list-models mode
     if (values["list-models"]) {
@@ -163,15 +155,11 @@ async function main(): Promise<void> {
         printUsage();
         process.exit(1);
     } else {
-        assert(
-            model.length <= 200,
-            "unusually long model name detected (length > 200)!",
-        );
+        assert(isValidModel(model), "Invalid model name!");
         assert(
             allowedDir.length <= 2000,
             "unusually long allowed directory detected (length > 2000)!",
         );
-        assert(model.trim() === model, "model has spurious whitespaces!");
         assert(
             allowedDir.trim() === allowedDir,
             "allowed directory has spurious whitespaces!",

@@ -27,6 +27,7 @@ src/lib/chat-orchestrator-history.ts	100
 src/lib/chat-orchestrator-llm.ts	100
 src/lib/chat-orchestrator-test-utils.ts	100
 src/lib/chat-orchestrator.ts	100
+src/lib/chat-provider-input-checks.ts	100
 src/lib/chat-provider-payload-adjustments.ts	100
 src/lib/chat-session.ts	100
 src/lib/chat-transcript-dump.ts	100

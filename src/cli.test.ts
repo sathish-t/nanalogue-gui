@@ -74,6 +74,20 @@ describe("nanalogue-chat CLI", () => {
     });
 
     describe("strict assertion checks", () => {
+        it("rejects malformed endpoint URLs", async () => {
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "https:///example.com/v1",
+                    "--list-models",
+                ]),
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringContaining("Invalid endpoint URL!"),
+            });
+        });
+
         it("rejects API keys longer than 200 characters", async () => {
             await expect(
                 execFileAsync("node", [
@@ -86,9 +100,24 @@ describe("nanalogue-chat CLI", () => {
                 ]),
             ).rejects.toMatchObject({
                 code: 1,
-                stderr: expect.stringContaining(
-                    "pathologically long api key found",
-                ),
+                stderr: expect.stringContaining("Invalid API key"),
+            });
+        });
+
+        it("rejects model names with surrounding whitespace", async () => {
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    " model",
+                    "--dir",
+                    ".",
+                ]),
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringContaining("Invalid model name!"),
             });
         });
 

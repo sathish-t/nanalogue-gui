@@ -26,6 +26,7 @@ src/
     chat-orchestrator-llm.ts                        # LLM transport helpers for AI chat orchestration.
     chat-orchestrator-test-utils.ts                 # Shared mock server infrastructure for chat-orchestrator tests.
     chat-orchestrator.ts                            # Chat orchestrator for AI Chat mode.
+    chat-provider-input-checks.ts                   # Validation for endpoint URL, API key, and model inputs used by chat providers.
     chat-provider-payload-adjustments.ts            # Provider-specific adjustments for OpenAI-compatible chat completion payloads.
     chat-session.ts                                 # Reusable chat session state for the AI Chat feature.
     chat-transcript-dump.ts                         # Persists LLM request and conversation history transcripts for human review.
