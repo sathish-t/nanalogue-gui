@@ -41,6 +41,33 @@ export function printUsage(): void {
         );
     }
 
+    assert(
+        EXTERNAL_FUNCTIONS.length > 11,
+        "CLI usage external function list must contain more than 11 items!",
+    );
+    for (const [index, functionName] of EXTERNAL_FUNCTIONS.entries()) {
+        assert(
+            functionName.trim().length > 0,
+            `CLI usage external function at index ${index} is empty!`,
+        );
+    }
+    assert(
+        EXTERNAL_FUNCTIONS.slice(0, 4).join(", ").length <= 40,
+        "CLI usage external function items 0-3 exceed 40 characters!",
+    );
+    assert(
+        EXTERNAL_FUNCTIONS.slice(4, 8).join(", ").length <= 40,
+        "CLI usage external function items 4-7 exceed 40 characters!",
+    );
+    assert(
+        EXTERNAL_FUNCTIONS.slice(8, 11).join(", ").length <= 40,
+        "CLI usage external function items 8-10 exceed 40 characters!",
+    );
+    assert(
+        EXTERNAL_FUNCTIONS.slice(11).join(", ").length <= 40,
+        "CLI usage external function items from index 11 exceed 40 characters!",
+    );
+
     console.log(`${TERMINAL_BOLD}nanalogue-chat${TERMINAL_RESET} — AI-powered BAM analysis from the terminal
 
 ${TERMINAL_BOLD}Usage:${TERMINAL_RESET}
@@ -103,7 +130,8 @@ ${TERMINAL_BOLD}Custom system prompt:${TERMINAL_RESET}
                                --only-system-append.
                                Valid names: ${EXTERNAL_FUNCTIONS.slice(0, 4).join(", ")},
                                             ${EXTERNAL_FUNCTIONS.slice(4, 8).join(", ")},
-                                            ${EXTERNAL_FUNCTIONS.slice(8).join(", ")}.
+                                            ${EXTERNAL_FUNCTIONS.slice(8, 11).join(", ")},
+                                            ${EXTERNAL_FUNCTIONS.slice(11).join(", ")}.
                                Hard error on unknown names.
 
 ${TERMINAL_BOLD}REPL commands:${TERMINAL_RESET}

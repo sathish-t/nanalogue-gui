@@ -11,6 +11,7 @@ import {
     TERMINAL_YELLOW,
 } from "./cli-terminal-formatting";
 import { color, emitEvent, printUsage } from "./cli-terminal-output";
+import { EXTERNAL_FUNCTIONS } from "./lib/ai-chat-constants";
 import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
 import type { SandboxResult } from "./lib/chat-types";
 
@@ -82,6 +83,65 @@ describe("CLI terminal formatting", () => {
         expect(usage).toContain("--endpoint <url>");
         expect(usage).toContain("--max-duration-secs <n>");
         expect(usage).toContain("/dump_system_prompt");
+    });
+
+    it("rejects an external function list with only eleven items", () => {
+        const log = vi
+            .spyOn(console, "log")
+            .mockImplementation(() => undefined);
+        const mutableFunctions = EXTERNAL_FUNCTIONS as unknown as string[];
+        const removedFunctions = mutableFunctions.splice(11);
+
+        try {
+            expect(() => printUsage()).toThrow(
+                "CLI usage external function list must contain more than 11 items!",
+            );
+            expect(log).not.toHaveBeenCalled();
+        } finally {
+            mutableFunctions.push(...removedFunctions);
+        }
+    });
+
+    it("rejects empty external function names before printing", () => {
+        const log = vi
+            .spyOn(console, "log")
+            .mockImplementation(() => undefined);
+        const mutableFunctions = EXTERNAL_FUNCTIONS as unknown as string[];
+        const originalFunction = mutableFunctions[0] as string;
+        mutableFunctions[0] = " ";
+
+        try {
+            expect(() => printUsage()).toThrow(
+                "CLI usage external function at index 0 is empty!",
+            );
+            expect(log).not.toHaveBeenCalled();
+        } finally {
+            mutableFunctions[0] = originalFunction;
+        }
+    });
+
+    it.each([
+        [0, "CLI usage external function items 0-3 exceed 40 characters!"],
+        [4, "CLI usage external function items 4-7 exceed 40 characters!"],
+        [8, "CLI usage external function items 8-10 exceed 40 characters!"],
+        [
+            11,
+            "CLI usage external function items from index 11 exceed 40 characters!",
+        ],
+    ])("rejects an oversized external function group starting at index %i", (functionIndex, expectedError) => {
+        const log = vi
+            .spyOn(console, "log")
+            .mockImplementation(() => undefined);
+        const mutableFunctions = EXTERNAL_FUNCTIONS as unknown as string[];
+        const originalFunction = mutableFunctions[functionIndex] as string;
+        mutableFunctions[functionIndex] = "x".repeat(41);
+
+        try {
+            expect(() => printUsage()).toThrow(expectedError);
+            expect(log).not.toHaveBeenCalled();
+        } finally {
+            mutableFunctions[functionIndex] = originalFunction;
+        }
     });
 
     it("rejects non-integer usage fallbacks before printing", () => {
