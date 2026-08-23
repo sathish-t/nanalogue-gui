@@ -1,4 +1,6 @@
 filename	%lines
+src/cli-terminal-formatting.ts	100
+src/cli-terminal-output.ts	100
 src/lib/ai-chat-constants.ts	100
 src/lib/ai-chat-ipc-validation.ts	96.59
 src/lib/ai-chat-shared-constants.ts	77.77

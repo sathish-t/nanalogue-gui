@@ -1,27 +1,18 @@
 // Terminal output helpers for the standalone nanalogue-chat CLI.
 
 import assert from "node:assert/strict";
+import {
+    TERMINAL_BOLD,
+    TERMINAL_CLEAR_LINE,
+    TERMINAL_DIM,
+    TERMINAL_LIGHT_BLUE,
+    TERMINAL_RED,
+    TERMINAL_RESET,
+    TERMINAL_YELLOW,
+} from "./cli-terminal-formatting";
 import { EXTERNAL_FUNCTIONS } from "./lib/ai-chat-constants";
 import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
 import type { AiChatEvent, SandboxResult } from "./lib/chat-types";
-
-/** ANSI escape code prefix. */
-const ESC = "\x1b[";
-
-/** Resets all ANSI formatting. */
-const RESET = `${ESC}0m`;
-/** Bold text. */
-const BOLD = `${ESC}1m`;
-/** Dim/grey text for sandbox results. */
-const DIM = `${ESC}2m`;
-/** Red text for errors. */
-const RED = `${ESC}31m`;
-/** Yellow text for progress indicators. */
-const YELLOW = `${ESC}33m`;
-/** Light blue text for code blocks. */
-const LIGHT_BLUE = `${ESC}94m`;
-/** Returns the cursor to column 0 and clears the current line. */
-const CLEAR_LINE = "\r\x1b[K";
 
 /**
  * Wraps text with an ANSI color code and reset suffix.
@@ -36,27 +27,27 @@ export function color(code: string, text: string): string {
         "Invalid ANSI color code",
     );
     if (text.length === 0 || "NO_COLOR" in process.env) return text;
-    return `${code.trim()}${text}${RESET}`;
+    return `${code.trim()}${text}${TERMINAL_RESET}`;
 }
 
 /**
  * Prints CLI usage information and exits.
  */
 export function printUsage(): void {
-    console.log(`${BOLD}nanalogue-chat${RESET} — AI-powered BAM analysis from the terminal
+    console.log(`${TERMINAL_BOLD}nanalogue-chat${TERMINAL_RESET} — AI-powered BAM analysis from the terminal
 
-${BOLD}Usage:${RESET}
+${TERMINAL_BOLD}Usage:${TERMINAL_RESET}
   nanalogue-chat --endpoint <url> --model <name> --dir <path> [options]
 
-${BOLD}Required:${RESET}
+${TERMINAL_BOLD}Required:${TERMINAL_RESET}
   --endpoint <url>         LLM endpoint URL (e.g. http://localhost:11434/v1)
   --model <name>           Model identifier (e.g. llama3)
   --dir <path>             Directory containing BAM files to analyze
 
-${BOLD}Authentication:${RESET}
+${TERMINAL_BOLD}Authentication:${TERMINAL_RESET}
   --api-key <key>          API key (default: $API_KEY environment variable)
 
-${BOLD}Advanced options:${RESET}
+${TERMINAL_BOLD}Advanced options:${TERMINAL_RESET}
   --context-window <n>     Context window tokens (default: ${CONFIG_FIELD_SPECS.contextWindowTokens.fallback})
   --max-retries <n>        Max retries per turn (default: ${CONFIG_FIELD_SPECS.maxRetries.fallback})
   --timeout <n>            Timeout in seconds (default: ${CONFIG_FIELD_SPECS.timeoutSeconds.fallback})
@@ -72,7 +63,7 @@ ${BOLD}Advanced options:${RESET}
   --max-write-mb <n>       Max write_file text size in MB (BAM access is not affected) (default: ${CONFIG_FIELD_SPECS.maxWriteMB.fallback})
   --temperature <n>        LLM sampling temperature 0-2 (default: provider default)
 
-${BOLD}Other:${RESET}
+${TERMINAL_BOLD}Other:${TERMINAL_RESET}
   --non-interactive <msg>  Send a single message, print the response, and exit
   --dump-history           Dump the complete raw conversation history
                            (only valid with --non-interactive)
@@ -82,7 +73,7 @@ ${BOLD}Other:${RESET}
   Note: --list-models takes precedence over --non-interactive if both are passed.
   -v, --version            Print version and exit
 
-${BOLD}Custom system prompt:${RESET}
+${TERMINAL_BOLD}Custom system prompt:${TERMINAL_RESET}
   --system-prompt <text>       Replace the default system prompt. Pass content
                                directly or via a shell variable:
                                --system-prompt "$MY_PROMPT"
@@ -108,7 +99,7 @@ ${BOLD}Custom system prompt:${RESET}
                                             ${EXTERNAL_FUNCTIONS.slice(8).join(", ")}.
                                Hard error on unknown names.
 
-${BOLD}REPL commands:${RESET}
+${TERMINAL_BOLD}REPL commands:${TERMINAL_RESET}
   /new                     Start a new conversation
   /exec <file.py>          Run a Python file directly in the sandbox
   /dump_history            Dump the complete raw conversation history
@@ -163,24 +154,27 @@ function formatSandboxResult(result: SandboxResult): string {
 export function emitEvent(event: AiChatEvent): void {
     switch (event.type) {
         case "turn_start":
-            process.stdout.write(color(YELLOW, "[thinking...]"));
+            process.stdout.write(color(TERMINAL_YELLOW, "[thinking...]"));
             break;
         case "code_execution_start":
-            process.stdout.write(CLEAR_LINE);
+            process.stdout.write(TERMINAL_CLEAR_LINE);
             console.log(
-                color(LIGHT_BLUE, `\`\`\`python\n${event.code}\n\`\`\``),
+                color(
+                    TERMINAL_LIGHT_BLUE,
+                    `\`\`\`python\n${event.code}\n\`\`\``,
+                ),
             );
-            process.stdout.write(color(YELLOW, "[running code...]"));
+            process.stdout.write(color(TERMINAL_YELLOW, "[running code...]"));
             break;
         case "code_execution_end":
-            process.stdout.write(CLEAR_LINE);
-            console.log(color(DIM, formatSandboxResult(event.result)));
+            process.stdout.write(TERMINAL_CLEAR_LINE);
+            console.log(color(TERMINAL_DIM, formatSandboxResult(event.result)));
             break;
         case "turn_end":
-            process.stdout.write(CLEAR_LINE);
+            process.stdout.write(TERMINAL_CLEAR_LINE);
             break;
         case "turn_error": {
-            process.stdout.write(CLEAR_LINE);
+            process.stdout.write(TERMINAL_CLEAR_LINE);
             const errorMsg: string = event.error;
             assert(errorMsg.length > 0, "Error message is missing");
             assert(
@@ -189,7 +183,7 @@ export function emitEvent(event: AiChatEvent): void {
             );
             console.error(
                 color(
-                    RED,
+                    TERMINAL_RED,
                     `Error: ${
                         event.isTimeout
                             ? "LLM response timed out (i.e. a message from the LLM took too much time to arrive)"
@@ -200,8 +194,8 @@ export function emitEvent(event: AiChatEvent): void {
             break;
         }
         case "turn_cancelled":
-            process.stdout.write(CLEAR_LINE);
-            console.log(color(YELLOW, "[cancelled]"));
+            process.stdout.write(TERMINAL_CLEAR_LINE);
+            console.log(color(TERMINAL_YELLOW, "[cancelled]"));
             break;
         default:
             break;

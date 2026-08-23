@@ -7,6 +7,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import {
     createServer,
     type IncomingMessage,
+    type RequestListener,
     type ServerResponse,
 } from "node:http";
 import { tmpdir } from "node:os";
@@ -19,6 +20,41 @@ const execFileAsync = promisify(execFile);
 
 /** Path to the built CLI entry point. */
 const CLI_PATH = join(import.meta.dirname, "..", "dist", "cli.mjs");
+
+/** Local HTTP endpoint and cleanup callback for a CLI integration test. */
+interface CliTestServer {
+    /** OpenAI-compatible base endpoint URL. */
+    endpointUrl: string;
+    /** Stops the local test server. */
+    close: () => Promise<void>;
+}
+
+/**
+ * Starts a local HTTP server for strict CLI integration tests.
+ *
+ * @param handler - Request handler for the test-specific response.
+ * @returns The endpoint URL and an asynchronous cleanup callback.
+ */
+async function startCliTestServer(
+    handler: RequestListener,
+): Promise<CliTestServer> {
+    return await new Promise<CliTestServer>((resolve, reject) => {
+        const server = createServer(handler);
+        server.on("error", reject);
+        server.listen(0, "127.0.0.1", () => {
+            const address = server.address();
+            if (address === null || typeof address === "string") {
+                reject(new Error("CLI test server did not bind to a port"));
+                return;
+            }
+            const close = promisify(server.close.bind(server));
+            resolve({
+                endpointUrl: `http://127.0.0.1:${address.port}/v1`,
+                close,
+            });
+        });
+    });
+}
 
 describe("nanalogue-chat CLI", () => {
     it("--version prints the package.json version", async () => {
@@ -35,6 +71,85 @@ describe("nanalogue-chat CLI", () => {
         const { stdout } = await execFileAsync("node", [CLI_PATH, "--version"]);
         // Verify it's a valid semver-like string
         expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
+    });
+
+    describe("strict assertion checks", () => {
+        it("rejects API keys longer than 200 characters", async () => {
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--api-key",
+                    "k".repeat(201),
+                    "--list-models",
+                ]),
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringContaining(
+                    "pathologically long api key found",
+                ),
+            });
+        });
+
+        it("rejects provider error bodies longer than 3000 characters", async () => {
+            const server = await startCliTestServer((_req, res) => {
+                res.writeHead(400, { "Content-Type": "text/plain" });
+                res.end("e".repeat(3001));
+            });
+
+            try {
+                await expect(
+                    execFileAsync("node", [
+                        CLI_PATH,
+                        "--endpoint",
+                        server.endpointUrl,
+                        "--model",
+                        "test-model",
+                        "--dir",
+                        ".",
+                        "--non-interactive",
+                        "hello",
+                    ]),
+                ).rejects.toMatchObject({
+                    code: 1,
+                    stderr: expect.stringContaining(
+                        "Error message is pathologically long",
+                    ),
+                });
+            } finally {
+                await server.close();
+            }
+        });
+
+        it.each([
+            [
+                { data: [{ id: "m".repeat(201) }] },
+                "Model string is pathological",
+            ],
+            [{ data: [{}] }, "Model identifier is not a string!"],
+        ])("rejects malformed model-list responses %#", async (responseBody, expectedError) => {
+            const server = await startCliTestServer((_req, res) => {
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify(responseBody));
+            });
+
+            try {
+                await expect(
+                    execFileAsync("node", [
+                        CLI_PATH,
+                        "--endpoint",
+                        server.endpointUrl,
+                        "--list-models",
+                    ]),
+                ).rejects.toMatchObject({
+                    code: 1,
+                    stderr: expect.stringContaining(expectedError),
+                });
+            } finally {
+                await server.close();
+            }
+        });
     });
 
     describe("--non-interactive flag", () => {

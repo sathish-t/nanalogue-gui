@@ -6,6 +6,12 @@ import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { parseArgs } from "node:util";
 import { version } from "../package.json";
+import {
+    TERMINAL_BOLD,
+    TERMINAL_RED,
+    TERMINAL_RESET,
+    TERMINAL_YELLOW,
+} from "./cli-terminal-formatting";
 import { color, emitEvent, printUsage } from "./cli-terminal-output";
 import { EXTERNAL_FUNCTIONS } from "./lib/ai-chat-constants";
 import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
@@ -19,20 +25,6 @@ import type { AiChatConfig } from "./lib/chat-types";
 import { fetchModels } from "./lib/model-listing";
 import { parseNumericArg, SANDBOX_ARG_DEFS } from "./lib/sandbox-cli-args";
 import { loadSystemAppend } from "./lib/system-append";
-
-// --- ANSI color helpers ---
-
-/** ANSI escape code prefix. */
-const ESC = "\x1b[";
-
-/** Resets all ANSI formatting. */
-const RESET = `${ESC}0m`;
-/** Bold text. */
-const BOLD = `${ESC}1m`;
-/** Red text for errors. */
-const RED = `${ESC}31m`;
-/** Yellow text for progress indicators. */
-const YELLOW = `${ESC}33m`;
 
 // --- Argument parsing ---
 
@@ -77,7 +69,7 @@ async function main(): Promise<void> {
             errorMsg.length <= 3000,
             "Error message is too long (length > 3000)!",
         );
-        console.error(color(RED, `Error: ${errorMsg}`));
+        console.error(color(TERMINAL_RED, `Error: ${errorMsg}`));
         printUsage();
         process.exit(1);
     }
@@ -107,7 +99,7 @@ async function main(): Promise<void> {
 
     // require endpointUrl
     if (!endpointUrl) {
-        console.error(color(RED, "Error: --endpoint is required"));
+        console.error(color(TERMINAL_RED, "Error: --endpoint is required"));
         process.exit(1);
     } else {
         assert(
@@ -131,10 +123,14 @@ async function main(): Promise<void> {
 
     // --list-models mode
     if (values["list-models"]) {
-        console.log(color(YELLOW, "[fetching models...]"));
+        console.log(color(TERMINAL_YELLOW, "[fetching models...]"));
         const result = await fetchModels(endpointUrl, apiKey);
         if (result.success) {
             for (const m of result.models) {
+                assert(
+                    typeof m === "string",
+                    "Model identifier is not a string!",
+                );
                 assert(
                     m.trim() === m,
                     "Model string has spurious whitespaces!",
@@ -153,7 +149,7 @@ async function main(): Promise<void> {
                 errorMsg.length <= 3000,
                 "Error message is pathological (length > 3000)!",
             );
-            console.error(color(RED, `Error: ${errorMsg}`));
+            console.error(color(TERMINAL_RED, `Error: ${errorMsg}`));
             process.exit(1);
         }
         return;
@@ -161,7 +157,9 @@ async function main(): Promise<void> {
 
     // Validate required arguments
     if (!model || !allowedDir) {
-        console.error(color(RED, "Error: --model and --dir are required"));
+        console.error(
+            color(TERMINAL_RED, "Error: --model and --dir are required"),
+        );
         printUsage();
         process.exit(1);
     } else {
@@ -539,12 +537,12 @@ async function main(): Promise<void> {
     }
 
     console.log(
-        `${BOLD}nanalogue-chat${RESET} connected to ${endpointUrl} using ${model}`,
+        `${TERMINAL_BOLD}nanalogue-chat${TERMINAL_RESET} connected to ${endpointUrl} using ${model}`,
     );
     console.log(`Analyzing files in: ${allowedDir}`);
     console.log(
         color(
-            YELLOW,
+            TERMINAL_YELLOW,
             "Note: The AI can read and list files in the above directory. " +
                 "A best-effort attempt is made to block common sensitive file types " +
                 "(keys, certificates, credentials), but complete protection cannot " +
@@ -555,7 +553,7 @@ async function main(): Promise<void> {
     if (onlySystemAppend) {
         console.log(
             color(
-                YELLOW,
+                TERMINAL_YELLOW,
                 "SYSTEM_APPEND.md is being used as the full system prompt. " +
                     "Run /dump_system_prompt to verify the full effective prompt.",
             ),
@@ -563,7 +561,7 @@ async function main(): Promise<void> {
     } else if (replaceSystemPrompt !== undefined) {
         console.log(
             color(
-                YELLOW,
+                TERMINAL_YELLOW,
                 "Default system prompt replaced via --system-prompt. " +
                     "Run /dump_system_prompt to verify the full effective prompt.",
             ),
@@ -572,20 +570,20 @@ async function main(): Promise<void> {
     if (!onlySystemAppend && appendSystemPrompt !== undefined) {
         console.log(
             color(
-                YELLOW,
+                TERMINAL_YELLOW,
                 "Custom system prompt append loaded from SYSTEM_APPEND.md. " +
                     "Run /dump_system_prompt to verify the full effective prompt.",
             ),
         );
     }
     console.log(
-        `Type ${BOLD}/new${RESET} for new chat, ${BOLD}/quit${RESET} to exit.\n`,
+        `Type ${TERMINAL_BOLD}/new${TERMINAL_RESET} for new chat, ${TERMINAL_BOLD}/quit${TERMINAL_RESET} to exit.\n`,
     );
 
     const rl = createInterface({
         input: process.stdin,
         output: process.stdout,
-        prompt: `${BOLD}You: ${RESET}`,
+        prompt: `${TERMINAL_BOLD}You: ${TERMINAL_RESET}`,
     });
 
     /** Whether a request is currently in flight. */
@@ -634,7 +632,7 @@ async function main(): Promise<void> {
 
             session.reset();
             appendSystemPrompt = reloadedAppend;
-            console.log(color(YELLOW, "[new conversation started]"));
+            console.log(color(TERMINAL_YELLOW, "[new conversation started]"));
             rl.prompt();
             continue;
         }
@@ -674,7 +672,7 @@ async function main(): Promise<void> {
 main().catch((error) => {
     console.error(
         color(
-            RED,
+            TERMINAL_RED,
             `Fatal: ${error instanceof Error ? error.message : String(error)}`,
         ),
     );
