@@ -64,7 +64,7 @@ src/renderer/ai-chat/ai-chat-config.ts	100
 src/renderer/ai-chat/ai-chat-consent.ts	100
 src/renderer/ai-chat/ai-chat-elements.ts	100
 src/renderer/ai-chat/ai-chat-ui.ts	100
-src/renderer/ai-chat/ai-chat.ts	87.23
+src/renderer/ai-chat/ai-chat.ts	88.69
 src/renderer/qc/seq-mini-charts.ts	100
 src/renderer/shared/apply-font-size.ts	100
 src/renderer/shared/bam-resource-input.ts	100

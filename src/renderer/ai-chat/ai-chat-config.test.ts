@@ -137,16 +137,53 @@ describe("ai-chat-config", () => {
         const model = document.getElementById(
             "input-model",
         ) as HTMLInputElement;
+        const apiKey = document.getElementById(
+            "input-api-key",
+        ) as HTMLInputElement;
 
         expect(validateConfig()).toBe("Please select a BAM directory.");
 
         inputDir.value = "/tmp/bam";
         expect(validateConfig()).toBe("Please enter an endpoint URL.");
 
+        endpoint.value = "ftp://example.com/v1";
+        expect(validateConfig()).toBe("Invalid endpoint URL.");
+
         endpoint.value = "http://localhost:11434/v1";
+        apiKey.value = " key";
+        expect(validateConfig()).toBe("Invalid API key.");
+
+        apiKey.value = "key";
         expect(validateConfig()).toBe("Please enter a model name.");
+
+        model.value = " model";
+        expect(validateConfig()).toBe("Invalid model name.");
 
         model.value = "gpt-test";
         expect(validateConfig()).toBeNull();
+    });
+
+    it("validates provider fields used to fetch models", async () => {
+        const { validateConnectionConfig } = await import("./ai-chat-config");
+        const endpoint = document.getElementById(
+            "input-endpoint",
+        ) as HTMLInputElement;
+        const apiKey = document.getElementById(
+            "input-api-key",
+        ) as HTMLInputElement;
+
+        expect(validateConnectionConfig()).toBe(
+            "Please enter an endpoint URL.",
+        );
+
+        endpoint.value = "https:///example.com/v1";
+        expect(validateConnectionConfig()).toBe("Invalid endpoint URL.");
+
+        endpoint.value = "https://example.com/v1";
+        apiKey.value = `${"k".repeat(200)}x`;
+        expect(validateConnectionConfig()).toBe("Invalid API key.");
+
+        apiKey.value = "";
+        expect(validateConnectionConfig()).toBeNull();
     });
 });

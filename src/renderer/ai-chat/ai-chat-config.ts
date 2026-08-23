@@ -1,6 +1,11 @@
 // Advanced configuration helpers for the AI Chat renderer.
 
 import { CONFIG_FIELD_SPECS } from "../../lib/ai-chat-shared-constants";
+import {
+    isValidApiKey,
+    isValidEndpointUrl,
+    isValidModel,
+} from "../../lib/chat-provider-input-checks";
 import { getAiChatElements } from "./ai-chat-elements";
 
 const {
@@ -138,13 +143,29 @@ export function resetDefaults(): void {
 }
 
 /**
+ * Validates the provider fields required to fetch models.
+ *
+ * @returns An alert message string, or null if the endpoint and API key are valid.
+ */
+export function validateConnectionConfig(): string | null {
+    if (!inputEndpoint.value) return "Please enter an endpoint URL.";
+    if (!isValidEndpointUrl(inputEndpoint.value)) {
+        return "Invalid endpoint URL.";
+    }
+    if (!isValidApiKey(inputApiKey.value)) return "Invalid API key.";
+    return null;
+}
+
+/**
  * Validates that required config fields are filled before sending.
  *
- * @returns An error message string, or null if valid.
+ * @returns An alert message string, or null if valid.
  */
 export function validateConfig(): string | null {
     if (!inputDir.value) return "Please select a BAM directory.";
-    if (!inputEndpoint.value) return "Please enter an endpoint URL.";
+    const connectionError = validateConnectionConfig();
+    if (connectionError) return connectionError;
     if (!inputModel.value) return "Please enter a model name.";
+    if (!isValidModel(inputModel.value)) return "Invalid model name.";
     return null;
 }

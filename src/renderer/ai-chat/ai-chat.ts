@@ -11,6 +11,7 @@ import {
     resetDefaults,
     unlockSessionConfig,
     validateConfig,
+    validateConnectionConfig,
 } from "./ai-chat-config";
 import { initConsentDialog, requestConsent } from "./ai-chat-consent";
 import { getAiChatElements } from "./ai-chat-elements";
@@ -164,8 +165,9 @@ inputEndpoint.addEventListener("input", () => {
 
 // Fetch Models button — query endpoint for model list
 btnFetchModels.addEventListener("click", async () => {
-    if (!inputEndpoint.value) {
-        fetchStatus.textContent = "Enter an endpoint URL first.";
+    const validationError = validateConnectionConfig();
+    if (validationError) {
+        window.alert(validationError);
         return;
     }
     fetchStatus.textContent = "Fetching models...";
@@ -378,7 +380,7 @@ btnSend.addEventListener("click", async () => {
 
     const validationError = validateConfig();
     if (validationError) {
-        appendMessage("error", validationError);
+        window.alert(validationError);
         return;
     }
 
