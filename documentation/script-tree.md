@@ -5,13 +5,14 @@
 
 ```
 src/
-  cli.ts                # Standalone CLI for the nanalogue AI Chat feature.
-  execute-cli.ts        # Standalone CLI for running a Python file directly in the Monty sandbox.
-  exit-watchdog.ts      # Watchdog child process that force-kills the parent on demand.
-  font-size.ts          # Shared font-size state for the main process.
-  main.ts               # Electron main process for nanalogue-gui with multi-mode support
-  preload.ts            # Preload script for nanalogue-gui
-  test-helpers.ts       # Shared test helpers that centralise repeated mock/setup patterns.
+  cli-terminal-output.ts  # Terminal output helpers for the standalone nanalogue-chat CLI.
+  cli.ts                  # Standalone CLI for the nanalogue AI Chat feature.
+  execute-cli.ts          # Standalone CLI for running a Python file directly in the Monty sandbox.
+  exit-watchdog.ts        # Watchdog child process that force-kills the parent on demand.
+  font-size.ts            # Shared font-size state for the main process.
+  main.ts                 # Electron main process for nanalogue-gui with multi-mode support
+  preload.ts              # Preload script for nanalogue-gui
+  test-helpers.ts         # Shared test helpers that centralise repeated mock/setup patterns.
   lib/
     ai-chat-constants.ts                            # Main-process constants for the AI Chat feature.
     ai-chat-ipc-validation.ts                       # Per-channel IPC payload validation for AI Chat mode.
