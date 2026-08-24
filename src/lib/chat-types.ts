@@ -193,6 +193,8 @@ interface AiChatSendFailure {
     error: string;
     /** Whether the request timed out. */
     isTimeout: boolean;
+    /** Whether the failure describes user input that should be corrected before retrying. */
+    inputError?: boolean;
 }
 
 /** Result returned by the send-message IPC handler. */

@@ -2,7 +2,6 @@
 // Provides an interactive REPL for LLM-powered BAM analysis without the Electron GUI.
 
 import assert from "node:assert/strict";
-import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { parseArgs } from "node:util";
 import { version } from "../package.json";
@@ -14,7 +13,12 @@ import {
 } from "./cli-terminal-formatting";
 import { color, emitEvent, printUsage } from "./cli-terminal-output";
 import { EXTERNAL_FUNCTIONS } from "./lib/ai-chat-constants";
-import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
+import {
+    CONFIG_FIELD_SPECS,
+    MAX_CHAT_MESSAGE_BYTES,
+    MAX_SYSTEM_PROMPT_BYTES,
+} from "./lib/ai-chat-shared-constants";
+import { validateAnalysisDirectory } from "./lib/chat-filesystem-input-checks";
 import {
     dumpConversationHistory,
     dumpLlmInstructions,
@@ -27,6 +31,14 @@ import {
 } from "./lib/chat-provider-input-checks";
 import { ChatSession } from "./lib/chat-session";
 import type { AiChatConfig } from "./lib/chat-types";
+import {
+    getUtf8ByteLength,
+    parseCanonicalTemperature,
+} from "./lib/chat-user-input-parsing";
+import {
+    findDuplicateCliOption,
+    parseRemovedToolNames,
+} from "./lib/cli-user-input-parsing";
 import { fetchModels } from "./lib/model-listing";
 import { parseNumericArg, SANDBOX_ARG_DEFS } from "./lib/sandbox-cli-args";
 import { loadSystemAppend } from "./lib/system-append";
@@ -56,6 +68,7 @@ const argConfig = {
         help: { type: "boolean" as const, short: "h", default: false },
     },
     strict: true,
+    tokens: true,
 } as const;
 
 /**
@@ -79,7 +92,13 @@ async function main(): Promise<void> {
         process.exit(1);
     }
 
-    const { values } = parsed;
+    const { tokens, values } = parsed;
+    const duplicateOption = findDuplicateCliOption(tokens);
+    if (duplicateOption !== null) {
+        console.error(`Error: --${duplicateOption} may only be supplied once`);
+        process.exitCode = 1;
+        return;
+    }
 
     if (values.version) {
         assert(
@@ -98,20 +117,22 @@ async function main(): Promise<void> {
     const endpointUrl = values.endpoint;
     const apiKey = values["api-key"] ?? process.env.API_KEY ?? "";
     const model = values.model;
-    const allowedDir = values.dir
-        ? resolve(process.cwd(), values.dir)
-        : values.dir;
 
     // require endpointUrl
     if (!endpointUrl) {
         console.error(color(TERMINAL_RED, "Error: --endpoint is required"));
         process.exit(1);
-    } else {
-        assert(isValidEndpointUrl(endpointUrl), "Invalid endpoint URL!");
+    }
+    if (!isValidEndpointUrl(endpointUrl)) {
+        console.error(color(TERMINAL_RED, "Error: invalid endpoint URL"));
+        process.exit(1);
     }
 
     // check api key
-    assert(isValidApiKey(apiKey), "Invalid API key!");
+    if (!isValidApiKey(apiKey)) {
+        console.error(color(TERMINAL_RED, "Error: invalid API key"));
+        process.exit(1);
+    }
 
     // --list-models mode
     if (values["list-models"]) {
@@ -148,22 +169,26 @@ async function main(): Promise<void> {
     }
 
     // Validate required arguments
-    if (!model || !allowedDir) {
+    if (!model || !values.dir) {
         console.error(
             color(TERMINAL_RED, "Error: --model and --dir are required"),
         );
         printUsage();
         process.exit(1);
-    } else {
-        assert(isValidModel(model), "Invalid model name!");
-        assert(
-            allowedDir.length <= 2000,
-            "unusually long allowed directory detected (length > 2000)!",
+    }
+    if (!isValidModel(model)) {
+        console.error(color(TERMINAL_RED, "Error: invalid model name"));
+        process.exit(1);
+    }
+    let allowedDir: string;
+    try {
+        allowedDir = await validateAnalysisDirectory(values.dir, process.cwd());
+    } catch (error) {
+        console.error(
+            `Error: ${error instanceof Error ? error.message : String(error)}`,
         );
-        assert(
-            allowedDir.trim() === allowedDir,
-            "allowed directory has spurious whitespaces!",
-        );
+        process.exitCode = 1;
+        return;
     }
 
     // --dump-llm-instructions is only valid alongside --non-interactive.
@@ -193,6 +218,16 @@ async function main(): Promise<void> {
         values["non-interactive"].trim() === ""
     ) {
         console.error("Error: --non-interactive message cannot be empty");
+        process.exitCode = 1;
+        return;
+    }
+    if (
+        values["non-interactive"] !== undefined &&
+        getUtf8ByteLength(values["non-interactive"]) > MAX_CHAT_MESSAGE_BYTES
+    ) {
+        console.error(
+            "Error: --non-interactive message exceeds the 1 MiB limit",
+        );
         process.exitCode = 1;
         return;
     }
@@ -291,15 +326,15 @@ async function main(): Promise<void> {
         // Temperature is optional — undefined means omit from request body.
         // Reject non-finite or out-of-range values to avoid sending NaN/null to the API.
         temperature: (() => {
-            if (values.temperature === undefined) return undefined;
-            const t = Number.parseFloat(values.temperature);
-            if (!Number.isFinite(t) || t < 0 || t > 2) {
-                console.warn(
-                    `Warning: ignoring invalid --temperature "${values.temperature}" (must be a number between 0 and 2)`,
-                );
+            const result = parseCanonicalTemperature(
+                "--temperature",
+                values.temperature ?? "",
+            );
+            if (!result.valid) {
+                configErrors.push(result.error);
                 return undefined;
             }
-            return t;
+            return result.value;
         })(),
     };
 
@@ -321,6 +356,14 @@ async function main(): Promise<void> {
         process.exitCode = 1;
         return;
     }
+    if (
+        values["system-prompt"] !== undefined &&
+        getUtf8ByteLength(values["system-prompt"]) > MAX_SYSTEM_PROMPT_BYTES
+    ) {
+        console.error("Error: --system-prompt exceeds the 1 MiB limit");
+        process.exitCode = 1;
+        return;
+    }
     const replaceSystemPrompt = values["system-prompt"];
     if (onlySystemAppend && replaceSystemPrompt !== undefined) {
         console.error(
@@ -334,7 +377,16 @@ async function main(): Promise<void> {
     // Declared as let so it can be reloaded when the user starts a new
     // conversation with /new — ensuring any edits to the file take effect
     // immediately rather than requiring a full process restart.
-    let appendSystemPrompt = await loadSystemAppend(allowedDir);
+    let appendSystemPrompt: string | undefined;
+    try {
+        appendSystemPrompt = await loadSystemAppend(allowedDir);
+    } catch (error) {
+        console.error(
+            `Error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        process.exitCode = 1;
+        return;
+    }
     if (onlySystemAppend && appendSystemPrompt === undefined) {
         console.error(
             "Error: --only-system-append requires SYSTEM_APPEND.md to exist and be non-empty",
@@ -346,28 +398,16 @@ async function main(): Promise<void> {
     // --rm-tools: parse, validate, and build the removal set.
     let removedTools: ReadonlySet<string> | undefined;
     if (values["rm-tools"] !== undefined) {
-        const names = values["rm-tools"].split(",").filter(Boolean);
-        if (names.length === 0) {
-            console.error("Error: --rm-tools value cannot be empty");
+        const result = parseRemovedToolNames(
+            values["rm-tools"],
+            EXTERNAL_FUNCTIONS,
+        );
+        if (!result.valid) {
+            console.error(`Error: ${result.error}`);
             process.exitCode = 1;
             return;
         }
-        const validTools = new Set<string>(EXTERNAL_FUNCTIONS);
-        for (const name of names) {
-            assert(name.length > 0, "tool name unspecified in rm-tools!");
-            assert(
-                name.length <= 300,
-                "pathologically long tool name detected (length > 300)!",
-            );
-            if (!validTools.has(name)) {
-                console.error(
-                    `Error: --rm-tools: unknown tool "${name}". Valid tools: ${[...EXTERNAL_FUNCTIONS].join(", ")}`,
-                );
-                process.exitCode = 1;
-                return;
-            }
-        }
-        removedTools = new Set(names);
+        removedTools = new Set(result.names);
     }
 
     if (
@@ -599,6 +639,12 @@ async function main(): Promise<void> {
             continue;
         }
 
+        if (getUtf8ByteLength(trimmed) > MAX_CHAT_MESSAGE_BYTES) {
+            console.error("Error: message exceeds the 1 MiB limit");
+            rl.prompt();
+            continue;
+        }
+
         if (trimmed === "/quit") {
             console.log("Goodbye!");
             break;
@@ -607,7 +653,16 @@ async function main(): Promise<void> {
         if (trimmed === "/new") {
             // Reload SYSTEM_APPEND.md so any edits since startup are picked up
             // by the fresh session without needing a process restart.
-            const reloadedAppend = await loadSystemAppend(allowedDir);
+            let reloadedAppend: string | undefined;
+            try {
+                reloadedAppend = await loadSystemAppend(allowedDir);
+            } catch (error) {
+                console.error(
+                    `Error: ${error instanceof Error ? error.message : String(error)}`,
+                );
+                rl.prompt();
+                continue;
+            }
             if (onlySystemAppend && reloadedAppend === undefined) {
                 console.error(
                     "Error: SYSTEM_APPEND.md is required when " +

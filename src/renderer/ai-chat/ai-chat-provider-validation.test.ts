@@ -5,6 +5,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MAX_CHAT_MESSAGE_BYTES } from "../../lib/ai-chat-shared-constants";
 
 /** Shape of the mock preload API used by provider validation tests. */
 interface MockApi {
@@ -74,6 +75,11 @@ describe("AI Chat provider validation", () => {
     beforeEach(async () => {
         vi.resetModules();
         loadAiChatHtml();
+        const systemPromptDialog = document.getElementById(
+            "system-prompt-dialog",
+        ) as HTMLDialogElement;
+        systemPromptDialog.showModal = vi.fn();
+        systemPromptDialog.close = vi.fn();
         mockApi = createMockApi();
         (window as unknown as { /** The preload API. */ api: MockApi }).api =
             mockApi;
@@ -130,5 +136,103 @@ describe("AI Chat provider validation", () => {
 
         expect(window.alert).toHaveBeenCalledWith(expectedAlert);
         expect(mockApi.aiChatListModels).not.toHaveBeenCalled();
+    });
+
+    it("blocks a message above the 1 MiB UTF-8 limit", async () => {
+        fillValidProviderFields();
+        (document.getElementById("input-message") as HTMLInputElement).value =
+            "x".repeat(MAX_CHAT_MESSAGE_BYTES + 1);
+
+        (document.getElementById("btn-send") as HTMLButtonElement).click();
+        await flushMicrotasks();
+
+        expect(window.alert).toHaveBeenCalledWith(
+            "Message exceeds the 1 MiB limit.",
+        );
+        expect(mockApi.aiChatSendMessage).not.toHaveBeenCalled();
+    });
+
+    it("alerts when the main process rejects filesystem input", async () => {
+        fillValidProviderFields();
+        mockApi.aiChatSendMessage.mockResolvedValueOnce({
+            success: false,
+            reason: "error",
+            error: "Analysis directory does not exist or is not accessible",
+            isTimeout: false,
+            inputError: true,
+        });
+        (document.getElementById("input-message") as HTMLInputElement).value =
+            "hello";
+
+        (document.getElementById("btn-send") as HTMLButtonElement).click();
+        await flushMicrotasks();
+
+        expect(window.alert).toHaveBeenCalledWith(
+            "Analysis directory does not exist or is not accessible",
+        );
+    });
+
+    it("keeps Advanced Options open when numeric input is malformed", () => {
+        (document.getElementById("opt-timeout") as HTMLInputElement).value =
+            "1.5";
+
+        (
+            document.getElementById("btn-close-advanced") as HTMLButtonElement
+        ).click();
+
+        expect(window.alert).toHaveBeenCalledWith(
+            expect.stringContaining("decimal digits only"),
+        );
+    });
+
+    it("blocks starting chat when an advanced option is malformed", async () => {
+        fillValidProviderFields();
+        (document.getElementById("opt-timeout") as HTMLInputElement).value =
+            "1.5";
+        (document.getElementById("input-message") as HTMLInputElement).value =
+            "hello";
+
+        (document.getElementById("btn-send") as HTMLButtonElement).click();
+        await flushMicrotasks();
+
+        expect(window.alert).toHaveBeenCalledWith(
+            expect.stringContaining("decimal digits only"),
+        );
+        expect(mockApi.aiChatSendMessage).not.toHaveBeenCalled();
+    });
+
+    it("alerts when system-prompt validation fails in the main process", async () => {
+        mockApi.aiChatGetSystemPrompt.mockResolvedValueOnce({
+            success: false,
+            error: "SYSTEM_APPEND.md exceeds the 1 MiB limit",
+        });
+
+        (
+            document.getElementById(
+                "btn-view-system-prompt",
+            ) as HTMLButtonElement
+        ).click();
+        await flushMicrotasks();
+
+        expect(window.alert).toHaveBeenCalledWith(
+            "SYSTEM_APPEND.md exceeds the 1 MiB limit",
+        );
+    });
+
+    it("blocks system-prompt preview when an advanced option is malformed", async () => {
+        (document.getElementById("opt-timeout") as HTMLInputElement).value =
+            "1.5";
+
+        (
+            document.getElementById(
+                "btn-view-system-prompt",
+            ) as HTMLButtonElement
+        ).click();
+        await flushMicrotasks();
+
+        expect(window.alert).toHaveBeenCalledWith(
+            expect.stringContaining("decimal digits only"),
+        );
+        expect(mockApi.aiChatGetSystemPrompt).not.toHaveBeenCalled();
     });
 });

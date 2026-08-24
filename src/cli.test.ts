@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { version } from "../package.json";
+import { MAX_SYSTEM_PROMPT_BYTES } from "./lib/ai-chat-shared-constants";
 
 const execFileAsync = promisify(execFile);
 
@@ -84,7 +85,7 @@ describe("nanalogue-chat CLI", () => {
                 ]),
             ).rejects.toMatchObject({
                 code: 1,
-                stderr: expect.stringContaining("Invalid endpoint URL!"),
+                stderr: expect.stringContaining("invalid endpoint URL"),
             });
         });
 
@@ -100,7 +101,7 @@ describe("nanalogue-chat CLI", () => {
                 ]),
             ).rejects.toMatchObject({
                 code: 1,
-                stderr: expect.stringContaining("Invalid API key"),
+                stderr: expect.stringContaining("invalid API key"),
             });
         });
 
@@ -117,7 +118,7 @@ describe("nanalogue-chat CLI", () => {
                 ]),
             ).rejects.toMatchObject({
                 code: 1,
-                stderr: expect.stringContaining("Invalid model name!"),
+                stderr: expect.stringContaining("invalid model name"),
             });
         });
 
@@ -779,7 +780,7 @@ describe("nanalogue-chat CLI", () => {
                         }
                     ).stderr;
                 }
-                expect(stderr).toContain('" ls"');
+                expect(stderr).toContain("surrounding whitespace");
             } finally {
                 await rm(tmpDir, { recursive: true, force: true });
             }
@@ -945,6 +946,8 @@ describe("nanalogue-chat CLI", () => {
     interface ReplResult {
         /** All text written to stdout by the spawned CLI process. */
         stdout: string;
+        /** All text written to stderr by the spawned CLI process. */
+        stderr: string;
         /** The process exit code, or null if the process was killed. */
         code: number | null;
     }
@@ -997,7 +1000,7 @@ describe("nanalogue-chat CLI", () => {
         it("prints a descriptive error when a numeric flag is below its minimum", async () => {
             const stderr = await stderrOf([...baseArgs, "--timeout", "0"]);
             expect(stderr).toContain("--timeout");
-            expect(stderr).toContain("below the minimum");
+            expect(stderr).toContain("between 1 and 1200");
         });
 
         it("exits 1 when a numeric flag is above its maximum", async () => {
@@ -1019,6 +1022,92 @@ describe("nanalogue-chat CLI", () => {
             expect(stderr).toContain("--timeout");
             expect(stderr).toContain("--max-duration-secs");
             expect(stderr).toContain("--max-memory-mb");
+        });
+
+        it.each([
+            ["--timeout", "1.5"],
+            ["--max-retries", "1e1"],
+            ["--max-code-rounds", "0x10"],
+            ["--temperature", "1e0"],
+        ])("rejects non-canonical numeric input %s %s", async (flag, value) => {
+            await expect(
+                execFileAsync("node", [...baseArgs, flag, value]),
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringMatching(/^Error:/),
+            });
+        });
+    });
+
+    describe("additional strict input validation", () => {
+        it("rejects a repeated scalar option", async () => {
+            await expect(
+                execFileAsync("node", [CLI_PATH, "--help", "--help"]),
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringContaining("may only be supplied once"),
+            });
+        });
+
+        it("rejects a missing analysis directory", async () => {
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    join(tmpdir(), "definitely-missing-nanalogue-directory"),
+                ]),
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringContaining("does not exist"),
+            });
+        });
+
+        it("rejects duplicate removed tool names", async () => {
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--endpoint",
+                    "http://localhost:11434/v1",
+                    "--model",
+                    "llama3",
+                    "--dir",
+                    ".",
+                    "--system-prompt",
+                    "prompt",
+                    "--rm-tools",
+                    "bash,bash",
+                ]),
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringContaining("repeats tool"),
+            });
+        });
+
+        it("rejects an existing empty SYSTEM_APPEND.md", async () => {
+            const directory = await mkdtemp(join(tmpdir(), "invalid-append-"));
+            try {
+                await writeFile(join(directory, "SYSTEM_APPEND.md"), "");
+                await expect(
+                    execFileAsync("node", [
+                        CLI_PATH,
+                        "--endpoint",
+                        "http://localhost:11434/v1",
+                        "--model",
+                        "llama3",
+                        "--dir",
+                        directory,
+                    ]),
+                ).rejects.toMatchObject({
+                    code: 1,
+                    stderr: expect.stringContaining("must not be empty"),
+                });
+            } finally {
+                await rm(directory, { recursive: true, force: true });
+            }
         });
     });
 
@@ -1077,7 +1166,7 @@ describe("nanalogue-chat CLI", () => {
 
                 proc.on("close", (code) => {
                     clearTimeout(timer);
-                    resolve({ stdout, code });
+                    resolve({ stdout, stderr, code });
                 });
 
                 proc.on("error", (err) => {
@@ -1162,6 +1251,22 @@ describe("nanalogue-chat CLI", () => {
                 "/quit",
             ]);
             expect(stdout).toContain("SYSTEM_APPEND.md");
+        });
+
+        it("rejects a combined system prompt larger than 1 MiB", async () => {
+            await writeFile(
+                join(tmpDir, "SYSTEM_APPEND.md"),
+                "x".repeat(MAX_SYSTEM_PROMPT_BYTES),
+                "utf-8",
+            );
+
+            const { stderr } = await runInteractiveCli(replArgs(tmpDir), [
+                "analyse this data",
+            ]);
+
+            expect(stderr).toContain(
+                "Combined system prompt exceeds the 1 MiB limit",
+            );
         });
     });
 });

@@ -3,12 +3,13 @@
 // basic script execution. Requires `npm run build` to have run first.
 
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { version } from "../package.json";
+import { MAX_PYTHON_SOURCE_BYTES } from "./lib/ai-chat-shared-constants";
 
 const execFileAsync = promisify(execFile);
 
@@ -151,7 +152,10 @@ describe("nanalogue-sandbox-exec CLI", () => {
                     "-5",
                     scriptPath,
                 ]),
-            ).rejects.toMatchObject({ code: 1 });
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringMatching(/^Error:/),
+            });
         });
 
         it("exits 1 when the script file does not exist", async () => {
@@ -164,6 +168,90 @@ describe("nanalogue-sandbox-exec CLI", () => {
                     missingScript,
                 ]),
             ).rejects.toMatchObject({ code: 1 });
+        });
+
+        it("rejects a repeated option", async () => {
+            await expect(
+                execFileAsync("node", [CLI_PATH, "--help", "--help"]),
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringContaining("may only be supplied once"),
+            });
+        });
+
+        it.each([
+            "1.5",
+            "1e3",
+            "0x10",
+            "+10",
+            " 10",
+        ])("rejects non-canonical --max-output-bytes value %j", async (value) => {
+            const scriptPath = join(tmpDir, "script.py");
+            await writeFile(scriptPath, "");
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--dir",
+                    tmpDir,
+                    "--max-output-bytes",
+                    value,
+                    scriptPath,
+                ]),
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringMatching(/^Error:/),
+            });
+        });
+
+        it("rejects an analysis path that is a regular file", async () => {
+            const scriptPath = join(tmpDir, "script.py");
+            const filePath = join(tmpDir, "not-a-directory");
+            await writeFile(scriptPath, "");
+            await writeFile(filePath, "content");
+
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--dir",
+                    filePath,
+                    scriptPath,
+                ]),
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringContaining("must identify a directory"),
+            });
+        });
+
+        it("rejects a directory masquerading as a Python file", async () => {
+            const scriptDirectory = join(tmpDir, "script.py");
+            await mkdir(scriptDirectory);
+
+            await expect(
+                execFileAsync("node", [
+                    CLI_PATH,
+                    "--dir",
+                    tmpDir,
+                    scriptDirectory,
+                ]),
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringContaining("regular file"),
+            });
+        });
+
+        it("rejects Python source above the 10 MiB limit", async () => {
+            const scriptPath = join(tmpDir, "large.py");
+            await writeFile(
+                scriptPath,
+                "x".repeat(MAX_PYTHON_SOURCE_BYTES + 1),
+            );
+
+            await expect(
+                execFileAsync("node", [CLI_PATH, "--dir", tmpDir, scriptPath]),
+            ).rejects.toMatchObject({
+                code: 1,
+                stderr: expect.stringContaining("10 MiB limit"),
+            });
         });
     });
 

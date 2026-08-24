@@ -4,6 +4,7 @@
 
 import { CONFIG_FIELD_SPECS } from "./ai-chat-shared-constants";
 import type { SandboxOptions } from "./chat-types";
+import { parseCanonicalInteger } from "./chat-user-input-parsing";
 
 export const /** Sandbox-related argument definitions for node:util parseArgs. Spread into each binary's own argConfig.options to include sandbox flags. */ SANDBOX_ARG_DEFS =
         {
@@ -52,7 +53,7 @@ export type ParseNumericArgResult =
 /**
  * Parses a numeric CLI argument and validates it against allowed bounds.
  * Returns the spec's fallback when the flag is absent.
- * Returns an error result when the value is non-numeric or out of range.
+ * Returns an error result unless the value is canonical decimal digits in range.
  *
  * @param flagName - CLI flag name without leading dashes (e.g. "max-duration-secs"), used in error messages.
  * @param value - Raw string from parseArgs, or undefined if the flag was omitted.
@@ -65,27 +66,10 @@ export function parseNumericArg(
     spec: NumericArgSpec,
 ): ParseNumericArgResult {
     if (value === undefined) return { ok: true, value: spec.fallback };
-    const n = Number(value);
-    if (!Number.isFinite(n)) {
-        return {
-            ok: false,
-            error: `--${flagName}: "${value}" is not a valid number`,
-        };
-    }
-    const rounded = Math.round(n);
-    if (rounded < spec.min) {
-        return {
-            ok: false,
-            error: `--${flagName}: ${rounded} is below the minimum of ${spec.min}`,
-        };
-    }
-    if (rounded > spec.max) {
-        return {
-            ok: false,
-            error: `--${flagName}: ${rounded} is above the maximum of ${spec.max}`,
-        };
-    }
-    return { ok: true, value: rounded };
+    const result = parseCanonicalInteger(`--${flagName}`, value, spec);
+    return result.valid
+        ? { ok: true, value: result.value }
+        : { ok: false, error: result.error };
 }
 
 /**

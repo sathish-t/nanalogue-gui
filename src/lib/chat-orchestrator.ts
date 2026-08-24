@@ -1,7 +1,6 @@
 // Chat orchestrator for AI Chat mode.
 // Manages conversation history, context transformation, and the code-only LLM loop.
 
-import { readFile } from "node:fs/promises";
 import {
     CONFIG_FIELD_SPECS,
     DEFAULT_MAX_BLANK_RETRIES,
@@ -11,6 +10,10 @@ import {
     MAX_INPUT_CONTEXT_FRACTION,
     NOMINAL_BYTES_PER_TOKEN,
 } from "./ai-chat-constants";
+import {
+    readValidatedPythonSource,
+    validatePythonSourcePath,
+} from "./chat-filesystem-input-checks";
 import {
     buildExecutionFeedback,
     buildMalformedAssistantProtocolFeedback,
@@ -48,10 +51,7 @@ import {
     collectTerminalOutput,
 } from "./monty-sandbox";
 import { deriveMaxOutputBytes, resolvePath } from "./monty-sandbox-helpers";
-import {
-    buildSystemPromptParts,
-    joinSystemPromptParts,
-} from "./sandbox-prompt";
+import { buildCompleteSystemPrompt } from "./sandbox-prompt";
 
 /** A single message in the LLM request payload (system, user, or assistant). */
 export interface LlmMessage {
@@ -182,11 +182,9 @@ export async function handleUserMessage(
         const maxOutputBytes = deriveMaxOutputBytes(config.contextWindowTokens);
         emitEvent({ type: "turn_start" });
         const filePath = execMatch[1].trim();
-        if (!filePath.endsWith(".py")) {
-            throw new Error("/exec only supports .py files");
-        }
+        validatePythonSourcePath(filePath);
         const resolved = await resolvePath(allowedDir, filePath);
-        const code = await readFile(resolved, "utf-8");
+        const code = await readValidatedPythonSource(resolved);
 
         emitEvent({ type: "code_execution_start", code });
         const sandboxResult = await runSandboxGuarded(
@@ -257,13 +255,12 @@ export async function handleUserMessage(
     const maxOutputKB = Math.round(maxOutputBytes / 1024);
     // Reuse the same derived output ceiling for both sandbox limits and the
     // default sandbox prompt so those two views of the runtime stay in sync.
-    const systemPromptParts = buildSystemPromptParts({
+    const systemPrompt = buildCompleteSystemPrompt({
         config,
         maxOutputKB,
         appendSystemPrompt,
         replaceSystemPrompt,
     });
-    const systemPrompt = joinSystemPromptParts(systemPromptParts);
 
     // Sandbox options
     const sandboxOptions: SandboxOptions = {

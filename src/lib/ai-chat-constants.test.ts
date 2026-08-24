@@ -11,6 +11,10 @@ import {
     MODEL_LIST_TIMEOUT_MS,
     NOMINAL_BYTES_PER_TOKEN,
 } from "./ai-chat-constants";
+import {
+    MAX_PYTHON_SOURCE_BYTES,
+    MAX_SYSTEM_PROMPT_BYTES,
+} from "./ai-chat-shared-constants";
 
 describe("ai-chat-constants", () => {
     it("validates CONFIG_FIELD_SPECS without throwing on import", async () => {
@@ -66,9 +70,10 @@ describe("ai-chat-constants scalar exports", () => {
         expect(MAX_INPUT_CONTEXT_FRACTION).toBeLessThan(1);
     });
 
-    it("has MAX_MESSAGE_BYTES as a positive integer", () => {
-        expect(MAX_MESSAGE_BYTES).toBeGreaterThan(0);
-        expect(Number.isInteger(MAX_MESSAGE_BYTES)).toBe(true);
+    it("uses the agreed chat input size limits", () => {
+        expect(MAX_MESSAGE_BYTES).toBe(1024 * 1024);
+        expect(MAX_SYSTEM_PROMPT_BYTES).toBe(1024 * 1024);
+        expect(MAX_PYTHON_SOURCE_BYTES).toBe(10 * 1024 * 1024);
     });
 
     it("has MODEL_LIST_TIMEOUT_MS as a positive integer", () => {

@@ -19,6 +19,7 @@ src/
     ai-chat-ipc-validation.ts                       # Per-channel IPC payload validation for AI Chat mode.
     ai-chat-shared-constants.ts                     # Config field specs and shared constants for the AI Chat feature.
     bed-parser.ts                                   # BED file parser for nanalogue-swipe
+    chat-filesystem-input-checks.ts                 # Node-only checks for chat analysis directories and Python source files.
     chat-orchestrator-execution.ts                  # Sandbox execution and feedback helpers for AI chat orchestration.
     chat-orchestrator-handle-message-test-utils.ts  # Shared helpers for handleUserMessage integration tests.
     chat-orchestrator-helpers.ts                    # Helper utilities for chat-orchestrator.
@@ -31,6 +32,8 @@ src/
     chat-session.ts                                 # Reusable chat session state for the AI Chat feature.
     chat-transcript-dump.ts                         # Persists LLM request and conversation history transcripts for human review.
     chat-types.ts                                   # Shared types for the AI Chat feature.
+    chat-user-input-parsing.ts                      # Browser-safe parsing and measurement for chat user inputs.
+    cli-user-input-parsing.ts                       # Parsing checks for command-line option structure and comma-separated tool names.
     format-utils.ts                                 # Pure formatting and trimming utilities shared across renderer pages.
     histogram-renderer.ts                           # Histogram SVG renderer backed by Vega-Lite.
     histogram.ts                                    # Streaming histogram accumulator for binning data without storing raw arrays

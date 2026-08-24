@@ -5,6 +5,7 @@ const API_KEY_MAX_LENGTH = 200;
 const MODEL_MAX_LENGTH = 200;
 const HTTP_URL_PREFIX = /^https?:\/\/[^/\\]/iu;
 const INVALID_URL_CHARACTER = /[\p{White_Space}\\]/u;
+const VISIBLE_ASCII_CHARACTERS = /^[!-~]*$/u;
 
 /**
  * Checks for a credential-free HTTP or HTTPS URL without raw whitespace or backslashes.
@@ -37,13 +38,16 @@ export function isValidEndpointUrl(endpointUrl: string): boolean {
 }
 
 /**
- * Checks whether an optional API key has an allowed length and no surrounding whitespace.
+ * Checks whether an optional API key contains at most 200 visible ASCII characters.
  *
  * @param apiKey - Chat provider API key.
- * @returns Whether the API key satisfies length and whitespace constraints.
+ * @returns Whether the API key is empty or satisfies the visible-ASCII and length constraints.
  */
 export function isValidApiKey(apiKey: string): boolean {
-    return apiKey.length <= API_KEY_MAX_LENGTH && apiKey === apiKey.trim();
+    return (
+        apiKey.length <= API_KEY_MAX_LENGTH &&
+        VISIBLE_ASCII_CHARACTERS.test(apiKey)
+    );
 }
 
 /**

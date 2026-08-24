@@ -1,7 +1,9 @@
 // Builds the LLM system prompt and assembles the full system message sent on every turn.
 // All numeric limits are derived from code constants, not hardcoded in prose.
 
+import { MAX_SYSTEM_PROMPT_BYTES } from "./ai-chat-shared-constants";
 import type { AiChatConfig } from "./chat-types";
+import { getUtf8ByteLength } from "./chat-user-input-parsing";
 import { buildSandboxPrompt } from "./sandbox-prompt-text";
 
 export type { SandboxPromptOptions } from "./sandbox-prompt-text";
@@ -76,7 +78,24 @@ export function buildSystemPromptParts(
  * @returns The assembled system prompt.
  */
 export function joinSystemPromptParts(parts: SystemPromptParts): string {
-    return [parts.base, parts.append]
+    const prompt = [parts.base, parts.append]
         .filter((part) => part.length > 0)
         .join("\n\n");
+    if (getUtf8ByteLength(prompt) > MAX_SYSTEM_PROMPT_BYTES) {
+        throw new Error("Combined system prompt exceeds the 1 MiB limit");
+    }
+    return prompt;
+}
+
+/**
+ * Builds and size-checks the complete system prompt.
+ *
+ * @param options - Static prompt assembly options.
+ * @returns The assembled system prompt, limited to 1 MiB of UTF-8 text.
+ * @throws {Error} If the combined base and append prompt exceeds 1 MiB.
+ */
+export function buildCompleteSystemPrompt(
+    options: BuildSystemPromptPartsOptions,
+): string {
+    return joinSystemPromptParts(buildSystemPromptParts(options));
 }

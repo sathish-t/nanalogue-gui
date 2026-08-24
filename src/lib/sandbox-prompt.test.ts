@@ -4,8 +4,10 @@
 
 import { describe, expect, it } from "vitest";
 import { EXTERNAL_FUNCTIONS } from "./ai-chat-constants";
+import { MAX_SYSTEM_PROMPT_BYTES } from "./ai-chat-shared-constants";
 import type { AiChatConfig } from "./chat-types";
 import {
+    buildCompleteSystemPrompt,
     buildSandboxPrompt,
     buildSystemPromptParts,
     joinSystemPromptParts,
@@ -229,5 +231,25 @@ describe("system prompt assembly", () => {
         expect(joinSystemPromptParts({ base: "## System", append: "" })).toBe(
             "## System",
         );
+    });
+
+    it("accepts a complete system prompt at the 1 MiB limit", () => {
+        expect(
+            joinSystemPromptParts({
+                base: "x".repeat(MAX_SYSTEM_PROMPT_BYTES),
+                append: "",
+            }),
+        ).toHaveLength(MAX_SYSTEM_PROMPT_BYTES);
+    });
+
+    it("rejects base and append text exceeding 1 MiB when combined", () => {
+        expect(() =>
+            buildCompleteSystemPrompt({
+                config,
+                maxOutputKB: BASE_OPTIONS.maxOutputKB,
+                replaceSystemPrompt: "x".repeat(MAX_SYSTEM_PROMPT_BYTES - 2),
+                appendSystemPrompt: "y",
+            }),
+        ).toThrow("Combined system prompt exceeds the 1 MiB limit");
     });
 });

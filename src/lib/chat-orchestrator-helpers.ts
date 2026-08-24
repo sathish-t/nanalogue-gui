@@ -11,10 +11,7 @@ import type {
     HistoryEntry,
 } from "./chat-types";
 import { deriveMaxOutputBytes, resolvePath } from "./monty-sandbox-helpers";
-import {
-    buildSystemPromptParts,
-    joinSystemPromptParts,
-} from "./sandbox-prompt";
+import { buildCompleteSystemPrompt } from "./sandbox-prompt";
 
 /** Serialized LLM message content that can be dumped to disk. */
 export interface DumpableLlmMessage {
@@ -146,13 +143,12 @@ export async function handleDumpCommand(
         const maxOutputKB = Math.round(maxOutputBytes / 1024);
         // Include SYSTEM_APPEND.md content in the dump so it accurately
         // reflects the system prompt sent on every turn.
-        const promptParts = buildSystemPromptParts({
+        const promptContent = buildCompleteSystemPrompt({
             config,
             maxOutputKB,
             appendSystemPrompt,
             replaceSystemPrompt,
         });
-        const promptContent = joinSystemPromptParts(promptParts);
         await writeFile(outputFile, promptContent, "utf-8");
 
         const relPath = join("ai_chat_output", filename);

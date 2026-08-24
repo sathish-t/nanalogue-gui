@@ -83,15 +83,29 @@ describe("ai-chat-config", () => {
             "opt-temperature",
         ) as HTMLInputElement;
 
-        contextWindow.value = "2048";
+        contextWindow.value = String(
+            CONFIG_FIELD_SPECS.contextWindowTokens.min,
+        );
         timeout.value = "120";
         temperature.value = "";
 
         const config = getConfig();
 
-        expect(config.contextWindowTokens).toBe(2048);
+        expect(config.contextWindowTokens).toBe(
+            CONFIG_FIELD_SPECS.contextWindowTokens.min,
+        );
         expect(config.timeoutSeconds).toBe(120);
         expect(config.temperature).toBeUndefined();
+    });
+
+    it("does not return config when an advanced option is invalid", async () => {
+        const { getConfig } = await import("./ai-chat-config");
+        const timeout = document.getElementById(
+            "opt-timeout",
+        ) as HTMLInputElement;
+        timeout.value = "1.5";
+
+        expect(() => getConfig()).toThrow("decimal digits only");
     });
 
     it("locks and unlocks session config controls", async () => {
@@ -185,5 +199,24 @@ describe("ai-chat-config", () => {
 
         apiKey.value = "";
         expect(validateConnectionConfig()).toBeNull();
+    });
+
+    it.each([
+        ["opt-timeout", "1.5", "decimal digits only"],
+        ["opt-max-retries", "0", "between 1 and 20"],
+        ["opt-temperature", "1e0", "shorter than 10 bytes"],
+    ])("rejects malformed advanced option %s", async (inputId, value, expectedError) => {
+        const { validateAdvancedConfig } = await import("./ai-chat-config");
+        (document.getElementById(inputId) as HTMLInputElement).value = value;
+
+        expect(validateAdvancedConfig()).toContain(expectedError);
+    });
+
+    it("rejects a directory with surrounding whitespace", async () => {
+        const { validateConfig } = await import("./ai-chat-config");
+        (document.getElementById("input-dir") as HTMLInputElement).value =
+            "/tmp/bam ";
+
+        expect(validateConfig()).toBe("Invalid BAM directory path.");
     });
 });

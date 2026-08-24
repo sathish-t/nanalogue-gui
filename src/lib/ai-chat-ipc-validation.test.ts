@@ -46,6 +46,53 @@ function validSendPayload(
     };
 }
 
+describe.each([
+    [
+        "send-message",
+        (config: unknown) => validateSendMessage(validSendPayload({ config })),
+    ],
+    [
+        "system-prompt-preview",
+        (config: unknown) => validateGetSystemPrompt({ config }),
+    ],
+] as const)("%s config validation", (_channel, validateConfig) => {
+    it("uses defaults only for undefined values", () => {
+        const result = validateConfig({
+            maxRetries: undefined,
+            temperature: undefined,
+        });
+
+        expect(result.valid).toBe(true);
+        if (result.valid) {
+            expect(result.data.config.maxRetries).toBe(
+                CONFIG_FIELD_SPECS.maxRetries.fallback,
+            );
+            expect(result.data.config.temperature).toBeUndefined();
+        }
+    });
+
+    it("rejects a null integer", () => {
+        expect(validateConfig({ maxRetries: null })).toEqual({
+            valid: false,
+            error: "max retries must be an integer",
+        });
+    });
+
+    it("rejects a null temperature", () => {
+        expect(validateConfig({ temperature: null })).toEqual({
+            valid: false,
+            error: "temperature must be a finite number",
+        });
+    });
+
+    it("rejects an array instead of a config object", () => {
+        expect(validateConfig([])).toEqual({
+            valid: false,
+            error: "config must be an object",
+        });
+    });
+});
+
 describe("validateListModels", () => {
     it("rejects null payload", () => {
         const result = validateListModels(null);
@@ -87,7 +134,7 @@ describe("validateListModels", () => {
         );
         expect(result.valid).toBe(false);
         if (!result.valid) {
-            expect(result.error).toContain("Invalid URL");
+            expect(result.error).toBe("Invalid endpoint URL");
         }
     });
 
@@ -100,9 +147,7 @@ describe("validateListModels", () => {
         );
         expect(result.valid).toBe(false);
         if (!result.valid) {
-            expect(result.error).toBe(
-                "URL must not contain embedded credentials",
-            );
+            expect(result.error).toBe("Invalid endpoint URL");
         }
     });
 
@@ -112,7 +157,7 @@ describe("validateListModels", () => {
         );
         expect(result.valid).toBe(false);
         if (!result.valid) {
-            expect(result.error).toContain("Unsupported URL scheme");
+            expect(result.error).toBe("Invalid endpoint URL");
         }
     });
 
@@ -126,14 +171,20 @@ describe("validateListModels", () => {
         }
     });
 
-    it("defaults apiKey to empty string when non-string", () => {
+    it("rejects apiKey when it is not a string", () => {
         const result = validateListModels(
             validListModelsPayload({ apiKey: 42 }),
         );
-        expect(result.valid).toBe(true);
-        if (result.valid) {
-            expect(result.data.apiKey).toBe("");
-        }
+        expect(result).toEqual({
+            valid: false,
+            error: "apiKey must be a string",
+        });
+    });
+
+    it("rejects an API key containing whitespace", () => {
+        expect(
+            validateListModels(validListModelsPayload({ apiKey: "bad key" })),
+        ).toEqual({ valid: false, error: "Invalid API key" });
     });
 
     it("accepts valid payload with http URL", () => {
@@ -175,6 +226,15 @@ describe("validateSendMessage", () => {
         }
     });
 
+    it("rejects invalid API keys and model names", () => {
+        expect(
+            validateSendMessage(validSendPayload({ apiKey: "bad key" })),
+        ).toEqual({ valid: false, error: "Invalid API key" });
+        expect(
+            validateSendMessage(validSendPayload({ model: " bad-model" })),
+        ).toEqual({ valid: false, error: "Invalid model name" });
+    });
+
     it("rejects missing endpointUrl", () => {
         const result = validateSendMessage(
             validSendPayload({ endpointUrl: undefined }),
@@ -201,7 +261,7 @@ describe("validateSendMessage", () => {
         );
         expect(result.valid).toBe(false);
         if (!result.valid) {
-            expect(result.error).toContain("Invalid URL");
+            expect(result.error).toBe("Invalid endpoint URL");
         }
     });
 
@@ -214,9 +274,7 @@ describe("validateSendMessage", () => {
         );
         expect(result.valid).toBe(false);
         if (!result.valid) {
-            expect(result.error).toBe(
-                "URL must not contain embedded credentials",
-            );
+            expect(result.error).toBe("Invalid endpoint URL");
         }
     });
 
@@ -226,16 +284,16 @@ describe("validateSendMessage", () => {
         );
         expect(result.valid).toBe(false);
         if (!result.valid) {
-            expect(result.error).toContain("Unsupported URL scheme");
+            expect(result.error).toBe("Invalid endpoint URL");
         }
     });
 
-    it("defaults apiKey to empty string when non-string", () => {
+    it("rejects apiKey when it is not a string", () => {
         const result = validateSendMessage(validSendPayload({ apiKey: null }));
-        expect(result.valid).toBe(true);
-        if (result.valid) {
-            expect(result.data.apiKey).toBe("");
-        }
+        expect(result).toEqual({
+            valid: false,
+            error: "apiKey must be a string",
+        });
     });
 
     it("rejects missing model", () => {
@@ -274,6 +332,16 @@ describe("validateSendMessage", () => {
         }
     });
 
+    it("rejects a whitespace-only message", () => {
+        const result = validateSendMessage(
+            validSendPayload({ message: " \n\t" }),
+        );
+        expect(result).toEqual({
+            valid: false,
+            error: "message must not contain only whitespace",
+        });
+    });
+
     it("rejects message exceeding byte limit", () => {
         const oversized = "x".repeat(MAX_MESSAGE_BYTES + 1);
         const result = validateSendMessage(
@@ -281,7 +349,7 @@ describe("validateSendMessage", () => {
         );
         expect(result.valid).toBe(false);
         if (!result.valid) {
-            expect(result.error).toBe("message exceeds 100 KB limit");
+            expect(result.error).toBe("message exceeds 1 MiB limit");
         }
     });
 
@@ -323,52 +391,44 @@ describe("validateSendMessage", () => {
         }
     });
 
-    it("treats non-object config as empty", () => {
+    it("rejects non-object config", () => {
         const result = validateSendMessage(
             validSendPayload({ config: "not-object" }),
         );
-        expect(result.valid).toBe(true);
-        if (result.valid) {
-            expect(result.data.config.contextWindowTokens).toBe(
-                CONFIG_FIELD_SPECS.contextWindowTokens.fallback,
-            );
-        }
+        expect(result).toEqual({
+            valid: false,
+            error: "config must be an object",
+        });
     });
 
-    it("treats null config as empty", () => {
+    it("rejects null config", () => {
         const result = validateSendMessage(validSendPayload({ config: null }));
-        expect(result.valid).toBe(true);
-        if (result.valid) {
-            expect(result.data.config.maxRetries).toBe(
-                CONFIG_FIELD_SPECS.maxRetries.fallback,
-            );
-        }
+        expect(result).toEqual({
+            valid: false,
+            error: "config must be an object",
+        });
     });
 
-    it("uses fallback for NaN config value", () => {
+    it("rejects a NaN config value", () => {
         const result = validateSendMessage(
             validSendPayload({ config: { maxRetries: Number.NaN } }),
         );
-        expect(result.valid).toBe(true);
-        if (result.valid) {
-            expect(result.data.config.maxRetries).toBe(
-                CONFIG_FIELD_SPECS.maxRetries.fallback,
-            );
-        }
+        expect(result).toEqual({
+            valid: false,
+            error: "max retries must be an integer",
+        });
     });
 
-    it("uses fallback for Infinity config value", () => {
+    it("rejects an infinite config value", () => {
         const result = validateSendMessage(
             validSendPayload({
                 config: { contextWindowTokens: Number.POSITIVE_INFINITY },
             }),
         );
-        expect(result.valid).toBe(true);
-        if (result.valid) {
-            expect(result.data.config.contextWindowTokens).toBe(
-                CONFIG_FIELD_SPECS.contextWindowTokens.fallback,
-            );
-        }
+        expect(result).toEqual({
+            valid: false,
+            error: "context window tokens must be an integer",
+        });
     });
 
     it("accepts fully valid payload and returns all fields", () => {
@@ -415,16 +475,14 @@ describe("validateSendMessage config validation", () => {
         }
     });
 
-    it("uses fallback for non-numeric values", () => {
+    it("rejects non-numeric values", () => {
         const result = validateSendMessage(
             validSendPayload({ config: { maxRetries: "abc" } }),
         );
-        expect(result.valid).toBe(true);
-        if (result.valid) {
-            expect(result.data.config.maxRetries).toBe(
-                CONFIG_FIELD_SPECS.maxRetries.fallback,
-            );
-        }
+        expect(result).toEqual({
+            valid: false,
+            error: "max retries must be an integer",
+        });
     });
 
     it("rejects below-minimum values", () => {
@@ -449,14 +507,14 @@ describe("validateSendMessage config validation", () => {
         }
     });
 
-    it("accepts and rounds valid numbers", () => {
+    it("rejects non-integer numbers", () => {
         const result = validateSendMessage(
             validSendPayload({ config: { timeoutSeconds: 60.7 } }),
         );
-        expect(result.valid).toBe(true);
-        if (result.valid) {
-            expect(result.data.config.timeoutSeconds).toBe(61);
-        }
+        expect(result).toEqual({
+            valid: false,
+            error: "timeout seconds must be an integer",
+        });
     });
 
     it("accepts boundary values", () => {
@@ -540,9 +598,37 @@ describe("validateGetSystemPrompt", () => {
         const result = validateGetSystemPrompt(null);
         expect(result.valid).toBe(false);
     });
+
+    it("rejects malformed config and temperature values", () => {
+        expect(validateGetSystemPrompt({ config: "invalid" })).toEqual({
+            valid: false,
+            error: "config must be an object",
+        });
+        expect(
+            validateGetSystemPrompt({ config: { temperature: "warm" } }),
+        ).toEqual({
+            valid: false,
+            error: "temperature must be a finite number",
+        });
+        expect(
+            validateGetSystemPrompt({ config: { temperature: 3 } }),
+        ).toMatchObject({ valid: false });
+        expect(
+            validateGetSystemPrompt({ config: { temperature: 0.5 } }),
+        ).toMatchObject({
+            valid: true,
+            data: { config: { temperature: 0.5 } },
+        });
+    });
 });
 
 describe("validateIpcPayload", () => {
+    it("routes ai-chat-get-system-prompt to its validator", () => {
+        expect(
+            validateIpcPayload("ai-chat-get-system-prompt", { config: {} }),
+        ).toMatchObject({ valid: true });
+    });
+
     it("routes ai-chat-list-models to validateListModels", () => {
         const result = validateIpcPayload(
             "ai-chat-list-models",

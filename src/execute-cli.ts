@@ -1,10 +1,16 @@
 // Standalone CLI for running a Python file directly in the Monty sandbox.
 // No LLM is involved — this is a pure sandbox execution tool for BAM analysis scripts.
 
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { version } from "../package.json";
+import {
+    readValidatedPythonSource,
+    validateAnalysisDirectory,
+    validatePythonSourcePath,
+} from "./lib/chat-filesystem-input-checks";
+import { parseCanonicalInteger } from "./lib/chat-user-input-parsing";
+import { findDuplicateCliOption } from "./lib/cli-user-input-parsing";
 import { collectTerminalOutput, runSandboxCode } from "./lib/monty-sandbox";
 import { safeUtf8Slice } from "./lib/monty-sandbox-helpers";
 import {
@@ -33,6 +39,7 @@ const argConfig = {
     },
     allowPositionals: true,
     strict: true,
+    tokens: true,
 } as const;
 
 /**
@@ -67,7 +74,7 @@ Required:
   <script.py>              Path to the Python script to run (resolved from cwd)
 
 Output:
-  --max-output-bytes <n>   Max output size in bytes (default: ${DEFAULT_MAX_OUTPUT_BYTES}); print() output
+  --max-output-bytes <n>   Max output size in decimal integer bytes (default: ${DEFAULT_MAX_OUTPUT_BYTES}); print() output
                            is buffered in memory up to ${MAX_PRINT_BUFFER_BYTES} bytes regardless of this value
 
 Sandbox limits:
@@ -105,7 +112,13 @@ async function main(): Promise<void> {
         process.exit(1);
     }
 
-    const { values, positionals } = parsed;
+    const { positionals, tokens, values } = parsed;
+    const duplicateOption = findDuplicateCliOption(tokens);
+    if (duplicateOption !== null) {
+        console.error(`Error: --${duplicateOption} may only be supplied once`);
+        process.exitCode = 1;
+        return;
+    }
 
     if (values.version) {
         console.log(version);
@@ -137,39 +150,54 @@ async function main(): Promise<void> {
     }
 
     const scriptArg = positionals[0];
-    if (!scriptArg.endsWith(".py")) {
-        console.error("Error: script must be a .py file");
-        process.exit(1);
+    try {
+        validatePythonSourcePath(scriptArg);
+    } catch (error) {
+        console.error(
+            `Error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        process.exitCode = 1;
+        return;
     }
 
-    // Resolve both paths to absolute so sandbox path checks work correctly
-    // when the user passes a relative --dir (e.g. --dir ./data).
+    // Resolve the script from cwd; the analysis directory validator returns
+    // its canonical real path so sandbox checks use a stable boundary.
     const scriptPath = resolve(process.cwd(), scriptArg);
-    const allowedDir = resolve(process.cwd(), values.dir);
+    let allowedDir: string;
+    try {
+        allowedDir = await validateAnalysisDirectory(values.dir, process.cwd());
+    } catch (error) {
+        console.error(
+            `Error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        process.exitCode = 1;
+        return;
+    }
 
-    // Parse --max-output-bytes with no upper ceiling.
+    // Parse --max-output-bytes up to JavaScript's safe-integer ceiling.
     const maxOutputBytes = (() => {
         const raw = values["max-output-bytes"];
         if (raw === undefined) return DEFAULT_MAX_OUTPUT_BYTES;
-        const n = Number(raw);
-        if (!Number.isFinite(n) || n < 1) {
-            console.error(
-                `Error: --max-output-bytes must be a positive number (got "${raw}")`,
-            );
+        const result = parseCanonicalInteger("--max-output-bytes", raw, {
+            min: 1,
+            max: Number.MAX_SAFE_INTEGER,
+        });
+        if (!result.valid) {
+            console.error(`Error: ${result.error}`);
             process.exit(1);
         }
-        return Math.round(n);
+        return result.value;
     })();
 
-    // Read the script from the filesystem (unrestricted — outside sandbox).
+    // Read the script from the filesystem (unrestricted — outside sandbox),
+    // while requiring a readable regular file no larger than 10 MiB.
     let code: string;
     try {
-        code = await readFile(scriptPath, "utf-8");
+        code = await readValidatedPythonSource(scriptPath);
     } catch (e) {
-        console.error(
-            `Error: could not read "${scriptPath}": ${e instanceof Error ? e.message : String(e)}`,
-        );
-        process.exit(1);
+        console.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+        process.exitCode = 1;
+        return;
     }
 
     // Build sandbox options from CLI values. Uses runSandboxCode directly —

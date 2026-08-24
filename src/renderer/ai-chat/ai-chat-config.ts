@@ -1,11 +1,18 @@
 // Advanced configuration helpers for the AI Chat renderer.
 
-import { CONFIG_FIELD_SPECS } from "../../lib/ai-chat-shared-constants";
+import {
+    CONFIG_FIELD_SPECS,
+    MAX_INPUT_PATH_LENGTH,
+} from "../../lib/ai-chat-shared-constants";
 import {
     isValidApiKey,
     isValidEndpointUrl,
     isValidModel,
 } from "../../lib/chat-provider-input-checks";
+import {
+    parseCanonicalInteger,
+    parseCanonicalTemperature,
+} from "../../lib/chat-user-input-parsing";
 import { getAiChatElements } from "./ai-chat-elements";
 
 const {
@@ -56,34 +63,63 @@ const ADVANCED_OPTION_FIELDS: ReadonlyArray<
     [optMaxWriteMB, "maxWriteMB"],
 ] as const;
 
+/** Result of parsing every advanced configuration input. */
+type AdvancedConfigInputResult =
+    | {
+          /** Indicates all inputs passed validation. */
+          valid: true;
+          /** Parsed values ready for IPC. */
+          config: Record<string, number | undefined>;
+      }
+    | {
+          /** Indicates at least one input failed validation. */
+          valid: false;
+          /** Concise validation failure. */
+          error: string;
+      };
+
 /**
- * Returns the current advanced options config values.
+ * Validates and parses every advanced configuration input.
+ *
+ * @returns Parsed config values or the first validation failure.
+ */
+function parseAdvancedConfigInput(): AdvancedConfigInputResult {
+    const config: Record<string, number | undefined> = {};
+    for (const [input, key] of ADVANCED_OPTION_FIELDS) {
+        const spec = CONFIG_FIELD_SPECS[key];
+        const result = parseCanonicalInteger(spec.label, input.value, spec);
+        if (!result.valid) return result;
+        config[key] = result.value;
+    }
+    const temperatureResult = parseCanonicalTemperature(
+        "temperature",
+        optTemperature.value,
+    );
+    if (!temperatureResult.valid) return temperatureResult;
+    config.temperature = temperatureResult.value;
+    return { valid: true, config };
+}
+
+/**
+ * Returns validated and parsed current advanced options config values.
  *
  * @returns A config object with the current field values.
+ * @throws {Error} If any advanced configuration input is invalid.
  */
 export function getConfig(): Record<string, unknown> {
-    /**
-     * Parses a numeric input value, returning the fallback if the value is
-     * not a finite number. Unlike `Number(x) || fallback`, this preserves 0.
-     *
-     * @param raw - The raw string from the input element.
-     * @param fallback - The fallback value from CONFIG_FIELD_SPECS.
-     * @returns The parsed number or the fallback.
-     */
-    const parse = (raw: string, fallback: number): number => {
-        const value = Number(raw);
-        return Number.isFinite(value) ? value : fallback;
-    };
+    const result = parseAdvancedConfigInput();
+    if (!result.valid) throw new Error(result.error);
+    return result.config;
+}
 
-    const config: Record<string, unknown> = {};
-    for (const [input, key] of ADVANCED_OPTION_FIELDS) {
-        config[key] = parse(input.value, CONFIG_FIELD_SPECS[key].fallback);
-    }
-    // Temperature is optional — empty string means undefined (omit from request)
-    config.temperature = optTemperature.value.trim()
-        ? Number.parseFloat(optTemperature.value)
-        : undefined;
-    return config;
+/**
+ * Validates every advanced numeric option using strict canonical syntax.
+ *
+ * @returns An alert message string, or null when all advanced options are valid.
+ */
+export function validateAdvancedConfig(): string | null {
+    const result = parseAdvancedConfigInput();
+    return result.valid ? null : `Invalid ${result.error}.`;
 }
 
 /**
@@ -163,9 +199,15 @@ export function validateConnectionConfig(): string | null {
  */
 export function validateConfig(): string | null {
     if (!inputDir.value) return "Please select a BAM directory.";
+    if (
+        inputDir.value !== inputDir.value.trim() ||
+        inputDir.value.length > MAX_INPUT_PATH_LENGTH
+    ) {
+        return "Invalid BAM directory path.";
+    }
     const connectionError = validateConnectionConfig();
     if (connectionError) return connectionError;
     if (!inputModel.value) return "Please enter a model name.";
     if (!isValidModel(inputModel.value)) return "Invalid model name.";
-    return null;
+    return validateAdvancedConfig();
 }

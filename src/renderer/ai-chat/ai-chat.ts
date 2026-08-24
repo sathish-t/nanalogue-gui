@@ -1,8 +1,12 @@
 // AI Chat renderer bootstrap.
 // Wires the chat UI, configuration panel, code panel, and IPC communication.
 
-import { NOMINAL_BYTES_PER_TOKEN } from "../../lib/ai-chat-constants";
+import {
+    MAX_MESSAGE_BYTES,
+    NOMINAL_BYTES_PER_TOKEN,
+} from "../../lib/ai-chat-constants";
 import type { AiChatEvent, StepInfo } from "../../lib/chat-types";
+import { getUtf8ByteLength } from "../../lib/chat-user-input-parsing";
 import { applyFontSize } from "../shared/apply-font-size";
 import {
     applyConfigBounds,
@@ -10,6 +14,7 @@ import {
     lockSessionConfig,
     resetDefaults,
     unlockSessionConfig,
+    validateAdvancedConfig,
     validateConfig,
     validateConnectionConfig,
 } from "./ai-chat-config";
@@ -349,7 +354,11 @@ async function sendUserMessage(
             const errorMsg = result.isTimeout
                 ? "LLM response timed out (i.e. a message from the LLM took too much time to arrive)"
                 : (result.error ?? "Unknown error occurred.");
-            appendMessage("error", errorMsg);
+            if (result.inputError) {
+                window.alert(errorMsg);
+            } else {
+                appendMessage("error", errorMsg);
+            }
             if (endpointStillMatches) {
                 connectedOrigin = null;
                 updateConnectionStatus(false);
@@ -377,6 +386,10 @@ async function sendUserMessage(
 btnSend.addEventListener("click", async () => {
     const message = inputMessage.value.trim();
     if (!message) return;
+    if (getUtf8ByteLength(message) > MAX_MESSAGE_BYTES) {
+        window.alert("Message exceeds the 1 MiB limit.");
+        return;
+    }
 
     const validationError = validateConfig();
     if (validationError) {
@@ -496,6 +509,11 @@ optOnlySystemAppend.addEventListener("change", () => {
 });
 
 btnCloseAdvanced?.addEventListener("click", () => {
+    const validationError = validateAdvancedConfig();
+    if (validationError) {
+        window.alert(validationError);
+        return;
+    }
     advancedDialog.close();
 });
 
@@ -508,6 +526,11 @@ btnDefaults?.addEventListener("click", () => {
 
 // View System Prompt button — fetch and display the static system prompt
 btnViewSystemPrompt.addEventListener("click", async () => {
+    const validationError = validateAdvancedConfig();
+    if (validationError) {
+        window.alert(validationError);
+        return;
+    }
     const generation = ++systemPromptGeneration;
     systemPromptPre.textContent = "Loading…";
     systemPromptTokenEstimate.textContent = "";
@@ -538,6 +561,7 @@ btnViewSystemPrompt.addEventListener("click", async () => {
         const roughTokens = Math.round(byteLength / NOMINAL_BYTES_PER_TOKEN);
         systemPromptTokenEstimate.textContent = `~${roughTokens.toLocaleString()} tokens (rough)`;
     } else {
+        window.alert(result.error);
         systemPromptPre.textContent = `Error: ${result.error}`;
         systemPromptTokenEstimate.textContent = "";
     }

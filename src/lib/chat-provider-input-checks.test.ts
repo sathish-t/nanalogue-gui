@@ -53,6 +53,9 @@ describe("isValidApiKey", () => {
     it.each([
         "",
         "k".repeat(200),
+        "sk-proj_example_123",
+        "eyJhbGciOiJIUzI1NiJ9.payload.signature",
+        "YWJjKysvLz09+/=~",
     ])("accepts an optional API key at a valid length", (apiKey) => {
         expect(isValidApiKey(apiKey)).toBe(true);
     });
@@ -64,7 +67,14 @@ describe("isValidApiKey", () => {
     it.each([
         " key",
         "key ",
-    ])("rejects surrounding whitespace in %j", (apiKey) => {
+        "api key",
+        "api\tkey",
+        "api\nkey",
+        "api\u0000key",
+        "api\u007fkey",
+        "clave-espa\u00f1ola",
+        "\u043a\u043b\u044e\u0447",
+    ])("rejects non-visible-ASCII characters in %j", (apiKey) => {
         expect(isValidApiKey(apiKey)).toBe(false);
     });
 });

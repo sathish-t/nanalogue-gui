@@ -82,6 +82,7 @@ ${TERMINAL_BOLD}Authentication:${TERMINAL_RESET}
   --api-key <key>          API key (default: $API_KEY environment variable)
 
 ${TERMINAL_BOLD}Advanced options:${TERMINAL_RESET}
+  Numeric limits require decimal digits only; decimals and exponent notation are rejected.
   --context-window <n>     Context window tokens (default: ${CONFIG_FIELD_SPECS.contextWindowTokens.fallback})
   --max-retries <n>        Max retries per turn (default: ${CONFIG_FIELD_SPECS.maxRetries.fallback})
   --timeout <n>            Timeout in seconds (default: ${CONFIG_FIELD_SPECS.timeoutSeconds.fallback})
@@ -99,6 +100,7 @@ ${TERMINAL_BOLD}Advanced options:${TERMINAL_RESET}
 
 ${TERMINAL_BOLD}Other:${TERMINAL_RESET}
   --non-interactive <msg>  Send a single message, print the response, and exit
+                           Maximum message size: 1 MiB of UTF-8 text.
   --dump-history           Dump the complete raw conversation history
                            (only valid with --non-interactive)
   --dump-llm-instructions  Dump the LLM request payload to a log file
@@ -113,6 +115,7 @@ ${TERMINAL_BOLD}Custom system prompt:${TERMINAL_RESET}
                                --system-prompt "$MY_PROMPT"
                                --system-prompt "$(cat prompt.md)"
                                SYSTEM_APPEND.md still applies.
+                               Maximum prompt size: 1 MiB of UTF-8 text.
   --only-system-append         Use SYSTEM_APPEND.md as the full system prompt
                                without the built-in prompt.
                                Requires SYSTEM_APPEND.md to exist and be
@@ -123,7 +126,7 @@ ${TERMINAL_BOLD}Custom system prompt:${TERMINAL_RESET}
   Place a SYSTEM_APPEND.md file in the analysis directory (--dir) to append
   additional instructions to the default (or replaced) system prompt. The
   file is read once at startup. Use /dump_system_prompt to verify the full
-  effective prompt.
+  effective prompt. The complete effective prompt cannot exceed 1 MiB.
 
   --rm-tools <t1,t2,...>       Comma-separated (no spaces) list of sandbox tool
                                names to remove. Requires --system-prompt or
@@ -137,6 +140,7 @@ ${TERMINAL_BOLD}Custom system prompt:${TERMINAL_RESET}
 ${TERMINAL_BOLD}REPL commands:${TERMINAL_RESET}
   /new                     Start a new conversation
   /exec <file.py>          Run a Python file directly in the sandbox
+                           Python source must be a regular file no larger than 10 MiB.
   /dump_history            Dump the complete raw conversation history
   /dump_llm_instructions   Dump the last LLM request payload to a log file
   /dump_system_prompt      Dump the static system prompt to a log file

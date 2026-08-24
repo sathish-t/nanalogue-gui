@@ -1,7 +1,7 @@
 // Tests for loadSystemAppend.
 // Verifies file reading, symlink safety, and graceful handling of absent files.
 
-import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -31,21 +31,40 @@ describe("loadSystemAppend", () => {
         expect(result).toBe(content);
     });
 
-    it("returns undefined for an empty SYSTEM_APPEND.md", async () => {
+    it("rejects an empty SYSTEM_APPEND.md", async () => {
         await writeFile(join(tmpDir, "SYSTEM_APPEND.md"), "", "utf-8");
 
-        const result = await loadSystemAppend(tmpDir);
-        expect(result).toBeUndefined();
+        await expect(loadSystemAppend(tmpDir)).rejects.toThrow(
+            "must not be empty",
+        );
     });
 
-    it("returns undefined for a whitespace-only SYSTEM_APPEND.md", async () => {
+    it("rejects SYSTEM_APPEND.md when it is not a regular file", async () => {
+        await mkdir(join(tmpDir, "SYSTEM_APPEND.md"));
+
+        await expect(loadSystemAppend(tmpDir)).rejects.toThrow(
+            "must be a regular file",
+        );
+    });
+
+    it("rejects an inaccessible SYSTEM_APPEND.md path", async () => {
+        await rm(tmpDir, { recursive: true });
+        await writeFile(tmpDir, "not a directory");
+
+        await expect(loadSystemAppend(tmpDir)).rejects.toThrow(
+            "exists but is not accessible",
+        );
+    });
+
+    it("rejects a whitespace-only SYSTEM_APPEND.md", async () => {
         await writeFile(join(tmpDir, "SYSTEM_APPEND.md"), "   \n\t", "utf-8");
 
-        const result = await loadSystemAppend(tmpDir);
-        expect(result).toBeUndefined();
+        await expect(loadSystemAppend(tmpDir)).rejects.toThrow(
+            "must not contain only whitespace",
+        );
     });
 
-    it("returns undefined when SYSTEM_APPEND.md is a symlink pointing outside the directory", async () => {
+    it("rejects SYSTEM_APPEND.md when it is a symlink outside the directory", async () => {
         // Create a sensitive file outside the allowed directory.
         const outsideDir = await mkdtemp(join(tmpdir(), "outside-"));
         try {
@@ -60,8 +79,9 @@ describe("loadSystemAppend", () => {
                 join(tmpDir, "SYSTEM_APPEND.md"),
             );
 
-            const result = await loadSystemAppend(tmpDir);
-            expect(result).toBeUndefined();
+            await expect(loadSystemAppend(tmpDir)).rejects.toThrow(
+                "could not be loaded safely",
+            );
         } finally {
             await rm(outsideDir, { recursive: true, force: true });
         }
@@ -80,13 +100,14 @@ describe("loadSystemAppend", () => {
         expect(result).toBe(content);
     });
 
-    it("returns undefined when SYSTEM_APPEND.md exceeds MAX_SYSTEM_APPEND_BYTES", async () => {
+    it("rejects SYSTEM_APPEND.md above MAX_SYSTEM_APPEND_BYTES", async () => {
         // Write a file that is one byte over the limit.
         const oversized = "x".repeat(MAX_SYSTEM_APPEND_BYTES + 1);
         await writeFile(join(tmpDir, "SYSTEM_APPEND.md"), oversized, "utf-8");
 
-        const result = await loadSystemAppend(tmpDir);
-        expect(result).toBeUndefined();
+        await expect(loadSystemAppend(tmpDir)).rejects.toThrow(
+            "exceeds the 1 MiB limit",
+        );
     });
 
     it("returns content when SYSTEM_APPEND.md is exactly MAX_SYSTEM_APPEND_BYTES", async () => {
