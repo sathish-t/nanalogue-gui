@@ -1,0 +1,2 @@
+# Plot snapshots are compared byte-for-byte and must retain LF line endings.
+tests/plot-snapshots/*.svg text eol=lf

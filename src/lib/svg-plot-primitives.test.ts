@@ -64,7 +64,7 @@ describe("renderSvgPlot", () => {
         expect(svg).toContain(">Horizontal</text>");
         expect(svg).toContain(">Vertical</text>");
         expect(svg).toContain('<circle cx="300" cy="185"/>');
-        expect(svg).toMatch(/<\/svg>$/);
+        expect(svg).toMatch(/<\/svg>\n$/);
     });
 
     it("renders and escapes a visible title and all user-controlled text", () => {

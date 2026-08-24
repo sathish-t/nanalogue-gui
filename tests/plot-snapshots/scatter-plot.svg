@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" role="img" aria-labelledby="plot-title plot-description" width="684" height="472" viewBox="0 0 684 472">
+  <title id="plot-title">Signal by genomic position - simulated data</title>
+  <desc id="plot-description">Scatter plot containing 8 points.</desc>
+  <rect width="684" height="472" fill="white"/>
+  <text x="342" y="24" text-anchor="middle" font-size="16" font-weight="600" fill="#111827">Signal by genomic position - simulated data</text>
+  <g transform="translate(64 44)" font-family="system-ui, sans-serif">
+    <line x1="0" y1="0" x2="0" y2="370" stroke="#e5e7eb"/>
+    <line x1="0" y1="370" x2="0" y2="375" stroke="#4b5563"/>
+    <text x="0" y="390" text-anchor="middle" font-size="12" fill="#374151">-1</text>
+    <line x1="60" y1="0" x2="60" y2="370" stroke="#e5e7eb"/>
+    <line x1="60" y1="370" x2="60" y2="375" stroke="#4b5563"/>
+    <text x="60" y="390" text-anchor="middle" font-size="12" fill="#374151">0</text>
+    <line x1="120" y1="0" x2="120" y2="370" stroke="#e5e7eb"/>
+    <line x1="120" y1="370" x2="120" y2="375" stroke="#4b5563"/>
+    <text x="120" y="390" text-anchor="middle" font-size="12" fill="#374151">1</text>
+    <line x1="180" y1="0" x2="180" y2="370" stroke="#e5e7eb"/>
+    <line x1="180" y1="370" x2="180" y2="375" stroke="#4b5563"/>
+    <text x="180" y="390" text-anchor="middle" font-size="12" fill="#374151">2</text>
+    <line x1="240" y1="0" x2="240" y2="370" stroke="#e5e7eb"/>
+    <line x1="240" y1="370" x2="240" y2="375" stroke="#4b5563"/>
+    <text x="240" y="390" text-anchor="middle" font-size="12" fill="#374151">3</text>
+    <line x1="300" y1="0" x2="300" y2="370" stroke="#e5e7eb"/>
+    <line x1="300" y1="370" x2="300" y2="375" stroke="#4b5563"/>
+    <text x="300" y="390" text-anchor="middle" font-size="12" fill="#374151">4</text>
+    <line x1="360" y1="0" x2="360" y2="370" stroke="#e5e7eb"/>
+    <line x1="360" y1="370" x2="360" y2="375" stroke="#4b5563"/>
+    <text x="360" y="390" text-anchor="middle" font-size="12" fill="#374151">5</text>
+    <line x1="420" y1="0" x2="420" y2="370" stroke="#e5e7eb"/>
+    <line x1="420" y1="370" x2="420" y2="375" stroke="#4b5563"/>
+    <text x="420" y="390" text-anchor="middle" font-size="12" fill="#374151">6</text>
+    <line x1="480" y1="0" x2="480" y2="370" stroke="#e5e7eb"/>
+    <line x1="480" y1="370" x2="480" y2="375" stroke="#4b5563"/>
+    <text x="480" y="390" text-anchor="middle" font-size="12" fill="#374151">7</text>
+    <line x1="540" y1="0" x2="540" y2="370" stroke="#e5e7eb"/>
+    <line x1="540" y1="370" x2="540" y2="375" stroke="#4b5563"/>
+    <text x="540" y="390" text-anchor="middle" font-size="12" fill="#374151">8</text>
+    <line x1="600" y1="0" x2="600" y2="370" stroke="#e5e7eb"/>
+    <line x1="600" y1="370" x2="600" y2="375" stroke="#4b5563"/>
+    <text x="600" y="390" text-anchor="middle" font-size="12" fill="#374151">9</text>
+    <line x1="0" y1="370" x2="600" y2="370" stroke="#4b5563"/>
+    <text x="300" y="416" text-anchor="middle" font-size="14" fill="#111827">Genomic position (kb)</text>
+    <line x1="0" y1="370" x2="600" y2="370" stroke="#e5e7eb"/>
+    <line x1="-5" y1="370" x2="0" y2="370" stroke="#4b5563"/>
+    <text x="-9" y="370" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">0.1</text>
+    <line x1="0" y1="328.889" x2="600" y2="328.889" stroke="#e5e7eb"/>
+    <line x1="-5" y1="328.889" x2="0" y2="328.889" stroke="#4b5563"/>
+    <text x="-9" y="328.889" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">0.2</text>
+    <line x1="0" y1="287.778" x2="600" y2="287.778" stroke="#e5e7eb"/>
+    <line x1="-5" y1="287.778" x2="0" y2="287.778" stroke="#4b5563"/>
+    <text x="-9" y="287.778" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">0.3</text>
+    <line x1="0" y1="246.667" x2="600" y2="246.667" stroke="#e5e7eb"/>
+    <line x1="-5" y1="246.667" x2="0" y2="246.667" stroke="#4b5563"/>
+    <text x="-9" y="246.667" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">0.4</text>
+    <line x1="0" y1="205.556" x2="600" y2="205.556" stroke="#e5e7eb"/>
+    <line x1="-5" y1="205.556" x2="0" y2="205.556" stroke="#4b5563"/>
+    <text x="-9" y="205.556" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">0.5</text>
+    <line x1="0" y1="164.444" x2="600" y2="164.444" stroke="#e5e7eb"/>
+    <line x1="-5" y1="164.444" x2="0" y2="164.444" stroke="#4b5563"/>
+    <text x="-9" y="164.444" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">0.6</text>
+    <line x1="0" y1="123.333" x2="600" y2="123.333" stroke="#e5e7eb"/>
+    <line x1="-5" y1="123.333" x2="0" y2="123.333" stroke="#4b5563"/>
+    <text x="-9" y="123.333" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">0.7</text>
+    <line x1="0" y1="82.222" x2="600" y2="82.222" stroke="#e5e7eb"/>
+    <line x1="-5" y1="82.222" x2="0" y2="82.222" stroke="#4b5563"/>
+    <text x="-9" y="82.222" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">0.8</text>
+    <line x1="0" y1="41.111" x2="600" y2="41.111" stroke="#e5e7eb"/>
+    <line x1="-5" y1="41.111" x2="0" y2="41.111" stroke="#4b5563"/>
+    <text x="-9" y="41.111" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">0.9</text>
+    <line x1="0" y1="0" x2="600" y2="0" stroke="#e5e7eb"/>
+    <line x1="-5" y1="0" x2="0" y2="0" stroke="#4b5563"/>
+    <text x="-9" y="0" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">1</text>
+    <line x1="0" y1="0" x2="0" y2="370" stroke="#4b5563"/>
+    <text transform="translate(-48 185) rotate(-90)" text-anchor="middle" font-size="14" fill="#111827">Signal</text>
+    <defs><clipPath id="plot-clip"><rect width="600" height="370"/></clipPath></defs>
+    <g clip-path="url(#plot-clip)">
+      <circle class="series-point" cx="120" cy="337.111" r="4" fill="#003366"><title>1, 0.18</title></circle>
+      <circle class="series-point" cx="180" cy="279.556" r="4" fill="#003366"><title>2, 0.32</title></circle>
+      <circle class="series-point" cx="240" cy="300.111" r="4" fill="#003366"><title>3, 0.27</title></circle>
+      <circle class="series-point" cx="300" cy="201.444" r="4" fill="#003366"><title>4, 0.51</title></circle>
+      <circle class="series-point" cx="360" cy="152.111" r="4" fill="#003366"><title>5, 0.63</title></circle>
+      <circle class="series-point" cx="420" cy="172.667" r="4" fill="#003366"><title>6, 0.58</title></circle>
+      <circle class="series-point" cx="480" cy="86.333" r="4" fill="#003366"><title>7, 0.79</title></circle>
+      <circle class="series-point" cx="540" cy="49.333" r="4" fill="#003366"><title>8, 0.88</title></circle>
+    </g>
+  </g>
+</svg>

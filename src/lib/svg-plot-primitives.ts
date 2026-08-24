@@ -342,5 +342,5 @@ ${yAxis}
 ${renderMarks(layout)}
     </g>
   </g>
-</svg>`;
+</svg>\n`;
 }
