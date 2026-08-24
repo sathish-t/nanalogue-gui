@@ -1,58 +1,8 @@
-// XY series SVG renderer backed by Vega-Lite.
-// Compiles a declarative Vega-Lite spec from x/y point data and renders it
-// to an SVG string using Vega's server-side (no-DOM) renderer.
+// Dependency-free x/y series SVG renderer.
 // No file I/O — pure data-in / SVG-string-out. Used by plot_series.
 
-import type * as vega from "vega";
 import type { XYPoint } from "./stats";
-
-/** Minimal object shape for Vega-Lite top-level specs. */
-type TopLevelSpec = Record<string, unknown>;
-
-/** Lazy-loaded Vega runtime module. */
-type VegaModule = typeof import("vega");
-/** Vega runtime spec type produced by Vega-Lite compile(). */
-type VegaSpec = Parameters<typeof vega.parse>[0];
-
-/** Result of compiling a Vega-Lite spec. */
-interface VegaLiteCompileResult {
-    /** Compiled Vega runtime spec. */
-    spec: VegaSpec;
-}
-
-/** Subset of the Vega-Lite module API used by this renderer. */
-interface VegaLiteModule {
-    /** Compiles a Vega-Lite spec into a Vega runtime spec. */
-    compile(spec: TopLevelSpec): VegaLiteCompileResult;
-}
-
-/** Cached promise for the Vega runtime module. */
-let vegaPromise: Promise<VegaModule> | null = null;
-/** Cached promise for the Vega-Lite module. */
-let vegaLitePromise: Promise<VegaLiteModule> | null = null;
-
-/**
- * Loads the Vega runtime once and reuses the same promise.
- *
- * @returns The cached Vega module promise.
- */
-async function loadVega(): Promise<VegaModule> {
-    vegaPromise ??= import("vega");
-    return vegaPromise;
-}
-
-/**
- * Loads Vega-Lite once and reuses the same promise.
- *
- * @returns The cached Vega-Lite module promise.
- */
-async function loadVegaLite(): Promise<VegaLiteModule> {
-    // @ts-expect-error - vega-lite is an external ESM dependency resolved at runtime.
-    vegaLitePromise ??= import("vega-lite").then(
-        (module) => module as unknown as VegaLiteModule,
-    );
-    return vegaLitePromise;
-}
+import { findPlotValueExtent, renderSvgPlot } from "./svg-plot-primitives";
 
 // --- Public types ---
 
@@ -65,7 +15,7 @@ export interface XYOptions {
     xlabel?: string;
     /** Label for the y-axis. Defaults to "y". */
     ylabel?: string;
-    /** Explicit [min, max] x-axis domain. Defaults to the data extent. */
+    /** Explicit [min, max] x-axis domain. Defaults to a zero-inclusive data extent. */
     xlim?: [number, number];
     /** Explicit [min, max] y-axis domain. Defaults to the data extent. */
     ylim?: [number, number];
@@ -73,23 +23,39 @@ export interface XYOptions {
     title?: string;
 }
 
-// --- Constants ---
-
 /** Series mark colour (dark blue, matching the histogram renderer). */
 const SERIES_COLOUR = "#003366";
-/** Plot area width in pixels (Vega adds its own padding for axis labels). */
-const PLOT_WIDTH = 600;
-/** Plot area height in pixels. */
-const PLOT_HEIGHT = 370;
+/** Radius of each scatter-plot point in pixels. */
+const SCATTER_POINT_RADIUS = 4;
+/** Fraction of each data span reserved around automatic scatter-plot domains. */
+const SCATTER_DOMAIN_PADDING = 0.05;
+
+/**
+ * Adds breathing room around scatter points at an automatic domain boundary.
+ *
+ * @param domain - Automatic data domain to pad on both sides.
+ * @returns The domain expanded by five percent of its span on each side.
+ */
+function padScatterDomain(domain: [number, number]): [number, number] {
+    const span = domain[1] - domain[0];
+    if (!Number.isFinite(span)) return domain;
+    const padding = span * SCATTER_DOMAIN_PADDING;
+    const paddedMinimum = domain[0] - padding;
+    const paddedMaximum = domain[1] + padding;
+    return [
+        Number.isFinite(paddedMinimum) ? paddedMinimum : domain[0],
+        Number.isFinite(paddedMaximum) ? paddedMaximum : domain[1],
+    ];
+}
 
 // --- Main export ---
 
 /**
- * Renders an XY series as an SVG string using Vega-Lite.
+ * Renders an x/y series as a standalone SVG string without third-party code.
  *
- * The caller supplies pre-computed x/y point data; this function builds a
- * Vega-Lite spec, compiles it to a Vega runtime spec, and renders to SVG
- * server-side (no DOM required).
+ * Line points are ordered by x value. Automatic x-domains include zero,
+ * automatic scatter domains include mark padding, and all marks are clipped
+ * to the plot area.
  *
  * @param points - The data points to plot. Must be non-empty; validated by the caller.
  * @param kind - The mark type: "line" for a connected line, "scatter" for points only.
@@ -102,52 +68,56 @@ export async function renderXySvg(
     options: XYOptions = {},
 ): Promise<string> {
     const { xlabel = "x", ylabel = "y", title } = options;
+    const automaticXDomain = findPlotValueExtent(
+        points.map((point) => point.x),
+        true,
+    );
+    const automaticYDomain = findPlotValueExtent(
+        points.map((point) => point.y),
+    );
+    const xDomain =
+        options.xlim ??
+        (kind === "scatter"
+            ? padScatterDomain(automaticXDomain)
+            : automaticXDomain);
+    const yDomain =
+        options.ylim ??
+        (kind === "scatter"
+            ? padScatterDomain(automaticYDomain)
+            : automaticYDomain);
 
-    // Map XYPoint (camelCase) to plain row objects for Vega-Lite.
-    const values = points.map((p) => ({ x: p.x, y: p.y }));
-
-    // Vega-Lite mark type: "line" maps directly; "scatter" maps to "point".
-    const markType = kind === "scatter" ? "point" : "line";
-
-    // Build the Vega-Lite spec. Using `as TopLevelSpec` because the TypeScript
-    // union is too wide to narrow precisely for the mark/encoding combination.
-    const spec = {
-        $schema: "https://vega.github.io/schema/vega-lite/v5.json",
-        width: PLOT_WIDTH,
-        height: PLOT_HEIGHT,
-        background: "white",
-        ...(title ? { title: { text: title } } : {}),
-        data: { values },
-        mark: { type: markType, color: SERIES_COLOUR },
-        encoding: {
-            x: {
-                field: "x",
-                type: "quantitative",
-                title: xlabel,
-                ...(options.xlim ? { scale: { domain: options.xlim } } : {}),
-            },
-            y: {
-                field: "y",
-                type: "quantitative",
-                title: ylabel,
-                // Default to data extent rather than forcing zero — more useful
-                // for general-purpose line and scatter plots.
-                scale: options.ylim
-                    ? { domain: options.ylim }
-                    : { zero: false },
-            },
+    return renderSvgPlot(
+        {
+            accessibleTitle: kind === "line" ? "Line chart" : "Scatter plot",
+            description: `${kind === "line" ? "Line chart" : "Scatter plot"} containing ${points.length} points.`,
+            xlabel,
+            ylabel,
+            title,
+            xDomain,
+            yDomain,
+            niceX: options.xlim === undefined,
+            niceY: options.ylim === undefined,
         },
-        config: {
-            axis: { labelFontSize: 12, titleFontSize: 14 },
-        },
-    } as TopLevelSpec;
+        ({ scaleX, scaleY, formatCoordinate }) => {
+            if (kind === "scatter") {
+                return points
+                    .map(
+                        (point) =>
+                            `      <circle class="series-point" cx="${formatCoordinate(scaleX(point.x))}" cy="${formatCoordinate(scaleY(point.y))}" r="${SCATTER_POINT_RADIUS}" fill="${SERIES_COLOUR}"><title>${point.x}, ${point.y}</title></circle>`,
+                    )
+                    .join("\n");
+            }
 
-    const [vega, { compile }] = await Promise.all([loadVega(), loadVegaLite()]);
-    const vegaSpec = compile(spec).spec;
-    const view = new vega.View(vega.parse(vegaSpec), { renderer: "none" });
-    try {
-        return await view.toSVG();
-    } finally {
-        view.finalize();
-    }
+            const orderedPoints = [...points].sort(
+                (left, right) => left.x - right.x,
+            );
+            const path = orderedPoints
+                .map((point, index) => {
+                    const command = index === 0 ? "M" : "L";
+                    return `${command}${formatCoordinate(scaleX(point.x))},${formatCoordinate(scaleY(point.y))}`;
+                })
+                .join("");
+            return `      <path class="series-line" d="${path}" fill="none" stroke="${SERIES_COLOUR}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+        },
+    );
 }

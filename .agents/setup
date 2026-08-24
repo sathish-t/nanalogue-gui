@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+setup_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repository_root="$(cd "$setup_directory/.." && pwd)"
+# shellcheck source=node-toolchain.env
+source "$setup_directory/node-toolchain.env"
+
+if [[ "$(uname -m)" != "x86_64" ]]; then
+  echo "orb setup: unsupported architecture $(uname -m); expected x86_64" >&2
+  exit 1
+fi
+
+node_archive="node-v${NANALOGUE_NODE_VERSION}-linux-x64.tar.xz"
+node_download_url="https://nodejs.org/dist/v${NANALOGUE_NODE_VERSION}/${node_archive}"
+toolchain_data_directory="${XDG_DATA_HOME:-$HOME/.local/share}/nanalogue-gui"
+toolchain_cache_directory="${XDG_CACHE_HOME:-$HOME/.cache}/nanalogue-gui/toolchains"
+node_install_directory="$toolchain_data_directory/${node_archive%.tar.xz}"
+node_toolchain_link="$toolchain_data_directory/node-toolchain"
+node_archive_path="$toolchain_cache_directory/$node_archive"
+
+mkdir -p "$toolchain_data_directory" "$toolchain_cache_directory"
+
+if [[ ! -x "$node_install_directory/bin/node" ]]; then
+  echo "Installing verified Node.js ${NANALOGUE_NODE_VERSION} toolchain..."
+  if [[ -f "$node_archive_path" ]] &&
+    ! printf '%s  %s\n' "$NANALOGUE_NODEJS_TOOLCHAIN_LINUX_X64_SHA256" "$node_archive_path" | sha256sum --check --status; then
+    rm -- "$node_archive_path"
+  fi
+
+  if [[ ! -f "$node_archive_path" ]]; then
+    rm -f -- "$node_archive_path.download"
+    curl --fail --location --proto '=https' --tlsv1.2 --retry 3 \
+      --output "$node_archive_path.download" "$node_download_url"
+    printf '%s  %s\n' "$NANALOGUE_NODEJS_TOOLCHAIN_LINUX_X64_SHA256" "$node_archive_path.download" | sha256sum --check --status
+    mv -- "$node_archive_path.download" "$node_archive_path"
+  fi
+
+  extraction_directory="$(mktemp -d "$toolchain_data_directory/.node-extract.XXXXXX")"
+  trap 'rm -rf -- "$extraction_directory"' EXIT INT TERM
+  tar -xJf "$node_archive_path" -C "$extraction_directory"
+  rm -rf -- "$node_install_directory"
+  mv -- "$extraction_directory/${node_archive%.tar.xz}" "$node_install_directory"
+  rm -rf -- "$extraction_directory"
+  trap - EXIT INT TERM
+fi
+
+installed_node_version="$($node_install_directory/bin/node --version)"
+installed_npm_version="$(PATH="$node_install_directory/bin:$PATH" "$node_install_directory/bin/npm" --version)"
+if [[ "$installed_node_version" != "v${NANALOGUE_NODE_VERSION}" ]] ||
+  [[ "$installed_npm_version" != "$NANALOGUE_NPM_VERSION" ]]; then
+  echo "orb setup: pinned toolchain mismatch (Node $installed_node_version, npm $installed_npm_version)" >&2
+  exit 1
+fi
+
+if [[ -e "$node_toolchain_link" && ! -L "$node_toolchain_link" ]]; then
+  echo "orb setup: $node_toolchain_link exists and is not a symbolic link" >&2
+  exit 1
+fi
+ln -sfn -- "$node_install_directory" "$node_toolchain_link"
+
+profile_marker="# nanalogue-gui orb Node toolchain"
+profile_file="$HOME/.bash_profile"
+touch "$profile_file"
+if ! grep -Fqx "$profile_marker" "$profile_file"; then
+  cat >> "$profile_file" <<EOF
+
+$profile_marker
+case "\$PWD/" in
+  "$repository_root/"*) export PATH="$node_toolchain_link/bin:\$PATH" ;;
+esac
+EOF
+fi
+
+export PATH="$node_toolchain_link/bin:$PATH"
+echo "Using Node $(node --version) and npm $(npm --version)."
+echo "Installing locked npm dependencies..."
+npm ci --ignore-scripts
+npm rebuild electron esbuild electron-winstaller
+git config core.hooksPath .githooks

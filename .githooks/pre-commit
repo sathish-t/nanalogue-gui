@@ -27,10 +27,33 @@ fi
 # Keeps package-lock.json in sync with package.json so that
 # npm ci in CI does not fail on optional-dependency mismatches.
 
-# Load nvm (shell function, not on PATH in non-interactive shells)
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+# Use the repository's pinned toolchain. Orb setup installs the verified
+# official Node distribution; local developers may activate the same versions
+# with their preferred version manager.
+if [ ! -r .agents/node-toolchain.env ]; then
+  echo "pre-commit: .agents/node-toolchain.env is missing" >&2
+  exit 1
+fi
 # shellcheck source=/dev/null
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+source .agents/node-toolchain.env
+
+has_pinned_node_toolchain() {
+  [ "$(node --version 2>/dev/null)" = "v${NANALOGUE_NODE_VERSION}" ] &&
+    [ "$(npm --version 2>/dev/null)" = "$NANALOGUE_NPM_VERSION" ]
+}
+
+if ! has_pinned_node_toolchain; then
+  provisioned_node_bin="${XDG_DATA_HOME:-$HOME/.local/share}/nanalogue-gui/node-toolchain/bin"
+  if [ -x "$provisioned_node_bin/node" ] && [ -x "$provisioned_node_bin/npm" ]; then
+    export PATH="$provisioned_node_bin:$PATH"
+  fi
+fi
+
+if ! has_pinned_node_toolchain; then
+  echo "pre-commit: requires Node v${NANALOGUE_NODE_VERSION} and npm ${NANALOGUE_NPM_VERSION}" >&2
+  echo "  In an Amp orb, run .agents/setup. Otherwise activate the pinned versions locally." >&2
+  exit 1
+fi
 
 if git diff --cached --name-only | grep -q '^package\(-lock\)\?\.json$'; then
   # Use the staged version of package.json for lock file generation
@@ -42,9 +65,7 @@ if git diff --cached --name-only | grep -q '^package\(-lock\)\?\.json$'; then
   cp "$staged_pkg" package.json
   rm "$staged_pkg"
 
-  # Use Node 22 (minimum supported version) so the lock file is
-  # compatible with npm ci on both Node 22 and Node 24 in CI.
-  if ! nvm exec 22 npm install --package-lock-only --ignore-scripts; then
+  if ! npm install --package-lock-only --ignore-scripts; then
     echo "pre-commit: npm install --package-lock-only failed, aborting commit" >&2
     exit 1
   fi

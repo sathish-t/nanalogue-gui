@@ -46,6 +46,7 @@ src/lib/sandbox-cli-args.ts	100
 src/lib/sandbox-prompt-text.ts	100
 src/lib/sandbox-prompt.ts	100
 src/lib/stats.ts	98.33
+src/lib/svg-plot-primitives.ts	100
 src/lib/swipe-contract.ts	100
 src/lib/swipe-data-loader.ts	100
 src/lib/system-append.ts	100

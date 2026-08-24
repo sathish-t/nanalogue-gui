@@ -74,6 +74,8 @@ Zone.Identifier
 # ===================
 # Project-specific (local development)
 # ===================
+# Amp orb portal metadata
+.amp/portals/
 # Sandbox temp files created by bash() inside the allowed directory
 ai_chat_temp_files/
 # SVG/file outputs written by plot_histogram and other sandbox tools

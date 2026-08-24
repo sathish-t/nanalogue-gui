@@ -28,7 +28,7 @@ src/
     chat-session.ts                                 # Reusable chat session state for the AI Chat feature.
     chat-types.ts                                   # Shared types for the AI Chat feature.
     format-utils.ts                                 # Pure formatting and trimming utilities shared across renderer pages.
-    histogram-renderer.ts                           # Histogram SVG renderer backed by Vega-Lite.
+    histogram-renderer.ts                           # Dependency-free histogram SVG renderer.
     histogram.ts                                    # Streaming histogram accumulator for binning data without storing raw arrays
     ipc-path-validation.ts                          # IPC path validation: guards file-path arguments in main-process IPC handlers
     line-counter.ts                                 # Streaming utilities for counting lines in text and BED files
@@ -46,11 +46,12 @@ src/
     sandbox-prompt-text.ts                          # Contains the large built-in sandbox prompt template used for AI chat.
     sandbox-prompt.ts                               # Builds the LLM system prompt and assembles the full system message sent on every turn.
     stats.ts                                        # Statistics utilities for QC calculations
+    svg-plot-primitives.ts                          # Dependency-free SVG primitives shared by histogram and x/y plot renderers.
     swipe-contract.ts
     swipe-data-loader.ts                            # Swipe data loader using nanalogue-node
     system-append.ts                                # Loads the optional SYSTEM_APPEND.md file from an analysis directory.
     types.ts                                        # Type definitions shared across nanalogue-gui modes
-    xy-renderer.ts                                  # XY series SVG renderer backed by Vega-Lite.
+    xy-renderer.ts                                  # Dependency-free x/y series SVG renderer.
     ai-external-tools/
       bam-mods.ts           # External tool: bam_mods
       bash.ts               # External tool: bash

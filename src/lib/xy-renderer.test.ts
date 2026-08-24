@@ -1,8 +1,6 @@
-// Unit tests for the Vega-Lite XY series renderer.
+// Unit tests for the dependency-free x/y series SVG renderer.
 // Verifies that renderXySvg returns well-formed SVG and that labels, titles,
-// kind, and options are reflected in the output. Structural details of the
-// SVG (element layout, exact coordinates) are deliberately not tested —
-// those are Vega's responsibility.
+// kind, options, and mark geometry are reflected in the output.
 
 import { describe, expect, it } from "vitest";
 import type { XYPoint } from "./stats";
@@ -39,6 +37,7 @@ describe("renderXySvg — basic structure", () => {
         const svg = await renderXySvg(ONE_POINT, "scatter");
         expect(svg).toContain("<svg");
         expect(svg).toContain("</svg>");
+        expect(svg).not.toContain("NaN");
     });
 
     it("produces valid SVG for a larger dataset", async () => {
@@ -55,17 +54,64 @@ describe("renderXySvg — basic structure", () => {
 
 describe("renderXySvg — kind", () => {
     it("renders line kind without throwing", async () => {
-        await expect(renderXySvg(POINTS, "line")).resolves.toContain("<svg");
+        await expect(renderXySvg(POINTS, "line")).resolves.toContain(
+            'class="series-line"',
+        );
     });
 
     it("renders scatter kind without throwing", async () => {
-        await expect(renderXySvg(POINTS, "scatter")).resolves.toContain("<svg");
+        const svg = await renderXySvg(POINTS, "scatter");
+        expect(svg.match(/class="series-point"/g)).toHaveLength(3);
+        expect(svg).toContain('<g clip-path="url(#plot-clip)">');
     });
 
     it("produces different SVG for line vs scatter", async () => {
         const lineSvg = await renderXySvg(POINTS, "line");
         const scatterSvg = await renderXySvg(POINTS, "scatter");
         expect(lineSvg).not.toBe(scatterSvg);
+    });
+
+    it("orders line points by x value", async () => {
+        const svg = await renderXySvg(
+            [
+                { x: 3, y: 15 },
+                { x: 1, y: 10 },
+                { x: 2, y: 20 },
+            ],
+            "line",
+            { xlim: [1, 3], ylim: [10, 20] },
+        );
+        expect(svg).toContain('d="M0,370L300,0L600,185"');
+    });
+
+    it("renders extreme finite scatter domains without invalid coordinates", async () => {
+        const pointSets: XYPoint[][] = [
+            [
+                { x: -Number.MAX_VALUE, y: -1 },
+                { x: Number.MAX_VALUE, y: 1 },
+            ],
+            [{ x: Number.MAX_VALUE, y: Number.MAX_VALUE }],
+            [{ x: -Number.MAX_VALUE, y: -Number.MAX_VALUE }],
+        ];
+        for (const points of pointSets) {
+            const svg = await renderXySvg(points, "scatter");
+            expect(svg).not.toContain("NaN");
+            expect(svg).not.toContain("Infinity");
+        }
+    });
+
+    it.each([
+        "line",
+        "scatter",
+    ] as const)("includes zero in the automatic x-domain for %s plots", async (kind) => {
+        const svg = await renderXySvg(
+            [
+                { x: 100, y: 1_000 },
+                { x: 110, y: 2_000 },
+            ],
+            kind,
+        );
+        expect(svg).toContain(">0</text>");
     });
 });
 
@@ -74,7 +120,7 @@ describe("renderXySvg — kind", () => {
 describe("renderXySvg — labels and title", () => {
     it("includes the default xlabel 'x' in the SVG", async () => {
         const svg = await renderXySvg(POINTS, "line");
-        expect(svg).toContain("x");
+        expect(svg).toContain(">x</text>");
     });
 
     it("includes custom xlabel in the SVG", async () => {
@@ -106,9 +152,8 @@ describe("renderXySvg — labels and title", () => {
 describe("renderXySvg — options", () => {
     it("accepts xlim without throwing", async () => {
         const opts: XYOptions = { xlim: [0, 5] };
-        await expect(renderXySvg(POINTS, "line", opts)).resolves.toContain(
-            "<svg",
-        );
+        const svg = await renderXySvg(POINTS, "line", opts);
+        expect(svg).toContain('<g clip-path="url(#plot-clip)">');
     });
 
     it("accepts ylim without throwing", async () => {
@@ -138,15 +183,21 @@ describe("renderXySvg — options", () => {
 // --- XML special characters ---
 
 describe("renderXySvg — special characters in labels", () => {
-    it("renders without throwing when xlabel contains special characters", async () => {
-        await expect(
-            renderXySvg(POINTS, "line", { xlabel: "A & B < C > D" }),
-        ).resolves.toContain("<svg");
+    it("escapes special characters in axis labels", async () => {
+        const svg = await renderXySvg(POINTS, "line", {
+            xlabel: "A & B < C > D",
+        });
+        expect(svg).toContain("A &amp; B &lt; C &gt; D");
+        expect(svg).not.toContain("A & B < C > D");
     });
 
-    it("renders without throwing when title contains special characters", async () => {
-        await expect(
-            renderXySvg(POINTS, "scatter", { title: 'Values "quoted"' }),
-        ).resolves.toContain("<svg");
+    it("escapes special characters in titles", async () => {
+        const svg = await renderXySvg(POINTS, "scatter", {
+            title: '<script>"quoted"</script>',
+        });
+        expect(svg).toContain(
+            "&lt;script&gt;&quot;quoted&quot;&lt;/script&gt;",
+        );
+        expect(svg).not.toContain("<script>");
     });
 });

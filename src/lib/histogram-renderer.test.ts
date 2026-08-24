@@ -1,8 +1,6 @@
-// Unit tests for the Vega-Lite histogram renderer.
+// Unit tests for the dependency-free histogram SVG renderer.
 // Verifies that renderHistogramSvg returns well-formed SVG and that labels,
-// titles, and options are reflected in the output. Structural details of the
-// SVG (element layout, exact coordinates) are deliberately not tested — those
-// are Vega's responsibility.
+// titles, options, and non-uniform bar geometry are reflected in the output.
 
 import { describe, expect, it } from "vitest";
 import type { HistogramOptions } from "./histogram-renderer";
@@ -34,6 +32,11 @@ describe("renderHistogramSvg — basic structure", () => {
         expect(svg.length).toBeGreaterThan(100);
     });
 
+    it("renders one bar for each bin", async () => {
+        const svg = await renderHistogramSvg(TWO_BINS);
+        expect(svg.match(/class="histogram-bar"/g)).toHaveLength(2);
+    });
+
     it("produces a valid SVG for a single-bin dataset", async () => {
         const svg = await renderHistogramSvg(ONE_BIN);
         expect(svg).toContain("<svg");
@@ -56,7 +59,7 @@ describe("renderHistogramSvg — basic structure", () => {
 describe("renderHistogramSvg — labels and title", () => {
     it("includes the default xlabel 'x' in the SVG", async () => {
         const svg = await renderHistogramSvg(TWO_BINS);
-        expect(svg).toContain("x");
+        expect(svg).toContain(">x</text>");
     });
 
     it("includes custom xlabel in the SVG", async () => {
@@ -93,6 +96,8 @@ describe("renderHistogramSvg — options", () => {
         await expect(renderHistogramSvg(TWO_BINS, opts)).resolves.toContain(
             "<svg",
         );
+        const svg = await renderHistogramSvg(TWO_BINS, opts);
+        expect(svg).toContain('clip-path="url(#plot-clip)"');
     });
 
     it("accepts ylim without throwing", async () => {
@@ -109,28 +114,38 @@ describe("renderHistogramSvg — options", () => {
         );
     });
 
-    it("handles non-uniform bin widths without throwing", async () => {
+    it("maps non-uniform bin widths proportionally", async () => {
         const bins: HistogramBin[] = [
             { binStart: 0, binEnd: 5, count: 3 },
             { binStart: 5, binEnd: 15, count: 6 },
             { binStart: 15, binEnd: 100, count: 1 },
         ];
-        await expect(renderHistogramSvg(bins)).resolves.toContain("<svg");
+        const svg = await renderHistogramSvg(bins, { xlim: [0, 100] });
+        const widths = [
+            ...svg.matchAll(/class="histogram-bar"[^>]+width="([^"]+)"/g),
+        ].map((match) => Number(match[1]));
+        expect(widths).toEqual([30, 60, 510]);
     });
 });
 
 // --- XML special characters ---
 
 describe("renderHistogramSvg — special characters in labels", () => {
-    it("renders without throwing when xlabel contains special characters", async () => {
-        await expect(
-            renderHistogramSvg(TWO_BINS, { xlabel: "A & B < C > D" }),
-        ).resolves.toContain("<svg");
+    it("escapes special characters in axis labels", async () => {
+        const svg = await renderHistogramSvg(TWO_BINS, {
+            xlabel: "A & B < C > D",
+        });
+        expect(svg).toContain("A &amp; B &lt; C &gt; D");
+        expect(svg).not.toContain("A & B < C > D");
     });
 
-    it("renders without throwing when title contains special characters", async () => {
-        await expect(
-            renderHistogramSvg(TWO_BINS, { title: 'Values "quoted"' }),
-        ).resolves.toContain("<svg");
+    it("escapes special characters in titles", async () => {
+        const svg = await renderHistogramSvg(TWO_BINS, {
+            title: '<script>"quoted"</script>',
+        });
+        expect(svg).toContain(
+            "&lt;script&gt;&quot;quoted&quot;&lt;/script&gt;",
+        );
+        expect(svg).not.toContain("<script>");
     });
 });
