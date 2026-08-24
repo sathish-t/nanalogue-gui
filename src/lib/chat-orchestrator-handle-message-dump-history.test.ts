@@ -46,6 +46,10 @@ describe("/dump_history slash command", () => {
             "No conversation history yet, nothing to dump.",
         );
         expect(history).toHaveLength(0);
+        expect(events.map((event) => event.type)).toEqual([
+            "turn_start",
+            "turn_end",
+        ]);
         await expect(readdir(join(tmpDir, "ai_chat_output"))).rejects.toThrow();
     });
 

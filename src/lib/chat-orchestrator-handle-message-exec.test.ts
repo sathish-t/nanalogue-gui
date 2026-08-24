@@ -84,7 +84,7 @@ describe("/exec slash command", () => {
 
         expect(history).toHaveLength(0);
         const types = events.map((e) => e.type);
-        expect(types).toContain("turn_start");
+        expect(types).not.toContain("turn_start");
         // turn_error is emitted by ChatSession.sendMessage, not handleUserMessage
         expect(types).not.toContain("turn_error");
     });
@@ -116,6 +116,7 @@ describe("/exec slash command", () => {
         ).rejects.toThrow(".py");
 
         expect(history).toHaveLength(0);
+        expect(events.map((event) => event.type)).not.toContain("turn_start");
     });
 
     it("handles extra whitespace between /exec and filename", async () => {

@@ -5,7 +5,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AiChatSendMessageResult } from "../../lib/chat-types";
+import type {
+    AiChatEvent,
+    AiChatSendMessageResult,
+} from "../../lib/chat-types";
 
 /** Shape of the mock preload API used by the renderer module. */
 interface MockApi {
@@ -69,6 +72,7 @@ async function click(id: string): Promise<void> {
 
 describe("AI Chat reset races", () => {
     let api: MockApi;
+    let emitAiChatEvent: (event: AiChatEvent) => void;
 
     beforeEach(async () => {
         vi.resetModules();
@@ -87,7 +91,12 @@ describe("AI Chat reset races", () => {
             aiChatGoBack: vi.fn().mockResolvedValue(undefined),
             aiChatConsent: vi.fn().mockResolvedValue(undefined),
             aiChatGetSystemPrompt: vi.fn(),
-            onAiChatEvent: vi.fn(),
+            onAiChatEvent: vi.fn(
+                (listener: (event: AiChatEvent) => void): (() => void) => {
+                    emitAiChatEvent = listener;
+                    return () => {};
+                },
+            ),
         };
         (
             window as unknown as { /** Mock preload bridge. */ api: MockApi }
@@ -169,6 +178,250 @@ describe("AI Chat reset races", () => {
         expect(
             document.getElementById("chat-messages")?.textContent,
         ).not.toContain("stale response");
+    });
+
+    it("adds and clears a pending user message only after turn_start", async () => {
+        let resolveSend!: (result: AiChatSendMessageResult) => void;
+        api.aiChatSendMessage.mockReturnValueOnce(
+            new Promise((resolve) => {
+                resolveSend = resolve;
+            }),
+        );
+        setSendFields("http://localhost:11434/v1", "hello");
+
+        await click("btn-send");
+
+        const input = document.getElementById(
+            "input-message",
+        ) as HTMLInputElement;
+        const messages = document.getElementById(
+            "chat-messages",
+        ) as HTMLDivElement;
+        expect(input.value).toBe("hello");
+        expect(messages.textContent).not.toContain("hello");
+
+        emitAiChatEvent({ type: "turn_start" });
+        emitAiChatEvent({ type: "turn_start" });
+
+        expect(input.value).toBe("");
+        expect(messages.textContent?.match(/hello/g)).toHaveLength(1);
+
+        resolveSend({ success: true, text: "done" });
+        await flushMicrotasks();
+    });
+
+    it("keeps the draft and ignores turn_start after preflight cancellation", async () => {
+        let resolveSend!: (result: AiChatSendMessageResult) => void;
+        api.aiChatSendMessage.mockReturnValueOnce(
+            new Promise((resolve) => {
+                resolveSend = resolve;
+            }),
+        );
+        setSendFields("http://localhost:11434/v1", "retry me");
+
+        await click("btn-send");
+        await click("btn-cancel");
+        emitAiChatEvent({ type: "turn_start" });
+
+        expect(
+            (document.getElementById("input-message") as HTMLInputElement)
+                .value,
+        ).toBe("retry me");
+        expect(
+            document.getElementById("chat-messages")?.textContent,
+        ).not.toContain("retry me");
+
+        resolveSend({
+            success: false,
+            reason: "cancelled",
+            error: "Cancelled",
+        });
+        await flushMicrotasks();
+    });
+
+    it("keeps an immediate retry isolated from a cancelled send result", async () => {
+        let resolveCancelledSend!: (result: AiChatSendMessageResult) => void;
+        let resolveRetry!: (result: AiChatSendMessageResult) => void;
+        api.aiChatSendMessage
+            .mockReturnValueOnce(
+                new Promise((resolve) => {
+                    resolveCancelledSend = resolve;
+                }),
+            )
+            .mockReturnValueOnce(
+                new Promise((resolve) => {
+                    resolveRetry = resolve;
+                }),
+            );
+        setSendFields("http://localhost:11434/v1", "cancelled draft");
+
+        await click("btn-send");
+        await click("btn-cancel");
+        (
+            document.getElementById("opt-max-code-rounds") as HTMLInputElement
+        ).value = "17";
+        (document.getElementById("input-message") as HTMLInputElement).value =
+            "retry draft";
+        await click("btn-send");
+
+        resolveCancelledSend({
+            success: false,
+            reason: "cancelled",
+            error: "Cancelled",
+        });
+        await flushMicrotasks();
+
+        expect(
+            document.getElementById("chat-messages")?.textContent,
+        ).not.toContain("Request cancelled");
+        expect(
+            (document.getElementById("input-message") as HTMLInputElement)
+                .value,
+        ).toBe("retry draft");
+        expect(
+            (document.getElementById("btn-cancel") as HTMLButtonElement)
+                .classList,
+        ).not.toContain("hidden");
+        expect(api.aiChatSendMessage).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                message: "retry draft",
+                config: expect.objectContaining({ maxCodeRounds: 17 }),
+            }),
+        );
+
+        emitAiChatEvent({ type: "turn_start" });
+        resolveRetry({ success: true, text: "retry response" });
+        await flushMicrotasks();
+        expect(document.getElementById("chat-messages")?.textContent).toContain(
+            "retry draft",
+        );
+    });
+
+    it("does not grant consent or resend after cancellation", async () => {
+        api.aiChatSendMessage.mockResolvedValueOnce({
+            success: false,
+            reason: "consent_required",
+            error: "CONSENT_REQUIRED",
+            origin: "https://api.example.com",
+        });
+        setSendFields("https://api.example.com/v1", "cancel consent");
+
+        await click("btn-send");
+        await click("btn-cancel");
+        await click("btn-consent-accept");
+
+        expect(api.aiChatConsent).not.toHaveBeenCalled();
+        expect(api.aiChatSendMessage).toHaveBeenCalledOnce();
+        expect(
+            (document.getElementById("input-message") as HTMLInputElement)
+                .value,
+        ).toBe("cancel consent");
+    });
+
+    it("keeps an accepted turn and config locked when cancelled", async () => {
+        let resolveSend!: (result: AiChatSendMessageResult) => void;
+        api.aiChatSendMessage.mockReturnValueOnce(
+            new Promise((resolve) => {
+                resolveSend = resolve;
+            }),
+        );
+        setSendFields("http://localhost:11434/v1", "accepted message");
+
+        await click("btn-send");
+        emitAiChatEvent({ type: "turn_start" });
+        await click("btn-cancel");
+
+        expect(
+            (document.getElementById("input-message") as HTMLInputElement)
+                .value,
+        ).toBe("");
+        expect(document.getElementById("chat-messages")?.textContent).toContain(
+            "accepted message",
+        );
+        expect(
+            (document.getElementById("input-dir") as HTMLInputElement).disabled,
+        ).toBe(true);
+
+        resolveSend({
+            success: false,
+            reason: "cancelled",
+            error: "Cancelled",
+            promptSnapshotAccepted: true,
+        });
+        await flushMicrotasks();
+        expect(
+            (document.getElementById("input-dir") as HTMLInputElement).disabled,
+        ).toBe(true);
+    });
+
+    it("does not accept a pending user message after New Chat", async () => {
+        api.aiChatSendMessage.mockReturnValueOnce(
+            new Promise<AiChatSendMessageResult>(() => {}),
+        );
+        setSendFields("http://localhost:11434/v1", "old draft");
+
+        await click("btn-send");
+        await click("btn-new-chat");
+        emitAiChatEvent({ type: "turn_start" });
+
+        expect(
+            document.getElementById("chat-messages")?.textContent,
+        ).not.toContain("old draft");
+    });
+
+    it("adds one user bubble when consent retry reaches turn_start", async () => {
+        api.aiChatSendMessage
+            .mockResolvedValueOnce({
+                success: false,
+                reason: "consent_required",
+                error: "CONSENT_REQUIRED",
+                origin: "https://api.example.com",
+            })
+            .mockImplementationOnce(async () => {
+                emitAiChatEvent({ type: "turn_start" });
+                return { success: true, text: "done" };
+            });
+        setSendFields("https://api.example.com/v1", "consented message");
+
+        await click("btn-send");
+        await click("btn-consent-accept");
+
+        expect(api.aiChatSendMessage).toHaveBeenCalledTimes(2);
+        expect(
+            document
+                .getElementById("chat-messages")
+                ?.textContent?.match(/consented message/g),
+        ).toHaveLength(1);
+        expect(
+            (document.getElementById("input-message") as HTMLInputElement)
+                .value,
+        ).toBe("");
+    });
+
+    it("locks config after accepted preflight followed by an LLM failure", async () => {
+        api.aiChatSendMessage.mockResolvedValueOnce({
+            success: false,
+            reason: "error",
+            error: "connection refused",
+            isTimeout: false,
+            promptSnapshotAccepted: true,
+        });
+        setSendFields("http://localhost:11434/v1", "hello");
+
+        await click("btn-send");
+
+        expect(
+            (document.getElementById("input-dir") as HTMLInputElement).disabled,
+        ).toBe(true);
+        expect(
+            (document.getElementById("btn-browse") as HTMLButtonElement)
+                .disabled,
+        ).toBe(true);
+
+        await click("btn-new-chat");
+        expect(
+            (document.getElementById("input-dir") as HTMLInputElement).disabled,
+        ).toBe(false);
     });
 
     it.each([

@@ -46,6 +46,10 @@ describe("/dump_system_prompt slash command", () => {
         expect(result.text).toContain("System prompt dumped to");
         expect(result.text).toContain("not fed back to the LLM");
         expect(result.steps).toHaveLength(0);
+        expect(events.map((event) => event.type)).toEqual([
+            "turn_start",
+            "turn_end",
+        ]);
 
         const files = await readdir(join(tmpDir, "ai_chat_output"));
         expect(files).toHaveLength(1);

@@ -123,7 +123,7 @@ export function validateAdvancedConfig(): string | null {
 }
 
 /**
- * Disables all session config fields after the first successful send.
+ * Disables all session config fields after prompt preflight accepts the session.
  */
 export function lockSessionConfig(): void {
     inputDir.disabled = true;

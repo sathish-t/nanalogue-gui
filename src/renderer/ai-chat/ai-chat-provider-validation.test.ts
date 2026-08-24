@@ -170,6 +170,13 @@ describe("AI Chat provider validation", () => {
         expect(window.alert).toHaveBeenCalledWith(
             "Analysis directory does not exist or is not accessible",
         );
+        expect(
+            (document.getElementById("input-message") as HTMLInputElement)
+                .value,
+        ).toBe("hello");
+        expect(
+            document.getElementById("chat-messages")?.textContent,
+        ).not.toContain("hello");
     });
 
     it("keeps Advanced Options open when numeric input is malformed", () => {

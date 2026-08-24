@@ -225,7 +225,9 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
             "## Domain context\nFocus on CpG methylation.",
         );
 
-        await invokeSendMessage();
+        const acceptedResult = await invokeSendMessage();
+
+        expect(acceptedResult).toMatchObject({ promptSnapshotAccepted: true });
 
         expect(mockSendMessage).toHaveBeenCalledOnce();
         expect(mockSendMessage).toHaveBeenCalledWith(
@@ -239,7 +241,9 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
     it("passes undefined appendSystemPrompt when SYSTEM_APPEND.md is absent", async () => {
         setMockResolvedValue(loadSystemAppend, undefined);
 
-        await invokeSendMessage();
+        const acceptedResult = await invokeSendMessage();
+
+        expect(acceptedResult).toMatchObject({ promptSnapshotAccepted: true });
 
         expect(mockSendMessage).toHaveBeenCalledOnce();
         expect(mockSendMessage).toHaveBeenCalledWith(
@@ -305,23 +309,25 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         expect(mockSendMessage).not.toHaveBeenCalled();
     });
 
-    it("re-reads SYSTEM_APPEND.md after a failed first send", async () => {
-        setMockResolvedValueOnce(loadSystemAppend, undefined);
+    it("keeps the prompt snapshot after a failed first LLM send", async () => {
+        setMockResolvedValueOnce(loadSystemAppend, "## Original prompt");
         mockSendMessage.mockResolvedValueOnce({
             success: false,
             reason: "error",
             error: "connection refused",
         });
 
+        const failedResult = await invokeSendMessage();
+
+        expect(failedResult).toMatchObject({ promptSnapshotAccepted: true });
+
+        setMockResolvedValueOnce(loadSystemAppend, "## Edited after failure");
         await invokeSendMessage();
 
-        setMockResolvedValueOnce(loadSystemAppend, "## Added after failure");
-        await invokeSendMessage({ onlySystemAppend: true });
-
-        expect(loadSystemAppend).toHaveBeenCalledTimes(2);
+        expect(loadSystemAppend).toHaveBeenCalledOnce();
         expect(mockSendMessage).toHaveBeenLastCalledWith(
             expect.objectContaining({
-                replaceSystemPrompt: "## Added after failure",
+                appendSystemPrompt: "## Original prompt",
             }),
         );
     });
@@ -335,6 +341,7 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         expect(result).toMatchObject({
             success: false,
             error: "System prompt mode cannot change during an active chat session",
+            inputError: true,
         });
         expect(mockSendMessage).toHaveBeenCalledOnce();
     });
@@ -373,20 +380,19 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         }
     });
 
-    it("re-reads the file when allowedDir changes between messages", async () => {
-        setMockResolvedValueOnce(loadSystemAppend, "## Dir A context");
-        setMockResolvedValueOnce(loadSystemAppend, "## Dir B context");
+    it("rejects changing allowedDir after the prompt snapshot is accepted", async () => {
+        setMockResolvedValue(loadSystemAppend, "## Dir A context");
 
         await invokeSendMessage({ allowedDir: "/tmp/dir-a" });
-        await invokeSendMessage({ allowedDir: "/tmp/dir-b" });
+        const result = await invokeSendMessage({ allowedDir: "/tmp/dir-b" });
 
-        expect(loadSystemAppend).toHaveBeenCalledTimes(2);
-        expect(vi.mocked(mockSendMessage).mock.calls[0][0]).toMatchObject({
-            appendSystemPrompt: "## Dir A context",
+        expect(loadSystemAppend).toHaveBeenCalledOnce();
+        expect(result).toMatchObject({
+            success: false,
+            error: "Analysis directory cannot change during an active chat session",
+            inputError: true,
         });
-        expect(vi.mocked(mockSendMessage).mock.calls[1][0]).toMatchObject({
-            appendSystemPrompt: "## Dir B context",
-        });
+        expect(mockSendMessage).toHaveBeenCalledOnce();
     });
 
     it("clears the cache and re-reads the file after ai-chat-new-chat", async () => {
@@ -481,20 +487,24 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         expect(mockSendMessage).not.toHaveBeenCalled();
     });
 
-    it("cancels append preflight and re-reads it on the next send", async () => {
-        let resolveLoad!: (value: string | undefined) => void;
+    it("keeps an immediate retry independent from cancelled append preflight", async () => {
+        const resolveLoads: Array<(value: string | undefined) => void> = [];
         setMockImplementation(
             loadSystemAppend,
             () =>
                 new Promise<string | undefined>((resolve) => {
-                    resolveLoad = resolve;
+                    resolveLoads.push(resolve);
                 }),
         );
 
         const cancelledSend = invokeSendMessage();
         await Promise.resolve();
         await ipcHandlers.get("ai-chat-cancel")?.();
-        resolveLoad("## Cancelled context");
+        const retrySend = invokeSendMessage();
+        await Promise.resolve();
+
+        expect(loadSystemAppend).toHaveBeenCalledTimes(2);
+        resolveLoads[0]("## Cancelled context");
 
         await expect(cancelledSend).resolves.toMatchObject({
             success: false,
@@ -502,16 +512,20 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         });
         expect(mockSendMessage).not.toHaveBeenCalled();
 
-        setMockResolvedValue(loadSystemAppend, "## Current context");
+        resolveLoads[1]("## Current context");
+        await expect(retrySend).resolves.toMatchObject({
+            success: true,
+        });
         await expect(invokeSendMessage()).resolves.toMatchObject({
             success: true,
         });
         expect(loadSystemAppend).toHaveBeenCalledTimes(2);
-        expect(mockSendMessage).toHaveBeenCalledWith(
-            expect.objectContaining({
+        expect(mockSendMessage).toHaveBeenCalledTimes(2);
+        for (const call of vi.mocked(mockSendMessage).mock.calls) {
+            expect(call[0]).toMatchObject({
                 appendSystemPrompt: "## Current context",
-            }),
-        );
+            });
+        }
     });
 
     it("preserves cancellation when deferred append loading fails", async () => {
@@ -621,6 +635,43 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
         );
     });
 
+    it("prompt preview does not reuse a pending send preflight read", async () => {
+        const resolveLoads: Array<(value: string | undefined) => void> = [];
+        setMockImplementation(
+            loadSystemAppend,
+            () =>
+                new Promise<string | undefined>((resolve) => {
+                    resolveLoads.push(resolve);
+                }),
+        );
+        const pendingSend = invokeSendMessage();
+        await Promise.resolve();
+        const previewHandler = ipcHandlers.get("ai-chat-get-system-prompt");
+        if (!previewHandler) {
+            throw new Error("ai-chat-get-system-prompt handler not registered");
+        }
+        const preview = previewHandler(null, {
+            config: {},
+            allowedDir: BASE_PAYLOAD.allowedDir,
+        });
+        await Promise.resolve();
+
+        expect(loadSystemAppend).toHaveBeenCalledTimes(2);
+        resolveLoads[1]("## Live preview content");
+        await expect(preview).resolves.toMatchObject({
+            success: true,
+            prompt: expect.stringContaining("## Live preview content"),
+        });
+
+        await ipcHandlers.get("ai-chat-cancel")?.();
+        resolveLoads[0]("## Cancelled send content");
+        await expect(pendingSend).resolves.toMatchObject({
+            success: false,
+            reason: "cancelled",
+        });
+        expect(mockSendMessage).not.toHaveBeenCalled();
+    });
+
     it("prompt preview rejects a combined prompt larger than 1 MiB", async () => {
         setMockResolvedValue(
             loadSystemAppend,
@@ -690,6 +741,9 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
 
         // Now the user edits SYSTEM_APPEND.md mid-session.
         setMockResolvedValue(loadSystemAppend, "## Edited content");
+        vi.mocked(validateAnalysisDirectory).mockRejectedValueOnce(
+            new Error("Edited directory is inaccessible"),
+        );
 
         // Preview mid-session must show the cached value, not the edited file,
         // because the send path is also using the cached value.
@@ -698,12 +752,13 @@ describe("ai-chat IPC handlers — SYSTEM_APPEND.md", () => {
             throw new Error("ai-chat-get-system-prompt handler not registered");
         const result = await previewHandler(null, {
             config: {},
-            allowedDir: BASE_PAYLOAD.allowedDir,
+            allowedDir: "/tmp/edited-dir",
         });
 
         // loadSystemAppend must not have been called again — preview must
         // have served the result from the warm cache.
         expect(loadSystemAppend).toHaveBeenCalledOnce();
+        expect(validateAnalysisDirectory).toHaveBeenCalledOnce();
         expect(result).toMatchObject({
             success: true,
             prompt: expect.stringContaining("## Session content"),

@@ -197,12 +197,20 @@ interface AiChatSendFailure {
     inputError?: boolean;
 }
 
+/** Send result returned after prompt preflight may have committed session state. */
+type AiChatSendCompletedResult = (
+    | AiChatSendSuccess
+    | AiChatSendCancelled
+    | AiChatSendFailure
+) & {
+    /** Whether prompt preflight succeeded and session configuration is now locked. */
+    promptSnapshotAccepted?: boolean;
+};
+
 /** Result returned by the send-message IPC handler. */
 export type AiChatSendMessageResult =
-    | AiChatSendSuccess
     | AiChatConsentRequiredResult
-    | AiChatSendCancelled
-    | AiChatSendFailure;
+    | AiChatSendCompletedResult;
 
 /** Successful list-models IPC result. */
 interface AiChatListModelsSuccess {

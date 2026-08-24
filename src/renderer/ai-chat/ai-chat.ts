@@ -83,8 +83,7 @@ let chatStarted = false;
 /**
  * Config snapshot captured when the first send is initiated.
  * Used so the system-prompt preview reflects the config actually sent to the
- * LLM, even during the window between clicking Send and the first successful
- * response (when chatStarted is still false but inputs are temporarily locked).
+ * backend while prompt preflight is pending and chatStarted is still false.
  */
 let sessionLockedConfig: Record<string, unknown> | null = null;
 /**
@@ -105,6 +104,53 @@ let chatGeneration = 0;
 let systemPromptGeneration = 0;
 /** Whether the Advanced Options checkbox uses SYSTEM_APPEND.md as the base prompt. */
 let onlySystemAppend = false;
+/** Renderer-owned send spanning preflight, consent, and result handling. */
+let activeRendererTurn:
+    | {
+          /** Identity shared by the initial send and a consent retry. */
+          requestToken: object;
+          /** Message to show after backend preflight succeeds. */
+          message: string;
+          /** Renderer session in which the message was submitted. */
+          generation: number;
+          /** Prompt mode submitted with this turn. */
+          onlySystemAppend: boolean;
+          /** Whether turn_start has already accepted this message. */
+          accepted: boolean;
+      }
+    | undefined;
+
+/**
+ * Checks whether a request still owns renderer send state.
+ *
+ * @param requestToken - Request identity to check.
+ * @param generation - Renderer session in which the request started.
+ * @returns True while the request may update renderer state.
+ */
+function ownsActiveRendererTurn(
+    requestToken: object,
+    generation: number,
+): boolean {
+    return (
+        activeRendererTurn?.requestToken === requestToken &&
+        generation === chatGeneration
+    );
+}
+
+/** Invalidates the active send and releases an unaccepted config snapshot. */
+function invalidateActiveRendererTurn(): void {
+    const requestToken = activeRendererTurn?.requestToken;
+    activeRendererTurn = undefined;
+    if (
+        !chatStarted &&
+        requestToken !== undefined &&
+        sessionSnapshotOwner === requestToken
+    ) {
+        sessionLockedConfig = null;
+        sessionLockedOnlySystemAppend = null;
+        sessionSnapshotOwner = null;
+    }
+}
 
 /**
  * Temporarily disables or re-enables the config fields during in-flight requests.
@@ -270,21 +316,16 @@ inputModel.addEventListener("blur", () => {
 
 /**
  * Sends a message to the AI Chat backend and handles the response.
- * Separated from the click handler to allow consent-retry without re-appending
- * the user bubble.
+ * Separated from the click handler to allow consent retry with the same pending
+ * user turn.
  *
  * @param message - The user's chat message text.
- * @param showBubble - Whether to append the user message as a chat bubble.
  * @param requestToken - Identity shared by an initial send and its consent retry.
  */
 async function sendUserMessage(
     message: string,
-    showBubble: boolean,
     requestToken: object = {},
 ): Promise<void> {
-    if (showBubble) {
-        appendMessage("user", message);
-    }
     if (!chatStarted && sessionLockedConfig === null) {
         sessionLockedConfig = getConfig();
         sessionLockedOnlySystemAppend = onlySystemAppend;
@@ -308,19 +349,25 @@ async function sendUserMessage(
             onlySystemAppend: requestedOnlySystemAppend,
         });
 
-        if (generation !== chatGeneration) return;
+        if (!ownsActiveRendererTurn(requestToken, generation)) return;
 
         const endpointStillMatches =
             inputEndpoint.value.trim() === requestedEndpoint;
 
+        if (
+            !chatStarted &&
+            (result.success ||
+                ("promptSnapshotAccepted" in result &&
+                    result.promptSnapshotAccepted === true))
+        ) {
+            onlySystemAppend = requestedOnlySystemAppend;
+            optOnlySystemAppend.checked = requestedOnlySystemAppend;
+            chatStarted = true;
+            lockSessionConfig();
+            hideModelDropdown();
+        }
+
         if (result.success) {
-            if (!chatStarted) {
-                onlySystemAppend = requestedOnlySystemAppend;
-                optOnlySystemAppend.checked = requestedOnlySystemAppend;
-                chatStarted = true;
-                lockSessionConfig();
-                hideModelDropdown();
-            }
             if (result.text) {
                 appendMessage("assistant", result.text);
             }
@@ -338,11 +385,12 @@ async function sendUserMessage(
             }
         } else if (result.reason === "consent_required") {
             const accepted = await requestConsent(result.origin);
+            if (!ownsActiveRendererTurn(requestToken, generation)) return;
             if (accepted) {
-                if (generation !== chatGeneration) return;
                 await api.aiChatConsent(result.origin);
-                await sendUserMessage(message, false, requestToken);
-            } else if (generation === chatGeneration) {
+                if (!ownsActiveRendererTurn(requestToken, generation)) return;
+                await sendUserMessage(message, requestToken);
+            } else {
                 appendMessage(
                     "error",
                     "Connection cancelled — endpoint consent denied.",
@@ -365,17 +413,18 @@ async function sendUserMessage(
             }
         }
     } catch (err) {
-        if (generation === chatGeneration) {
+        if (ownsActiveRendererTurn(requestToken, generation)) {
             const msg = err instanceof Error ? err.message : String(err);
             appendMessage("error", `Unexpected error: ${msg}`);
         }
     } finally {
-        if (!chatStarted && sessionSnapshotOwner === requestToken) {
-            sessionLockedConfig = null;
-            sessionLockedOnlySystemAppend = null;
-            sessionSnapshotOwner = null;
-        }
-        if (generation === chatGeneration) {
+        if (ownsActiveRendererTurn(requestToken, generation)) {
+            if (!chatStarted && sessionSnapshotOwner === requestToken) {
+                sessionLockedConfig = null;
+                sessionLockedOnlySystemAppend = null;
+                sessionSnapshotOwner = null;
+            }
+            activeRendererTurn = undefined;
             setProcessing(false);
             setSpinner(false);
         }
@@ -397,8 +446,15 @@ btnSend.addEventListener("click", async () => {
         return;
     }
 
-    inputMessage.value = "";
-    await sendUserMessage(message, true);
+    const requestToken = {};
+    activeRendererTurn = {
+        requestToken,
+        message,
+        generation: chatGeneration,
+        onlySystemAppend,
+        accepted: false,
+    };
+    await sendUserMessage(message, requestToken);
 });
 
 // Enter key sends the message
@@ -411,6 +467,7 @@ inputMessage.addEventListener("keydown", (event) => {
 
 // Cancel button — abort current request
 btnCancel.addEventListener("click", async () => {
+    invalidateActiveRendererTurn();
     await api.aiChatCancel();
     setProcessing(false);
     setSpinner(false);
@@ -423,6 +480,7 @@ btnNewChat.addEventListener("click", async () => {
     sessionLockedConfig = null;
     sessionLockedOnlySystemAppend = null;
     sessionSnapshotOwner = null;
+    activeRendererTurn = undefined;
 
     await api.aiChatNewChat();
     chatMessages.innerHTML = "";
@@ -448,6 +506,7 @@ btnBack.addEventListener("click", async () => {
     sessionLockedConfig = null;
     sessionLockedOnlySystemAppend = null;
     sessionSnapshotOwner = null;
+    activeRendererTurn = undefined;
     await api.aiChatGoBack();
 });
 
@@ -595,6 +654,22 @@ btnCloseSystemPrompt.addEventListener("click", () => {
 api.onAiChatEvent((event: AiChatEvent) => {
     switch (event.type) {
         case "turn_start":
+            if (
+                activeRendererTurn !== undefined &&
+                activeRendererTurn.generation === chatGeneration &&
+                !activeRendererTurn.accepted
+            ) {
+                appendMessage("user", activeRendererTurn.message);
+                inputMessage.value = "";
+                activeRendererTurn.accepted = true;
+                if (!chatStarted) {
+                    onlySystemAppend = activeRendererTurn.onlySystemAppend;
+                    optOnlySystemAppend.checked = onlySystemAppend;
+                    chatStarted = true;
+                    lockSessionConfig();
+                    hideModelDropdown();
+                }
+            }
             setSpinner(true, "Processing...");
             break;
         case "llm_request_start":

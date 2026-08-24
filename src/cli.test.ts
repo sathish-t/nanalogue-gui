@@ -30,6 +30,15 @@ interface CliTestServer {
     close: () => Promise<void>;
 }
 
+/** Captured OpenAI-compatible request body used by CLI integration tests. */
+interface CapturedCliRequestBody {
+    /** Messages sent to the model. */
+    messages?: Array<{
+        /** Message content. */
+        content?: string;
+    }>;
+}
+
 /**
  * Starts a local HTTP server for strict CLI integration tests.
  *
@@ -897,6 +906,8 @@ describe("nanalogue-chat CLI", () => {
                         "--dir",
                         tmpDir,
                         "--only-system-append",
+                        "--non-interactive",
+                        "hello",
                     ]),
                 ).rejects.toMatchObject({ code: 1 });
             } finally {
@@ -918,6 +929,8 @@ describe("nanalogue-chat CLI", () => {
                         "--dir",
                         tmpDir,
                         "--only-system-append",
+                        "--non-interactive",
+                        "hello",
                     ]);
                 } catch (err) {
                     stderr = (
@@ -1100,6 +1113,8 @@ describe("nanalogue-chat CLI", () => {
                         "llama3",
                         "--dir",
                         directory,
+                        "--non-interactive",
+                        "hello",
                     ]),
                 ).rejects.toMatchObject({
                     code: 1,
@@ -1199,6 +1214,43 @@ describe("nanalogue-chat CLI", () => {
             ];
         }
 
+        /**
+         * Waits for new child-process output to contain a marker.
+         *
+         * @param proc - Spawned CLI process.
+         * @param getOutput - Returns the output collected so far.
+         * @param marker - Text that must appear in newly collected output.
+         * @param output - Process stream to monitor.
+         * @returns A promise that resolves when the marker appears.
+         */
+        function waitForNewProcessOutput(
+            proc: ReturnType<typeof spawn>,
+            getOutput: () => string,
+            marker: string,
+            output: "stdout" | "stderr" = "stdout",
+        ): Promise<void> {
+            const start = getOutput().length;
+            const stream = proc[output];
+            return new Promise((resolve, reject) => {
+                const timer = setTimeout(() => {
+                    stream?.off("data", checkOutput);
+                    reject(
+                        new Error(`CLI ${output} did not contain: ${marker}`),
+                    );
+                }, 15_000);
+                /** Resolves after output written since this wait began contains the marker. */
+                function checkOutput(): void {
+                    if (getOutput().slice(start).includes(marker)) {
+                        clearTimeout(timer);
+                        stream?.off("data", checkOutput);
+                        resolve();
+                    }
+                }
+                stream?.on("data", checkOutput);
+                checkOutput();
+            });
+        }
+
         it("/quit exits with code 0 and prints Goodbye!", async () => {
             const { stdout, code } = await runInteractiveCli(replArgs(tmpDir), [
                 "/quit",
@@ -1238,10 +1290,7 @@ describe("nanalogue-chat CLI", () => {
             expect(stdout).toContain(tmpDir);
         });
 
-        it("SYSTEM_APPEND.md presence is reflected in the startup banner", async () => {
-            // Write a SYSTEM_APPEND.md into the analysis dir, then start the
-            // CLI and quit immediately — the banner should note it was loaded.
-            const { writeFile } = await import("node:fs/promises");
+        it("does not claim SYSTEM_APPEND.md was loaded at startup", async () => {
             await writeFile(
                 join(tmpDir, "SYSTEM_APPEND.md"),
                 "## Extra context\nFocus on CpG islands.",
@@ -1250,7 +1299,160 @@ describe("nanalogue-chat CLI", () => {
             const { stdout } = await runInteractiveCli(replArgs(tmpDir), [
                 "/quit",
             ]);
-            expect(stdout).toContain("SYSTEM_APPEND.md");
+            expect(stdout).not.toContain("Custom system prompt append loaded");
+        });
+
+        it("captures SYSTEM_APPEND.md on the first message and again after /new", async () => {
+            const requestBodies: Array<Record<string, unknown>> = [];
+            const server = await startCliTestServer((req, res) => {
+                const chunks: Buffer[] = [];
+                req.on("data", (chunk: Buffer) => chunks.push(chunk));
+                req.on("end", () => {
+                    requestBodies.push(
+                        JSON.parse(Buffer.concat(chunks).toString("utf-8")),
+                    );
+                    res.writeHead(200, { "Content-Type": "application/json" });
+                    res.end(
+                        JSON.stringify({
+                            choices: [
+                                {
+                                    message: { content: 'print("42bp")' },
+                                    finish_reason: "stop",
+                                },
+                            ],
+                        }),
+                    );
+                });
+            });
+            const proc = spawn(
+                "node",
+                [
+                    CLI_PATH,
+                    "--endpoint",
+                    server.endpointUrl,
+                    "--model",
+                    "test-model",
+                    "--dir",
+                    tmpDir,
+                ],
+                { stdio: ["pipe", "pipe", "pipe"] },
+            );
+            let stdout = "";
+            let stderr = "";
+            proc.stdout.on("data", (chunk: Buffer) => {
+                stdout += chunk.toString();
+            });
+            proc.stderr.on("data", (chunk: Buffer) => {
+                stderr += chunk.toString();
+            });
+
+            try {
+                await waitForNewProcessOutput(proc, () => stdout, "You:");
+                await writeFile(
+                    join(tmpDir, "SYSTEM_APPEND.md"),
+                    "## Preview content",
+                );
+                let outputReady = waitForNewProcessOutput(
+                    proc,
+                    () => stdout,
+                    "System prompt dumped",
+                );
+                proc.stdin.write("/dump_system_prompt\n");
+                await outputReady;
+
+                await writeFile(
+                    join(tmpDir, "SYSTEM_APPEND.md"),
+                    "x".repeat(MAX_SYSTEM_PROMPT_BYTES),
+                );
+                outputReady = waitForNewProcessOutput(
+                    proc,
+                    () => stderr,
+                    "Combined system prompt exceeds the 1 MiB limit",
+                    "stderr",
+                );
+                proc.stdin.write("rejected message\n");
+                await outputReady;
+
+                await writeFile(
+                    join(tmpDir, "SYSTEM_APPEND.md"),
+                    "## First session",
+                );
+                outputReady = waitForNewProcessOutput(
+                    proc,
+                    () => stdout,
+                    "42bp",
+                );
+                proc.stdin.write("first message\n");
+                await outputReady;
+
+                await writeFile(
+                    join(tmpDir, "SYSTEM_APPEND.md"),
+                    "## Edited mid-session",
+                );
+                outputReady = waitForNewProcessOutput(
+                    proc,
+                    () => stdout,
+                    "42bp",
+                );
+                proc.stdin.write("second message\n");
+                await outputReady;
+
+                outputReady = waitForNewProcessOutput(
+                    proc,
+                    () => stdout,
+                    "[new conversation started]",
+                );
+                proc.stdin.write("/new\n");
+                await outputReady;
+                await writeFile(
+                    join(tmpDir, "SYSTEM_APPEND.md"),
+                    "## Second session",
+                );
+                outputReady = waitForNewProcessOutput(
+                    proc,
+                    () => stdout,
+                    "42bp",
+                );
+                proc.stdin.write("third message\n");
+                await outputReady;
+                proc.stdin.write("/quit\n");
+                proc.stdin.end();
+                await new Promise<void>((resolve) =>
+                    proc.on("close", () => resolve()),
+                );
+
+                const systemPrompts = requestBodies.map((body) =>
+                    String(
+                        (body as CapturedCliRequestBody).messages?.[0]?.content,
+                    ),
+                );
+                expect(systemPrompts).toHaveLength(3);
+                expect(systemPrompts[0]).toContain("## First session");
+                expect(systemPrompts[1]).toContain("## First session");
+                expect(systemPrompts[1]).not.toContain("Edited mid-session");
+                expect(systemPrompts[2]).toContain("## Second session");
+                expect(JSON.stringify(requestBodies)).not.toContain(
+                    "rejected message",
+                );
+
+                const dumpedFiles = await readdir(
+                    join(tmpDir, "ai_chat_output"),
+                );
+                const dump = dumpedFiles.find((file) => file.endsWith(".log"));
+                expect(dump).toBeDefined();
+                expect(
+                    await readFile(
+                        join(tmpDir, "ai_chat_output", dump as string),
+                        "utf-8",
+                    ),
+                ).toContain("## Preview content");
+            } finally {
+                if (proc.exitCode === null) proc.kill();
+                await server.close();
+            }
+            expect(stderr).toContain(
+                "Combined system prompt exceeds the 1 MiB limit",
+            );
         });
 
         it("rejects a combined system prompt larger than 1 MiB", async () => {

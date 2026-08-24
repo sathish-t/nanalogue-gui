@@ -58,7 +58,7 @@ src/lib/swipe-contract.ts	100
 src/lib/swipe-data-loader.ts	100
 src/lib/system-append.ts	100
 src/lib/xy-renderer.ts	100
-src/modes/ai-chat.ts	98.62
+src/modes/ai-chat.ts	100
 src/modes/locate.ts	100
 src/modes/qc.ts	100
 src/modes/swipe.ts	100
@@ -67,7 +67,7 @@ src/renderer/ai-chat/ai-chat-config.ts	100
 src/renderer/ai-chat/ai-chat-consent.ts	100
 src/renderer/ai-chat/ai-chat-elements.ts	100
 src/renderer/ai-chat/ai-chat-ui.ts	100
-src/renderer/ai-chat/ai-chat.ts	89.22
+src/renderer/ai-chat/ai-chat.ts	89.9
 src/renderer/qc/seq-mini-charts.ts	100
 src/renderer/shared/apply-font-size.ts	100
 src/renderer/shared/bam-resource-input.ts	100

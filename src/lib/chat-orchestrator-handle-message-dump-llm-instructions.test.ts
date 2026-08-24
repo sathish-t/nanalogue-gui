@@ -51,6 +51,10 @@ describe("/dump_llm_instructions slash command", () => {
             "No LLM call has been made yet, nothing to dump.",
         );
         expect(result.steps).toHaveLength(0);
+        expect(events.map((event) => event.type)).toEqual([
+            "turn_start",
+            "turn_end",
+        ]);
 
         // Verify no file was written
         const outputDir = join(tmpDir, "ai_chat_output");

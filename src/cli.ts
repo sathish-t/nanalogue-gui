@@ -40,8 +40,39 @@ import {
     parseRemovedToolNames,
 } from "./lib/cli-user-input-parsing";
 import { fetchModels } from "./lib/model-listing";
+import { deriveMaxOutputBytes } from "./lib/monty-sandbox-helpers";
 import { parseNumericArg, SANDBOX_ARG_DEFS } from "./lib/sandbox-cli-args";
+import { buildCompleteSystemPrompt } from "./lib/sandbox-prompt";
 import { loadSystemAppend } from "./lib/system-append";
+
+/** System prompt inputs captured for one CLI conversation. */
+interface CliSystemPromptSnapshot {
+    /** Optional text appended to the default prompt. */
+    appendSystemPrompt?: string;
+    /** Optional complete replacement for the default prompt. */
+    replaceSystemPrompt?: string;
+}
+
+/** Whether a CLI message captures, previews, or does not use the system prompt. */
+type CliPromptRequirement = "capture" | "preview" | "none";
+
+/**
+ * Classifies how a CLI message interacts with the conversation system prompt.
+ *
+ * @param message - Trimmed CLI message.
+ * @returns The prompt behavior required before dispatching the message.
+ */
+function classifyCliPromptRequirement(message: string): CliPromptRequirement {
+    if (/^\/dump_system_prompt\s*$/.test(message)) return "preview";
+    if (
+        /^\/exec\s+/.test(message) ||
+        /^\/dump_history\s*$/.test(message) ||
+        /^\/dump_llm_instructions\s*$/.test(message)
+    ) {
+        return "none";
+    }
+    return "capture";
+}
 
 // --- Argument parsing ---
 
@@ -373,28 +404,6 @@ async function main(): Promise<void> {
         return;
     }
 
-    // Load SYSTEM_APPEND.md from the analysis directory if present.
-    // Declared as let so it can be reloaded when the user starts a new
-    // conversation with /new — ensuring any edits to the file take effect
-    // immediately rather than requiring a full process restart.
-    let appendSystemPrompt: string | undefined;
-    try {
-        appendSystemPrompt = await loadSystemAppend(allowedDir);
-    } catch (error) {
-        console.error(
-            `Error: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        process.exitCode = 1;
-        return;
-    }
-    if (onlySystemAppend && appendSystemPrompt === undefined) {
-        console.error(
-            "Error: --only-system-append requires SYSTEM_APPEND.md to exist and be non-empty",
-        );
-        process.exitCode = 1;
-        return;
-    }
-
     // --rm-tools: parse, validate, and build the removal set.
     let removedTools: ReadonlySet<string> | undefined;
     if (values["rm-tools"] !== undefined) {
@@ -424,17 +433,57 @@ async function main(): Promise<void> {
     }
 
     const session = new ChatSession();
+    let systemPromptSnapshot: CliSystemPromptSnapshot | undefined;
+
+    /**
+     * Loads and validates the current prompt inputs without storing them.
+     *
+     * @returns Effective prompt inputs for the current file contents.
+     */
+    const loadCurrentSystemPrompt =
+        async (): Promise<CliSystemPromptSnapshot> => {
+            const appendSystemPrompt = await loadSystemAppend(allowedDir);
+            if (onlySystemAppend && appendSystemPrompt === undefined) {
+                throw new Error(
+                    "--only-system-append requires SYSTEM_APPEND.md to exist and be non-empty",
+                );
+            }
+            const prompt = {
+                appendSystemPrompt: onlySystemAppend
+                    ? undefined
+                    : appendSystemPrompt,
+                replaceSystemPrompt: onlySystemAppend
+                    ? appendSystemPrompt
+                    : replaceSystemPrompt,
+            };
+            const maxOutputBytes = deriveMaxOutputBytes(
+                config.contextWindowTokens,
+            );
+            buildCompleteSystemPrompt({
+                config,
+                maxOutputKB: Math.round(maxOutputBytes / 1024),
+                ...prompt,
+            });
+            return prompt;
+        };
 
     // Non-interactive mode: send a single message, print the response, and exit.
     // No banner, no readline, no progress indicators — clean for scripting and piping.
     if (values["non-interactive"] !== undefined) {
-        const message = values["non-interactive"];
-        const effectiveAppendSystemPrompt = onlySystemAppend
-            ? undefined
-            : appendSystemPrompt;
-        const effectiveReplaceSystemPrompt = onlySystemAppend
-            ? appendSystemPrompt
-            : replaceSystemPrompt;
+        const message = values["non-interactive"].trim();
+        const promptRequirement = classifyCliPromptRequirement(message);
+        let promptForMessage: CliSystemPromptSnapshot | undefined;
+        if (promptRequirement !== "none") {
+            try {
+                promptForMessage = await loadCurrentSystemPrompt();
+            } catch (error) {
+                console.error(
+                    `Error: ${error instanceof Error ? error.message : String(error)}`,
+                );
+                process.exitCode = 1;
+                return;
+            }
+        }
         const result = await session.sendMessage({
             endpointUrl,
             apiKey,
@@ -442,8 +491,7 @@ async function main(): Promise<void> {
             message,
             allowedDir,
             config,
-            appendSystemPrompt: effectiveAppendSystemPrompt,
-            replaceSystemPrompt: effectiveReplaceSystemPrompt,
+            ...promptForMessage,
             removedTools,
             /**
              * Suppresses all progress events in non-interactive mode.
@@ -582,7 +630,8 @@ async function main(): Promise<void> {
         console.log(
             color(
                 TERMINAL_YELLOW,
-                "SYSTEM_APPEND.md is being used as the full system prompt. " +
+                "SYSTEM_APPEND.md will be captured as the full system prompt " +
+                    "when the first message is sent. " +
                     "Run /dump_system_prompt to verify the full effective prompt.",
             ),
         );
@@ -591,15 +640,6 @@ async function main(): Promise<void> {
             color(
                 TERMINAL_YELLOW,
                 "Default system prompt replaced via --system-prompt. " +
-                    "Run /dump_system_prompt to verify the full effective prompt.",
-            ),
-        );
-    }
-    if (!onlySystemAppend && appendSystemPrompt !== undefined) {
-        console.log(
-            color(
-                TERMINAL_YELLOW,
-                "Custom system prompt append loaded from SYSTEM_APPEND.md. " +
                     "Run /dump_system_prompt to verify the full effective prompt.",
             ),
         );
@@ -616,10 +656,13 @@ async function main(): Promise<void> {
 
     /** Whether a request is currently in flight. */
     let requestInFlight = false;
+    /** Incremented whenever Ctrl+C cancels the active request. */
+    let requestCancellationGeneration = 0;
 
     // Ctrl+C handling: cancel in-flight request or exit at prompt
     rl.on("SIGINT", () => {
         if (requestInFlight) {
+            requestCancellationGeneration += 1;
             session.cancel();
             requestInFlight = false;
         } else {
@@ -651,42 +694,45 @@ async function main(): Promise<void> {
         }
 
         if (trimmed === "/new") {
-            // Reload SYSTEM_APPEND.md so any edits since startup are picked up
-            // by the fresh session without needing a process restart.
-            let reloadedAppend: string | undefined;
-            try {
-                reloadedAppend = await loadSystemAppend(allowedDir);
-            } catch (error) {
-                console.error(
-                    `Error: ${error instanceof Error ? error.message : String(error)}`,
-                );
-                rl.prompt();
-                continue;
-            }
-            if (onlySystemAppend && reloadedAppend === undefined) {
-                console.error(
-                    "Error: SYSTEM_APPEND.md is required when " +
-                        "--only-system-append is enabled; " +
-                        "keeping the current conversation open",
-                );
-                rl.prompt();
-                continue;
-            }
-
             session.reset();
-            appendSystemPrompt = reloadedAppend;
+            systemPromptSnapshot = undefined;
             console.log(color(TERMINAL_YELLOW, "[new conversation started]"));
             rl.prompt();
             continue;
         }
 
         requestInFlight = true;
-        const effectiveAppendSystemPrompt = onlySystemAppend
-            ? undefined
-            : appendSystemPrompt;
-        const effectiveReplaceSystemPrompt = onlySystemAppend
-            ? appendSystemPrompt
-            : replaceSystemPrompt;
+        const requestGeneration = requestCancellationGeneration;
+        const promptRequirement = classifyCliPromptRequirement(trimmed);
+        let promptForMessage = systemPromptSnapshot;
+        try {
+            if (
+                promptRequirement === "preview" &&
+                promptForMessage === undefined
+            ) {
+                promptForMessage = await loadCurrentSystemPrompt();
+            } else if (
+                promptRequirement === "capture" &&
+                promptForMessage === undefined
+            ) {
+                promptForMessage = await loadCurrentSystemPrompt();
+                if (requestGeneration === requestCancellationGeneration) {
+                    systemPromptSnapshot = promptForMessage;
+                }
+            }
+        } catch (error) {
+            requestInFlight = false;
+            console.error(
+                `Error: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            rl.prompt();
+            continue;
+        }
+        if (requestGeneration !== requestCancellationGeneration) {
+            requestInFlight = false;
+            rl.prompt();
+            continue;
+        }
         const result = await session.sendMessage({
             endpointUrl,
             apiKey,
@@ -695,8 +741,7 @@ async function main(): Promise<void> {
             allowedDir,
             config,
             emitEvent,
-            appendSystemPrompt: effectiveAppendSystemPrompt,
-            replaceSystemPrompt: effectiveReplaceSystemPrompt,
+            ...promptForMessage,
             removedTools,
         });
         requestInFlight = false;

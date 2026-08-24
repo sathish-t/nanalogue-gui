@@ -180,12 +180,12 @@ export async function handleUserMessage(
     if (execMatch) {
         history.pop();
         const maxOutputBytes = deriveMaxOutputBytes(config.contextWindowTokens);
-        emitEvent({ type: "turn_start" });
         const filePath = execMatch[1].trim();
         validatePythonSourcePath(filePath);
         const resolved = await resolvePath(allowedDir, filePath);
         const code = await readValidatedPythonSource(resolved);
 
+        emitEvent({ type: "turn_start" });
         emitEvent({ type: "code_execution_start", code });
         const sandboxResult = await runSandboxGuarded(
             code,

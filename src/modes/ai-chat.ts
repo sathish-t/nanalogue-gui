@@ -31,29 +31,18 @@ const session = new ChatSession();
 /** Set of acknowledged non-localhost endpoint origins (memory-only). */
 const endpointConsent = new Set<string>();
 
-/**
- * The allowedDir for which SYSTEM_APPEND.md is being (or has been) loaded.
- * Updated synchronously before the async read begins so that concurrent
- * callers for the same dir share a single Promise rather than racing.
- */
-let cachedSystemAppendDir: string | undefined;
-
-/**
- * Pending or resolved Promise for the SYSTEM_APPEND.md load.
- * Stored as a Promise (not a resolved value) so that if two sends arrive
- * while a read is still in-flight, both await the same operation and
- * loadSystemAppend() is never called twice for the same directory.
- */
-let cachedSystemAppendPromise: Promise<string | undefined> | undefined;
-
-/** System prompt mode fixed for the lifetime of an accepted chat session. */
-interface SessionPromptModeLock {
+/** Immutable system prompt inputs captured by the first accepted send. */
+interface SessionPromptSnapshot {
+    /** Canonical directory from which SYSTEM_APPEND.md was read. */
+    allowedDir: string;
+    /** Captured file content, or undefined when the file was absent. */
+    appendSystemPrompt: string | undefined;
     /** Whether SYSTEM_APPEND.md is the complete system prompt. */
     onlySystemAppend: boolean;
 }
 
-/** Prompt mode fixed for the active session after its first accepted send. */
-let sessionPromptModeLock: SessionPromptModeLock | undefined;
+/** Committed prompt snapshot for the active session, if a send was accepted. */
+let sessionPromptSnapshot: SessionPromptSnapshot | undefined;
 
 /** Identity of the one send currently allowed to mutate session state. */
 interface ActiveAiChatSend {
@@ -87,58 +76,6 @@ function isAiChatSendCancelled(sendToken: ActiveAiChatSend): boolean {
 }
 
 /**
- * Returns the SYSTEM_APPEND.md content for the given directory.
- *
- * The Promise is stored immediately (before awaiting) so any concurrent
- * call for the same dir awaits the same read rather than starting a new
- * one. The cache is invalidated by clearSystemAppendCache() on session
- * reset, or automatically when allowedDir changes.
- *
- * @param allowedDir - Absolute path to the analysis directory.
- * @returns The file content, or undefined if absent or blocked.
- */
-function getCachedSystemAppend(
-    allowedDir: string,
-): Promise<string | undefined> {
-    if (cachedSystemAppendDir !== allowedDir) {
-        cachedSystemAppendDir = allowedDir;
-        // Assign the Promise synchronously before any await so concurrent
-        // callers see it and share this single in-flight read.
-        cachedSystemAppendPromise = loadSystemAppend(allowedDir);
-    }
-    // cachedSystemAppendPromise is always defined here: either it was just
-    // assigned above, or it was set on a previous call for the same dir.
-    return cachedSystemAppendPromise as Promise<string | undefined>;
-}
-
-/**
- * Returns the cached SYSTEM_APPEND.md promise if the cache is warm for the
- * given directory, otherwise undefined.
- *
- * Does not populate the cache — safe to call from preview handlers that
- * must not affect session state.
- *
- * @param allowedDir - Absolute path to the analysis directory.
- * @returns The in-flight or resolved promise if cached, otherwise undefined.
- */
-function peekSystemAppendCache(
-    allowedDir: string,
-): Promise<string | undefined> | undefined {
-    return cachedSystemAppendDir === allowedDir
-        ? cachedSystemAppendPromise
-        : undefined;
-}
-
-/**
- * Clears the SYSTEM_APPEND.md cache so the next session re-reads the file.
- * Called whenever the session is reset (New Chat or Go Back).
- */
-function clearSystemAppendCache(): void {
-    cachedSystemAppendDir = undefined;
-    cachedSystemAppendPromise = undefined;
-}
-
-/**
  * Sets the main browser window reference used by IPC handlers.
  *
  * @param window - The main BrowserWindow instance, or null to clear.
@@ -163,17 +100,13 @@ function emitEvent(event: AiChatEvent): void {
  * @returns True if the URL points to localhost.
  */
 function isLocalhost(url: string): boolean {
-    try {
-        const parsed = new URL(url);
-        return (
-            parsed.hostname === "localhost" ||
-            parsed.hostname === "127.0.0.1" ||
-            parsed.hostname === "::1" ||
-            parsed.hostname === "[::1]"
-        );
-    } catch {
-        return false;
-    }
+    const parsed = new URL(url);
+    return (
+        parsed.hostname === "localhost" ||
+        parsed.hostname === "127.0.0.1" ||
+        parsed.hostname === "::1" ||
+        parsed.hostname === "[::1]"
+    );
 }
 
 /**
@@ -183,11 +116,7 @@ function isLocalhost(url: string): boolean {
  * @returns The origin string.
  */
 function getOrigin(url: string): string {
-    try {
-        return new URL(url).origin;
-    } catch {
-        return url;
-    }
+    return new URL(url).origin;
 }
 
 /**
@@ -299,6 +228,19 @@ async function sendAiChatMessage(
             };
         }
 
+        if (
+            sessionPromptSnapshot !== undefined &&
+            allowedDir !== sessionPromptSnapshot.allowedDir
+        ) {
+            return {
+                success: false,
+                reason: "error",
+                error: "Analysis directory cannot change during an active chat session",
+                isTimeout: false,
+                inputError: true,
+            };
+        }
+
         if (!isLocalhost(endpointUrl)) {
             const origin = getOrigin(endpointUrl);
             if (!endpointConsent.has(origin)) {
@@ -313,35 +255,39 @@ async function sendAiChatMessage(
 
         const requestedOnlySystemAppend = onlySystemAppend === true;
         if (
-            sessionPromptModeLock !== undefined &&
-            sessionPromptModeLock.onlySystemAppend !== requestedOnlySystemAppend
+            sessionPromptSnapshot !== undefined &&
+            sessionPromptSnapshot.onlySystemAppend !== requestedOnlySystemAppend
         ) {
             return {
                 success: false,
                 reason: "error",
                 error: "System prompt mode cannot change during an active chat session",
                 isTimeout: false,
+                inputError: true,
             };
         }
 
-        const reusedSystemAppendCache =
-            cachedSystemAppendDir === allowedDir &&
-            cachedSystemAppendPromise !== undefined;
-        const systemAppendPromise = getCachedSystemAppend(allowedDir);
-        /** Clears only the cache entry created by this request. */
-        const clearCreatedSystemAppendCache = (): void => {
-            if (
-                !reusedSystemAppendCache &&
-                cachedSystemAppendPromise === systemAppendPromise
-            ) {
-                clearSystemAppendCache();
+        let appendSystemPrompt = sessionPromptSnapshot?.appendSystemPrompt;
+        if (sessionPromptSnapshot === undefined) {
+            try {
+                appendSystemPrompt = await loadSystemAppend(allowedDir);
+            } catch (error) {
+                if (isAiChatSendCancelled(sendToken)) {
+                    return {
+                        success: false,
+                        reason: "cancelled",
+                        error: "Cancelled",
+                    };
+                }
+                return {
+                    success: false,
+                    reason: "error",
+                    error:
+                        error instanceof Error ? error.message : String(error),
+                    isTimeout: false,
+                    inputError: true,
+                };
             }
-        };
-        let appendSystemPrompt: string | undefined;
-        try {
-            appendSystemPrompt = await systemAppendPromise;
-        } catch (error) {
-            clearCreatedSystemAppendCache();
             if (isAiChatSendCancelled(sendToken)) {
                 return {
                     success: false,
@@ -349,24 +295,8 @@ async function sendAiChatMessage(
                     error: "Cancelled",
                 };
             }
-            return {
-                success: false,
-                reason: "error",
-                error: error instanceof Error ? error.message : String(error),
-                isTimeout: false,
-                inputError: true,
-            };
-        }
-        if (isAiChatSendCancelled(sendToken)) {
-            clearCreatedSystemAppendCache();
-            return {
-                success: false,
-                reason: "cancelled",
-                error: "Cancelled",
-            };
         }
         if (onlySystemAppend && appendSystemPrompt === undefined) {
-            clearCreatedSystemAppendCache();
             return {
                 success: false,
                 reason: "error",
@@ -393,7 +323,6 @@ async function sendAiChatMessage(
                 replaceSystemPrompt: effectiveReplaceSystemPrompt,
             });
         } catch (error) {
-            clearCreatedSystemAppendCache();
             return {
                 success: false,
                 reason: "error",
@@ -403,11 +332,11 @@ async function sendAiChatMessage(
             };
         }
 
-        const promptModeLock =
-            sessionPromptModeLock ??
-            ({ onlySystemAppend: requestedOnlySystemAppend } as const);
-        const createdPromptModeLock = sessionPromptModeLock === undefined;
-        sessionPromptModeLock = promptModeLock;
+        sessionPromptSnapshot ??= {
+            allowedDir,
+            appendSystemPrompt,
+            onlySystemAppend: requestedOnlySystemAppend,
+        };
 
         /**
          * Forwards progress only while this request still owns the active session.
@@ -435,17 +364,10 @@ async function sendAiChatMessage(
                 success: false,
                 reason: "cancelled",
                 error: "Cancelled",
+                promptSnapshotAccepted: true,
             };
         }
-        if (
-            !result.success &&
-            createdPromptModeLock &&
-            sessionPromptModeLock === promptModeLock
-        ) {
-            sessionPromptModeLock = undefined;
-            clearSystemAppendCache();
-        }
-        return result;
+        return { ...result, promptSnapshotAccepted: true };
     } finally {
         if (activeAiChatSend === sendToken) {
             activeAiChatSend = undefined;
@@ -497,15 +419,14 @@ export function registerAiChatIpcHandlers(): void {
         "ai-chat-new-chat",
         /**
          * Resets conversation state without losing connection settings.
-         * Also clears the SYSTEM_APPEND.md cache so the next session
+         * Also clears the SYSTEM_APPEND.md snapshot so the next session
          * re-reads the file (the user may have edited it between sessions).
          */
         () => {
             aiChatSessionGeneration += 1;
             activeAiChatSend = undefined;
             session.reset();
-            clearSystemAppendCache();
-            sessionPromptModeLock = undefined;
+            sessionPromptSnapshot = undefined;
         },
     );
 
@@ -531,15 +452,14 @@ export function registerAiChatIpcHandlers(): void {
         "ai-chat-go-back",
         /**
          * Navigates back to the landing page from the AI Chat screen.
-         * Also clears the SYSTEM_APPEND.md cache so the next session
+         * Also clears the SYSTEM_APPEND.md snapshot so the next session
          * re-reads the file (the user may have edited it between sessions).
          */
         () => {
             aiChatSessionGeneration += 1;
             activeAiChatSend = undefined;
             session.reset();
-            clearSystemAppendCache();
-            sessionPromptModeLock = undefined;
+            sessionPromptSnapshot = undefined;
         },
     );
 
@@ -561,10 +481,9 @@ export function registerAiChatIpcHandlers(): void {
         /**
          * Builds and returns the effective system prompt for the given config.
          *
-         * Reads SYSTEM_APPEND.md directly (bypassing the session cache) so
-         * that previewing the prompt never freezes stale content into the
-         * cache before the first message is sent. The send-message handler
-         * maintains its own cache independently.
+         * Reads SYSTEM_APPEND.md live before the first accepted message, then
+         * uses the immutable conversation snapshot after a send is accepted.
+         * Previewing never commits a snapshot itself.
          *
          * @param _event - The IPC event (unused).
          * @param payload - The config and optional allowedDir from the renderer.
@@ -581,7 +500,10 @@ export function registerAiChatIpcHandlers(): void {
                 onlySystemAppend,
             } = validation.data;
             let allowedDir: string | undefined;
-            if (allowedDirInput !== undefined) {
+            if (
+                allowedDirInput !== undefined &&
+                sessionPromptSnapshot === undefined
+            ) {
                 try {
                     allowedDir = await validateAnalysisDirectory(
                         allowedDirInput,
@@ -599,8 +521,8 @@ export function registerAiChatIpcHandlers(): void {
             }
             const requestedOnlySystemAppend = onlySystemAppend === true;
             if (
-                sessionPromptModeLock !== undefined &&
-                sessionPromptModeLock.onlySystemAppend !==
+                sessionPromptSnapshot !== undefined &&
+                sessionPromptSnapshot.onlySystemAppend !==
                     requestedOnlySystemAppend
             ) {
                 return {
@@ -622,17 +544,16 @@ export function registerAiChatIpcHandlers(): void {
                 maxWriteMB: config.maxWriteMB,
                 maxDurationSecs: config.maxDurationSecs,
             });
-            // If the session cache is already warm (first message has been
-            // sent), use the cached value so the preview matches exactly what
-            // the LLM is receiving. If the cache is cold (pre-session), read
-            // directly without populating the cache — so preview cannot prime
-            // it with stale content before the first send.
+            // Use a committed snapshot after the first accepted send. Before
+            // then, read independently so preview cannot publish or reuse a
+            // pending send's provisional content.
             let appendContent: string | undefined;
             try {
-                appendContent = allowedDir
-                    ? await (peekSystemAppendCache(allowedDir) ??
-                          loadSystemAppend(allowedDir))
-                    : undefined;
+                appendContent = sessionPromptSnapshot
+                    ? sessionPromptSnapshot.appendSystemPrompt
+                    : allowedDir
+                      ? await loadSystemAppend(allowedDir)
+                      : undefined;
             } catch (error) {
                 return {
                     success: false,
