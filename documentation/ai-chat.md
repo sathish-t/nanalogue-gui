@@ -40,9 +40,8 @@ duplicated between them.
 Each user message triggers a multi-round execution loop in
 `handleUserMessage()`:
 
-1. **Build context** — call `transformContext()` to prune old failed rounds
-   and apply the sliding window, then `convertToLlmMessages()` to strip
-   internal metadata before sending.
+1. **Build context** — call `transformContext()` to apply the sliding window,
+   then `convertToLlmMessages()` to strip internal metadata before sending.
 2. **Call the LLM** — `fetchChatCompletion()` sends a plain
    `/chat/completions` request. The response is Python code (no tool
    calling, no structured JSON schema).
@@ -70,7 +69,7 @@ Each user message triggers a multi-round execution loop in
 
 All execution feedback messages are marked `isExecutionResult: true` on
 the `UserMessage` so they can be distinguished from real user input by the
-renderer and by `pruneFailedRounds()`.
+renderer.
 
 ---
 
@@ -130,14 +129,10 @@ Two layers of limits protect the host process:
 
 ## Context management
 
-Conversations are handled by a two-phase pipeline called before every LLM
-request:
-
-1. **`pruneFailedRounds()`** — removes old assistant-code + user-error pairs
-   from history, keeping only the most recent failed pair so the LLM can see
-   its last error without accumulating noise from earlier failures.
-2. **`applySlidingWindow()`** — drops the oldest messages to keep the
-   assembled context within ~80% of the model's context budget.
+Before every LLM request, `applySlidingWindow()` drops the oldest messages to
+keep the assembled context within ~80% of the model's context budget. Failed
+assistant-code + user-error pairs remain in history and are sent in later
+requests until this normal context-window limit evicts them.
 
 ---
 
@@ -148,8 +143,8 @@ outside `allowedDir` or consuming excessive resources. It is **not** a
 hardened sandbox against a determined adversary — it is designed for safe
 accidental use.
 
-The LLM endpoint receives the current conversation context (the pruned
-sliding-window history), including sandbox results containing BAM data. This
+The LLM endpoint receives the current conversation context (the windowed
+history), including sandbox results containing BAM data. This
 is unavoidable — the LLM needs to see the data to answer questions about it.
 Choosing a trusted endpoint is the user's responsibility. A consent modal
 appears the first time a non-localhost endpoint is used. Consent is keyed by

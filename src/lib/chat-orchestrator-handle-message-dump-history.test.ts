@@ -63,7 +63,6 @@ describe("/dump_history slash command", () => {
                 role: "user",
                 content: "Code execution result: first failure",
                 isExecutionResult: true,
-                executionStatus: "error",
             },
             { role: "assistant", content: "Final answer" },
         );
@@ -115,7 +114,6 @@ describe("/dump_history slash command", () => {
         expect(log).toContain("=== Message 4: assistant ===\n\nFinal answer");
         expect(log).not.toContain("=== Message 1: system ===");
         expect(log).not.toContain("isExecutionResult");
-        expect(log).not.toContain("executionStatus");
         expect(log).not.toContain("/dump_history");
 
         const html = await readFile(
@@ -127,7 +125,6 @@ describe("/dump_history slash command", () => {
         expect(html).toContain("Final answer");
         expect(html).not.toContain('<details class="message message-system">');
         expect(html).not.toContain("isExecutionResult");
-        expect(html).not.toContain("executionStatus");
     });
 
     it("reports a sandbox-relative path when allowedDir is a symlink", async () => {

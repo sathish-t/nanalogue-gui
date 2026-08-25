@@ -1,5 +1,5 @@
 // History and context helpers for AI chat orchestration.
-// Keeps token budgeting, failed-round pruning, and LLM message conversion separate.
+// Keeps token budgeting, sliding-window limits, and LLM message conversion separate.
 
 import { NOMINAL_BYTES_PER_TOKEN } from "./ai-chat-constants";
 import type { HistoryEntry } from "./chat-types";
@@ -22,46 +22,10 @@ function estimateTokens(
 }
 
 /**
- * Removes failed code-execute-feedback round pairs from history,
- * keeping the most recent failed pair so the model can see its last error.
- * A failed round is an assistant message (code) followed by a user message
- * with executionStatus: "error". Each pair is evaluated independently.
- *
- * @param history - The conversation history to prune.
- * @returns A new history array with old failed round pairs removed.
- */
-export function pruneFailedRounds(history: HistoryEntry[]): HistoryEntry[] {
-    // First pass: identify all failed-pair indices
-    const failedPairStarts: number[] = [];
-    for (let i = 0; i < history.length - 1; i++) {
-        const entry = history[i];
-        if (entry.role === "assistant") {
-            const next = history[i + 1];
-            if (next.role === "user" && next.executionStatus === "error") {
-                failedPairStarts.push(i);
-            }
-        }
-    }
-    // Keep the last failed pair so the model can see its most recent error
-    const skipIndices = new Set<number>();
-    for (let j = 0; j < failedPairStarts.length - 1; j++) {
-        skipIndices.add(failedPairStarts[j]);
-        skipIndices.add(failedPairStarts[j] + 1);
-    }
-    const result: HistoryEntry[] = [];
-    for (let i = 0; i < history.length; i++) {
-        if (!skipIndices.has(i)) {
-            result.push(history[i]);
-        }
-    }
-    return result;
-}
-
-/**
  * Applies a sliding window to keep messages within the given token budget.
  * Keeps the most recent messages, dropping older ones first.
  *
- * @param history - The pruned history to window.
+ * @param history - The complete conversation history to window.
  * @param budgetTokens - The available history budget in tokens.
  * @param bytesPerToken - Estimated bytes per token for this provider/model.
  * @returns A windowed history array.
@@ -95,7 +59,7 @@ export function applySlidingWindow(
 }
 
 /**
- * Phase 1 of the context pipeline: prune failed rounds then apply sliding window.
+ * Applies the context sliding window without removing failed execution rounds.
  *
  * @param history - The full conversation history.
  * @param config - Context configuration with budget.
@@ -112,9 +76,8 @@ export function transformContext(
         bytesPerToken?: number;
     },
 ): HistoryEntry[] {
-    const pruned = pruneFailedRounds(history);
     return applySlidingWindow(
-        pruned,
+        history,
         config.contextBudgetTokens,
         config.bytesPerToken,
     );
@@ -146,8 +109,7 @@ export function deriveHistoryBudgetTokens(
 
 /**
  * Converts internal history to LLM message format.
- * Strips internal metadata (isExecutionResult, executionStatus) — these are
- * used for context management and renderer display, not sent to the LLM.
+ * Strips the internal isExecutionResult marker, which is not sent to the LLM.
  *
  * @param history - The transformed history from phase 1.
  * @returns Clean message array for the LLM API.

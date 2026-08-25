@@ -560,7 +560,7 @@ async function main(): Promise<void> {
             }
         }
 
-        // If --dump-history was requested, write the complete unpruned session
+        // If --dump-history was requested, write the complete raw session
         // history without the system prompt or internal metadata.
         if (values["dump-history"]) {
             try {

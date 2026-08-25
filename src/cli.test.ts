@@ -523,7 +523,6 @@ describe("nanalogue-chat CLI", () => {
             expect(logContent).toContain("=== Message 2: assistant ===");
             expect(logContent).not.toContain(": system ===");
             expect(logContent).not.toContain("isExecutionResult");
-            expect(logContent).not.toContain("executionStatus");
         });
 
         it("rejects --dump-history without --non-interactive", async () => {

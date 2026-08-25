@@ -61,7 +61,7 @@ export interface DumpCommandHandlerOptions {
     history: HistoryEntry[];
     /** Most recent messages sent to the LLM, if any. */
     lastSentMessages: DumpableLlmMessage[] | null;
-    /** Callback for dumping the complete unpruned conversation history. */
+    /** Callback for dumping the complete raw conversation history. */
     dumpConversationHistory: DumpConversationHistoryFn;
     /** Callback for dumping last-sent LLM instructions. */
     dumpLlmInstructions: DumpLlmInstructionsFn;

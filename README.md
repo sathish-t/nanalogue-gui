@@ -460,7 +460,7 @@ without the built-in prompt. The two
 flags cannot be combined. Use `--dump-llm-instructions --non-interactive "<msg>"`
 to write the full LLM request payload (system prompt + conversation) to a dated
 `.log` file and a self-contained `.html` viewer in `ai_chat_output/`. Use
-`--dump-history --non-interactive "<msg>"` to write the complete unpruned
+`--dump-history --non-interactive "<msg>"` to write the complete raw
 conversation without the system prompt.
 
 **Remove tools:** use `--rm-tools "tool1,tool2"` to disable specific external
@@ -474,7 +474,7 @@ sandbox capabilities. This flag requires `--system-prompt` or
 |---|---|
 | `/new` | Start a new conversation |
 | `/exec <file.py>` | Run a Python file directly in the sandbox without sending it to the LLM |
-| `/dump_history` | Dump the complete unpruned conversation history to a `.log` file and a self-contained `.html` viewer in `ai_chat_output/` |
+| `/dump_history` | Dump the complete raw conversation history to a `.log` file and a self-contained `.html` viewer in `ai_chat_output/` |
 | `/dump_llm_instructions` | Dump the full LLM request payload from the last round to a `.log` file and a self-contained `.html` viewer in `ai_chat_output/` |
 | `/dump_system_prompt` | Dump the static system prompt to a log file in `ai_chat_output/` |
 | `/quit` | Exit the CLI |

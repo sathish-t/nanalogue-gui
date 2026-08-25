@@ -82,8 +82,6 @@ export interface UserMessage {
     content: string;
     /** Whether this message is a code execution result (not real user input). */
     isExecutionResult?: boolean;
-    /** Typed execution status for pruning (replaces string-prefix detection). */
-    executionStatus?: "ok" | "error";
 }
 
 /** A single entry in the conversation history. */

@@ -82,7 +82,7 @@ export async function dumpLlmInstructions(
 }
 
 /**
- * Dumps the complete unpruned conversation history without internal metadata.
+ * Dumps the complete raw conversation history without internal metadata.
  *
  * @param allowedDir - The analysis directory (must be the sandbox root).
  * @param history - The raw session history to dump.

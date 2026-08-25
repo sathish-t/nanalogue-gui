@@ -27,7 +27,6 @@ import {
     applySlidingWindow,
     convertToLlmMessages,
     deriveHistoryBudgetTokens,
-    pruneFailedRounds,
     transformContext,
 } from "./chat-orchestrator-history";
 import {
@@ -103,7 +102,6 @@ export {
     applySlidingWindow,
     deriveHistoryBudgetTokens,
     extractCodeFromFences,
-    pruneFailedRounds,
     runSandboxGuarded,
     transformContext,
 };
@@ -388,7 +386,6 @@ export async function handleUserMessage(
                 role: "user",
                 content: truncMsg,
                 isExecutionResult: true,
-                executionStatus: "error",
             });
             continue;
         }
@@ -407,7 +404,6 @@ export async function handleUserMessage(
                 role: "user",
                 content: malformedFunctionCallMsg,
                 isExecutionResult: true,
-                executionStatus: "error",
             });
             continue;
         }
@@ -431,7 +427,6 @@ export async function handleUserMessage(
                 role: "user",
                 content: blankResponseMsg,
                 isExecutionResult: true,
-                executionStatus: "error",
             });
             publishLastSentMessages([
                 ...(requestLastSentMessages ?? []),
@@ -454,7 +449,6 @@ export async function handleUserMessage(
                     maxRounds - (round + 1),
                 ),
                 isExecutionResult: true,
-                executionStatus: "error",
             });
             continue;
         }
@@ -511,7 +505,6 @@ export async function handleUserMessage(
                     role: "user",
                     content: feedback,
                     isExecutionResult: true,
-                    executionStatus: "ok",
                 });
             } else {
                 // A terminal round is print-only and uses values already
@@ -531,7 +524,6 @@ export async function handleUserMessage(
                         role: "user",
                         content: noOutputMsg,
                         isExecutionResult: true,
-                        executionStatus: "error",
                     });
                 } else {
                     finalText = collectTerminalOutput(sandboxResult);
@@ -548,7 +540,6 @@ export async function handleUserMessage(
                         role: "user",
                         content: terminalFeedback,
                         isExecutionResult: true,
-                        executionStatus: "ok",
                     });
                     // Store the user-facing answer as an assistant message so
                     // follow-up turns can see what was shown to the user.
@@ -576,7 +567,6 @@ export async function handleUserMessage(
                 role: "user",
                 content: feedback,
                 isExecutionResult: true,
-                executionStatus: "error",
             });
         }
     }
@@ -591,7 +581,6 @@ export async function handleUserMessage(
             role: "user",
             content: exhaustedMsg,
             isExecutionResult: true,
-            executionStatus: "error",
         });
 
         const maxInputContextTokens = Math.floor(
@@ -653,7 +642,6 @@ export async function handleUserMessage(
                     0,
                 ),
                 isExecutionResult: true,
-                executionStatus: "error",
             });
         } else if (
             rawFinal.trim() &&
@@ -698,7 +686,6 @@ export async function handleUserMessage(
                 role: "user",
                 content: buildExecutionFeedback(result, 0),
                 isExecutionResult: true,
-                executionStatus: result.success ? "ok" : "error",
             });
             if (finalText) {
                 history.push({
