@@ -44,7 +44,7 @@ if git diff --cached --name-only | grep -q '^package\(-lock\)\?\.json$'; then
 
   # Use Node 22 (minimum supported version) so the lock file is
   # compatible with npm ci on both Node 22 and Node 24 in CI.
-  if ! nvm exec 22 npm install --package-lock-only --ignore-scripts; then
+  if ! nvm exec 22.16.0 npm install --package-lock-only --ignore-scripts; then
     echo "pre-commit: npm install --package-lock-only failed, aborting commit" >&2
     exit 1
   fi

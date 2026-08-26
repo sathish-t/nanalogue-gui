@@ -85,6 +85,9 @@ docs/
 # Pi coding agent files
 .pi/
 
+# Amp orb portal metadata
+.amp/portals/*
+
 # Local brainstorming notes (not for GitHub)
 brainstorming*
 

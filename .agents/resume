@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly node_runtime_version="24.15.0"
+readonly node_runtime_npm_version="11.12.1"
+readonly node_runtime_corepack_version="0.34.6"
+readonly node_install_dir="$HOME/.nvm/versions/node/v$node_runtime_version"
+
+for source_path in \
+    "$node_install_dir/bin/node" \
+    "$node_install_dir/bin/npm" \
+    "$node_install_dir/bin/npx" \
+    "$node_install_dir/bin/corepack" \
+    "$node_install_dir/lib/node_modules/npm/bin/npm-cli.js" \
+    "$node_install_dir/lib/node_modules/npm/bin/npx-cli.js" \
+    "$node_install_dir/lib/node_modules/corepack/dist/corepack.js"; do
+    if [[ ! -f "$source_path" || ! -x "$source_path" ]]; then
+        printf 'Orb resume: Node.js toolchain is incomplete; rerun .agents/setup\n' >&2
+        exit 1
+    fi
+done
+
+if [[ "$(readlink -f "$node_install_dir/bin/npm")" != "$node_install_dir/lib/node_modules/npm/bin/npm-cli.js" ]] || \
+    [[ "$(readlink -f "$node_install_dir/bin/npx")" != "$node_install_dir/lib/node_modules/npm/bin/npx-cli.js" ]] || \
+    [[ "$(readlink -f "$node_install_dir/bin/corepack")" != "$node_install_dir/lib/node_modules/corepack/dist/corepack.js" ]]; then
+    printf 'Orb resume: Node.js entry points are invalid; rerun .agents/setup\n' >&2
+    exit 1
+fi
+
+mkdir -p "$HOME/.local/bin"
+for executable in node npm npx corepack; do
+    source_path="$node_install_dir/bin/$executable"
+    target_path="$HOME/.local/bin/$executable"
+    ln -sfnT "$source_path" "$target_path"
+    if [[ "$(readlink -f "$target_path")" != "$(readlink -f "$source_path")" ]]; then
+        printf 'Orb resume: failed to link %s into ~/.local/bin\n' "$executable" >&2
+        exit 1
+    fi
+done
+
+if [[ "$($HOME/.local/bin/node --version)" != "v$node_runtime_version" ]]; then
+    printf 'Orb resume: failed to activate Node.js v%s\n' "$node_runtime_version" >&2
+    exit 1
+fi
+if [[ "$(PATH="$node_install_dir/bin:/usr/bin:/bin" "$node_install_dir/bin/npm" --version)" != "$node_runtime_npm_version" ]] || \
+    [[ "$(PATH="$node_install_dir/bin:/usr/bin:/bin" "$node_install_dir/bin/npx" --version)" != "$node_runtime_npm_version" ]] || \
+    [[ "$(PATH="$node_install_dir/bin:/usr/bin:/bin" "$node_install_dir/bin/corepack" --version)" != "$node_runtime_corepack_version" ]]; then
+    printf 'Orb resume: Node.js tool versions are invalid; rerun .agents/setup\n' >&2
+    exit 1
+fi
+
+printf 'Orb resume: Node.js v%s is ready\n' "$node_runtime_version"

@@ -1,0 +1,230 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly node_runtime_version="24.15.0"
+readonly node_runtime_npm_version="11.12.1"
+readonly node_runtime_corepack_version="0.34.6"
+readonly node_lockfile_version="22.16.0"
+readonly node_lockfile_npm_version="11.10.0"
+readonly node_lockfile_corepack_version="0.32.0"
+readonly node_lockfile_npm_sha512="8bc844e37892200305b98562f13c6c10849d10b3387c8cdaeb4d1a2e32746a79063cba9dd284cf28c26a01c3bf4169b7d3b31b4a5586cc970d6749463108073c"
+readonly nvm_version="v0.40.7"
+readonly nvm_commit="f0b0c6bb0b281ceeb106c8cf9ab8fde141215092"
+readonly nvm_repository="https://github.com/nvm-sh/nvm.git"
+readonly repo_root="$(git rev-parse --show-toplevel)"
+
+export NVM_DIR="$HOME/.nvm"
+
+log_step() {
+    printf '\n==> %s\n' "$1"
+}
+
+install_pinned_nvm() {
+    log_step "Installing nvm $nvm_version"
+
+    if [[ -e "$NVM_DIR" && ! -d "$NVM_DIR/.git" ]]; then
+        printf 'Orb setup: %s exists but is not an nvm Git checkout\n' "$NVM_DIR" >&2
+        return 1
+    fi
+
+    if [[ ! -d "$NVM_DIR/.git" ]]; then
+        git init --quiet "$NVM_DIR"
+        git -C "$NVM_DIR" remote add origin "$nvm_repository"
+    else
+        git -C "$NVM_DIR" remote set-url origin "$nvm_repository"
+    fi
+
+    if [[ "$(git -C "$NVM_DIR" rev-parse HEAD 2>/dev/null || true)" != "$nvm_commit" ]]; then
+        git -C "$NVM_DIR" fetch --quiet --depth=1 origin "refs/tags/$nvm_version"
+        git -C "$NVM_DIR" checkout --quiet --force --detach FETCH_HEAD
+    fi
+
+    if [[ "$(git -C "$NVM_DIR" rev-parse HEAD)" != "$nvm_commit" ]]; then
+        printf 'Orb setup: nvm %s did not resolve to the pinned commit\n' "$nvm_version" >&2
+        return 1
+    fi
+
+    # Restore every tracked file even when HEAD already names the pinned commit.
+    git -C "$NVM_DIR" reset --hard --quiet "$nvm_commit"
+}
+
+node_archive_sha256() {
+    local version="$1"
+    local architecture="$2"
+
+    case "$version:$architecture" in
+        22.16.0:x64) printf '%s\n' "f4cb75bb036f0d0eddf6b79d9596df1aaab9ddccd6a20bf489be5abe9467e84e" ;;
+        22.16.0:arm64) printf '%s\n' "eab80cb88f8fda1e65f5e8d0420c9809bdb320b03fd34976ab7161b6e703b910" ;;
+        24.15.0:x64) printf '%s\n' "472655581fb851559730c48763e0c9d3bc25975c59d518003fc0849d3e4ba0f6" ;;
+        24.15.0:arm64) printf '%s\n' "f3d5a797b5d210ce8e2cb265544c8e482eaedcb8aa409a8b46da7e8595d0dda0" ;;
+        *)
+            printf 'Orb setup: no Node.js checksum for %s on %s\n' "$version" "$architecture" >&2
+            return 1
+            ;;
+    esac
+}
+
+install_pinned_node() {
+    local version="$1"
+    local architecture
+    local archive
+    local checksum
+    local install_dir="$NVM_DIR/versions/node/v$version"
+    local staged_install_dir
+    local temporary_dir
+
+    if node_installation_is_complete "$version"; then
+        printf 'Node.js v%s is already installed\n' "$version"
+        return
+    fi
+
+    case "$(uname -m)" in
+        x86_64) architecture="x64" ;;
+        aarch64 | arm64) architecture="arm64" ;;
+        *)
+            printf 'Orb setup: unsupported Node.js architecture: %s\n' "$(uname -m)" >&2
+            return 1
+            ;;
+    esac
+
+    archive="node-v${version}-linux-${architecture}.tar.xz"
+    checksum="$(node_archive_sha256 "$version" "$architecture")"
+    temporary_dir="$(mktemp -d)"
+    mkdir -p "$NVM_DIR/versions/node"
+    staged_install_dir="$(mktemp -d -p "$NVM_DIR/versions/node" ".v${version}.installing.XXXXXX")"
+    trap 'rm -rf "$temporary_dir" "$staged_install_dir"' EXIT
+
+    log_step "Installing checksum-pinned Node.js v$version"
+    curl --fail --silent --show-error --location \
+        "https://nodejs.org/dist/v${version}/${archive}" \
+        --output "$temporary_dir/$archive"
+    printf '%s  %s\n' "$checksum" "$temporary_dir/$archive" | sha256sum --check
+
+    tar -xJf "$temporary_dir/$archive" -C "$staged_install_dir" --strip-components=1
+    rm -rf "$install_dir"
+    mv "$staged_install_dir" "$install_dir"
+    trap - EXIT
+    rm -rf "$temporary_dir"
+}
+
+node_installation_is_complete() {
+    local version="$1"
+    local install_dir="$NVM_DIR/versions/node/v$version"
+    local node_binary="$install_dir/bin/node"
+    local npm_cli="$install_dir/lib/node_modules/npm/bin/npm-cli.js"
+    local npx_cli="$install_dir/lib/node_modules/npm/bin/npx-cli.js"
+    local corepack_cli="$install_dir/lib/node_modules/corepack/dist/corepack.js"
+    local expected_npm_version
+    local expected_corepack_version
+    local executable
+
+    [[ -x "$node_binary" ]] || return 1
+    [[ "$($node_binary --version)" == "v$version" ]] || return 1
+    [[ -x "$npm_cli" ]] || return 1
+    [[ -x "$npx_cli" ]] || return 1
+    [[ -x "$corepack_cli" ]] || return 1
+    for executable in npm npx corepack; do
+        [[ -x "$install_dir/bin/$executable" ]] || return 1
+    done
+    [[ "$(readlink -f "$install_dir/bin/npm")" == "$npm_cli" ]] || return 1
+    [[ "$(readlink -f "$install_dir/bin/npx")" == "$npx_cli" ]] || return 1
+    [[ "$(readlink -f "$install_dir/bin/corepack")" == "$corepack_cli" ]] || return 1
+
+    case "$version" in
+        "$node_runtime_version")
+            expected_npm_version="$node_runtime_npm_version"
+            expected_corepack_version="$node_runtime_corepack_version"
+            ;;
+        "$node_lockfile_version")
+            expected_npm_version="$node_lockfile_npm_version"
+            expected_corepack_version="$node_lockfile_corepack_version"
+            ;;
+        *) return 1 ;;
+    esac
+
+    [[ "$(PATH="$install_dir/bin:/usr/bin:/bin" "$install_dir/bin/npm" --version)" == "$expected_npm_version" ]] || return 1
+    [[ "$(PATH="$install_dir/bin:/usr/bin:/bin" "$install_dir/bin/npx" --version)" == "$expected_npm_version" ]] || return 1
+    [[ "$(PATH="$install_dir/bin:/usr/bin:/bin" "$install_dir/bin/corepack" --version)" == "$expected_corepack_version" ]] || return 1
+}
+
+install_pinned_lockfile_npm() {
+    local install_dir="$NVM_DIR/versions/node/v$node_lockfile_version"
+    local node_binary="$install_dir/bin/node"
+    local npm_cli="$install_dir/lib/node_modules/npm/bin/npm-cli.js"
+    local npx_cli="$install_dir/lib/node_modules/npm/bin/npx-cli.js"
+    local temporary_dir
+    local npm_archive
+
+    if [[ "$("$node_binary" "$npm_cli" --version)" == "$node_lockfile_npm_version" ]] && \
+        [[ "$("$node_binary" "$npx_cli" --version)" == "$node_lockfile_npm_version" ]]; then
+        return
+    fi
+
+    temporary_dir="$(mktemp -d)"
+    npm_archive="$temporary_dir/npm-$node_lockfile_npm_version.tgz"
+    trap 'rm -rf "$temporary_dir"' EXIT
+
+    log_step "Installing content-pinned npm $node_lockfile_npm_version"
+    curl --fail --silent --show-error --location \
+        "https://registry.npmjs.org/npm/-/npm-${node_lockfile_npm_version}.tgz" \
+        --output "$npm_archive"
+    printf '%s  %s\n' "$node_lockfile_npm_sha512" "$npm_archive" | sha512sum --check
+    "$node_binary" "$npm_cli" install --global --ignore-scripts "$npm_archive"
+
+    trap - EXIT
+    rm -rf "$temporary_dir"
+
+    if ! node_installation_is_complete "$node_lockfile_version"; then
+        printf 'Orb setup: failed to install npm/npx %s for Node.js %s\n' \
+            "$node_lockfile_npm_version" "$node_lockfile_version" >&2
+        return 1
+    fi
+}
+
+install_pinned_nvm
+install_pinned_node "$node_lockfile_version"
+install_pinned_node "$node_runtime_version"
+
+# The minimum supported Node release bundles an older npm. The pre-commit hook
+# uses this toolchain to regenerate package-lock.json, so install the repository's
+# minimum npm version without running package lifecycle scripts.
+log_step "Checking the Node.js $node_lockfile_version lockfile toolchain"
+install_pinned_lockfile_npm
+
+log_step "Activating Node.js v$node_runtime_version"
+mkdir -p "$HOME/.local/bin"
+for executable in node npm npx corepack; do
+    ln -sfnT "$NVM_DIR/versions/node/v$node_runtime_version/bin/$executable" "$HOME/.local/bin/$executable"
+done
+export PATH="$HOME/.local/bin:$PATH"
+
+if [[ "$(node --version)" != "v$node_runtime_version" ]]; then
+    printf 'Orb setup: expected Node.js v%s, found %s\n' "$node_runtime_version" "$(node --version)" >&2
+    exit 1
+fi
+if [[ "$(npm --version)" != "$node_runtime_npm_version" ]]; then
+    printf 'Orb setup: expected npm %s, found %s\n' "$node_runtime_npm_version" "$(npm --version)" >&2
+    exit 1
+fi
+if [[ "$(npx --version)" != "$node_runtime_npm_version" ]]; then
+    printf 'Orb setup: expected npx %s, found %s\n' "$node_runtime_npm_version" "$(npx --version)" >&2
+    exit 1
+fi
+if [[ "$(corepack --version)" != "$node_runtime_corepack_version" ]]; then
+    printf 'Orb setup: expected corepack %s, found %s\n' \
+        "$node_runtime_corepack_version" "$(corepack --version)" >&2
+    exit 1
+fi
+
+log_step "Installing locked npm dependencies"
+cd "$repo_root"
+git config --local core.hooksPath .githooks
+if [[ "$(git config --local --get core.hooksPath)" != ".githooks" ]]; then
+    printf 'Orb setup: failed to activate repository Git hooks\n' >&2
+    exit 1
+fi
+npm ci --ignore-scripts
+npm rebuild electron esbuild electron-winstaller
+
+log_step "Orb setup complete"
+printf 'Node.js %s, npm %s\n' "$(node --version)" "$(npm --version)"
