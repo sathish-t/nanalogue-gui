@@ -119,18 +119,56 @@ describe("buildQCConfig", () => {
 
     it.each([
         "",
+        "   ",
         "0",
         "100.01",
+        "5abc",
+        "Infinity",
     ])("rejects invalid sample fraction %j", (sampleFraction) => {
         expect(failureMessage(minimalInput({ sampleFraction }))).toBe(
             "Sample fraction must be a number between 0.01 and 100.",
         );
     });
 
-    it.each(["", "-1"])("rejects invalid seed %j", (sampleSeed) => {
+    it.each([
+        "",
+        "   ",
+        "-1",
+        "42abc",
+        "1.5",
+        "Infinity",
+        "9007199254740992",
+    ])("rejects invalid seed %j", (sampleSeed) => {
         expect(failureMessage(minimalInput({ sampleSeed }))).toBe(
             "Sample seed must be a non-negative integer.",
         );
+    });
+
+    it("accepts trimmed sample fraction and seed fields", () => {
+        const result = buildQCConfig(
+            minimalInput({ sampleFraction: " 5 ", sampleSeed: " 42 " }),
+        );
+
+        expect(result.success && result.config).toMatchObject({
+            sampleFraction: 5,
+            sampleSeed: 42,
+        });
+    });
+
+    it.each([
+        "0.01",
+        "100",
+    ])("accepts sample fraction boundary %j", (sampleFraction) => {
+        expect(buildQCConfig(minimalInput({ sampleFraction })).success).toBe(
+            true,
+        );
+    });
+
+    it.each([
+        "0",
+        "9007199254740991",
+    ])("accepts sample seed boundary %j", (sampleSeed) => {
+        expect(buildQCConfig(minimalInput({ sampleSeed })).success).toBe(true);
     });
 
     it("rejects an invalid window size", () => {
@@ -150,12 +188,35 @@ describe("buildQCConfig", () => {
     });
 
     it.each([
+        "",
+        "   ",
         "0",
         "invalid",
+        "100abc",
+        "1.5",
+        "Infinity",
+        "9007199254740992",
     ])("rejects invalid read length granularity %j", (readLengthBinWidth) => {
         expect(failureMessage(minimalInput({ readLengthBinWidth }))).toBe(
             "Read length granularity must be a positive integer.",
         );
+    });
+
+    it("accepts a trimmed read length granularity field", () => {
+        const result = buildQCConfig(
+            minimalInput({ readLengthBinWidth: " 1000 " }),
+        );
+
+        expect(result.success && result.config.readLengthBinWidth).toBe(1000);
+    });
+
+    it.each([
+        "1",
+        "9007199254740991",
+    ])("accepts read length granularity boundary %j", (readLengthBinWidth) => {
+        expect(
+            buildQCConfig(minimalInput({ readLengthBinWidth })).success,
+        ).toBe(true);
     });
 
     it("reports invalid region syntax", () => {
