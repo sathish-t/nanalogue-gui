@@ -274,6 +274,7 @@ function updateGenerateButton(): void {
     const bamValue = bamSource.value;
     const readIdValue = elements.readIdPath.value;
     const outputValue = outputSource.value;
+    const outputValid = outputSource.isValid;
 
     const allFilled =
         bamValue.length > 0 && readIdValue.length > 0 && outputValue.length > 0;
@@ -288,24 +289,25 @@ function updateGenerateButton(): void {
         if (localBam && localBam === outputValue) {
             hasCollision = true;
         }
-        if (readIdValue === outputValue) {
+        if (outputValid && readIdValue === outputValue) {
             outputSource.showWarning(
                 "Output path cannot be the same as the read ID file.",
                 true,
             );
             hasCollision = true;
-        } else if (outputSource.requiresOverwrite) {
+        } else if (outputValid && outputSource.requiresOverwrite) {
             outputSource.showWarning(
                 "This file already exists and will be overwritten.",
                 false,
             );
-        } else {
+        } else if (outputValid) {
             outputSource.hideWarning();
         }
     }
 
     const overwriteOk =
-        !outputSource.requiresOverwrite || outputSource.overwriteConfirmed;
+        outputValid &&
+        (!outputSource.requiresOverwrite || outputSource.overwriteConfirmed);
 
     elements.btnGenerate.disabled = !allFilled || hasCollision || !overwriteOk;
 }
@@ -402,6 +404,11 @@ elements.btnGenerate.addEventListener("click", async () => {
     const outputPath = outputSource.value;
 
     if (!bamPath || !readIdPath || !outputPath) return;
+    if (
+        !outputSource.isValid ||
+        (outputSource.requiresOverwrite && !outputSource.overwriteConfirmed)
+    )
+        return;
 
     // Validate region if provided
     const regionInput = elements.region.value.trim();
@@ -430,11 +437,18 @@ elements.btnGenerate.addEventListener("click", async () => {
                   bamPath,
                   readIdPath,
                   outputPath,
+                  overwriteConfirmed: outputSource.overwriteConfirmed,
                   treatAsUrl,
                   region,
                   fullRegion,
               }
-            : { bamPath, readIdPath, outputPath, treatAsUrl };
+            : {
+                  bamPath,
+                  readIdPath,
+                  outputPath,
+                  overwriteConfirmed: outputSource.overwriteConfirmed,
+                  treatAsUrl,
+              };
         const result = await api.locateGenerateBed(request);
 
         elements.loadingOverlay.classList.add("hidden");
@@ -447,6 +461,7 @@ elements.btnGenerate.addEventListener("click", async () => {
         bamSource.disabled = false;
         elements.btnBrowseReadIds.disabled = false;
         outputSource.disabled = false;
+        await outputSource.checkCurrentFileExists();
         updateGenerateButton();
     }
 });

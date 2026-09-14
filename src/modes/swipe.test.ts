@@ -123,6 +123,7 @@ const BASE_ARGS: SwipeArgs = {
     bamPath: "/data/sample.bam",
     bedPath: "/data/annotations.bed",
     outputPath: "/data/output.bed",
+    overwriteConfirmed: false,
     windowSize: 200,
 };
 
@@ -225,13 +226,30 @@ describe("swipe mode — initialize()", () => {
             annotations: [...FAKE_ANNOTATIONS],
         });
 
-        await initializeSwipeReview(BASE_ARGS, true);
+        await initializeSwipeReview(BASE_ARGS, false);
 
         expect(vi.mocked(writeFileSync)).toHaveBeenCalledWith(
             "/data/output.bed",
             "",
-            "utf-8",
+            { encoding: "utf-8", flag: "wx" },
         );
+    });
+
+    it("propagates an exclusive-create conflict without deleting output", async () => {
+        setMockReturnValue(parseBedFile, {
+            capped: false,
+            annotations: [...FAKE_ANNOTATIONS],
+        });
+        vi.mocked(writeFileSync).mockImplementationOnce(() => {
+            throw Object.assign(new Error("output appeared"), {
+                code: "EEXIST",
+            });
+        });
+
+        await expect(initializeSwipeReview(BASE_ARGS, false)).rejects.toThrow(
+            "output appeared",
+        );
+        expect(unlinkSync).not.toHaveBeenCalled();
     });
 
     it("throws when the BED file exceeds 10 000 annotations", async () => {
@@ -542,6 +560,11 @@ describe("swipe mode — initialize() overwrite dialog", () => {
         await initializeSwipeReview(BASE_ARGS, true);
 
         expect(dialog.showMessageBox).not.toHaveBeenCalled();
+        expect(vi.mocked(writeFileSync)).toHaveBeenCalledWith(
+            BASE_ARGS.outputPath,
+            "",
+            { encoding: "utf-8", flag: "w" },
+        );
     });
 
     it("throws when user cancels the overwrite dialog", async () => {

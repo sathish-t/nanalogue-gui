@@ -30,6 +30,7 @@ describe("OutputFileInput", () => {
 
     beforeEach(() => {
         el = createElement();
+        el.checkExistsFn = resolvingFn(false);
     });
 
     afterEach(() => {
@@ -205,14 +206,14 @@ describe("OutputFileInput", () => {
             await vi.waitFor(() => expect(el.value).toBe("/output/result.bed"));
         });
 
-        it("fires output-selected after a path is picked", async () => {
+        it("fires output-selected for pending and checked states", async () => {
             el.selectFileFn = resolvingFn("/output/result.bed");
             const handler = vi.fn();
             el.addEventListener("output-selected", handler);
 
             const btn = el.querySelector<HTMLButtonElement>("button");
             btn?.click();
-            await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(1));
+            await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(2));
         });
 
         it("does not fire output-selected when dialog is cancelled", async () => {
@@ -235,6 +236,27 @@ describe("OutputFileInput", () => {
     // -------------------------------------------------------------------------
 
     describe("checkExistsFn — overwrite flow", () => {
+        it("is invalid while the existence check is pending", async () => {
+            let resolveExists: ((exists: boolean) => void) | undefined;
+            el.selectFileFn = resolvingFn("/out/new.bed");
+            /**
+             * Keeps the existence check pending until the test resolves it.
+             *
+             * @returns A promise controlled by resolveExists.
+             */
+            el.checkExistsFn = () =>
+                new Promise<boolean>((resolve) => {
+                    resolveExists = resolve;
+                });
+
+            el.querySelector<HTMLButtonElement>("button")?.click();
+            await vi.waitFor(() => expect(el.value).toBe("/out/new.bed"));
+
+            expect(el.isValid).toBe(false);
+            resolveExists?.(false);
+            await vi.waitFor(() => expect(el.isValid).toBe(true));
+        });
+
         it("sets requiresOverwrite to true when the file exists", async () => {
             el.selectFileFn = resolvingFn("/out/existing.bed");
             el.checkExistsFn = resolvingFn(true);
@@ -273,6 +295,135 @@ describe("OutputFileInput", () => {
             await vi.waitFor(() => expect(el.value).toBe("/out/new.bed"));
 
             expect(el.requiresOverwrite).toBe(false);
+        });
+
+        it("stays invalid and shows a retryable error when the check rejects", async () => {
+            el.selectFileFn = resolvingFn("/out/result.bed");
+            el.checkExistsFn = vi
+                .fn<() => Promise<boolean>>()
+                .mockRejectedValueOnce(new Error("IPC unavailable"))
+                .mockResolvedValueOnce(false);
+
+            el.querySelector<HTMLButtonElement>("button")?.click();
+            await vi.waitFor(() =>
+                expect(
+                    el.querySelector(".file-exists-warning")?.textContent,
+                ).toContain("retry"),
+            );
+
+            expect(el.isValid).toBe(false);
+            expect(el.requiresOverwrite).toBe(false);
+
+            el.querySelector<HTMLButtonElement>("button")?.click();
+            await vi.waitFor(() => expect(el.isValid).toBe(true));
+            expect(el.checkExistsFn).toHaveBeenCalledTimes(2);
+        });
+
+        it("stays invalid when no existence checker is configured", async () => {
+            el.selectFileFn = resolvingFn("/out/result.bed");
+            el.checkExistsFn = null;
+
+            el.querySelector<HTMLButtonElement>("button")?.click();
+            await vi.waitFor(() =>
+                expect(
+                    el.querySelector(".file-exists-warning")?.textContent,
+                ).toContain("retry"),
+            );
+
+            expect(el.isValid).toBe(false);
+        });
+
+        it("ignores an older same-path success after the latest check rejects", async () => {
+            let resolveFirst: ((exists: boolean) => void) | undefined;
+            el.selectFileFn = resolvingFn("/out/result.bed");
+            el.checkExistsFn = vi
+                .fn<() => Promise<boolean>>()
+                .mockImplementationOnce(
+                    () =>
+                        new Promise<boolean>((resolve) => {
+                            resolveFirst = resolve;
+                        }),
+                )
+                .mockRejectedValueOnce(new Error("latest check failed"));
+
+            el.querySelector<HTMLButtonElement>("button")?.click();
+            await vi.waitFor(() =>
+                expect(el.checkExistsFn).toHaveBeenCalledOnce(),
+            );
+            el.querySelector<HTMLButtonElement>("button")?.click();
+            await vi.waitFor(() =>
+                expect(
+                    el.querySelector(".file-exists-warning")?.textContent,
+                ).toContain("retry"),
+            );
+
+            resolveFirst?.(true);
+            await Promise.resolve();
+            expect(el.isValid).toBe(false);
+            expect(el.requiresOverwrite).toBe(false);
+        });
+
+        it("ignores an older rejection after the latest check succeeds", async () => {
+            let rejectFirst: ((error: Error) => void) | undefined;
+            el.selectFileFn = resolvingFn("/out/result.bed");
+            el.checkExistsFn = vi
+                .fn<() => Promise<boolean>>()
+                .mockImplementationOnce(
+                    () =>
+                        new Promise<boolean>((_resolve, reject) => {
+                            rejectFirst = reject;
+                        }),
+                )
+                .mockResolvedValueOnce(false);
+
+            el.querySelector<HTMLButtonElement>("button")?.click();
+            await vi.waitFor(() =>
+                expect(el.checkExistsFn).toHaveBeenCalledOnce(),
+            );
+            el.querySelector<HTMLButtonElement>("button")?.click();
+            await vi.waitFor(() => expect(el.isValid).toBe(true));
+
+            rejectFirst?.(new Error("stale check failed"));
+            await Promise.resolve();
+            expect(el.isValid).toBe(true);
+            expect(
+                el
+                    .querySelector(".file-exists-warning")
+                    ?.classList.contains("hidden"),
+            ).toBe(true);
+        });
+
+        it("resets overwrite authorization before rechecking", async () => {
+            let resolveSecond: ((exists: boolean) => void) | undefined;
+            el.selectFileFn = resolvingFn("/out/result.bed");
+            el.checkExistsFn = vi
+                .fn<() => Promise<boolean>>()
+                .mockResolvedValueOnce(true)
+                .mockImplementationOnce(
+                    () =>
+                        new Promise<boolean>((resolve) => {
+                            resolveSecond = resolve;
+                        }),
+                );
+
+            el.querySelector<HTMLButtonElement>("button")?.click();
+            await vi.waitFor(() => expect(el.requiresOverwrite).toBe(true));
+            const checkbox = el.querySelector<HTMLInputElement>(
+                'input[type="checkbox"]',
+            );
+            if (checkbox) {
+                checkbox.checked = true;
+                checkbox.dispatchEvent(new Event("change"));
+            }
+            expect(el.overwriteConfirmed).toBe(true);
+
+            el.querySelector<HTMLButtonElement>("button")?.click();
+            await vi.waitFor(() =>
+                expect(el.checkExistsFn).toHaveBeenCalledTimes(2),
+            );
+            expect(el.isValid).toBe(false);
+            expect(el.overwriteConfirmed).toBe(false);
+            resolveSecond?.(false);
         });
     });
 
@@ -337,13 +488,14 @@ describe("OutputFileInput", () => {
 
             const btn = el.querySelector<HTMLButtonElement>("button");
             btn?.click();
-            await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(1));
+            await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(2));
 
-            const detail = handler.mock.calls[0][0]
+            const detail = handler.mock.calls[1][0]
                 .detail as OutputSelectedDetail;
             expect(detail.value).toBe("/out/new.bed");
             expect(detail.requiresOverwrite).toBe(false);
             expect(detail.overwriteConfirmed).toBe(false);
+            expect(detail.isValid).toBe(true);
         });
     });
 
