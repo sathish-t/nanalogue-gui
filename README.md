@@ -266,7 +266,7 @@ To use AI Chat, you need three things: an **API endpoint URL**, an **API key**
 Any other provider that supports the OpenAI v1 chat completions protocol
 (`POST /v1/chat/completions`) will also work.
 Please note that unless you have a local LLM that you or your organization are running,
-it is likely that you will be charged per request to these URLs.
+it is likely that you will be charged per request to these URLs. Remote endpoints also receive the BAM-derived prompts and results from your session, so only use a provider you trust.
 
 We have tested for the following providers either manually or automatically in this repository.
 
@@ -351,7 +351,8 @@ relevant for you depends on how you use the chat feature here.
 We use a Python sandbox to receive code from the LLM and execute it.
 Our sandbox uses the [Monty](https://github.com/pydantic/monty) package from pydantic to run Python
 code in a restricted way so that it has access only to our files and to specific functions.
-This ensures our sandbox is secure against mistakes by the user or the LLM,
+This helps protect against accidental mistakes by the user or the LLM,
+but it is not a hardened security boundary against a determined adversary,
 and allows us to inspect what the LLM is doing.
 See [documentation/ai-chat.md](documentation/ai-chat.md#security-model) for the security model
 and trust boundaries. A copy button in the code panel lets you copy the Python code to your clipboard.
