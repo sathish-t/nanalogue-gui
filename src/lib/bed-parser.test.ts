@@ -103,6 +103,41 @@ describe("parseBedFile", () => {
         );
     });
 
+    it.each([
+        ["an empty start", "", "200"],
+        ["an empty end", "100", " "],
+        ["trailing garbage", "100abc", "200"],
+        ["fractional coordinates", "100.5", "200"],
+        ["non-finite coordinates", "100", "Infinity"],
+        ["unsafe integer coordinates", "100", "9007199254740992"],
+    ])("skips %s", async (_description, start, end) => {
+        const warnSpy = suppressConsoleWarn();
+        const path = await writeTempBed(`chr1\t${start}\t${end}\tread1`);
+        const result = parseBedFile(path);
+
+        expect(result.annotations).toHaveLength(0);
+        expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining("invalid start/end"),
+        );
+    });
+
+    it("accepts coordinates with surrounding whitespace", async () => {
+        const path = await writeTempBed("chr1\t 100 \t 200 \tread1");
+        const result = parseBedFile(path);
+
+        expect(result.annotations[0]).toMatchObject({ start: 100, end: 200 });
+    });
+
+    it("accepts safe-integer coordinate boundaries", async () => {
+        const path = await writeTempBed("chr1\t0\t9007199254740991\tread1");
+        const result = parseBedFile(path);
+
+        expect(result.annotations[0]).toMatchObject({
+            start: 0,
+            end: Number.MAX_SAFE_INTEGER,
+        });
+    });
+
     it("skips lines with negative start coordinate", async () => {
         const warnSpy = suppressConsoleWarn();
         const path = await writeTempBed("chr1\t-10\t200\tread1");

@@ -65,11 +65,18 @@ export function parseBedFile(
         }
 
         const contig = fields[0];
-        const start = parseInt(fields[1], 10);
-        const end = parseInt(fields[2], 10);
+        const startField = fields[1].trim();
+        const endField = fields[2].trim();
+        const start = Number(startField);
+        const end = Number(endField);
         const readId = fields[3];
 
-        if (Number.isNaN(start) || Number.isNaN(end)) {
+        if (
+            !startField ||
+            !endField ||
+            !Number.isSafeInteger(start) ||
+            !Number.isSafeInteger(end)
+        ) {
             console.warn(
                 `Skipping line ${i + 1}: invalid start/end coordinates`,
             );
