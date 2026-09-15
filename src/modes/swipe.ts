@@ -12,6 +12,7 @@ import { dialog, ipcMain } from "electron";
 import { parseBedFile } from "../lib/bed-parser";
 import type {
     SwipePlotData,
+    SwipeReviewActionResult,
     SwipeReviewState,
     SwipeStartRequest,
 } from "../lib/swipe-contract";
@@ -163,6 +164,30 @@ function writeAcceptedAnnotation(outputPath: string, rawLine: string): void {
 }
 
 /**
+ * Advances the review index and loads the next annotation's plot when one remains.
+ *
+ * @returns The updated review state and next plot, or a completed result at the end.
+ */
+async function advanceAndLoadNextAnnotation(): Promise<SwipeReviewActionResult> {
+    appState.currentIndex++;
+
+    if (appState.currentIndex >= annotations.length) {
+        return { done: true, state: appState };
+    }
+
+    try {
+        const plotData = await loadCurrentPlotData();
+        return { done: false, state: appState, plotData };
+    } catch (error) {
+        console.error(
+            `Error loading data for annotation ${appState.currentIndex + 1}:`,
+            error,
+        );
+        return { done: false, state: appState, plotData: null };
+    }
+}
+
+/**
  * Registers IPC handlers for the renderer process to request state, plot data, and accept or reject annotations.
  */
 export function registerSwipeIpcHandlers(): void {
@@ -184,27 +209,14 @@ export function registerSwipeIpcHandlers(): void {
             const annotation = annotations[appState.currentIndex];
             writeAcceptedAnnotation(cliArgs.outputPath, annotation.rawLine);
             appState.acceptedCount++;
-            appState.currentIndex++;
+            return await advanceAndLoadNextAnnotation();
         } else {
             console.error(
                 "Unknown state: accept called even though we've run out of annotations",
             );
         }
 
-        if (appState.currentIndex >= annotations.length) {
-            return { done: true, state: appState };
-        }
-
-        try {
-            const plotData = await loadCurrentPlotData();
-            return { done: false, state: appState, plotData };
-        } catch (error) {
-            console.error(
-                `Error loading data for annotation ${appState.currentIndex + 1}:`,
-                error,
-            );
-            return { done: false, state: appState, plotData: null };
-        }
+        return { done: true, state: appState };
     });
 
     ipcMain.handle("reject", async () => {
@@ -215,26 +227,13 @@ export function registerSwipeIpcHandlers(): void {
 
         if (appState.currentIndex < annotations.length) {
             appState.rejectedCount++;
-            appState.currentIndex++;
+            return await advanceAndLoadNextAnnotation();
         } else {
             console.error(
                 "Unknown state: reject called even though we've run out of annotations",
             );
         }
 
-        if (appState.currentIndex >= annotations.length) {
-            return { done: true, state: appState };
-        }
-
-        try {
-            const plotData = await loadCurrentPlotData();
-            return { done: false, state: appState, plotData };
-        } catch (error) {
-            console.error(
-                `Error loading data for annotation ${appState.currentIndex + 1}:`,
-                error,
-            );
-            return { done: false, state: appState, plotData: null };
-        }
+        return { done: true, state: appState };
     });
 }
