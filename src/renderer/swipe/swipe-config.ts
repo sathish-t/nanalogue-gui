@@ -292,6 +292,7 @@ function updateSummary(): void {
  * Also blocks start when the output path matches the input BED path or when the mod filter is empty.
  */
 function updateStartButton(): void {
+    const outputValid = outputSource.isValid;
     const allFilled =
         bamSource.value.length > 0 &&
         elements.bedPath.value.length > 0 &&
@@ -300,22 +301,23 @@ function updateStartButton(): void {
     const sameAsBed =
         allFilled && outputSource.value === elements.bedPath.value;
 
-    if (sameAsBed) {
+    if (outputValid && sameAsBed) {
         outputSource.showWarning(
             "Output path cannot be the same as the input BED file.",
             true,
         );
-    } else if (outputSource.requiresOverwrite) {
+    } else if (outputValid && outputSource.requiresOverwrite) {
         outputSource.showWarning(
             "This file already exists and will be overwritten.",
             false,
         );
-    } else {
+    } else if (outputValid) {
         outputSource.hideWarning();
     }
 
     const overwriteOk =
-        !outputSource.requiresOverwrite || outputSource.overwriteConfirmed;
+        outputValid &&
+        (!outputSource.requiresOverwrite || outputSource.overwriteConfirmed);
 
     // Enable flanking region when all paths are valid
     elements.regionExpansion.disabled = !(
@@ -425,6 +427,11 @@ elements.btnStart.addEventListener("click", async () => {
     const outputPath = outputSource.value;
 
     if (!bamPath || !bedPath || !outputPath) return;
+    if (
+        !outputSource.isValid ||
+        (outputSource.requiresOverwrite && !outputSource.overwriteConfirmed)
+    )
+        return;
 
     const windowSize = windowSizeInput.value;
     if (!windowSizeInput.isValid) {
@@ -452,6 +459,7 @@ elements.btnStart.addEventListener("click", async () => {
             bamPath,
             bedPath,
             outputPath,
+            overwriteConfirmed: outputSource.overwriteConfirmed,
             windowSize,
             modTag,
             modStrand,

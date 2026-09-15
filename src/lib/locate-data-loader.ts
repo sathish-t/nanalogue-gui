@@ -11,6 +11,8 @@ export type LocateGenerateBedRequest = {
     readIdPath: string;
     /** Destination BED file path. */
     outputPath: string;
+    /** Whether the user authorized replacing an existing output file. */
+    overwriteConfirmed: boolean;
     /** Whether bamPath is a remote URL. */
     treatAsUrl: boolean;
 } & (
@@ -51,6 +53,11 @@ export function validateLocateGenerateBedRequest(
     if (typeof request.treatAsUrl !== "boolean") {
         throw new Error("Invalid Locate request: treatAsUrl must be a boolean");
     }
+    if (typeof request.overwriteConfirmed !== "boolean") {
+        throw new Error(
+            "Invalid Locate request: overwriteConfirmed must be a boolean",
+        );
+    }
     if (
         request.region !== undefined &&
         (typeof request.region !== "string" ||
@@ -78,6 +85,7 @@ export function validateLocateGenerateBedRequest(
             bamPath: request.bamPath as string,
             readIdPath: request.readIdPath as string,
             outputPath: request.outputPath as string,
+            overwriteConfirmed: request.overwriteConfirmed as boolean,
             treatAsUrl: request.treatAsUrl as boolean,
             region,
             fullRegion: request.fullRegion as boolean | undefined,
@@ -87,6 +95,7 @@ export function validateLocateGenerateBedRequest(
         bamPath: request.bamPath as string,
         readIdPath: request.readIdPath as string,
         outputPath: request.outputPath as string,
+        overwriteConfirmed: request.overwriteConfirmed as boolean,
         treatAsUrl: request.treatAsUrl as boolean,
     };
 }

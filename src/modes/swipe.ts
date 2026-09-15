@@ -45,12 +45,12 @@ const appState: SwipeReviewState = {
  * Initializes the swipe mode by loading contig sizes, parsing annotations, and preparing the output file.
  *
  * @param args - The validated swipe CLI arguments containing file paths and window size.
- * @param skipOverwriteConfirm - Whether to skip the overwrite confirmation dialog (used when the GUI config page already warned the user).
+ * @param overwriteConfirmed - Whether the user already authorized replacing an existing output file.
  * @returns A promise that resolves when initialization is complete.
  */
 export async function initializeSwipeReview(
     args: SwipeArgs,
-    skipOverwriteConfirm = false,
+    overwriteConfirmed = false,
 ): Promise<void> {
     cliArgs = args;
     modTag = args.modTag;
@@ -102,7 +102,7 @@ export async function initializeSwipeReview(
     appState.outputPath = cliArgs.outputPath;
 
     if (existsSync(cliArgs.outputPath)) {
-        if (!skipOverwriteConfirm) {
+        if (!overwriteConfirmed) {
             const { response } = await dialog.showMessageBox({
                 type: "warning",
                 buttons: ["Overwrite", "Cancel"],
@@ -114,10 +114,14 @@ export async function initializeSwipeReview(
             if (response === 1) {
                 throw new Error("User cancelled: output file exists");
             }
+            overwriteConfirmed = true;
         }
         unlinkSync(cliArgs.outputPath);
     }
-    writeFileSync(cliArgs.outputPath, "", "utf-8");
+    writeFileSync(cliArgs.outputPath, "", {
+        encoding: "utf-8",
+        flag: overwriteConfirmed ? "w" : "wx",
+    });
 
     console.log("Ready! Opening window...");
 }

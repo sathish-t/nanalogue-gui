@@ -99,21 +99,18 @@ echo "  ✓  BAM selected and peeked"
 rodney js "document.getElementById('read-id-path').value = '${READ_IDS_FILE}'"
 echo "  ✓  Read-IDs path injected"
 
-# ── inject output path and fire output-selected ───────────────────────────────
-# Set the internal text input value of the output-file-input custom element,
-# then dispatch output-selected (requiresOverwrite: false because the output
-# file does not exist yet).  The output-selected listener calls
-# updateGenerateButton(), which now sees all three fields filled.
+# ── inject and validate output path ───────────────────────────────────────────
+# Set the internal text input value, then run the component's real asynchronous
+# existence check. This fires the pending and checked output-selected events
+# that updateGenerateButton() listens for without bypassing overwrite detection.
 rodney js "(function() {
   var os = document.getElementById('output-source');
   var inp = os.querySelector('input[type=text]');
   if (inp) inp.value = '${OUTPUT_BED}';
-  os.dispatchEvent(new CustomEvent('output-selected', {
-    bubbles: true,
-    detail: { value: '${OUTPUT_BED}', requiresOverwrite: false, overwriteConfirmed: false }
-  }));
+  return os.checkCurrentFileExists();
 })()"
-rodney sleep 0.5
+rodney assert "document.getElementById('output-source').isValid" "true"
+rodney assert "document.getElementById('output-source').requiresOverwrite" "false"
 echo "  ✓  Output path injected"
 
 # ── assert Generate button is now enabled ────────────────────────────────────

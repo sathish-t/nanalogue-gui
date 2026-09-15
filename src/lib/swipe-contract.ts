@@ -94,6 +94,8 @@ export interface SwipeStartRequest {
     bedPath: string;
     /** Output BED path for accepted annotations. */
     outputPath: string;
+    /** Whether the user authorized replacing an existing output file. */
+    overwriteConfirmed: boolean;
     /** Signal aggregation window in base pairs. */
     windowSize: number;
     /** Modification tag to include. */
@@ -145,6 +147,10 @@ export function validateSwipeStartRequest(value: unknown): SwipeStartRequest {
         throw new Error(
             "Invalid Swipe start request: windowSize must be an integer between 2 and 10,000",
         );
+    if (typeof request.overwriteConfirmed !== "boolean")
+        throw new Error(
+            "Invalid Swipe start request: overwriteConfirmed must be a boolean",
+        );
     if (request.modTag !== undefined && typeof request.modTag !== "string")
         throw new Error("Invalid Swipe start request: modTag must be a string");
     if (
@@ -174,6 +180,7 @@ export function validateSwipeStartRequest(value: unknown): SwipeStartRequest {
         bamPath: request.bamPath as string,
         bedPath: request.bedPath as string,
         outputPath: request.outputPath as string,
+        overwriteConfirmed: request.overwriteConfirmed as boolean,
         windowSize: request.windowSize as number,
         modTag: request.modTag as string | undefined,
         modStrand: request.modStrand as "bc" | "bc_comp" | undefined,

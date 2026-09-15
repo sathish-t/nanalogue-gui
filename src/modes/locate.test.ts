@@ -67,6 +67,7 @@ describe("Locate IPC handlers", () => {
                     readIdPath: "/ids",
                     outputPath: "/out",
                     treatAsUrl: false,
+                    overwriteConfirmed: false,
                     fullRegion: true,
                 },
             ),
@@ -84,6 +85,7 @@ describe("Locate IPC handlers", () => {
                 readIdPath: "/ids",
                 outputPath: "/out",
                 treatAsUrl: false,
+                overwriteConfirmed: false,
             },
         );
         expect(validateIpcFilePath).toHaveBeenNthCalledWith(
@@ -109,6 +111,7 @@ describe("Locate IPC handlers", () => {
                     readIdPath: "/ids",
                     outputPath: "/out",
                     treatAsUrl: true,
+                    overwriteConfirmed: false,
                 },
             ),
         ).rejects.toThrow("200,000");
@@ -133,12 +136,13 @@ describe("Locate IPC handlers", () => {
                 readIdPath: "/ids",
                 outputPath: "/out",
                 treatAsUrl: true,
+                overwriteConfirmed: false,
             },
         );
         expect(writeFileSync).toHaveBeenCalledWith(
             "/out",
             "chr1\t10\t20\tread-1\t1000\t+\n",
-            "utf-8",
+            { encoding: "utf-8", flag: "wx" },
         );
         expect(result).toMatchObject({
             totalIds: 2,
@@ -146,6 +150,51 @@ describe("Locate IPC handlers", () => {
             bedEntries: 1,
             notFound: 1,
         });
+    });
+
+    it("allows replacement only with explicit overwrite authorization", async () => {
+        vi.mocked(readFileSync).mockReturnValue("read-1\n");
+        vi.mocked(readInfo).mockResolvedValue([]);
+
+        await generate(
+            {},
+            {
+                bamPath: "https://x",
+                readIdPath: "/ids",
+                outputPath: "/out",
+                treatAsUrl: true,
+                overwriteConfirmed: true,
+            },
+        );
+
+        expect(writeFileSync).toHaveBeenCalledWith("/out", "", {
+            encoding: "utf-8",
+            flag: "w",
+        });
+    });
+
+    it("propagates an exclusive-create conflict without retrying a write", async () => {
+        vi.mocked(readFileSync).mockReturnValue("read-1\n");
+        vi.mocked(readInfo).mockResolvedValue([]);
+        vi.mocked(writeFileSync).mockImplementationOnce(() => {
+            throw Object.assign(new Error("output appeared"), {
+                code: "EEXIST",
+            });
+        });
+
+        await expect(
+            generate(
+                {},
+                {
+                    bamPath: "https://x",
+                    readIdPath: "/ids",
+                    outputPath: "/out",
+                    treatAsUrl: true,
+                    overwriteConfirmed: false,
+                },
+            ),
+        ).rejects.toThrow("output appeared");
+        expect(writeFileSync).toHaveBeenCalledOnce();
     });
 
     it("returns null without a window or when the picker is cancelled", async () => {
@@ -193,6 +242,7 @@ describe("Locate IPC handlers", () => {
                 readIdPath: "/ids",
                 outputPath: "/out",
                 treatAsUrl: true,
+                overwriteConfirmed: false,
                 region: "chr1:10-20",
                 fullRegion: true,
             },
