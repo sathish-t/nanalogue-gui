@@ -120,6 +120,9 @@ jobs:
             exit 1
           fi
 
+      - name: Check brace-expansion advisory
+        run: npm run check:brace-expansion
+
       - name: Lint (Biome, ESLint, Stylelint, html-validate, empty JSDoc)
         run: npm run lint
 
