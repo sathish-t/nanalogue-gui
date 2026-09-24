@@ -120,6 +120,9 @@ jobs:
             exit 1
           fi
 
+      - name: Audit production dependencies
+        run: npm run audit:prod
+
       - name: Lint (Biome, ESLint, Stylelint, html-validate, empty JSDoc)
         run: npm run lint
 
