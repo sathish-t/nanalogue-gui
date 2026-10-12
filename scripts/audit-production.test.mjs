@@ -1,6 +1,15 @@
 // Production audit policy: a single temporary exception must not hide other risks.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import {
+    copyFileSync,
+    mkdirSync,
+    mkdtempSync,
+    rmSync,
+    writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { evaluateProductionAudit } from "./audit-production.mjs";
@@ -199,6 +208,53 @@ test("the CLI exits nonzero when npm cannot reach the audit registry", () => {
         assert.equal(result.error, undefined);
         assert.equal(result.status, 1);
         assert.match(result.stderr, /Production audit failed/);
+        assert.match(result.stderr, /ECONNREFUSED/);
+        assert.match(
+            result.stderr,
+            /http:\/\/127\.0\.0\.1:0\/-\/npm\/v1\/security\/advisories\/bulk/,
+        );
         assert.doesNotMatch(result.stdout, /Production audit exception/);
+    }
+});
+
+test("the CLI rejects shrinkwrap alongside package-lock before contacting npm", () => {
+    const root = mkdtempSync(join(tmpdir(), "production-audit-shrinkwrap-"));
+    try {
+        mkdirSync(join(root, "scripts"));
+        const script = join(root, "scripts", "audit-production.mjs");
+        copyFileSync(
+            new URL("./audit-production.mjs", import.meta.url),
+            script,
+        );
+        const manifest = { name: "audit-fixture", version: "1.0.0" };
+        const fixtureLock = {
+            ...manifest,
+            lockfileVersion: 3,
+            packages: { "": manifest },
+        };
+        writeFileSync(join(root, "package.json"), JSON.stringify(manifest));
+        for (const filename of ["package-lock.json", "npm-shrinkwrap.json"]) {
+            writeFileSync(join(root, filename), JSON.stringify(fixtureLock));
+        }
+        const result = spawnSync(process.execPath, [script], {
+            encoding: "utf8",
+            timeout: 20_000,
+            env: {
+                ...process.env,
+                npm_config_registry: "http://127.0.0.1:0",
+                npm_config_fetch_retries: "0",
+                npm_config_fetch_timeout: "1000",
+            },
+        });
+        assert.equal(result.error, undefined);
+        assert.equal(result.status, 1);
+        assert.match(
+            result.stderr,
+            /Production audit failed: npm-shrinkwrap\.json overrides package-lock\.json/,
+        );
+        assert.doesNotMatch(result.stderr, /ECONNREFUSED/);
+        assert.equal(result.stdout, "");
+    } finally {
+        rmSync(root, { recursive: true, force: true });
     }
 });

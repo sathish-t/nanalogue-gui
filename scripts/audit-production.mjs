@@ -6,7 +6,7 @@
 // large allocations / denial of service. This exception is not a mitigation.
 // Remove when a reviewed fix is available; never silently extend the deadline.
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -120,6 +120,13 @@ if (
     process.argv[1] &&
     resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
+    // npm prefers shrinkwrap, but our version checks read package-lock.json.
+    if (existsSync(new URL("../npm-shrinkwrap.json", import.meta.url))) {
+        console.error(
+            "Production audit failed: npm-shrinkwrap.json overrides package-lock.json; remove the alternative lockfile before auditing.",
+        );
+        process.exit(1);
+    }
     const result = spawnSync(
         process.platform === "win32" ? "npm.cmd" : "npm",
         [
