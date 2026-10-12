@@ -47,6 +47,7 @@ async function loadSwipeHandlers(api: Record<string, unknown>) {
     };
     Object.assign(output, {
         value: "/output.bed",
+        isValid: true,
         requiresOverwrite: false,
         overwriteConfirmed: false,
         showWarning: vi.fn(),

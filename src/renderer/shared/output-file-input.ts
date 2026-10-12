@@ -11,6 +11,8 @@ export interface OutputSelectedDetail {
     requiresOverwrite: boolean;
     /** Whether the user has confirmed the overwrite via the checkbox. */
     overwriteConfirmed: boolean;
+    /** Whether the output existence check completed successfully. */
+    isValid: boolean;
 }
 
 /**
@@ -44,6 +46,12 @@ export class OutputFileInput extends HTMLElement {
 
     /** Whether the currently selected file requires an overwrite. */
     private fileRequiresOverwrite = false;
+
+    /** Whether the current path passed its asynchronous existence check. */
+    private existenceCheckSucceeded = false;
+
+    /** Identifies the latest existence check so stale responses are ignored. */
+    private existenceCheckRequestId = 0;
 
     /**
      * Pluggable callback invoked when the Browse button is clicked.
@@ -162,6 +170,15 @@ export class OutputFileInput extends HTMLElement {
     }
 
     /**
+     * Returns whether the current path has passed its output existence check.
+     *
+     * @returns True only after the current path's check succeeds.
+     */
+    get isValid(): boolean {
+        return this.textInput.value.length > 0 && this.existenceCheckSucceeded;
+    }
+
+    /**
      * Displays a warning message below the file input.
      * Used externally for path-collision or other validation warnings.
      *
@@ -195,22 +212,49 @@ export class OutputFileInput extends HTMLElement {
         if (!path) return;
 
         this.textInput.value = path;
+        await this.checkCurrentFileExists();
+    }
+
+    /**
+     * Rechecks whether the selected output exists and resets prior authorization.
+     *
+     * @returns A promise that settles after the current existence check finishes.
+     */
+    async checkCurrentFileExists(): Promise<void> {
+        const path = this.textInput.value;
+        if (!path) return;
+
+        const requestId = ++this.existenceCheckRequestId;
         this.confirmCheckbox.checked = false;
         this.fileRequiresOverwrite = false;
+        this.existenceCheckSucceeded = false;
+        this.warningText.textContent = "Checking whether this file exists...";
+        this.warningText.classList.remove("hidden");
+        this.confirmLabel.classList.add("hidden");
+        this.fireOutputSelected();
 
         // Check if file exists
-        let exists = false;
-        if (this.checkExistsFn) {
-            try {
-                exists = await this.checkExistsFn(path);
-            } catch (error) {
-                console.error("Failed to check file exists:", error);
-            }
+        if (!this.checkExistsFn) {
+            this.showExistenceCheckError();
+            this.fireOutputSelected();
+            return;
+        }
+
+        let exists: boolean;
+        try {
+            exists = await this.checkExistsFn(path);
+        } catch (error) {
+            console.error("Failed to check file exists:", error);
+            if (requestId !== this.existenceCheckRequestId) return;
+            this.showExistenceCheckError();
+            this.fireOutputSelected();
+            return;
         }
 
         // Guard against stale results if the user picked a different file
-        if (path !== this.textInput.value) return;
+        if (requestId !== this.existenceCheckRequestId) return;
 
+        this.existenceCheckSucceeded = true;
         this.fileRequiresOverwrite = exists;
         if (exists) {
             this.warningText.textContent =
@@ -223,6 +267,14 @@ export class OutputFileInput extends HTMLElement {
         }
 
         this.fireOutputSelected();
+    }
+
+    /** Displays a retryable error after the output existence check fails. */
+    private showExistenceCheckError(): void {
+        this.warningText.textContent =
+            "Could not check whether this file already exists. Select the output file again to retry.";
+        this.warningText.classList.remove("hidden");
+        this.confirmLabel.classList.add("hidden");
     }
 
     /**
@@ -246,6 +298,7 @@ export class OutputFileInput extends HTMLElement {
                     value: this.textInput.value,
                     requiresOverwrite: this.fileRequiresOverwrite,
                     overwriteConfirmed: this.confirmCheckbox.checked,
+                    isValid: this.isValid,
                 },
             }),
         );

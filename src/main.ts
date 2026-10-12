@@ -436,7 +436,10 @@ ipcMain.handle(
         await validateIpcFilePath(swipeArgs.outputPath, "write");
 
         try {
-            await swipeModule.initializeSwipeReview(swipeArgs, true);
+            await swipeModule.initializeSwipeReview(
+                swipeArgs,
+                swipeArgs.overwriteConfirmed,
+            );
             resizeAndLoadMode("swipe");
             return { success: true };
         } catch (error) {

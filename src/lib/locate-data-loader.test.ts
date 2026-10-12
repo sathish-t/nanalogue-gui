@@ -16,6 +16,7 @@ describe("validateLocateGenerateBedRequest", () => {
                 bamPath: "/a.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
+                overwriteConfirmed: false,
             },
             "treatAsUrl must be a boolean",
         ],
@@ -25,6 +26,7 @@ describe("validateLocateGenerateBedRequest", () => {
                 readIdPath: "/ids",
                 outputPath: "/out",
                 treatAsUrl: false,
+                overwriteConfirmed: false,
                 region: " ",
             },
             "region must be a non-empty string",
@@ -35,6 +37,7 @@ describe("validateLocateGenerateBedRequest", () => {
                 readIdPath: "/ids",
                 outputPath: "/out",
                 treatAsUrl: false,
+                overwriteConfirmed: false,
                 region: "chr1",
                 fullRegion: "yes",
             },
@@ -46,6 +49,17 @@ describe("validateLocateGenerateBedRequest", () => {
         );
     });
 
+    it("requires explicit overwrite authorization", () => {
+        expect(() =>
+            validateLocateGenerateBedRequest({
+                bamPath: "/a.bam",
+                readIdPath: "/ids",
+                outputPath: "/out",
+                treatAsUrl: false,
+            }),
+        ).toThrow("overwriteConfirmed");
+    });
+
     it("retains valid region filtering fields", () => {
         expect(
             validateLocateGenerateBedRequest({
@@ -53,6 +67,7 @@ describe("validateLocateGenerateBedRequest", () => {
                 readIdPath: "/ids",
                 outputPath: "/out",
                 treatAsUrl: false,
+                overwriteConfirmed: true,
                 region: "chr1:10-20",
                 fullRegion: true,
             }),
@@ -61,6 +76,7 @@ describe("validateLocateGenerateBedRequest", () => {
             readIdPath: "/ids",
             outputPath: "/out",
             treatAsUrl: false,
+            overwriteConfirmed: true,
             region: "chr1:10-20",
             fullRegion: true,
         });

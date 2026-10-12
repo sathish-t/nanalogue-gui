@@ -49,6 +49,7 @@ await run("Swipe mode", async () => {
                     bamPath: bam,
                     bedPath: bed,
                     outputPath: out,
+                    overwriteConfirmed: true,
                     windowSize: 300,
                     modTag: "T",
                     modStrand: "bc",

@@ -37,8 +37,10 @@ async function loadLocateHandlers(api: Record<string, unknown>) {
     Object.assign(output, {
         value: "/output.bed",
         disabled: false,
+        isValid: true,
         requiresOverwrite: false,
         overwriteConfirmed: false,
+        checkCurrentFileExists: vi.fn().mockResolvedValue(undefined),
         showWarning: vi.fn(),
         hideWarning: vi.fn(),
     });
@@ -158,6 +160,7 @@ describe("Locate config form handlers", () => {
             bamPath: "/reads.bam",
             readIdPath: "/ids.txt",
             outputPath: "/output.bed",
+            overwriteConfirmed: false,
             treatAsUrl: false,
         });
         finishGeneration?.(result);

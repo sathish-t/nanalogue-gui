@@ -9,6 +9,7 @@ const VALID_REQUEST: SwipeStartRequest = {
     bamPath: "/data/sample.bam",
     bedPath: "/data/annotations.bed",
     outputPath: "/data/accepted.bed",
+    overwriteConfirmed: false,
     windowSize: 200,
 };
 
@@ -46,5 +47,14 @@ describe("validateSwipeStartRequest", () => {
         ],
     ])("rejects invalid payload %#", (payload, message) => {
         expect(() => validateSwipeStartRequest(payload)).toThrow(message);
+    });
+
+    it("requires explicit overwrite authorization", () => {
+        expect(() =>
+            validateSwipeStartRequest({
+                ...VALID_REQUEST,
+                overwriteConfirmed: undefined,
+            }),
+        ).toThrow("overwriteConfirmed");
     });
 });

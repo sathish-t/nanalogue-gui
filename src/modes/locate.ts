@@ -81,10 +81,15 @@ export function registerLocateIpcHandlers(): void {
             records,
             parseResult.ids.length,
         );
+        // "wx" creates the file exclusively, failing instead of truncating it
+        // if it appeared after the renderer's existence check.
         writeFileSync(
             outputPath,
             lines.length > 0 ? `${lines.join("\n")}\n` : "",
-            "utf-8",
+            {
+                encoding: "utf-8",
+                flag: request.overwriteConfirmed ? "w" : "wx",
+            },
         );
         return summary;
     });

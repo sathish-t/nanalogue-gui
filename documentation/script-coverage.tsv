@@ -18,7 +18,7 @@ src/lib/ai-external-tools/read-info.ts	100
 src/lib/ai-external-tools/seq-table.ts	100
 src/lib/ai-external-tools/window-reads.ts	100
 src/lib/ai-external-tools/write-file.ts	100
-src/lib/bed-parser.ts	93.1
+src/lib/bed-parser.ts	93.54
 src/lib/chat-orchestrator-execution.ts	100
 src/lib/chat-orchestrator-facts.ts	100
 src/lib/chat-orchestrator-handle-message-test-utils.ts	100
@@ -61,7 +61,7 @@ src/renderer/ai-chat/ai-chat-consent.ts	100
 src/renderer/ai-chat/ai-chat-elements.ts	100
 src/renderer/ai-chat/ai-chat-ui.ts	100
 src/renderer/ai-chat/ai-chat.ts	83.26
-src/renderer/locate/locate-config.ts	59.34
+src/renderer/locate/locate-config.ts	59.81
 src/renderer/qc/qc-config.ts	51.5
 src/renderer/qc/qc-results-charts.ts	0
 src/renderer/qc/qc-results-filters.ts	0
@@ -74,8 +74,8 @@ src/renderer/shared/apply-font-size.ts	100
 src/renderer/shared/bam-resource-input.ts	100
 src/renderer/shared/chart-font-size.ts	100
 src/renderer/shared/mod-filter-input.ts	100
-src/renderer/shared/output-file-input.ts	98.68
+src/renderer/shared/output-file-input.ts	100
 src/renderer/shared/window-size-input.ts	100
-src/renderer/swipe/swipe-config.ts	55.55
+src/renderer/swipe/swipe-config.ts	55.95
 src/renderer/swipe/swipe.ts	100
 src/test-helpers.ts	100

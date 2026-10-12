@@ -76,9 +76,11 @@ export type QCConfigBuildResult =
 export function buildQCConfig(
     input: QCConfigInputSnapshot,
 ): QCConfigBuildResult {
-    const sampleFraction = parseFloat(input.sampleFraction);
+    const sampleFractionField = input.sampleFraction.trim();
+    const sampleFraction = Number(sampleFractionField);
     if (
-        Number.isNaN(sampleFraction) ||
+        !sampleFractionField ||
+        !Number.isFinite(sampleFraction) ||
         sampleFraction < 0.01 ||
         sampleFraction > 100
     ) {
@@ -88,8 +90,13 @@ export function buildQCConfig(
         };
     }
 
-    const sampleSeed = parseInt(input.sampleSeed, 10);
-    if (Number.isNaN(sampleSeed) || sampleSeed < 0) {
+    const sampleSeedField = input.sampleSeed.trim();
+    const sampleSeed = Number(sampleSeedField);
+    if (
+        !sampleSeedField ||
+        !Number.isSafeInteger(sampleSeed) ||
+        sampleSeed < 0
+    ) {
         return {
             success: false,
             message: "Sample seed must be a non-negative integer.",
@@ -107,11 +114,12 @@ export function buildQCConfig(
         };
     }
 
-    const readLengthBinWidth = parseInt(input.readLengthBinWidth, 10);
+    const readLengthBinWidthField = input.readLengthBinWidth.trim();
+    const readLengthBinWidth = Number(readLengthBinWidthField);
     if (
-        !Number.isFinite(readLengthBinWidth) ||
-        readLengthBinWidth < 1 ||
-        readLengthBinWidth !== Math.floor(readLengthBinWidth)
+        !readLengthBinWidthField ||
+        !Number.isSafeInteger(readLengthBinWidth) ||
+        readLengthBinWidth < 1
     ) {
         return {
             success: false,
