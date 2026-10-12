@@ -106,6 +106,9 @@ let readIdCount: number | null = null;
 /** Monotonically increasing counter to guard against stale peek responses. */
 let peekRequestId = 0;
 
+/** Monotonically increasing counter to guard against stale read ID count responses. */
+let readIdCountRequestId = 0;
+
 /**
  * Creates a summary line element with a bold label and text value.
  *
@@ -344,16 +347,18 @@ bamSource.addEventListener("bam-selected", async (e) => {
     const currentRequestId = ++peekRequestId;
     updateGenerateButton();
 
+    let peekResult: PeekResult | null;
     try {
-        bamPeekResult = await api.peekBam(value, isUrl);
+        peekResult = await api.peekBam(value, isUrl);
     } catch (error) {
         console.error("Failed to peek BAM:", error);
-        bamPeekResult = null;
+        peekResult = null;
     }
 
     if (currentRequestId !== peekRequestId) return;
     if (value !== bamSource.value) return;
 
+    bamPeekResult = peekResult;
     updateSummary();
 });
 
@@ -372,13 +377,18 @@ elements.btnBrowseReadIds.addEventListener("click", async () => {
     elements.readIdPath.value = path;
     updateGenerateButton();
 
+    const currentRequestId = ++readIdCountRequestId;
+    let lineCount: number | null;
     try {
-        readIdCount = await api.locateCountReadIds(path);
+        lineCount = await api.locateCountReadIds(path);
     } catch (error) {
         console.error("Failed to count read IDs:", error);
-        readIdCount = null;
+        lineCount = null;
     }
+    if (currentRequestId !== readIdCountRequestId) return;
     if (path !== elements.readIdPath.value) return;
+
+    readIdCount = lineCount;
     updateSummary();
 });
 
