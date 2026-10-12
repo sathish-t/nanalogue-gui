@@ -169,6 +169,34 @@ describe("basic functionality", () => {
         expect(r.exit_code).toBe(42);
     });
 
+    // just-bash formats these through native Number methods, not sprintf-js.
+    // This checks recoverable precision errors, not width/allocation limits.
+    it.each([
+        'printf "%.101f" 1',
+        'printf "%.*f" 101 1',
+        'printf "%.101e" 1',
+        'printf "%.101g" 1',
+        "awk 'BEGIN { printf \"%.101f\", 1 }'",
+        "awk 'BEGIN { print sprintf(\"%.101f\", 1) }'",
+    ])("contains excessive formatting precision: %s", async (command) => {
+        const result = (await bash(command)) as BashResult;
+        expect(result.exit_code).not.toBe(0);
+        expect(result.stdout).toBe("");
+        expect(result.stderr).toMatch(/toFixed|toExponential|toPrecision/);
+        const next = (await bash('printf "%.2f" 1.25')) as BashResult;
+        expect(next).toEqual({ stdout: "1.25", stderr: "", exit_code: 0 });
+    });
+
+    it("accepts zero general-format precision without losing the tool", async () => {
+        const result = (await bash('printf "%.0g" 1.25')) as BashResult;
+        expect(result).toEqual({ stdout: "1", stderr: "", exit_code: 0 });
+        expect((await bash("echo alive")) as BashResult).toEqual({
+            stdout: "alive\n",
+            stderr: "",
+            exit_code: 0,
+        });
+    });
+
     it("captures stderr separately from stdout", async () => {
         const r = (await bash("echo out && echo err >&2")) as BashResult;
         expect(r.stdout).toContain("out");
