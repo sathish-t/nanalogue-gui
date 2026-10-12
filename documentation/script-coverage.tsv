@@ -61,7 +61,7 @@ src/renderer/ai-chat/ai-chat-consent.ts	100
 src/renderer/ai-chat/ai-chat-elements.ts	100
 src/renderer/ai-chat/ai-chat-ui.ts	100
 src/renderer/ai-chat/ai-chat.ts	83.26
-src/renderer/locate/locate-config.ts	59.81
+src/renderer/locate/locate-config.ts	64.28
 src/renderer/qc/qc-config.ts	51.5
 src/renderer/qc/qc-results-charts.ts	0
 src/renderer/qc/qc-results-filters.ts	0
@@ -76,6 +76,6 @@ src/renderer/shared/chart-font-size.ts	100
 src/renderer/shared/mod-filter-input.ts	100
 src/renderer/shared/output-file-input.ts	100
 src/renderer/shared/window-size-input.ts	100
-src/renderer/swipe/swipe-config.ts	55.95
+src/renderer/swipe/swipe-config.ts	61.88
 src/renderer/swipe/swipe.ts	100
 src/test-helpers.ts	100

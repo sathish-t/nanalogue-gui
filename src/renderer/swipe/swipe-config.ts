@@ -116,6 +116,12 @@ let bamPeekResult: PeekResult | null = null;
 /** Stores the BED file line count for display in the summary. */
 let bedLineCount: number | null = null;
 
+/** Monotonically increasing counter to guard against stale BAM peek responses. */
+let peekRequestId = 0;
+
+/** Monotonically increasing counter to guard against stale BED count responses. */
+let bedCountRequestId = 0;
+
 /**
  * Creates a summary line element with a bold label and text value.
  *
@@ -367,16 +373,21 @@ bamSource.addEventListener("bam-selected", async (e) => {
     const { value, isUrl } = (e as CustomEvent<BamSelectedDetail>).detail;
     if (!value.trim()) return;
 
+    const currentRequestId = ++peekRequestId;
     updateStartButton();
 
     // Peek at BAM for summary
+    let peekResult: PeekResult | null;
     try {
-        bamPeekResult = await api.peekBam(value, isUrl);
+        peekResult = await api.peekBam(value, isUrl);
     } catch (error) {
         console.error("Failed to peek BAM:", error);
-        bamPeekResult = null;
+        peekResult = null;
     }
+    if (currentRequestId !== peekRequestId) return;
     if (value !== bamSource.value) return;
+
+    bamPeekResult = peekResult;
 
     // Auto-populate mod filter with first detected modification
     if (bamPeekResult) {
@@ -387,6 +398,7 @@ bamSource.addEventListener("bam-selected", async (e) => {
 });
 
 bamSource.addEventListener("source-type-changed", () => {
+    peekRequestId++;
     bamPeekResult = null;
     updateStartButton();
     updateSummary();
@@ -401,13 +413,18 @@ elements.btnBrowseBed.addEventListener("click", async () => {
     updateStartButton();
 
     // Count lines for summary
+    const currentRequestId = ++bedCountRequestId;
+    let lineCount: number | null;
     try {
-        bedLineCount = await api.swipeCountBedLines(path);
+        lineCount = await api.swipeCountBedLines(path);
     } catch (error) {
         console.error("Failed to count BED lines:", error);
-        bedLineCount = null;
+        lineCount = null;
     }
+    if (currentRequestId !== bedCountRequestId) return;
     if (path !== elements.bedPath.value) return;
+
+    bedLineCount = lineCount;
     updateSummary();
 });
 
