@@ -6,6 +6,7 @@ import {
     mkdirSync,
     mkdtempSync,
     rmSync,
+    symlinkSync,
     writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -208,7 +209,8 @@ test("the CLI exits nonzero when npm cannot reach the audit registry", () => {
         assert.equal(result.error, undefined);
         assert.equal(result.status, 1);
         assert.match(result.stderr, /Production audit failed/);
-        assert.match(result.stderr, /ECONNREFUSED/);
+        // Linux refuses port zero; macOS reports the address as unavailable.
+        assert.match(result.stderr, /\b(?:ECONNREFUSED|EADDRNOTAVAIL)\b/);
         assert.match(
             result.stderr,
             /http:\/\/127\.0\.0\.1:0\/-\/npm\/v1\/security\/advisories\/bulk/,
@@ -218,9 +220,14 @@ test("the CLI exits nonzero when npm cannot reach the audit registry", () => {
 });
 
 test("the CLI rejects shrinkwrap alongside package-lock before contacting npm", () => {
-    const root = mkdtempSync(join(tmpdir(), "production-audit-shrinkwrap-"));
+    const fixture = mkdtempSync(join(tmpdir(), "production-audit-shrinkwrap-"));
     try {
-        mkdirSync(join(root, "scripts"));
+        const root = join(fixture, "workspace");
+        mkdirSync(join(root, "scripts"), { recursive: true });
+        // macOS temporary paths can alias their canonical location; exercise
+        // the same CLI path mismatch on every platform, including Linux.
+        const alias = join(fixture, "alias");
+        symlinkSync(root, alias, "junction");
         const script = join(root, "scripts", "audit-production.mjs");
         copyFileSync(
             new URL("./audit-production.mjs", import.meta.url),
@@ -236,25 +243,32 @@ test("the CLI rejects shrinkwrap alongside package-lock before contacting npm", 
         for (const filename of ["package-lock.json", "npm-shrinkwrap.json"]) {
             writeFileSync(join(root, filename), JSON.stringify(fixtureLock));
         }
-        const result = spawnSync(process.execPath, [script], {
-            encoding: "utf8",
-            timeout: 20_000,
-            env: {
-                ...process.env,
-                npm_config_registry: "http://127.0.0.1:0",
-                npm_config_fetch_retries: "0",
-                npm_config_fetch_timeout: "1000",
+        const result = spawnSync(
+            process.execPath,
+            [join(alias, "scripts", "audit-production.mjs")],
+            {
+                encoding: "utf8",
+                timeout: 20_000,
+                env: {
+                    ...process.env,
+                    npm_config_registry: "http://127.0.0.1:0",
+                    npm_config_fetch_retries: "0",
+                    npm_config_fetch_timeout: "1000",
+                },
             },
-        });
+        );
         assert.equal(result.error, undefined);
         assert.equal(result.status, 1);
         assert.match(
             result.stderr,
             /Production audit failed: npm-shrinkwrap\.json overrides package-lock\.json/,
         );
-        assert.doesNotMatch(result.stderr, /ECONNREFUSED/);
+        assert.doesNotMatch(
+            result.stderr,
+            /\b(?:ECONNREFUSED|EADDRNOTAVAIL)\b/,
+        );
         assert.equal(result.stdout, "");
     } finally {
-        rmSync(root, { recursive: true, force: true });
+        rmSync(fixture, { recursive: true, force: true });
     }
 });

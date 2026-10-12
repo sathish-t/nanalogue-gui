@@ -6,8 +6,7 @@
 // large allocations / denial of service. This exception is not a mitigation.
 // Remove when a reviewed fix is available; never silently extend the deadline.
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
@@ -118,7 +117,8 @@ export function evaluateProductionAudit(
 // Run the real npm audit in CI/local npm scripts; preserve failed reports for review.
 if (
     process.argv[1] &&
-    resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+    realpathSync(process.argv[1]) ===
+        realpathSync(fileURLToPath(import.meta.url))
 ) {
     // npm prefers shrinkwrap, but our version checks read package-lock.json.
     if (existsSync(new URL("../npm-shrinkwrap.json", import.meta.url))) {
