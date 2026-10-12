@@ -13,7 +13,18 @@ vi.mock("electron", () => ({
     },
     dialog: { showOpenDialog: vi.fn() },
 }));
-vi.mock("node:fs", () => ({ readFileSync: vi.fn(), writeFileSync: vi.fn() }));
+vi.mock("node:fs", () => ({
+    readFileSync: vi.fn(),
+    realpathSync: vi.fn((filePath: string) => filePath),
+    statSync: vi.fn((filePath: string) => ({
+        dev: 1,
+        ino: [...filePath].reduce(
+            (hash, character) => hash * 31 + character.charCodeAt(0),
+            7,
+        ),
+    })),
+    writeFileSync: vi.fn(),
+}));
 vi.mock("@nanalogue/node", () => ({ readInfo: vi.fn() }));
 vi.mock("../lib/ipc-path-validation", () => ({
     validateIpcFilePath: vi.fn(),
