@@ -125,6 +125,36 @@ it("makeWriteFile throws SandboxError (not plain Error) for all guard failures",
     expect(err).toBeInstanceOf(SandboxError);
 });
 
+it("makeWriteFile atomically rejects concurrent creation of the same file", async () => {
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    const contents = ["first", "second"];
+    const results = await Promise.allSettled([
+        fn("concurrent.txt", contents[0]),
+        fn("concurrent.txt", contents[1]),
+    ]);
+
+    expect(
+        results.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+        results.filter((result) => result.status === "rejected"),
+    ).toHaveLength(1);
+    expect(
+        results.find((result) => result.status === "rejected"),
+    ).toMatchObject({
+        reason: {
+            name: "FileExistsError",
+            message: expect.stringContaining("already exists"),
+        },
+    });
+    const successfulIndex = results.findIndex(
+        (result) => result.status === "fulfilled",
+    );
+    await expect(
+        readFile(join(allowedDir, "concurrent.txt"), "utf-8"),
+    ).resolves.toBe(contents[successfulIndex]);
+});
+
 // --- makeReadFile ---
 
 it("makeReadFile rejects .svg files with ValueError", async () => {
