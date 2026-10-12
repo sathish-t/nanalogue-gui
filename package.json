@@ -12,9 +12,9 @@
     ],
     "scripts": {
         "build": "npm run build:main && npm run build:renderer && npm run build:cli && npm run build:execute-cli && npm run copy-assets",
-        "build:cli": "esbuild src/cli.ts --bundle --outfile=dist/cli.mjs --format=esm --platform=node --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd --banner:js='#!/usr/bin/env node' --external:vega --external:vega-lite",
-        "build:execute-cli": "esbuild src/execute-cli.ts --bundle --outfile=dist/execute-cli.mjs --format=esm --platform=node --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd --banner:js='#!/usr/bin/env node' --external:vega --external:vega-lite",
-        "build:main": "esbuild src/main.ts src/preload.ts src/exit-watchdog.ts --bundle --platform=node --format=cjs --outdir=dist --external:electron --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd --external:vega --external:vega-lite",
+        "build:cli": "esbuild src/cli.ts --bundle --outfile=dist/cli.mjs --format=esm --platform=node --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd --banner:js='#!/usr/bin/env node'",
+        "build:execute-cli": "esbuild src/execute-cli.ts --bundle --outfile=dist/execute-cli.mjs --format=esm --platform=node --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd --banner:js='#!/usr/bin/env node'",
+        "build:main": "esbuild src/main.ts src/preload.ts src/exit-watchdog.ts --bundle --platform=node --format=cjs --outdir=dist --external:electron --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd",
         "build:renderer": "npm run build:landing && npm run build:swipe && npm run build:qc && npm run build:locate && npm run build:ai-chat",
         "build:landing": "esbuild src/renderer/landing/landing.ts --bundle --outfile=dist/renderer/landing/landing.js --format=iife --platform=browser",
         "build:swipe": "esbuild src/renderer/swipe/swipe.ts src/renderer/swipe/swipe-config.ts --bundle --outdir=dist/renderer/swipe --format=iife --platform=browser",
@@ -50,9 +50,7 @@
         "highlight.js": "^11.11.1",
         "just-bash": "^2.14.0",
         "marked": "^17.0.4",
-        "picomatch": "^4.0.3",
-        "vega": "^6.2.0",
-        "vega-lite": "^6.4.2"
+        "picomatch": "^4.0.3"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.6",
@@ -64,7 +62,7 @@
         "@types/node": "^22.0.0",
         "@types/picomatch": "^4.0.2",
         "@vitest/coverage-v8": "^4.1.0",
-        "electron": "^41.0.2",
+        "electron": "^41.10.5",
         "electron-builder": "^26.8.1",
         "esbuild": "^0.28.1",
         "eslint": "^10.0.3",

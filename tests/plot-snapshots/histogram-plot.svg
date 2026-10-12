@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" role="img" aria-labelledby="plot-title plot-description" width="684" height="472" viewBox="0 0 684 472">
+  <title id="plot-title">Read length distribution - simulated data</title>
+  <desc id="plot-description">Histogram containing 7 bins.</desc>
+  <rect width="684" height="472" fill="white"/>
+  <text x="342" y="24" text-anchor="middle" font-size="16" font-weight="600" fill="#111827">Read length distribution - simulated data</text>
+  <g transform="translate(64 44)" font-family="system-ui, sans-serif">
+    <line x1="0" y1="0" x2="0" y2="370" stroke="#e5e7eb"/>
+    <line x1="0" y1="370" x2="0" y2="375" stroke="#4b5563"/>
+    <text x="0" y="390" text-anchor="middle" font-size="12" fill="#374151">0</text>
+    <line x1="42.857" y1="0" x2="42.857" y2="370" stroke="#e5e7eb"/>
+    <line x1="42.857" y1="370" x2="42.857" y2="375" stroke="#4b5563"/>
+    <text x="42.857" y="390" text-anchor="middle" font-size="12" fill="#374151">500</text>
+    <line x1="85.714" y1="0" x2="85.714" y2="370" stroke="#e5e7eb"/>
+    <line x1="85.714" y1="370" x2="85.714" y2="375" stroke="#4b5563"/>
+    <text x="85.714" y="390" text-anchor="middle" font-size="12" fill="#374151">1000</text>
+    <line x1="128.571" y1="0" x2="128.571" y2="370" stroke="#e5e7eb"/>
+    <line x1="128.571" y1="370" x2="128.571" y2="375" stroke="#4b5563"/>
+    <text x="128.571" y="390" text-anchor="middle" font-size="12" fill="#374151">1500</text>
+    <line x1="171.429" y1="0" x2="171.429" y2="370" stroke="#e5e7eb"/>
+    <line x1="171.429" y1="370" x2="171.429" y2="375" stroke="#4b5563"/>
+    <text x="171.429" y="390" text-anchor="middle" font-size="12" fill="#374151">2000</text>
+    <line x1="214.286" y1="0" x2="214.286" y2="370" stroke="#e5e7eb"/>
+    <line x1="214.286" y1="370" x2="214.286" y2="375" stroke="#4b5563"/>
+    <text x="214.286" y="390" text-anchor="middle" font-size="12" fill="#374151">2500</text>
+    <line x1="257.143" y1="0" x2="257.143" y2="370" stroke="#e5e7eb"/>
+    <line x1="257.143" y1="370" x2="257.143" y2="375" stroke="#4b5563"/>
+    <text x="257.143" y="390" text-anchor="middle" font-size="12" fill="#374151">3000</text>
+    <line x1="300" y1="0" x2="300" y2="370" stroke="#e5e7eb"/>
+    <line x1="300" y1="370" x2="300" y2="375" stroke="#4b5563"/>
+    <text x="300" y="390" text-anchor="middle" font-size="12" fill="#374151">3500</text>
+    <line x1="342.857" y1="0" x2="342.857" y2="370" stroke="#e5e7eb"/>
+    <line x1="342.857" y1="370" x2="342.857" y2="375" stroke="#4b5563"/>
+    <text x="342.857" y="390" text-anchor="middle" font-size="12" fill="#374151">4000</text>
+    <line x1="385.714" y1="0" x2="385.714" y2="370" stroke="#e5e7eb"/>
+    <line x1="385.714" y1="370" x2="385.714" y2="375" stroke="#4b5563"/>
+    <text x="385.714" y="390" text-anchor="middle" font-size="12" fill="#374151">4500</text>
+    <line x1="428.571" y1="0" x2="428.571" y2="370" stroke="#e5e7eb"/>
+    <line x1="428.571" y1="370" x2="428.571" y2="375" stroke="#4b5563"/>
+    <text x="428.571" y="390" text-anchor="middle" font-size="12" fill="#374151">5000</text>
+    <line x1="471.429" y1="0" x2="471.429" y2="370" stroke="#e5e7eb"/>
+    <line x1="471.429" y1="370" x2="471.429" y2="375" stroke="#4b5563"/>
+    <text x="471.429" y="390" text-anchor="middle" font-size="12" fill="#374151">5500</text>
+    <line x1="514.286" y1="0" x2="514.286" y2="370" stroke="#e5e7eb"/>
+    <line x1="514.286" y1="370" x2="514.286" y2="375" stroke="#4b5563"/>
+    <text x="514.286" y="390" text-anchor="middle" font-size="12" fill="#374151">6000</text>
+    <line x1="557.143" y1="0" x2="557.143" y2="370" stroke="#e5e7eb"/>
+    <line x1="557.143" y1="370" x2="557.143" y2="375" stroke="#4b5563"/>
+    <text x="557.143" y="390" text-anchor="middle" font-size="12" fill="#374151">6500</text>
+    <line x1="600" y1="0" x2="600" y2="370" stroke="#e5e7eb"/>
+    <line x1="600" y1="370" x2="600" y2="375" stroke="#4b5563"/>
+    <text x="600" y="390" text-anchor="middle" font-size="12" fill="#374151">7000</text>
+    <line x1="0" y1="370" x2="600" y2="370" stroke="#4b5563"/>
+    <text x="300" y="416" text-anchor="middle" font-size="14" fill="#111827">Read length (bp)</text>
+    <line x1="0" y1="370" x2="600" y2="370" stroke="#e5e7eb"/>
+    <line x1="-5" y1="370" x2="0" y2="370" stroke="#4b5563"/>
+    <text x="-9" y="370" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">0</text>
+    <line x1="0" y1="339.167" x2="600" y2="339.167" stroke="#e5e7eb"/>
+    <line x1="-5" y1="339.167" x2="0" y2="339.167" stroke="#4b5563"/>
+    <text x="-9" y="339.167" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">2</text>
+    <line x1="0" y1="308.333" x2="600" y2="308.333" stroke="#e5e7eb"/>
+    <line x1="-5" y1="308.333" x2="0" y2="308.333" stroke="#4b5563"/>
+    <text x="-9" y="308.333" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">4</text>
+    <line x1="0" y1="277.5" x2="600" y2="277.5" stroke="#e5e7eb"/>
+    <line x1="-5" y1="277.5" x2="0" y2="277.5" stroke="#4b5563"/>
+    <text x="-9" y="277.5" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">6</text>
+    <line x1="0" y1="246.667" x2="600" y2="246.667" stroke="#e5e7eb"/>
+    <line x1="-5" y1="246.667" x2="0" y2="246.667" stroke="#4b5563"/>
+    <text x="-9" y="246.667" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">8</text>
+    <line x1="0" y1="215.833" x2="600" y2="215.833" stroke="#e5e7eb"/>
+    <line x1="-5" y1="215.833" x2="0" y2="215.833" stroke="#4b5563"/>
+    <text x="-9" y="215.833" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">10</text>
+    <line x1="0" y1="185" x2="600" y2="185" stroke="#e5e7eb"/>
+    <line x1="-5" y1="185" x2="0" y2="185" stroke="#4b5563"/>
+    <text x="-9" y="185" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">12</text>
+    <line x1="0" y1="154.167" x2="600" y2="154.167" stroke="#e5e7eb"/>
+    <line x1="-5" y1="154.167" x2="0" y2="154.167" stroke="#4b5563"/>
+    <text x="-9" y="154.167" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">14</text>
+    <line x1="0" y1="123.333" x2="600" y2="123.333" stroke="#e5e7eb"/>
+    <line x1="-5" y1="123.333" x2="0" y2="123.333" stroke="#4b5563"/>
+    <text x="-9" y="123.333" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">16</text>
+    <line x1="0" y1="92.5" x2="600" y2="92.5" stroke="#e5e7eb"/>
+    <line x1="-5" y1="92.5" x2="0" y2="92.5" stroke="#4b5563"/>
+    <text x="-9" y="92.5" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">18</text>
+    <line x1="0" y1="61.667" x2="600" y2="61.667" stroke="#e5e7eb"/>
+    <line x1="-5" y1="61.667" x2="0" y2="61.667" stroke="#4b5563"/>
+    <text x="-9" y="61.667" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">20</text>
+    <line x1="0" y1="30.833" x2="600" y2="30.833" stroke="#e5e7eb"/>
+    <line x1="-5" y1="30.833" x2="0" y2="30.833" stroke="#4b5563"/>
+    <text x="-9" y="30.833" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">22</text>
+    <line x1="0" y1="0" x2="600" y2="0" stroke="#e5e7eb"/>
+    <line x1="-5" y1="0" x2="0" y2="0" stroke="#4b5563"/>
+    <text x="-9" y="0" dy="0.32em" text-anchor="end" font-size="12" fill="#374151">24</text>
+    <line x1="0" y1="0" x2="0" y2="370" stroke="#4b5563"/>
+    <text transform="translate(-48 185) rotate(-90)" text-anchor="middle" font-size="14" fill="#111827">Read count</text>
+    <defs><clipPath id="plot-clip"><rect width="600" height="370"/></clipPath></defs>
+    <g clip-path="url(#plot-clip)">
+      <rect class="histogram-bar" x="0" y="323.75" width="85.714" height="46.25" fill="#003366"><title>0–1000: 3</title></rect>
+      <rect class="histogram-bar" x="85.714" y="231.25" width="85.714" height="138.75" fill="#003366"><title>1000–2000: 9</title></rect>
+      <rect class="histogram-bar" x="171.429" y="107.917" width="85.714" height="262.083" fill="#003366"><title>2000–3000: 17</title></rect>
+      <rect class="histogram-bar" x="257.143" y="0" width="85.714" height="370" fill="#003366"><title>3000–4000: 24</title></rect>
+      <rect class="histogram-bar" x="342.857" y="77.083" width="85.714" height="292.917" fill="#003366"><title>4000–5000: 19</title></rect>
+      <rect class="histogram-bar" x="428.571" y="200.417" width="85.714" height="169.583" fill="#003366"><title>5000–6000: 11</title></rect>
+      <rect class="histogram-bar" x="514.286" y="292.917" width="85.714" height="77.083" fill="#003366"><title>6000–7000: 5</title></rect>
+    </g>
+  </g>
+</svg>
