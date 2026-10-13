@@ -108,6 +108,40 @@ describe("AI Chat reset races", () => {
         document.documentElement.innerHTML = "";
     });
 
+    it("previews the accepted session settings in default prompt mode", async () => {
+        api.aiChatSendMessage.mockResolvedValueOnce({
+            success: true,
+            text: "response",
+        });
+        api.aiChatGetSystemPrompt.mockResolvedValueOnce({
+            success: true,
+            prompt: "mock prompt",
+        });
+        setSendFields("http://localhost:11434/v1", "hello");
+        const contextWindow = document.getElementById(
+            "opt-context-window",
+        ) as HTMLInputElement;
+        contextWindow.value = "16384";
+        await click("btn-send");
+
+        // Even a programmatic edit to a locked field must not change the preview.
+        contextWindow.value = "32768";
+        await click("btn-view-system-prompt");
+
+        expect(api.aiChatGetSystemPrompt).toHaveBeenCalledWith(
+            expect.objectContaining({
+                config: expect.objectContaining({ contextWindowTokens: 16384 }),
+                onlySystemAppend: false,
+            }),
+        );
+        expect(
+            document.getElementById("system-prompt-config-note")?.textContent,
+        ).toBe("Based on the settings for this session.");
+        expect(document.getElementById("system-prompt-pre")?.textContent).toBe(
+            "mock prompt",
+        );
+    });
+
     it("keeps a new first-send snapshot when an old send finishes", async () => {
         let resolveOld!: (result: AiChatSendMessageResult) => void;
         api.aiChatSendMessage

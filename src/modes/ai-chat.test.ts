@@ -1036,13 +1036,16 @@ describe("ai-chat IPC handlers — additional coverage", () => {
         expect(mockSendMessage).not.toHaveBeenCalled();
     });
 
-    it("prompt preview reports invalid directory and append-file errors", async () => {
+    it.each([
+        new Error("Analysis directory is inaccessible"),
+        "Analysis directory is inaccessible",
+    ])("prompt preview reports directory failure %s and append-file errors", async (directoryError) => {
         const handler = ipcHandlers.get("ai-chat-get-system-prompt");
         if (!handler)
             throw new Error("ai-chat-get-system-prompt handler not registered");
 
         vi.mocked(validateAnalysisDirectory).mockRejectedValueOnce(
-            new Error("Analysis directory is inaccessible"),
+            directoryError,
         );
         await expect(
             handler(null, {
@@ -1065,6 +1068,17 @@ describe("ai-chat IPC handlers — additional coverage", () => {
         ).resolves.toEqual({
             success: false,
             error: "SYSTEM_APPEND.md is malformed",
+        });
+    });
+
+    it("previews the built-in prompt before an analysis directory is selected", async () => {
+        const handler = ipcHandlers.get("ai-chat-get-system-prompt");
+        if (!handler)
+            throw new Error("ai-chat-get-system-prompt handler not registered");
+
+        await expect(handler(null, { config: {} })).resolves.toMatchObject({
+            success: true,
+            prompt: expect.stringContaining("Python REPL"),
         });
     });
 
