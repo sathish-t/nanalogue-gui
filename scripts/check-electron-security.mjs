@@ -29,6 +29,7 @@ export function validateElectronSecuritySource(filePath, content) {
         const resources = document.querySelectorAll("script, link");
         if (
             policies.length !== 1 ||
+            policy.parentElement !== document.head ||
             policy.getAttribute("content") !== REQUIRED_CSP ||
             [...resources].some(
                 (resource) =>
@@ -57,6 +58,32 @@ export function validateElectronSecuritySource(filePath, content) {
     // or follow arbitrary aliases. Namespace, require and dynamic imports cannot
     // silently grant a second route to ipcMain or shell.
     function visit(node) {
+        // Reserve the ipc property: scoped WebContents/WebFrameMain handlers must
+        // not bypass the global validator, including via destructured aliases.
+        // There are no legitimate ipc property reads in production code.
+        let property;
+        if (ts.isPropertyAccessExpression(node)) {
+            property = node.name;
+        } else if (
+            ts.isElementAccessExpression(node) &&
+            (ts.isStringLiteral(node.argumentExpression) ||
+                ts.isNoSubstitutionTemplateLiteral(node.argumentExpression))
+        ) {
+            property = node.argumentExpression;
+        } else if (
+            ts.isBindingElement(node) &&
+            ts.isObjectBindingPattern(node.parent)
+        ) {
+            property = node.propertyName ?? node.name;
+            if (ts.isComputedPropertyName(property)) {
+                property = property.expression;
+            }
+        }
+        if (property?.text === "ipc") {
+            failures.push(
+                `${filePath}: scoped ipc access bypasses the trusted registrar`,
+            );
+        }
         if (
             (ts.isStringLiteral(node) ||
                 ts.isNoSubstitutionTemplateLiteral(node)) &&

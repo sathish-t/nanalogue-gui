@@ -26,6 +26,7 @@ test("rejects CSP text that the browser would not enforce or that arrives too la
         `<head>${meta.replace('http-equiv="Content-Security-Policy"', 'name="description"')}</head>`,
         `<head><!-- ${meta} --></head>`,
         `<head><template>${meta}</template></head>`,
+        `<head><noscript>${meta}</noscript><script src="app.js"></script></head>`,
         `<head></head><body>${meta}</body>`,
         `<head><script src="app.js"></script>${meta}</head>`,
         `<head>${meta.replace("script-src 'self'", "script-src *")}</head>`,
@@ -94,6 +95,44 @@ test("rejects shell access even with an alias or a destructured method", () => {
             content,
         );
     }
+});
+
+test("rejects window and frame IPC access before it can be aliased or registered", () => {
+    const centralHandler =
+        'import { ipcMain } from "electron"; ipcMain.handle(channel, trustedHandler);';
+    for (const content of [
+        'import { webContents } from "electron"; webContents.getAllWebContents()[0].ipc.handle("x", handler);',
+        'window.webContents.ipc.handleOnce("x", handler);',
+        'event.senderFrame.ipc.on("x", handler);',
+        'frame.ipc.once("x", handler);',
+        'const messages = contents["ipc"]; messages.handle("x", handler);',
+        'const messages = frame[`ipc`]; messages.on("x", handler);',
+        'const { ipc } = contents; ipc.handle("x", handler);',
+        'const { ipc: messages } = frame; messages.on("x", handler);',
+        'const { ["ipc"]: messages } = contents; messages.handle("x", handler);',
+    ]) {
+        assert.notDeepEqual(
+            validateElectronSecuritySource(modePath, content),
+            [],
+            content,
+        );
+        // The central registrar cannot grow a scoped path around its validator either.
+        assert.notDeepEqual(
+            validateElectronSecuritySource(
+                registrarPath,
+                `${centralHandler}\n${content}`,
+            ),
+            [],
+            content,
+        );
+    }
+    assert.deepEqual(
+        validateElectronSecuritySource(
+            modePath,
+            'window.webContents.send("update", data); event.senderFrame.url; const ipcLabel = "ipc";',
+        ),
+        [],
+    );
 });
 
 test("does not let the central registrar acquire extra IPC paths", () => {
