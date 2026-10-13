@@ -5,7 +5,6 @@
 import { mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import picomatch from "picomatch";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
     convertMaps,
@@ -13,6 +12,7 @@ import {
     enforceDataSizeLimit,
     enforceRecordLimit,
     gateOutputSize,
+    isDeniedPath,
     listFilesRecursive,
     rejectTreatAsUrl,
     resolvePath,
@@ -44,6 +44,37 @@ beforeAll(async () => {
 
 afterAll(async () => {
     await rm(tmpDir, { recursive: true });
+});
+
+describe("isDeniedPath", () => {
+    it.each([
+        "private.key",
+        "cert.pem",
+        "cert.crt",
+        "cert.cer",
+        "archive.p12",
+        "archive.pfx",
+        "store.credentials",
+        "secrets.gpg",
+    ])("blocks the sensitive suffix in %s", (filename) => {
+        expect(isDeniedPath(`nested/${filename}`)).toBe(true);
+    });
+
+    it.each([
+        ".env",
+        ".env.local",
+        "id_rsa",
+        "id_ed25519",
+        "id_dsa",
+        "id_ecdsa",
+    ])("blocks the sensitive filename %s case-insensitively", (filename) => {
+        expect(isDeniedPath(`nested\\${filename.toUpperCase()}`)).toBe(true);
+    });
+
+    it("allows empty and ordinary paths", () => {
+        expect(isDeniedPath("")).toBe(false);
+        expect(isDeniedPath("nested/safe.txt")).toBe(false);
+    });
 });
 
 describe("resolvePath", () => {
@@ -308,13 +339,25 @@ describe("listFilesRecursive", () => {
 
     it("excludes files matched by the deny filter", async () => {
         // deny everything — no files should appear.
-        const deny = picomatch("**");
+        /**
+         * Rejects every test file.
+         *
+         * @returns True so every test file is rejected.
+         */
+        const deny = (): boolean => true;
         const { files } = await listFilesRecursive(tmpDir, tmpDir, { deny });
         expect(files).toHaveLength(0);
     });
 
     it("includes only files matched by the pattern filter", async () => {
-        const pattern = picomatch("**/*.bam");
+        /**
+         * Matches BAM files at any depth.
+         *
+         * @param filePath - Relative test file path.
+         * @returns True for BAM files at any depth.
+         */
+        const pattern = (filePath: string): boolean =>
+            filePath.endsWith(".bam");
         const { files } = await listFilesRecursive(tmpDir, tmpDir, {
             pattern,
         });

@@ -147,6 +147,18 @@ sub_bam = ls("sample_001/**/*.bam")      # BAM files under sample_001/ only
 nested = ls("run_A/alignments/*.bam")    # BAM files in a specific subfolder
 \`\`\`
 
+Patterns are case-sensitive relative paths using / on every platform.
+Only * (zero or more characters within a name), ? (one Unicode character),
+and ** (zero or more whole path segments) are supported. ** must occupy an
+entire segment, so sample_001/**/*.bam also matches sample_001/direct.bam.
+Wildcards do not match dot-prefixed names unless that pattern segment starts
+with a literal dot: **/*.bam excludes .cache/sample.bam, while .cache/*.bam
+includes it. ls() or ls("") lists hidden files too, but sensitive files are
+always excluded, even when explicitly named.
+Patterns longer than 1024 UTF-16 code units, braces, brackets, !, extglobs,
+backslash escapes, and empty, . or .. path segments raise ValueError.
+Use separate ls() calls instead of alternatives such as *.{bam,bed}.
+
 Results are hard-capped at ${MAX_LS_ENTRIES} entries. If the cap is hit, a
 ValueError is raised — use a glob pattern to narrow results.
 

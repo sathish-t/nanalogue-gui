@@ -63,6 +63,88 @@ it("makeLs returns a plain array when under the cap", async () => {
     expect(Array.isArray(result)).toBe(true);
 });
 
+it("makeLs supports every documented glob shape", async () => {
+    await mkdir(join(allowedDir, "sample_001", "run"), { recursive: true });
+    await mkdir(join(allowedDir, "run_A", "alignments", "deeper"), {
+        recursive: true,
+    });
+    await Promise.all([
+        writeFile(join(allowedDir, "sample_001", "direct.bam"), ""),
+        writeFile(join(allowedDir, "sample_001", "run", "deep.bam"), ""),
+        writeFile(join(allowedDir, "run_A", "alignments", "direct.bam"), ""),
+        writeFile(
+            join(allowedDir, "run_A", "alignments", "deeper", "deep.bam"),
+            "",
+        ),
+    ]);
+    const fn = makeLs(allowedDir, 20);
+
+    await expect(fn("*.bam")).resolves.toEqual([bamName]);
+    const sampleFiles = (await fn("sample_001/**/*.bam")) as string[];
+    expect(sampleFiles).toHaveLength(2);
+    expect(sampleFiles).toEqual(
+        expect.arrayContaining([
+            "sample_001/direct.bam",
+            "sample_001/run/deep.bam",
+        ]),
+    );
+    await expect(fn("run_A/alignments/*.bam")).resolves.toEqual([
+        "run_A/alignments/direct.bam",
+    ]);
+    const allBamFiles = (await fn("**/*.bam")) as string[];
+    expect(allBamFiles).toHaveLength(5);
+    expect(allBamFiles).toEqual(
+        expect.arrayContaining([
+            bamName,
+            "sample_001/direct.bam",
+            "sample_001/run/deep.bam",
+            "run_A/alignments/direct.bam",
+            "run_A/alignments/deeper/deep.bam",
+        ]),
+    );
+});
+
+it("makeLs validates globs before traversal, including empty directories", async () => {
+    const emptyDir = await mkdtemp(join(allowedDir, "empty-glob-"));
+    for (const root of [emptyDir, join(emptyDir, "does-not-exist")]) {
+        const fn = makeLs(root);
+        for (const pattern of ["{1..1000000000}", "@(a|b)", "a".repeat(1025)]) {
+            await expect(fn(pattern)).rejects.toMatchObject({
+                name: "ValueError",
+            });
+        }
+    }
+    await expect(makeLs(emptyDir)("**/*.bam")).resolves.toEqual([]);
+});
+
+it("makeLs keeps hidden-file matching separate from sensitive-file exclusion", async () => {
+    const root = await mkdtemp(join(allowedDir, "hidden-glob-"));
+    await mkdir(join(root, ".cache"));
+    for (const file of [
+        "visible.bam",
+        ".hidden.bam",
+        ".cache/sample.bam",
+        ".env",
+        "private.pem",
+    ]) {
+        await writeFile(join(root, file), "");
+    }
+    const fn = makeLs(root);
+    await expect(fn("**/*.bam")).resolves.toEqual(["visible.bam"]);
+    await expect(fn(".cache/*.bam")).resolves.toEqual([".cache/sample.bam"]);
+    await expect(fn(".*.bam")).resolves.toEqual([".hidden.bam"]);
+    await expect(fn(".env")).resolves.toEqual([]);
+    await expect(fn("**/*.pem")).resolves.toEqual([]);
+    for (const pattern of [undefined, ""]) {
+        const files = (await fn(pattern)) as string[];
+        expect(files.sort()).toEqual([
+            ".cache/sample.bam",
+            ".hidden.bam",
+            "visible.bam",
+        ]);
+    }
+});
+
 it("makeLs throws SandboxError when file count exceeds maxEntries", async () => {
     // Use a small cap so we don't need to create thousands of files.
     const capDir = join(allowedDir, "cap_test");

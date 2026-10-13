@@ -2,13 +2,13 @@
 // Lists files in the sandboxed directory, with optional glob filtering.
 
 import { realpath } from "node:fs/promises";
-import picomatch from "picomatch";
 import { MAX_LS_ENTRIES } from "../ai-chat-constants";
 import {
     isDeniedPath,
     listFilesRecursive,
     SandboxError,
 } from "../monty-sandbox-helpers";
+import { compileSandboxGlob } from "../sandbox-glob";
 
 /**
  * Returns the ls tool implementation bound to the given allowed directory.
@@ -36,7 +36,7 @@ export function makeLs(
         pattern?: string | Record<string, unknown>,
     ): Promise<unknown> => {
         const patternStr = typeof pattern === "string" ? pattern : undefined;
-        const matcher = patternStr ? picomatch(patternStr) : undefined;
+        const matcher = patternStr ? compileSandboxGlob(patternStr) : undefined;
         const allowedDirReal = await realpath(allowedDir);
         const { files, capped } = await listFilesRecursive(
             allowedDirReal,

@@ -24,7 +24,7 @@ import {
  * methods (including the sync variants used by initFilesystem such as
  * mkdirSync and writeFileSync) continue to work without being enumerated here.
  * Only readFile, readFileBuffer, and readdir are overridden to enforce
- * SENSITIVE_FILE_DENY_LIST, applying the same protection already present in
+ * the sensitive-file deny-list, applying the same protection already present in
  * read_file() and ls(). When an inherited method (cp, chmod, utimes, …)
  * internally calls this.readFileBuffer, it calls the override — so the deny
  * list is enforced transitively for all read paths. MountableFs does not

@@ -4,25 +4,62 @@
 import { lstat, readdir, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import type { ReadOptions, WindowOptions } from "@nanalogue/node";
-import picomatch from "picomatch";
 import {
     MAX_LS_ENTRIES,
     MAX_OUTPUT_BYTES,
     MIN_OUTPUT_BYTES,
-    SENSITIVE_FILE_DENY_LIST,
 } from "./ai-chat-constants";
 
-export const /** Precomputed deny-list matcher for sensitive file paths, compiled once at module load. Uses dot:true (hidden dirs) and nocase:true (case-insensitive file systems). */ isDeniedPath =
-        picomatch([...SENSITIVE_FILE_DENY_LIST], {
-            dot: true,
-            nocase: true,
-        });
+/** Case-insensitive filename suffixes blocked from sandbox reads and listings. */
+const SENSITIVE_FILE_SUFFIXES = [
+    ".cer",
+    ".credentials",
+    ".crt",
+    ".gpg",
+    ".key",
+    ".p12",
+    ".pem",
+    ".pfx",
+] as const;
+
+/** Case-insensitive exact filenames blocked from sandbox reads and listings. */
+const SENSITIVE_FILE_NAMES = new Set([
+    ".env",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+    "id_rsa",
+]);
+
+/** File-path predicate used by recursive directory listing filters. */
+type FilePathMatcher = (filePath: string) => boolean;
+
+/**
+ * Checks a relative path against the sandbox sensitive-file deny-list.
+ * Matching is case-insensitive and applies at every directory depth.
+ *
+ * @param filePath - Relative file path using either platform separator.
+ * @returns True for private keys, credentials, dotenv files, and certificates.
+ */
+export function isDeniedPath(filePath: string): boolean {
+    const filename = toForwardSlashes(filePath)
+        .split("/")
+        .at(-1)
+        ?.toLowerCase();
+    if (!filename) {
+        return false;
+    }
+    return (
+        SENSITIVE_FILE_NAMES.has(filename) ||
+        filename.startsWith(".env.") ||
+        SENSITIVE_FILE_SUFFIXES.some((suffix) => filename.endsWith(suffix))
+    );
+}
 
 /**
  * Normalises a file path for deny-list matching by converting backslashes to
- * forward slashes. Picomatch patterns always use forward slashes, so without
- * this step nested paths on Windows (e.g. "sub\id_rsa") would escape the
- * deny-list even though they match the glob "** /id_rsa".
+ * forward slashes. This keeps sandbox path predicates and user glob matching
+ * platform-independent.
  *
  * @param p - The relative path to normalise.
  * @returns The path with all backslashes replaced by forward slashes.
@@ -302,9 +339,9 @@ export async function listFilesRecursive(
     allowedDir: string,
     options: {
         /** Glob matcher function to filter files. */
-        pattern?: picomatch.Matcher;
+        pattern?: FilePathMatcher;
         /** Glob matcher function to exclude files (deny-list). */
-        deny?: picomatch.Matcher;
+        deny?: FilePathMatcher;
         /** Maximum number of entries to return. */
         maxEntries?: number;
         /** Set of visited inodes for symlink cycle detection. */
@@ -341,8 +378,7 @@ export async function listFilesRecursive(
         } catch {
             continue;
         }
-        // Normalise to forward slashes so the deny-list picomatch patterns
-        // match correctly on Windows where relative() uses backslashes.
+        // Normalise paths before applying platform-independent filters.
         const resolvedRel = toForwardSlashes(relative(allowedDir, resolved));
         if (entry.isDirectory() || entry.isSymbolicLink()) {
             try {

@@ -5,137 +5,13 @@
  * human review. Used by the conversation and LLM request dump commands.
  *
  * All rendering (markdown, syntax highlighting) is done at generation time
- * using marked and highlight.js. The output HTML contains only a small inline
- * script for the copy button; no external JavaScript dependencies.
+ * by local escaping-first renderers. The output HTML contains only a small
+ * inline script for the copy button; no external JavaScript dependencies.
  */
 
-import hljs from "highlight.js";
-import { marked, Renderer } from "marked";
+import { renderChatCodeBlock, renderChatMarkdown } from "./chat-markdown.js";
 import type { LlmMessage } from "./chat-orchestrator.js";
 import { COPY_JS, HLJS_THEME_CSS, PAGE_CSS } from "./log-to-html-assets.js";
-
-// ---------------------------------------------------------------------------
-// marked configuration — highlight code fences with highlight.js
-// ---------------------------------------------------------------------------
-
-/**
- * Renders a fenced code block token using highlight.js for syntax highlighting.
- * Assigned to the marked Renderer in buildMarkedRenderer.
- *
- * @param token - The code token provided by marked.
- * @param token.text - The raw code text inside the fence.
- * @param token.lang - The language identifier from the opening fence, if any.
- * @param token.escaped - Unused flag passed by marked; included for type compatibility.
- * @returns An HTML string with a highlighted pre/code block.
- */
-function renderCodeBlock({
-    text,
-    lang,
-}: {
-    /** The raw code text inside the fence. */
-    text: string;
-    /** The language identifier from the opening fence, if any. */
-    lang?: string;
-    /** Unused flag passed by marked; included for type compatibility. */
-    escaped?: boolean;
-}): string {
-    const language = lang && hljs.getLanguage(lang) ? lang : "plaintext";
-    const highlighted = hljs.highlight(text, { language }).value;
-    return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
-}
-
-/**
- * Renderer for markdown link tokens. LLM messages in this context are Python
- * code and plain-text prompts — clickable links add no value and introduce an
- * XSS surface (javascript: schemes etc.). We therefore render the visible link
- * text only, discarding the URL entirely.
- *
- * @param token - The link token provided by marked.
- * @param token.text - The link label (already rendered inner HTML).
- * @param token.href - Discarded; not used.
- * @param token.title - Discarded; not used.
- * @returns The link label as plain inline HTML with no anchor element.
- */
-function renderLink({
-    text,
-}: {
-    /** The link label (already rendered inner HTML). */
-    text: string;
-    /** Discarded; not used. */
-    href?: string;
-    /** Discarded; not used. */
-    title?: string | null;
-}): string {
-    return text;
-}
-
-/**
- * Renderer for raw HTML tokens produced by marked. Escapes the text rather
- * than passing it through, preventing any script or tag injection from message
- * content that happens to contain literal HTML.
- *
- * @param token - The HTML token provided by marked.
- * @param token.text - The raw HTML text to escape.
- * @returns The HTML-escaped text, safe for inclusion in the output document.
- */
-function renderRawHtml({
-    text,
-}: {
-    /** The raw HTML text to escape. */
-    text: string;
-}): string {
-    return escapeHtml(text);
-}
-
-/**
- * Renderer for markdown image tokens. Images are stripped to their alt text
- * only — no <img> element is emitted. This prevents URL fetching, src-based
- * injection (data: URIs, remote tracking pixels, etc.) and keeps the output
- * fully self-contained.
- *
- * @param token - The image token provided by marked.
- * @param token.text - The image alt text (already rendered inner HTML).
- * @param token.href - Discarded; not used.
- * @param token.title - Discarded; not used.
- * @returns The alt text as plain inline HTML with no img element.
- */
-function renderImage({
-    text,
-}: {
-    /** The image alt text (already rendered inner HTML). */
-    text: string;
-    /** Discarded; not used. */
-    href?: string;
-    /** Discarded; not used. */
-    title?: string | null;
-}): string {
-    return text;
-}
-
-/**
- * Builds and returns a configured marked Renderer that uses highlight.js for
- * fenced code blocks and escapes raw HTML to prevent injection. Created once
- * per generateChatHtml call so the module stays side-effect-free at import
- * time.
- *
- * @returns A marked Renderer with syntax-highlighted code block support,
- *   raw-HTML escaping, link stripping, and image stripping.
- */
-function buildMarkedRenderer(): Renderer {
-    const renderer = new Renderer();
-    renderer.code = renderCodeBlock;
-    /* Escape raw HTML tokens instead of passing them through. Without this,
-       marked preserves literal <script> tags and similar constructs from the
-       input, which would execute when the user opens the generated HTML file. */
-    renderer.html = renderRawHtml;
-    /* Strip markdown links to their visible text only — no <a> element.
-       Eliminates javascript: injection and keeps the dump non-interactive. */
-    renderer.link = renderLink;
-    /* Strip markdown images to their alt text only — no <img> element.
-       Prevents URL fetching, data: URIs, and remote tracking pixels. */
-    renderer.image = renderImage;
-    return renderer;
-}
 
 // ---------------------------------------------------------------------------
 // Execution-result message rendering
@@ -166,6 +42,34 @@ interface ExecResultPayload {
 }
 
 /**
+ * Validates untrusted execution-result JSON before rendering a structured card.
+ * Unknown fields and arbitrary JSON values are allowed; display fields must be typed.
+ *
+ * @param value - Parsed JSON from a message that claims to be an execution result.
+ * @returns True for an object with valid optional display fields and a safe round count.
+ */
+function isExecResultPayload(value: unknown): value is ExecResultPayload {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        return false;
+    }
+    const fields = value as Record<string, unknown>;
+    return (
+        ["success", "value_truncated", "truncated", "is_timeout"].every(
+            (key) =>
+                fields[key] === undefined || typeof fields[key] === "boolean",
+        ) &&
+        ["prints", "error_type", "message", "hint"].every(
+            (key) =>
+                fields[key] === undefined || typeof fields[key] === "string",
+        ) &&
+        (fields.rounds_remaining === undefined ||
+            (typeof fields.rounds_remaining === "number" &&
+                Number.isSafeInteger(fields.rounds_remaining) &&
+                fields.rounds_remaining >= 0))
+    );
+}
+
+/**
  * Renders the HTML for a "Code execution result: {json}" user message.
  * Parses the JSON and produces a structured block showing success/failure,
  * prints, value, rounds remaining, and error details.
@@ -177,9 +81,12 @@ function renderExecResult(content: string): string {
     const jsonStr = content.slice("Code execution result:".length).trim();
     let payload: ExecResultPayload | null = null;
     try {
-        payload = JSON.parse(jsonStr) as ExecResultPayload;
+        const parsed: unknown = JSON.parse(jsonStr);
+        if (isExecResultPayload(parsed)) {
+            payload = parsed;
+        }
     } catch {
-        /* If JSON is malformed, fall back to showing raw content. */
+        /* Invalid JSON or field types use the escaped raw-content fallback. */
     }
     if (payload === null) {
         const escaped = escapeHtml(content);
@@ -282,12 +189,11 @@ function escapeHtml(text: string): string {
  * treated as markdown (the system prompt uses headers, code fences, tables).
  *
  * @param content - Raw system prompt text.
- * @param renderer - Pre-built marked Renderer.
  * @returns HTML string.
  */
-function renderSystemMessage(content: string, renderer: Renderer): string {
+function renderSystemMessage(content: string): string {
     const lineCount = content.split("\n").length;
-    const bodyHtml = marked(content, { renderer }) as string;
+    const bodyHtml = renderChatMarkdown(content);
     return `<details class="message message-system">
   <!-- system prompt — collapsed by default, expand to inspect -->
   <summary>System prompt · ${lineCount} lines</summary>
@@ -299,14 +205,12 @@ function renderSystemMessage(content: string, renderer: Renderer): string {
  * Renders a human user message as a simple bubble with plain text.
  *
  * @param content - The user message text.
- * @param renderer - Pre-built marked Renderer (includes raw-HTML escaping).
  * @returns HTML string.
  */
-function renderUserMessage(content: string, renderer: Renderer): string {
+function renderUserMessage(content: string): string {
     /* Render as markdown in case the user typed something with formatting,
-       but keep it simple — most prompts are plain prose. The renderer is
-       passed to ensure raw HTML in the content is escaped, not injected. */
-    const bodyHtml = marked(content, { renderer, breaks: true }) as string;
+       but keep it simple — most prompts are plain prose. Raw HTML is escaped. */
+    const bodyHtml = renderChatMarkdown(content, { breaks: true });
     return `<div class="message message-user">
   <!-- human user prompt -->
   <div class="message-header">
@@ -320,20 +224,17 @@ function renderUserMessage(content: string, renderer: Renderer): string {
 /**
  * Renders an assistant message. The model should respond in pure Python per
  * the system prompt, but may occasionally wrap code in markdown fences (e.g.
- * Older models). We run the content through marked either way: if it is bare
- * Python with no fences, marked treats it as a plain paragraph; if it has
- * fences, they are syntax-highlighted by the custom renderer..
+ * Older models). Bare Python is highlighted directly; fenced responses go
+ * through the local Markdown renderer.
  *
  * @param content - The assistant message text (Python or markdown).
- * @param renderer - Pre-built marked Renderer.
  * @returns HTML string.
  */
-function renderAssistantMessage(content: string, renderer: Renderer): string {
-    /* If the whole response is bare Python (no markdown fences), wrap it in
-       a synthetic code fence so it gets proper syntax highlighting. */
-    const hasFence = /^```/m.test(content);
-    const mdSource = hasFence ? content : `\`\`\`python\n${content}\n\`\`\``;
-    const bodyHtml = marked(mdSource, { renderer }) as string;
+function renderAssistantMessage(content: string): string {
+    const hasFence = /^ {0,3}(?:`{3,}|~{3,})/m.test(content);
+    const bodyHtml = hasFence
+        ? renderChatMarkdown(content)
+        : renderChatCodeBlock(content, "python");
     return `<div class="message message-assistant">
   <!-- assistant (LLM) response -->
   <div class="message-header">
@@ -369,22 +270,20 @@ export function generateChatHtml(
     snapshotId: string,
     model: string,
 ): string {
-    const renderer = buildMarkedRenderer();
-
     /* Render each message to HTML. */
     const messagesHtml = messages
         .map((msg) => {
             if (msg.role === "system") {
-                return renderSystemMessage(msg.content, renderer);
+                return renderSystemMessage(msg.content);
             }
             if (msg.role === "user") {
                 if (msg.content.startsWith("Code execution result:")) {
                     return renderExecResult(msg.content);
                 }
-                return renderUserMessage(msg.content, renderer);
+                return renderUserMessage(msg.content);
             }
             if (msg.role === "assistant") {
-                return renderAssistantMessage(msg.content, renderer);
+                return renderAssistantMessage(msg.content);
             }
             /* Unknown role — render as plain text fallback. */
             return `<div class="message message-user">
