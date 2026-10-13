@@ -4,6 +4,7 @@ import {
     mkdir,
     mkdtemp,
     open,
+    realpath,
     rm,
     stat,
     symlink,
@@ -39,7 +40,7 @@ describe("chat filesystem input validation", () => {
 
         await expect(
             validateAnalysisDirectory("analysis-alias", temporaryDirectory),
-        ).resolves.toBe(directory);
+        ).resolves.toBe(await realpath(directory));
     });
 
     it.each([
