@@ -50,7 +50,7 @@ jobs:
           npm ci --ignore-scripts
           npm rebuild esbuild electron-winstaller
           # Download Electron before network egress is restricted.
-          npx install-electron --no
+          npx --no install-electron
 
       - name: Install display dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb openbox

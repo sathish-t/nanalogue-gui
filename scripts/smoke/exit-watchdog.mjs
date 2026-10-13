@@ -1,4 +1,5 @@
-// Exercises the real Electron utility watchdog with responsive and blocked parents.
+// Exercises the real Electron utility watchdog with responsive parents and
+// parents that block after sending the arm request, not before shutdown begins.
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -24,7 +25,7 @@ app.whenReady().then(() => {
     watchdog.once('spawn', () => {
         watchdog.postMessage('arm-exit-watchdog');
         if (process.argv.includes('blocked')) {
-            // No acknowledgement callback or main-process timer can run now.
+            // Block only after sending the arm request. No callback or timer can run now.
             Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
         }
     });

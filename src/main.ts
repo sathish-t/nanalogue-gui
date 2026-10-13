@@ -53,8 +53,8 @@ let mainWindow: BrowserWindow | null = null;
 
 // --- Global exit failsafe ---
 // Fork a watchdog utility process that can force-kill us via SIGKILL.
-// This works even when the main event loop is blocked by native addon calls,
-// because the utility process has its own independent event loop.
+// Its independent event loop handles a main-process hang after the arm request
+// is sent; it cannot recover a main process already blocked before that request.
 let exitWatchdog: UtilityProcess | null = null;
 
 /** Prevents duplicate watchdog handshakes during overlapping close events. */
@@ -65,7 +65,7 @@ const EXIT_WATCHDOG_FALLBACK_MS = 1000;
 
 /**
  * Spawns the exit watchdog utility process and registers signal handlers.
- * Called once at startup so the kill switch is always available.
+ * Called once at startup; the main process must remain responsive to arm it.
  */
 function initExitWatchdog() {
     exitWatchdog = utilityProcess.fork(
@@ -280,8 +280,8 @@ function createWindow(mode: AppMode) {
     });
 
     // Global failsafe: force-kill the process when the user closes the window.
-    // Sends SIGKILL via the watchdog utility process, which works even when the
-    // main event loop is blocked by long-running native addon calls.
+    // The close callback must run and send the arm request before the watchdog
+    // can protect against a main-event-loop hang.
     mainWindow.on("close", () => {
         forceExit();
     });
