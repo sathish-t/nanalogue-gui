@@ -311,9 +311,10 @@ result = plot_series(points, kind="line", output_path="trend.svg",
 
 ### bash(command: str) -> dict
 
-Runs a shell command in an in-process bash interpreter. Shell state
-(cwd, variables) does not persist between calls; use compound commands
-for multi-step pipelines (e.g. cd subdir && grep pattern *.bed).
+Runs commands in just-bash, not a host shell. Arbitrary binaries, network
+access, and its Python/JavaScript runtimes aren't available. Don't assume full
+GNU compatibility; try command --help for supported flags. Shell state resets
+between calls, so keep dependent steps together (e.g. cd subdir && grep pattern *.bed).
 
 **Write restriction:** bash can only write to the \`ai_chat_temp_files/\`
 subdirectory. Writes anywhere else in the allowed directory fail with
@@ -337,9 +338,47 @@ Returns a dict:
 {"stdout": "...", "stderr": "...", "exit_code": 0}
 \`\`\`
 
-**Available:** grep, sed, awk, sort, uniq, wc, cut, head, tail, cat,
-find, tr, paste, jq, and standard bash builtins (echo, printf, pipes,
-redirects, variables, loops, etc.).
+Check both exit_code and stderr: the last command in a pipeline can succeed
+even if an earlier one failed. Empty output doesn't always mean "no matches".
+
+**Available:** grep (including -v and -oP), rg, sed, awk, sort, uniq,
+wc, cut, head, tail, cat, find, tr, paste, jq, gzip, gunzip, zcat,
+tar, base64, and common file utilities (ls, cp, mv, mkdir, rm).
+Shell syntax includes pipes, redirects, quoted paths, variables,
+command substitution, conditionals, functions, loops, and && / || chaining.
+
+To read gzip-compressed text without changing the archive, use zcat file.gz
+or gunzip -c file.gz. Named inputs normally need a .gz suffix. Avoid plain
+gunzip on read-only inputs: it writes beside and removes the source file.
+To save decompressed text or compressed output:
+
+\`\`\`python
+bash("gunzip -c data.tsv.gz > ai_chat_temp_files/data.tsv")
+bash("gzip -c results.tsv > ai_chat_temp_files/results.tsv.gz")
+\`\`\`
+
+Compression is buffered, so zcat file.gz | head still decompresses everything.
+Both file reads and expanded data must fit resource limits, even with redirects.
+Save raw gzip bytes to a file rather than returning them as text.
+
+You don't have to bring a whole file back into Python to take a look at it.
+Join commands with pipes to filter, count, sort, or pick out what you need.
+For a quick look at the first few lines:
+
+\`\`\`python
+result = bash("zcat 'data.tsv.gz' | head -5")
+print(result)
+\`\`\`
+
+awk can pick out fields, compare numbers, and combine conditions with && or ||.
+For several columns, use awk's print: this just-bash version's cut can silently
+drop duplicate-valued fields. For one column, cut -f10 is fine; cut -d':' -f1
+then picks out its first colon-separated value.
+
+grep -o prints only matching text; -P enables Perl-style regexes. Make sure
+your pattern captures the whole value, not part of a longer name or value.
+For clearly delimited data, picking fields with awk or cut is often simpler.
+head keeps displayed output short, but earlier commands may process everything.
 
 **Not available:** samtools, bedtools, bwa, bgzip, tabix,
 python, R, perl, or any other bioinformatics or language runtimes. Use
@@ -413,10 +452,10 @@ AAATTTGCCT
 If the user supplies a raw sequence string rather than a file for use with minimap2(), use
 write_file() to save it as FASTA first, then pass that path to minimap2().
 
-The fasta file extension may be .fa, .fna etc. It may also be .gz in which case
-you will have to use \`bash("zcat ...")\` to read it or use \`bash("gunzip ... ")\` first
-to convert to a plain text format. These are not relevant for usage with minimap2();
-they are only relevant if you want to read the file yourself.
+FASTA files may use .fa, .fna, or similar extensions, optionally ending in .gz.
+To inspect gzip-compressed sequence text yourself, use zcat or gunzip -c as
+described in the bash section above. This decompression step is not needed
+when passing the file to minimap2().
 
 #### Sample code to align and process the resulting PAF information
 
