@@ -29,6 +29,8 @@ export class RunningHistogram {
     private _max = Number.NEGATIVE_INFINITY;
     /** Count of values that exceeded the maximum representable value. */
     private _exceededCount = 0;
+    /** Yield from values above the maximum representable value. */
+    private _aboveRangeYield = 0;
 
     /**
      * Creates a streaming histogram with the specified bin width and maximum value.
@@ -107,6 +109,9 @@ export class RunningHistogram {
 
         if (binIndex < 0 || binIndex >= this.numBins) {
             this._exceededCount++;
+            if (binIndex >= this.numBins) {
+                this._aboveRangeYield += value;
+            }
             return;
         }
 
@@ -186,7 +191,10 @@ export class RunningHistogram {
         };
 
         if (calculateN50) {
-            stats.n50 = this.approximateN50();
+            const n50 = this.approximateN50();
+            if (n50 !== undefined) {
+                stats.n50 = n50;
+            }
         }
 
         return stats;
@@ -215,22 +223,31 @@ export class RunningHistogram {
     }
 
     /**
-     * Approximates N50 by walking bins from smallest to largest,
+     * Approximates N50 by walking bins from largest to smallest,
      * accumulating yield until 50% of total yield is reached.
      *
-     * @returns The midpoint of the bin where cumulative yield reaches 50%.
+     * @returns The midpoint of the bin where cumulative yield reaches 50%, or undefined if it lies above range.
      */
-    private approximateN50(): number {
+    private approximateN50(): number | undefined {
         const halfSum = this._sum / 2;
-        let cumulativeYield = 0;
+        if (halfSum === 0) {
+            return this.binWidth / 2;
+        }
 
-        for (let i = 0; i < this.numBins; i++) {
+        let cumulativeYield = this._aboveRangeYield;
+        if (cumulativeYield >= halfSum) {
+            return undefined;
+        }
+
+        let n50 = (this.numBins - 0.5) * this.binWidth;
+        for (let i = this.numBins - 1; i >= 0; i--) {
             cumulativeYield += this.yields[i];
             if (cumulativeYield >= halfSum) {
-                return (i + 0.5) * this.binWidth;
+                n50 = (i + 0.5) * this.binWidth;
+                break;
             }
         }
 
-        return (this.numBins - 0.5) * this.binWidth;
+        return n50;
     }
 }
