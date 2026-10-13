@@ -4,10 +4,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { MAX_FILENAME_LENGTH } from "../ai-chat-constants";
+import { hasControlChars } from "../control-characters";
 import {
     assertExistingAncestorInside,
     assertInside,
-    hasControlChars,
     isDeniedPath,
     resolvePath,
     SandboxError,

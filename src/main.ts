@@ -3,7 +3,8 @@
 // Suppress dconf warnings on Linux/WSL by using in-memory GSettings backend
 process.env.GSETTINGS_BACKEND ??= "memory";
 
-import { existsSync, readFileSync } from "node:fs";
+import { access } from "node:fs/promises";
+import { release } from "node:os";
 import { resolve } from "node:path";
 import {
     app,
@@ -13,6 +14,7 @@ import {
     type UtilityProcess,
     utilityProcess,
 } from "electron";
+import { version as appVersion } from "../package.json";
 import {
     configureElectronSecurityAfterReady,
     configureElectronSecurityBeforeReady,
@@ -22,12 +24,11 @@ import {
 import type { FontSize } from "./font-size";
 import { getFontSize, setFontSize } from "./font-size";
 import { validateIpcFilePath } from "./lib/ipc-path-validation";
-import { countBedDataLines } from "./lib/line-counter";
+import { countBedDataLines, countNonEmptyLines } from "./lib/line-counter";
 import { validateSwipeStartRequest } from "./lib/swipe-contract";
-import * as aiChatModule from "./modes/ai-chat";
-import * as locateModule from "./modes/locate";
-import * as qcModule from "./modes/qc";
-import * as swipeModule from "./modes/swipe";
+
+// Prevent Electron from constructing a default menu during application startup.
+Menu.setApplicationMenu(null);
 
 configureElectronSecurityBeforeReady();
 
@@ -35,12 +36,8 @@ configureElectronSecurityBeforeReady();
 // compositing surface, leaving the window visible in the taskbar but unable to
 // render.  Software compositing is sufficient for this app (2-D canvas charts,
 // CSS animations, DOM updates — no WebGL or 3-D).
-try {
-    if (/microsoft/i.test(readFileSync("/proc/version", "utf8"))) {
-        app.disableHardwareAcceleration();
-    }
-} catch {
-    // Not on Linux / WSL — nothing to do.
+if (process.platform === "linux" && /microsoft/i.test(release())) {
+    app.disableHardwareAcceleration();
 }
 
 /**
@@ -48,8 +45,99 @@ try {
  */
 type AppMode = "landing" | "swipe" | "qc" | "locate" | "ai-chat";
 
+/** Lazily loaded shared BAM inspection exports. */
+type BamInspectionModeModule = typeof import("./modes/bam-inspection.js");
+/** Lazily loaded AI Chat mode exports. */
+type AiChatModeModule = typeof import("./modes/ai-chat.js");
+/** Lazily loaded Locate mode exports. */
+type LocateModeModule = typeof import("./modes/locate.js");
+/** Lazily loaded quality control mode exports. */
+type QcModeModule = typeof import("./modes/qc.js");
+/** Lazily loaded Swipe mode exports. */
+type SwipeModeModule = typeof import("./modes/swipe.js");
+
 let currentMode: AppMode = "landing";
 let mainWindow: BrowserWindow | null = null;
+/** Identifies the newest mode launch so slower imports cannot navigate later. */
+let latestModeLaunchRequestId = 0;
+let bamInspectionModeModulePromise:
+    | Promise<BamInspectionModeModule>
+    | undefined;
+let aiChatModeModulePromise: Promise<AiChatModeModule> | undefined;
+let locateModeModulePromise: Promise<LocateModeModule> | undefined;
+let qcModeModulePromise: Promise<QcModeModule> | undefined;
+let swipeModeModulePromise: Promise<SwipeModeModule> | undefined;
+
+/**
+ * Loads shared BAM inspection only when a configuration page first needs it.
+ *
+ * @returns The loaded BAM inspection mode module.
+ */
+async function loadBamInspectionModeModule(): Promise<BamInspectionModeModule> {
+    bamInspectionModeModulePromise ??= import("./modes/bam-inspection.js").then(
+        (module) => {
+            module.registerBamInspectionIpcHandlers();
+            return module;
+        },
+    );
+    return bamInspectionModeModulePromise;
+}
+
+/**
+ * Loads and registers AI Chat only when the user opens that feature.
+ *
+ * @returns The loaded AI Chat mode module.
+ */
+async function loadAiChatModeModule(): Promise<AiChatModeModule> {
+    aiChatModeModulePromise ??= import("./modes/ai-chat.js").then((module) => {
+        module.registerAiChatIpcHandlers();
+        return module;
+    });
+    const module = await aiChatModeModulePromise;
+    module.setAiChatMainWindow(mainWindow);
+    return module;
+}
+
+/**
+ * Loads and registers Locate only when the user opens that feature.
+ *
+ * @returns The loaded Locate mode module.
+ */
+async function loadLocateModeModule(): Promise<LocateModeModule> {
+    locateModeModulePromise ??= import("./modes/locate.js").then((module) => {
+        module.registerLocateIpcHandlers();
+        return module;
+    });
+    return locateModeModulePromise;
+}
+
+/**
+ * Loads and registers QC only when the user opens that feature.
+ *
+ * @returns The loaded QC mode module.
+ */
+async function loadQcModeModule(): Promise<QcModeModule> {
+    qcModeModulePromise ??= import("./modes/qc.js").then((module) => {
+        module.registerQcIpcHandlers();
+        return module;
+    });
+    const module = await qcModeModulePromise;
+    module.setQcMainWindow(mainWindow);
+    return module;
+}
+
+/**
+ * Loads and registers Swipe only when the user opens that feature.
+ *
+ * @returns The loaded Swipe mode module.
+ */
+async function loadSwipeModeModule(): Promise<SwipeModeModule> {
+    swipeModeModulePromise ??= import("./modes/swipe.js").then((module) => {
+        module.registerSwipeIpcHandlers();
+        return module;
+    });
+    return swipeModeModulePromise;
+}
 
 // --- Global exit failsafe ---
 // Fork a watchdog utility process that can force-kill us via SIGKILL.
@@ -101,13 +189,6 @@ function forceExit() {
     });
     watchdog.postMessage("arm-exit-watchdog");
 }
-
-/** The application version read from package.json at startup. */
-const APP_VERSION: string = (
-    JSON.parse(
-        readFileSync(resolve(__dirname, "..", "package.json"), "utf-8"),
-    ) as Record<string, string>
-).version;
 
 /**
  * Returns the window dimensions appropriate for the given application mode.
@@ -235,7 +316,6 @@ function autoFitHeight(win: BrowserWindow): void {
  */
 function createWindow(mode: AppMode) {
     currentMode = mode;
-    Menu.setApplicationMenu(null);
 
     const { width, height } = getWindowSize(mode);
 
@@ -270,11 +350,6 @@ function createWindow(mode: AppMode) {
         autoFitHeight(mainWindow);
     }
 
-    // Set main window reference for mode modules
-    qcModule.setQcMainWindow(mainWindow);
-    aiChatModule.setAiChatMainWindow(mainWindow);
-    locateModule.setLocateMainWindow(mainWindow);
-
     mainWindow.on("closed", () => {
         mainWindow = null;
     });
@@ -297,11 +372,6 @@ function resizeAndLoadMode(mode: AppMode) {
 
     currentMode = mode;
     const { width, height } = getWindowSize(mode);
-
-    // Update module window references when changing modes
-    qcModule.setQcMainWindow(mainWindow);
-    aiChatModule.setAiChatMainWindow(mainWindow);
-    locateModule.setLocateMainWindow(mainWindow);
 
     mainWindow.setSize(width, height);
     mainWindow.center();
@@ -349,7 +419,15 @@ registerTrustedIpcHandler(
      * @returns A result object indicating success or failure with an optional reason.
      */
     async () => {
+        const launchRequestId = ++latestModeLaunchRequestId;
         if (!mainWindow) return { success: false, reason: "No window" };
+        await Promise.all([
+            loadSwipeModeModule(),
+            loadBamInspectionModeModule(),
+        ]);
+        if (launchRequestId !== latestModeLaunchRequestId) {
+            return { success: true };
+        }
 
         // Set currentMode before loadURL so any concurrent set-font-size
         // IPC call sees the updated mode and skips the landing-only resize.
@@ -368,6 +446,32 @@ registerTrustedIpcHandler(
 );
 
 // Shared file-picker IPC handlers (used by swipe, locate, and QC modes)
+
+// Retain the existing Locate channel names; QC also needs these on a cold launch.
+registerTrustedIpcHandler("locate-pick-read-ids", async () => {
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+        title: "Select read ID file",
+        filters: [
+            { name: "Text files", extensions: ["txt"] },
+            { name: "All files", extensions: ["*"] },
+        ],
+        properties: ["openFile"],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+});
+
+registerTrustedIpcHandler(
+    "locate-count-read-ids",
+    async (_event, filePath: unknown) => {
+        if (typeof filePath !== "string" || filePath.length === 0) {
+            throw new Error("Invalid Locate read ID path");
+        }
+        await validateIpcFilePath(filePath, "read");
+        return countNonEmptyLines(filePath);
+    },
+);
 
 registerTrustedIpcHandler(
     "pick-bam",
@@ -420,8 +524,13 @@ registerTrustedIpcHandler(
      * @param filePath - The path to check.
      * @returns True if the file exists, false otherwise.
      */
-    (_event, filePath: string) => {
-        return existsSync(filePath);
+    async (_event, filePath: string) => {
+        try {
+            await access(filePath);
+            return true;
+        } catch {
+            return false;
+        }
     },
 );
 
@@ -477,6 +586,7 @@ registerTrustedIpcHandler(
         await validateIpcFilePath(swipeArgs.outputPath, "write");
 
         try {
+            const swipeModule = await loadSwipeModeModule();
             await swipeModule.initializeSwipeReview(
                 swipeArgs,
                 swipeArgs.overwriteConfirmed,
@@ -503,11 +613,11 @@ registerTrustedIpcHandler(
 registerTrustedIpcHandler(
     "get-app-version",
     /**
-     * Returns the application version from package.json.
+     * Returns the application version bundled from package.json.
      *
      * @returns The version string.
      */
-    () => APP_VERSION,
+    () => appVersion,
 );
 
 registerTrustedIpcHandler(
@@ -518,6 +628,11 @@ registerTrustedIpcHandler(
      * @returns A result object indicating success.
      */
     async () => {
+        const launchRequestId = ++latestModeLaunchRequestId;
+        await Promise.all([loadQcModeModule(), loadBamInspectionModeModule()]);
+        if (launchRequestId !== latestModeLaunchRequestId) {
+            return { success: true };
+        }
         resizeAndLoadMode("qc");
         return { success: true };
     },
@@ -554,6 +669,14 @@ registerTrustedIpcHandler(
      * @returns A result object indicating success.
      */
     async () => {
+        const launchRequestId = ++latestModeLaunchRequestId;
+        await Promise.all([
+            loadLocateModeModule(),
+            loadBamInspectionModeModule(),
+        ]);
+        if (launchRequestId !== latestModeLaunchRequestId) {
+            return { success: true };
+        }
         resizeAndLoadMode("locate");
         return { success: true };
     },
@@ -577,6 +700,11 @@ registerTrustedIpcHandler(
      * @returns A result object indicating success.
      */
     async () => {
+        const launchRequestId = ++latestModeLaunchRequestId;
+        await loadAiChatModeModule();
+        if (launchRequestId !== latestModeLaunchRequestId) {
+            return { success: true };
+        }
         resizeAndLoadMode("ai-chat");
         return { success: true };
     },
@@ -591,12 +719,6 @@ registerTrustedIpcHandler(
         resizeAndLoadMode("landing");
     },
 );
-
-// Register mode IPC handlers
-swipeModule.registerSwipeIpcHandlers();
-locateModule.registerLocateIpcHandlers();
-qcModule.registerQcIpcHandlers();
-aiChatModule.registerAiChatIpcHandlers();
 
 app.whenReady().then(async () => {
     await configureElectronSecurityAfterReady();

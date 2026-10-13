@@ -3,13 +3,16 @@
  *
  * Checks:
  *  - QC config page loads after clicking the mode button
+ *  - Read-ID selection/counting works before and after opening Locate
  *  - generateQC IPC call succeeds with demo BAM
  *  - QC results page renders with all five tabs present
- *  - Four tabs contain a rendered chart canvas; the sequences tab displays text content
+ *  - Four tabs contain a rendered chart canvas; every sequence row renders on first opening
  *
  * Usage:  node scripts/smoke/qc.mjs
  */
 
+import { deepStrictEqual } from "node:assert";
+import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
     assert,
@@ -42,6 +45,67 @@ await run("QC mode", async () => {
         await page.waitForLoadState("domcontentloaded");
         pass("QC config page loaded");
 
+        // Only the OS dialog is stubbed; clicks, IPC registration, path validation,
+        // file reading, counting, and renderer updates run against the built app.
+        const readIdPath = resolve(outDir, "read-ids.txt");
+        writeFileSync(readIdPath, "read-a\n\nread-b\n");
+        for (const mode of ["qc", "locate"]) {
+            if (mode === "qc") {
+                await page.click("#advanced-options summary");
+            }
+            await app.evaluate(({ dialog }, path) => {
+                const original = dialog.showOpenDialog;
+                dialog.showOpenDialog = async () => {
+                    dialog.showOpenDialog = original;
+                    return { canceled: false, filePaths: [path] };
+                };
+            }, readIdPath);
+            await page.click("#btn-browse-read-ids");
+            await page.waitForFunction(
+                ({ path, mode }) =>
+                    document.querySelector("#read-id-path").value === path &&
+                    (mode === "qc"
+                        ? document.querySelector("#read-id-count")
+                              .textContent === "2 read IDs found"
+                        : document
+                              .querySelector("#file-summary")
+                              .textContent.includes("2 read IDs")),
+                { path: readIdPath, mode },
+                { timeout: 5000 },
+            );
+            pass(`${mode} read-ID picker and counter work`);
+            await page.click("#btn-back");
+            await page.waitForURL(/landing\.html/);
+            await page.click(mode === "qc" ? "#btn-locate" : "#btn-qc");
+            await page.waitForURL(
+                mode === "qc" ? /locate-config\.html/ : /qc-config\.html/,
+            );
+        }
+        await app.evaluate(({ dialog }) => {
+            const original = dialog.showOpenDialog;
+            dialog.showOpenDialog = async () => {
+                dialog.showOpenDialog = original;
+                return { canceled: true, filePaths: [] };
+            };
+        });
+        assert(
+            (await page.evaluate(() => window.api.locatePickReadIds())) ===
+                null,
+            "cancelled picker returns null",
+        );
+        const invalidPathError = await page.evaluate(async () => {
+            try {
+                await window.api.locateCountReadIds("");
+                return "";
+            } catch (error) {
+                return error.message;
+            }
+        });
+        assert(
+            invalidPathError.includes("Invalid Locate read ID path"),
+            "read-ID counter rejects invalid paths",
+        );
+
         await page.screenshot({ path: `${outDir}/01-qc-config.png` });
         console.log(`  📸  ${outDir}/01-qc-config.png`);
 
@@ -66,7 +130,11 @@ await run("QC mode", async () => {
         // --- QC results page ---
         await page.waitForURL(/qc-results\.html/, { timeout: 30_000 });
         await page.waitForLoadState("domcontentloaded");
-        await page.waitForTimeout(1000);
+        await page.waitForFunction(
+            () =>
+                document.querySelector("#stats-read-lengths").children.length >
+                0,
+        );
         pass("QC results page loaded");
 
         // --- check chart tabs ---
@@ -93,18 +161,51 @@ await run("QC mode", async () => {
         }
 
         // --- check table tabs ---
-        // The sequences tab renders a text table, not a canvas.
+        // Compare the rendered rows with the IPC payload, not static panel text.
+        // This fixture spans multiple rendering batches, so a stalled batch fails.
+        const expectedRows = await page.evaluate(async () => {
+            const data = await window.api.getQCData();
+            return data.seqTableRows?.map((row) => [
+                row.readId,
+                row.baseSequence,
+            ]);
+        });
+        assert(
+            expectedRows?.length > 10,
+            "demo region must provide multiple batches of sequence rows",
+        );
+        assert(
+            (await page.locator("#seq-table-container tbody tr").count()) === 0,
+            "sequence rows should be deferred until their tab opens",
+        );
         for (const tab of TABLE_TABS) {
             await page.click(`button.tab-button[data-tab="${tab}"]`);
 
-            const activePanel = page.locator(".tab-content.active");
+            const activePanel = page.locator("#tab-sequences.active");
             await activePanel.waitFor({ state: "visible", timeout: 5000 });
-            const text = await activePanel.textContent();
-            assert(
-                text && text.trim().length > 0,
-                `sequences tab panel is empty`,
+            await page.waitForFunction(
+                (count) =>
+                    document.querySelectorAll("#seq-table-container tbody tr")
+                        .length === count,
+                expectedRows.length,
+                { timeout: 10_000 },
             );
-            pass(`tab "${tab}" — content visible`);
+            const actualRows = await activePanel
+                .locator("tbody tr")
+                .evaluateAll((rows) =>
+                    rows.map((row) => [
+                        row.querySelector(".seq-read-id").textContent,
+                        row.querySelector("td:nth-child(3)").textContent,
+                    ]),
+                );
+            deepStrictEqual(
+                actualRows,
+                expectedRows,
+                "sequence read IDs and bases must match the QC data",
+            );
+            pass(
+                `tab "${tab}" — all ${actualRows.length} sequence rows rendered with matching read IDs and bases`,
+            );
 
             await page.screenshot({ path: `${outDir}/02-qc-${tab}.png` });
             console.log(`  📸  ${outDir}/02-qc-${tab}.png`);

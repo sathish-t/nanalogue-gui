@@ -7,7 +7,7 @@ import {
     MAX_INPUT_PATH_LENGTH,
     MAX_PYTHON_SOURCE_BYTES,
 } from "./ai-chat-shared-constants";
-import { hasControlChars } from "./monty-sandbox-helpers";
+import { hasControlChars } from "./control-characters";
 
 /** Error messages and byte ceiling for a bounded regular-file read. */
 export interface BoundedRegularFileOptions {

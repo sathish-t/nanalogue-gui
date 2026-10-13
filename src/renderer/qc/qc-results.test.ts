@@ -1,11 +1,13 @@
-// Tests for qc-results.html template structure and default state.
-// Uses jsdom to parse the HTML and verify DOM elements without a browser.
+// Tests for the QC results template and deferred sequence rendering.
+// Uses the real page handlers and template with a stubbed preload API.
 
 // @vitest-environment jsdom
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { calculateStats } from "../../lib/stats";
+import type { QCData } from "./qc-results-types";
 
 /**
  * Reads the qc-results.html template and injects it into the jsdom document body.
@@ -19,6 +21,190 @@ function loadTemplate(): Document {
     document.documentElement.innerHTML = html;
     return document;
 }
+
+/**
+ * Builds a QC payload with enough sequence rows to span a rendering batch.
+ *
+ * @returns QC data with empty histograms and eleven distinct sequence read IDs.
+ */
+function sequenceQCData(): QCData {
+    return {
+        sampleSeed: 42,
+        readLengthStats: calculateStats([]),
+        readLengthHistogram: [],
+        readLengthBinWidth: 100,
+        exceededReadLengths: 0,
+        yieldByLength: [],
+        wholeReadDensityStats: calculateStats([]),
+        wholeReadDensityHistogram: [],
+        windowedDensityStats: calculateStats([]),
+        windowedDensityHistogram: [],
+        rawProbabilityStats: calculateStats([]),
+        rawProbabilityHistogram: [],
+        readTypeCounts: {
+            primaryForward: 0,
+            primaryReverse: 0,
+            secondaryForward: 0,
+            secondaryReverse: 0,
+            supplementaryForward: 0,
+            supplementaryReverse: 0,
+            unmapped: 0,
+        },
+        seqTableRows: Array.from({ length: 11 }, (_, index) => ({
+            readId: `sequence-${index}`,
+            sequence: "AZ",
+            baseSequence: "AT",
+            qualities: [20, 30],
+            avgQuality: 25,
+        })),
+    };
+}
+
+/**
+ * Starts the real page renderer against the supplied preload result.
+ *
+ * @param data - The QC data returned by the stubbed preload API.
+ */
+async function initializeResults(data: QCData): Promise<void> {
+    vi.stubGlobal("api", {
+        /**
+         * Supplies the QC result normally returned over IPC.
+         *
+         * @returns The test's QC payload.
+         */
+        getQCData: async () => data,
+        goBackToConfig: vi.fn(),
+    });
+    const { initializeQCResultsPage } = await import("./qc-results-page");
+    initializeQCResultsPage();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(
+        document.querySelector("#sample-seed-display")?.textContent,
+    ).toContain("Sample seed: 42");
+}
+
+describe("QC results deferred sequences", () => {
+    beforeEach(() => {
+        vi.resetModules();
+        loadTemplate();
+        vi.useFakeTimers();
+        vi.stubGlobal(
+            "requestAnimationFrame",
+            (callback: FrameRequestCallback) =>
+                setTimeout(() => callback(0), 16),
+        );
+        // jsdom has no canvas drawing implementation; retain the real chart DOM.
+        vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+            null,
+        );
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+    });
+
+    it("renders only on first opening, completes all rows, and does not duplicate on revisits", async () => {
+        await initializeResults(sequenceQCData());
+        expect(
+            document.querySelectorAll("#seq-table-container tbody tr"),
+        ).toHaveLength(0);
+        expect(document.querySelector(".mini-charts-row")).toBeNull();
+
+        const sequences = document.querySelector<HTMLButtonElement>(
+            '[data-tab="sequences"]',
+        );
+        sequences?.click();
+        expect(document.querySelector(".tab-content.active")?.id).toBe(
+            "tab-sequences",
+        );
+        expect(
+            document.querySelectorAll("#seq-table-container tbody tr"),
+        ).toHaveLength(10);
+        expect(document.querySelector(".mini-charts-row")).toBeNull();
+        // Revisiting while the next batch is pending must not start another render.
+        document
+            .querySelector<HTMLButtonElement>('[data-tab="read-lengths"]')
+            ?.click();
+        sequences?.click();
+        await vi.advanceTimersByTimeAsync(16);
+
+        expect(
+            Array.from(
+                document.querySelectorAll(".seq-read-id"),
+                (cell) => cell.textContent,
+            ),
+        ).toEqual(
+            Array.from({ length: 11 }, (_, index) => `sequence-${index}`),
+        );
+        expect(
+            Array.from(
+                document.querySelectorAll("#seq-table-container tbody tr"),
+                (row) => row.querySelectorAll("td")[2].textContent,
+            ),
+        ).toEqual(Array(11).fill("AT"));
+        expect(document.querySelectorAll(".mini-chart-card")).toHaveLength(3);
+
+        document
+            .querySelector<HTMLButtonElement>('[data-tab="read-lengths"]')
+            ?.click();
+        sequences?.click();
+        await vi.advanceTimersByTimeAsync(32);
+        expect(
+            document.querySelectorAll("#seq-table-container tbody tr"),
+        ).toHaveLength(11);
+        expect(document.querySelectorAll(".seq-toolbar")).toHaveLength(1);
+        expect(document.querySelectorAll(".mini-charts-row")).toHaveLength(1);
+    });
+
+    it.each([
+        [
+            undefined,
+            "Region exceeds 500 bp",
+            "Sequences not available: Region exceeds 500 bp",
+        ],
+        [[], undefined, "No reads found in the specified region."],
+    ] as const)("shows the empty/skip result after opening sequences (%s)", async (rows, reason, message) => {
+        await initializeResults({
+            ...sequenceQCData(),
+            seqTableRows: rows === undefined ? undefined : [...rows],
+            seqTableSkipReason: reason,
+        });
+        expect(
+            document.querySelector("#seq-table-container")?.textContent,
+        ).toBe("");
+        document
+            .querySelector<HTMLButtonElement>('[data-tab="sequences"]')
+            ?.click();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(
+            document.querySelector("#seq-table-container")?.textContent,
+        ).toBe(message);
+        expect(document.querySelector(".mini-charts-row")).toBeNull();
+    });
+
+    it("replaces a partial sequence table with an error if deferred rendering fails", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        await initializeResults(sequenceQCData());
+        vi.stubGlobal("requestAnimationFrame", () => {
+            throw new Error("Frame scheduling failed");
+        });
+        document
+            .querySelector<HTMLButtonElement>('[data-tab="sequences"]')
+            ?.click();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(
+            document.querySelector("#seq-table-container")?.textContent,
+        ).toBe(
+            "Failed to render sequence results: Error: Frame scheduling failed",
+        );
+        expect(
+            document.querySelectorAll("#seq-table-container tbody tr"),
+        ).toHaveLength(0);
+        expect(document.querySelector(".mini-charts-row")).toBeNull();
+    });
+});
 
 describe("qc-results.html", () => {
     describe("header", () => {
