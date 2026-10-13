@@ -8,7 +8,8 @@ import {
     writeFileSync,
 } from "node:fs";
 import { resolve } from "node:path";
-import { dialog, ipcMain } from "electron";
+import { dialog } from "electron";
+import { registerTrustedIpcHandler } from "../electron-security";
 import { parseBedFile } from "../lib/bed-parser";
 import type {
     SwipePlotData,
@@ -194,15 +195,15 @@ async function advanceAndLoadNextAnnotation(): Promise<SwipeReviewActionResult> 
  * Registers IPC handlers for the renderer process to request state, plot data, and accept or reject annotations.
  */
 export function registerSwipeIpcHandlers(): void {
-    ipcMain.handle("get-state", () => {
+    registerTrustedIpcHandler("get-state", () => {
         return appState;
     });
 
-    ipcMain.handle("get-plot-data", async () => {
+    registerTrustedIpcHandler("get-plot-data", async () => {
         return await loadCurrentPlotData();
     });
 
-    ipcMain.handle("accept", async () => {
+    registerTrustedIpcHandler("accept", async () => {
         if (!cliArgs) {
             console.error("Unknown state: accept called without cliArgs set");
             return { done: true, state: appState };
@@ -222,7 +223,7 @@ export function registerSwipeIpcHandlers(): void {
         return { done: true, state: appState };
     });
 
-    ipcMain.handle("reject", async () => {
+    registerTrustedIpcHandler("reject", async () => {
         if (!cliArgs) {
             console.error("Unknown state: reject called without cliArgs set");
             return { done: true, state: appState };

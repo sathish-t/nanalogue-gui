@@ -72,6 +72,22 @@ vi.mock("electron", () => ({
     BrowserWindow: class {},
 }));
 
+// Mock the sender-validating registrar; its security behavior has a dedicated test suite.
+vi.mock("../electron-security", () => ({
+    /**
+     * Captures a trusted IPC handler for mode-level tests.
+     *
+     * @param channel - The IPC channel name.
+     * @param handler - The mode handler to register.
+     */
+    registerTrustedIpcHandler: (
+        channel: string,
+        handler: (...args: unknown[]) => Promise<unknown>,
+    ) => {
+        ipcHandlers.set(channel, handler);
+    },
+}));
+
 // Mock ChatSession using class methods (not field initializers) so that
 // mockSendMessage / mockReset are resolved at *call* time, not at
 // instantiation time. This allows beforeEach to reassign the variables and

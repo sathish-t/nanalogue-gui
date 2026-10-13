@@ -80,6 +80,21 @@ jobs:
           esac
           npx electron-builder --publish never "$EBUILDER_ARCH"
 
+      # Fuse changes must leave a valid ad-hoc signature even without a Developer ID.
+      - name: Verify packaged app signatures (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          shopt -s nullglob
+          apps=(out/mac*/*.app)
+          if [ ${#apps[@]} -eq 0 ]; then
+            echo "No packaged macOS app found" >&2
+            exit 1
+          fi
+          for app in "${apps[@]}"; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+          done
+
       - name: Upload binary artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:

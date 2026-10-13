@@ -19,8 +19,6 @@ interface LaunchResult {
 interface LandingApi {
     /** Returns the application version string from package.json. */
     getVersion: () => Promise<string>;
-    /** Opens a URL in the user's default OS browser. */
-    openExternalUrl: (url: string) => Promise<void>;
     /** Launches the swipe mode for interactive read annotation review. */
     launchSwipe: () => Promise<LaunchResult>;
     /** Launches the QC mode for generating quality control reports. */
@@ -156,18 +154,6 @@ btnVersion.addEventListener("click", async () => {
         alert(`Failed to get version: ${String(error)}`);
     }
 });
-
-// Open external links in the OS browser instead of an Electron window
-document
-    .getElementById("nanalogue-link")
-    ?.addEventListener("click", async (e) => {
-        e.preventDefault();
-        try {
-            await api.openExternalUrl("https://www.nanalogue.com");
-        } catch (error) {
-            console.error("Failed to open external URL:", error);
-        }
-    });
 
 // Close button for the version dialog
 document

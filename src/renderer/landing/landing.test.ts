@@ -162,6 +162,13 @@ describe("landing.html", () => {
     });
 
     describe("page structure", () => {
+        it("shows nanalogue.com as plain text rather than a link", () => {
+            const doc = loadTemplate();
+            const versionDialog = doc.querySelector("#version-dialog");
+            expect(versionDialog?.textContent).toContain("nanalogue.com");
+            expect(versionDialog?.querySelector("a")).toBeNull();
+        });
+
         it("has a mode-selection main element", () => {
             const doc = loadTemplate();
             const main = doc.querySelector("#mode-selection");

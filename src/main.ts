@@ -3,10 +3,22 @@
 // Suppress dconf warnings on Linux/WSL by using in-memory GSettings backend
 process.env.GSETTINGS_BACKEND ??= "memory";
 
-import { type ChildProcess, fork } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
+import {
+    app,
+    BrowserWindow,
+    dialog,
+    Menu,
+    type UtilityProcess,
+    utilityProcess,
+} from "electron";
+import {
+    configureElectronSecurityAfterReady,
+    configureElectronSecurityBeforeReady,
+    getRendererAssetUrl,
+    registerTrustedIpcHandler,
+} from "./electron-security";
 import type { FontSize } from "./font-size";
 import { getFontSize, setFontSize } from "./font-size";
 import { validateIpcFilePath } from "./lib/ipc-path-validation";
@@ -16,6 +28,8 @@ import * as aiChatModule from "./modes/ai-chat";
 import * as locateModule from "./modes/locate";
 import * as qcModule from "./modes/qc";
 import * as swipeModule from "./modes/swipe";
+
+configureElectronSecurityBeforeReady();
 
 // Disable GPU acceleration on WSL — the virtual GPU often fails to set up a
 // compositing surface, leaving the window visible in the taskbar but unable to
@@ -38,20 +52,27 @@ let currentMode: AppMode = "landing";
 let mainWindow: BrowserWindow | null = null;
 
 // --- Global exit failsafe ---
-// Fork a watchdog child process that can force-kill us via SIGKILL.
+// Fork a watchdog utility process that can force-kill us via SIGKILL.
 // This works even when the main event loop is blocked by native addon calls,
-// because the child process has its own independent event loop.
-let exitWatchdog: ChildProcess | null = null;
+// because the utility process has its own independent event loop.
+let exitWatchdog: UtilityProcess | null = null;
+
+/** Prevents duplicate watchdog handshakes during overlapping close events. */
+let forceExitStarted = false;
+
+/** Maximum wait for watchdog termination before the main process exits itself. */
+const EXIT_WATCHDOG_FALLBACK_MS = 1000;
 
 /**
- * Spawns the exit watchdog child process and registers signal handlers.
+ * Spawns the exit watchdog utility process and registers signal handlers.
  * Called once at startup so the kill switch is always available.
  */
 function initExitWatchdog() {
-    exitWatchdog = fork(resolve(__dirname, "exit-watchdog.js"), [
-        String(process.pid),
-    ]);
-    exitWatchdog.unref();
+    exitWatchdog = utilityProcess.fork(
+        resolve(__dirname, "exit-watchdog.js"),
+        [String(process.pid)],
+        { serviceName: "nanalogue-exit-watchdog", stdio: "ignore" },
+    );
 
     // Ctrl+C or terminal kill — exit immediately
     process.on("SIGINT", () => process.exit(0));
@@ -59,12 +80,26 @@ function initExitWatchdog() {
 }
 
 /**
- * Sends a kill message to the watchdog and also tries process.exit directly.
- * Belt and suspenders: whichever fires first wins.
+ * Arms the watchdog before asking it to kill the parent process.
+ * Falls back to direct exit if the utility process does not acknowledge in time.
  */
 function forceExit() {
-    exitWatchdog?.send("kill");
-    process.exit(0);
+    if (forceExitStarted) return;
+    forceExitStarted = true;
+
+    const watchdog = exitWatchdog;
+    if (!watchdog) {
+        process.exit(0);
+        return;
+    }
+
+    setTimeout(() => process.exit(0), EXIT_WATCHDOG_FALLBACK_MS);
+    watchdog.once("message", (message: unknown) => {
+        if (message === "exit-watchdog-armed") {
+            watchdog.postMessage("kill-parent");
+        }
+    });
+    watchdog.postMessage("arm-exit-watchdog");
 }
 
 /** The application version read from package.json at startup. */
@@ -93,28 +128,23 @@ function getWindowSize(mode: AppMode): {
 }
 
 /**
- * Resolves the absolute file path to the HTML file for the given mode.
+ * Returns the packaged renderer path for the HTML file for the given mode.
  *
  * @param mode - The application mode to get the HTML path for.
- * @returns The absolute path to the HTML file for the specified mode.
+ * @returns The renderer-relative HTML path for the specified mode.
  */
-function getHtmlPath(mode: AppMode): string {
+function getRendererPagePath(mode: AppMode): string {
     switch (mode) {
         case "landing":
-            return resolve(__dirname, "renderer", "landing", "landing.html");
+            return "landing/landing.html";
         case "swipe":
-            return resolve(__dirname, "renderer", "swipe", "swipe.html");
+            return "swipe/swipe.html";
         case "qc":
-            return resolve(__dirname, "renderer", "qc", "qc-config.html");
+            return "qc/qc-config.html";
         case "locate":
-            return resolve(
-                __dirname,
-                "renderer",
-                "locate",
-                "locate-config.html",
-            );
+            return "locate/locate-config.html";
         case "ai-chat":
-            return resolve(__dirname, "renderer", "ai-chat", "ai-chat.html");
+            return "ai-chat/ai-chat.html";
     }
 }
 
@@ -218,13 +248,22 @@ function createWindow(mode: AppMode) {
             preload: resolve(__dirname, "preload.js"),
             contextIsolation: true,
             nodeIntegration: false,
+            nodeIntegrationInSubFrames: false,
+            nodeIntegrationInWorker: false,
+            sandbox: true,
+            webSecurity: true,
+            allowRunningInsecureContent: false,
+            experimentalFeatures: false,
+            webviewTag: false,
         },
         title: getWindowTitle(mode),
     });
 
-    mainWindow.loadFile(getHtmlPath(mode), {
-        query: { fontSize: getFontSize() },
-    });
+    void mainWindow.loadURL(
+        getRendererAssetUrl(getRendererPagePath(mode), {
+            fontSize: getFontSize(),
+        }),
+    );
 
     // Auto-fit the landing page so the window matches its content height
     if (mode === "landing") {
@@ -241,7 +280,7 @@ function createWindow(mode: AppMode) {
     });
 
     // Global failsafe: force-kill the process when the user closes the window.
-    // Sends SIGKILL via the watchdog child process, which works even when the
+    // Sends SIGKILL via the watchdog utility process, which works even when the
     // main event loop is blocked by long-running native addon calls.
     mainWindow.on("close", () => {
         forceExit();
@@ -267,9 +306,11 @@ function resizeAndLoadMode(mode: AppMode) {
     mainWindow.setSize(width, height);
     mainWindow.center();
     mainWindow.setTitle(getWindowTitle(mode));
-    mainWindow.loadFile(getHtmlPath(mode), {
-        query: { fontSize: getFontSize() },
-    });
+    void mainWindow.loadURL(
+        getRendererAssetUrl(getRendererPagePath(mode), {
+            fontSize: getFontSize(),
+        }),
+    );
 
     // Auto-fit the landing page so the window matches its content height
     if (mode === "landing") {
@@ -279,7 +320,7 @@ function resizeAndLoadMode(mode: AppMode) {
 
 // Landing page IPC handlers
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "set-font-size",
     /**
      * Updates the in-memory font size preference used for all subsequent page navigations.
@@ -300,7 +341,7 @@ ipcMain.handle(
     },
 );
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "launch-swipe",
     /**
      * Handles the launch-swipe IPC request by navigating to the swipe configuration page.
@@ -310,16 +351,17 @@ ipcMain.handle(
     async () => {
         if (!mainWindow) return { success: false, reason: "No window" };
 
-        // Set currentMode before loadFile so any concurrent set-font-size
+        // Set currentMode before loadURL so any concurrent set-font-size
         // IPC call sees the updated mode and skips the landing-only resize.
         currentMode = "swipe";
         const { width, height } = getWindowSize("swipe");
         mainWindow.setSize(width, height);
         mainWindow.center();
         mainWindow.setTitle("nanalogue-swipe");
-        mainWindow.loadFile(
-            resolve(__dirname, "renderer", "swipe", "swipe-config.html"),
-            { query: { fontSize: getFontSize() } },
+        void mainWindow.loadURL(
+            getRendererAssetUrl("swipe/swipe-config.html", {
+                fontSize: getFontSize(),
+            }),
         );
         return { success: true };
     },
@@ -327,7 +369,7 @@ ipcMain.handle(
 
 // Shared file-picker IPC handlers (used by swipe, locate, and QC modes)
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "pick-bam",
     /**
      * Opens a native file dialog for selecting a BAM or CRAM file.
@@ -351,7 +393,7 @@ ipcMain.handle(
     },
 );
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "pick-output-bed",
     /**
      * Opens a native save dialog for selecting the output BED file path.
@@ -369,7 +411,7 @@ ipcMain.handle(
     },
 );
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "check-file-exists",
     /**
      * Checks whether a file exists at the given path.
@@ -385,7 +427,7 @@ ipcMain.handle(
 
 // Swipe config page IPC handlers
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "swipe-pick-bed",
     /**
      * Opens a native file dialog for selecting a BED annotations file.
@@ -404,7 +446,7 @@ ipcMain.handle(
     },
 );
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "swipe-count-bed-lines",
     /**
      * Counts BED data lines, skipping header and comment lines.
@@ -419,7 +461,7 @@ ipcMain.handle(
     },
 );
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "swipe-start",
     /**
      * Initializes the swipe module with the provided file paths and navigates to the swipe UI.
@@ -448,7 +490,7 @@ ipcMain.handle(
     },
 );
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "swipe-go-back",
     /**
      * Navigates back to the landing page from the swipe config screen.
@@ -458,33 +500,7 @@ ipcMain.handle(
     },
 );
 
-ipcMain.handle(
-    "open-external-url",
-    /**
-     * Opens a URL in the user's default OS browser after validating it uses a safe scheme.
-     * Only http: and https: URLs are allowed; all others are rejected.
-     *
-     * @param _event - The IPC event (unused).
-     * @param url - The URL to open externally.
-     * @returns A promise that resolves when the URL has been handed off to the OS.
-     */
-    (_event: unknown, url: string) => {
-        let parsed: URL;
-        try {
-            parsed = new URL(url);
-        } catch {
-            throw new Error(`Malformed URL: ${url}`);
-        }
-        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-            throw new Error(
-                `Blocked URL with unsupported scheme: ${parsed.protocol}`,
-            );
-        }
-        return shell.openExternal(url);
-    },
-);
-
-ipcMain.handle(
+registerTrustedIpcHandler(
     "get-app-version",
     /**
      * Returns the application version from package.json.
@@ -494,7 +510,7 @@ ipcMain.handle(
     () => APP_VERSION,
 );
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "launch-qc",
     /**
      * Handles the launch-qc IPC request by switching the application to QC mode.
@@ -508,7 +524,7 @@ ipcMain.handle(
 );
 
 // QC navigation IPC handlers (registered here to use resizeAndLoadMode)
-ipcMain.handle(
+registerTrustedIpcHandler(
     "qc-go-back",
     /**
      * Handles the qc-go-back IPC request by switching back to the landing page.
@@ -518,7 +534,7 @@ ipcMain.handle(
     },
 );
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "qc-go-back-to-config",
     /**
      * Handles the qc-go-back-to-config IPC request by switching back to the QC config page.
@@ -530,7 +546,7 @@ ipcMain.handle(
 
 // Locate page IPC handlers
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "launch-locate",
     /**
      * Handles the launch-locate IPC request by switching to locate mode.
@@ -543,7 +559,7 @@ ipcMain.handle(
     },
 );
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "locate-go-back",
     /**
      * Navigates back to the landing page from the locate config screen.
@@ -553,7 +569,7 @@ ipcMain.handle(
     },
 );
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "launch-ai-chat",
     /**
      * Handles the launch-ai-chat IPC request by switching to AI Chat mode.
@@ -566,7 +582,7 @@ ipcMain.handle(
     },
 );
 
-ipcMain.handle(
+registerTrustedIpcHandler(
     "ai-chat-go-back-nav",
     /**
      * Navigates back to the landing page from the AI Chat screen.
@@ -582,7 +598,8 @@ locateModule.registerLocateIpcHandlers();
 qcModule.registerQcIpcHandlers();
 aiChatModule.registerAiChatIpcHandlers();
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+    await configureElectronSecurityAfterReady();
     initExitWatchdog();
     createWindow("landing");
 });
