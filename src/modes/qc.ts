@@ -5,7 +5,7 @@ import { type BrowserWindow, dialog, ipcMain } from "electron";
 import { getFontSize } from "../font-size";
 import { validateIpcFilePath } from "../lib/ipc-path-validation";
 import { validateQCRequest } from "../lib/qc-contract";
-import { generateQCData, peekBam } from "../lib/qc-data-loader";
+import { generateQCData } from "../lib/qc-data-loader";
 import type { QCData } from "../lib/types";
 
 let qcData: QCData | null = null;
@@ -21,19 +21,9 @@ export function setQcMainWindow(window: BrowserWindow | null) {
 }
 
 /**
- * Registers all IPC handlers for the QC mode, including BAM peeking, file selection, and QC generation.
+ * Registers QC-owned IPC handlers for file selection and QC generation.
  */
 export function registerQcIpcHandlers() {
-    ipcMain.handle("peek-bam", async (_event, bamPath: unknown) => {
-        if (typeof bamPath !== "string" || bamPath.length === 0) {
-            throw new Error(
-                "Invalid QC peek-bam request: bamPath must be a non-empty string",
-            );
-        }
-        await validateIpcFilePath(bamPath, "read");
-        return await peekBam(bamPath);
-    });
-
     ipcMain.handle("select-file", async () => {
         if (!mainWindow) return null;
 
@@ -98,7 +88,7 @@ export function registerQcIpcHandlers() {
 
         // Navigate to results page
         mainWindow?.loadFile(
-            resolve(__dirname, "renderer", "qc", "qc-results.html"),
+            resolve(__dirname, "..", "renderer", "qc", "qc-results.html"),
             { query: { fontSize: getFontSize() } },
         );
     });

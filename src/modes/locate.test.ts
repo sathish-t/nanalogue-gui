@@ -11,54 +11,40 @@ vi.mock("electron", () => ({
             handler: (...args: unknown[]) => Promise<unknown>,
         ) => handlers.set(name, handler),
     },
-    dialog: { showOpenDialog: vi.fn() },
 }));
-vi.mock("node:fs", () => ({
-    readFileSync: vi.fn(),
-    realpathSync: vi.fn((filePath: string) => filePath),
-    statSync: vi.fn((filePath: string) => ({
+vi.mock("node:fs/promises", () => ({
+    readFile: vi.fn(),
+    realpath: vi.fn(async (filePath: string) => filePath),
+    stat: vi.fn(async (filePath: string) => ({
         dev: 1,
         ino: [...filePath].reduce(
             (hash, character) => hash * 31 + character.charCodeAt(0),
             7,
         ),
     })),
-    writeFileSync: vi.fn(),
+    writeFile: vi.fn(),
 }));
 vi.mock("@nanalogue/node", () => ({ readInfo: vi.fn() }));
 vi.mock("../lib/ipc-path-validation", () => ({
     validateIpcFilePath: vi.fn(),
 }));
-vi.mock("../lib/line-counter", () => ({ countNonEmptyLines: vi.fn() }));
 
-const { dialog } = await import("electron");
-const { readFileSync, writeFileSync } = await import("node:fs");
+const { readFile, writeFile } = await import("node:fs/promises");
 const { readInfo } = await import("@nanalogue/node");
 const { validateIpcFilePath } = await import("../lib/ipc-path-validation");
-const { countNonEmptyLines } = await import("../lib/line-counter");
-const { registerLocateIpcHandlers, setLocateMainWindow } = await import(
-    "./locate"
-);
+const { registerLocateIpcHandlers } = await import("./locate");
 
 registerLocateIpcHandlers();
 const generate = handlers.get("locate-generate-bed");
-const pick = handlers.get("locate-pick-read-ids");
-const count = handlers.get("locate-count-read-ids");
-if (!generate || !pick || !count)
-    throw new Error("Locate handlers were not registered");
+if (!generate) throw new Error("Locate handler was not registered");
 
 describe("Locate IPC handlers", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        setLocateMainWindow({} as Electron.BrowserWindow);
     });
 
     it("registers all Locate-owned handlers", () => {
-        expect([...handlers.keys()]).toEqual([
-            "locate-pick-read-ids",
-            "locate-count-read-ids",
-            "locate-generate-bed",
-        ]);
+        expect([...handlers.keys()]).toEqual(["locate-generate-bed"]);
     });
 
     it("validates payload shape before paths", async () => {
@@ -85,7 +71,7 @@ describe("Locate IPC handlers", () => {
     });
 
     it("validates local input and output paths", async () => {
-        vi.mocked(readFileSync).mockReturnValue("read-1\n");
+        vi.mocked(readFile).mockResolvedValue("read-1\n");
         vi.mocked(readInfo).mockResolvedValue([]);
         await generate(
             {},
@@ -106,7 +92,7 @@ describe("Locate IPC handlers", () => {
     });
 
     it("rejects capped read IDs", async () => {
-        vi.mocked(readFileSync).mockReturnValue(
+        vi.mocked(readFile).mockResolvedValue(
             Array.from({ length: 200_001 }, (_, index) => `id-${index}`).join(
                 "\n",
             ),
@@ -126,7 +112,7 @@ describe("Locate IPC handlers", () => {
     });
 
     it("generates and writes BED output", async () => {
-        vi.mocked(readFileSync).mockReturnValue("read-1\nmissing\n");
+        vi.mocked(readFile).mockResolvedValue("read-1\nmissing\n");
         vi.mocked(readInfo).mockResolvedValue([
             {
                 read_id: "read-1",
@@ -145,7 +131,7 @@ describe("Locate IPC handlers", () => {
                 overwriteConfirmed: false,
             },
         );
-        expect(writeFileSync).toHaveBeenCalledWith(
+        expect(writeFile).toHaveBeenCalledWith(
             "/out",
             "chr1\t10\t20\tread-1\t1000\t+\n",
             { encoding: "utf-8", flag: "wx" },
@@ -159,7 +145,7 @@ describe("Locate IPC handlers", () => {
     });
 
     it("allows replacement only with explicit overwrite authorization", async () => {
-        vi.mocked(readFileSync).mockReturnValue("read-1\n");
+        vi.mocked(readFile).mockResolvedValue("read-1\n");
         vi.mocked(readInfo).mockResolvedValue([]);
 
         await generate(
@@ -172,20 +158,59 @@ describe("Locate IPC handlers", () => {
             },
         );
 
-        expect(writeFileSync).toHaveBeenCalledWith("/out", "", {
+        expect(writeFile).toHaveBeenCalledWith("/out", "", {
             encoding: "utf-8",
             flag: "w",
         });
     });
 
-    it("propagates an exclusive-create conflict without retrying a write", async () => {
-        vi.mocked(readFileSync).mockReturnValue("read-1\n");
+    it.each([
+        false,
+        true,
+    ])("rejects overlapping overwrites and permits retry after write failure=%s", async (failWrite) => {
+        vi.mocked(readFile).mockResolvedValue("read-1\n");
         vi.mocked(readInfo).mockResolvedValue([]);
-        vi.mocked(writeFileSync).mockImplementationOnce(() => {
-            throw Object.assign(new Error("output appeared"), {
-                code: "EEXIST",
-            });
+        let releaseWrite!: () => void;
+        vi.mocked(writeFile).mockImplementationOnce(
+            () =>
+                new Promise<void>((resolve, reject) => {
+                    releaseWrite = () =>
+                        failWrite ? reject(new Error("disk full")) : resolve();
+                }),
+        );
+        const request = {
+            bamPath: "/a.bam",
+            readIdPath: "/ids",
+            outputPath: "/out",
+            overwriteConfirmed: true,
+        };
+        const pending = generate({}, request);
+        const finished = failWrite
+            ? expect(pending).rejects.toThrow("disk full")
+            : expect(pending).resolves.toMatchObject({ bedEntries: 0 });
+        try {
+            await vi.waitFor(() => expect(releaseWrite).toBeDefined());
+            await expect(generate({}, request)).rejects.toThrow(
+                "Locate generation is busy",
+            );
+            expect(writeFile).toHaveBeenCalledOnce();
+        } finally {
+            releaseWrite();
+            await finished;
+        }
+        await expect(generate({}, request)).resolves.toMatchObject({
+            bedEntries: 0,
         });
+    });
+
+    it("propagates an exclusive-create conflict without retrying a write", async () => {
+        vi.mocked(readFile).mockResolvedValue("read-1\n");
+        vi.mocked(readInfo).mockResolvedValue([]);
+        vi.mocked(writeFile).mockRejectedValueOnce(
+            Object.assign(new Error("output appeared"), {
+                code: "EEXIST",
+            }),
+        );
 
         await expect(
             generate(
@@ -198,46 +223,11 @@ describe("Locate IPC handlers", () => {
                 },
             ),
         ).rejects.toThrow("output appeared");
-        expect(writeFileSync).toHaveBeenCalledOnce();
-    });
-
-    it("returns null without a window or when the picker is cancelled", async () => {
-        setLocateMainWindow(null);
-        await expect(pick()).resolves.toBeNull();
-        setLocateMainWindow({} as Electron.BrowserWindow);
-        vi.mocked(dialog.showOpenDialog).mockResolvedValue({
-            canceled: true,
-            filePaths: [],
-        });
-        await expect(pick()).resolves.toBeNull();
-    });
-
-    it("returns the selected read ID path", async () => {
-        vi.mocked(dialog.showOpenDialog).mockResolvedValue({
-            canceled: false,
-            filePaths: ["/data/read-ids.txt"],
-        });
-        await expect(pick()).resolves.toBe("/data/read-ids.txt");
-    });
-
-    it("validates and counts a read ID file", async () => {
-        vi.mocked(countNonEmptyLines).mockReturnValue(3);
-        await expect(count({}, "/data/read-ids.txt")).resolves.toBe(3);
-        expect(validateIpcFilePath).toHaveBeenCalledWith(
-            "/data/read-ids.txt",
-            "read",
-        );
-    });
-
-    it("rejects an invalid read ID path", async () => {
-        await expect(count({}, "")).rejects.toThrow(
-            "Invalid Locate read ID path",
-        );
-        expect(validateIpcFilePath).not.toHaveBeenCalled();
+        expect(writeFile).toHaveBeenCalledOnce();
     });
 
     it("passes region filtering to BAM read-info loading", async () => {
-        vi.mocked(readFileSync).mockReturnValue("read-1\n");
+        vi.mocked(readFile).mockResolvedValue("read-1\n");
         vi.mocked(readInfo).mockResolvedValue([]);
         await generate(
             {},

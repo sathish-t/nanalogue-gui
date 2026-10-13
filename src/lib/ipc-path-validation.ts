@@ -3,7 +3,7 @@
 
 import { lstat, realpath } from "node:fs/promises";
 import { dirname, isAbsolute } from "node:path";
-import { hasControlChars } from "./monty-sandbox-helpers";
+import { hasControlChars } from "./control-characters";
 
 /**
  * Asserts that a file path supplied by the renderer is safe to use for a

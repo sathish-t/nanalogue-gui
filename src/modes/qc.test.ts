@@ -1,6 +1,6 @@
 // Tests for the QC mode IPC handlers.
-// Verifies that peek-bam, select-file, generate-qc, and get-qc-data channels
-// are registered and behave correctly, including the readIdFilePath resolution path.
+// Verifies that select-file, generate-qc, and get-qc-data channels are
+// registered and behave correctly, including the readIdFilePath resolution path.
 //
 // Uses top-level vi.mock (hoisted) so that all dependency modules are replaced
 // before the module under test is imported. Module-level qcData state is
@@ -19,7 +19,6 @@ import {
 import type { QCConfig, QCData } from "../lib/types";
 import {
     setMockImplementation,
-    setMockRejectedValue,
     setMockResolvedValue,
     setMockReturnValue,
 } from "../test-helpers";
@@ -58,7 +57,6 @@ vi.mock("electron", () => ({
 // Mock qc-data-loader – actual BAM I/O is covered by its own test suite.
 vi.mock("../lib/qc-data-loader", () => ({
     generateQCData: vi.fn(),
-    peekBam: vi.fn(),
 }));
 
 // Mock font-size – not relevant to IPC handler logic.
@@ -85,7 +83,7 @@ vi.mock("../lib/locate-data-loader", () => ({
 // Top-level imports (after mocks are in place).
 // ---------------------------------------------------------------------------
 
-const { generateQCData, peekBam } = await import("../lib/qc-data-loader");
+const { generateQCData } = await import("../lib/qc-data-loader");
 const { dialog } = await import("electron");
 const { readFile } = await import("node:fs/promises");
 const { parseReadIds } = await import("../lib/locate-data-loader");
@@ -115,12 +113,7 @@ const mockWindow = {
 describe("qc IPC handlers", () => {
     beforeAll(() => {
         // Sanity-check that all expected channels were registered.
-        for (const channel of [
-            "peek-bam",
-            "select-file",
-            "generate-qc",
-            "get-qc-data",
-        ]) {
+        for (const channel of ["select-file", "generate-qc", "get-qc-data"]) {
             if (!ipcHandlers.has(channel)) {
                 throw new Error(`${channel} handler not registered`);
             }
@@ -134,90 +127,6 @@ describe("qc IPC handlers", () => {
 
     afterEach(() => {
         setQcMainWindow(null);
-    });
-
-    // -------------------------------------------------------------------------
-    // peek-bam
-    // -------------------------------------------------------------------------
-
-    describe("peek-bam", () => {
-        it("delegates to peekBam with the local BAM path", async () => {
-            setMockResolvedValue(peekBam, {
-                contigs: ["chr1"],
-                totalContigs: 1,
-                modifications: [],
-                allContigs: { chr1: 1000 },
-            });
-
-            await ipcHandlers.get("peek-bam")?.(undefined, "/data/sample.bam");
-
-            expect(vi.mocked(peekBam)).toHaveBeenCalledOnce();
-            expect(vi.mocked(peekBam)).toHaveBeenCalledWith("/data/sample.bam");
-        });
-
-        it("returns the result from peekBam", async () => {
-            const mockResult = {
-                contigs: ["chr1", "chr2"],
-                totalContigs: 2,
-                modifications: ["m6A"],
-                allContigs: { chr1: 1000, chr2: 2000 },
-            };
-            setMockResolvedValue(peekBam, mockResult);
-
-            const result = await ipcHandlers.get("peek-bam")?.(
-                undefined,
-                "/data/sample.bam",
-            );
-
-            expect(result).toEqual(mockResult);
-        });
-
-        it("validates the BAM as a local read path", async () => {
-            setMockResolvedValue(peekBam, {
-                contigs: [],
-                totalContigs: 0,
-                modifications: [],
-                allContigs: {},
-            });
-
-            await ipcHandlers.get("peek-bam")?.(undefined, "/data/sample.bam");
-
-            expect(vi.mocked(validateIpcFilePath)).toHaveBeenCalledWith(
-                "/data/sample.bam",
-                "read",
-            );
-        });
-
-        it("does not peek when local path validation rejects", async () => {
-            setMockRejectedValue(
-                validateIpcFilePath,
-                new Error("Path must be absolute"),
-            );
-
-            try {
-                await expect(
-                    ipcHandlers.get("peek-bam")?.(
-                        undefined,
-                        "relative/sample.bam",
-                    ),
-                ).rejects.toThrow("Path must be absolute");
-
-                expect(vi.mocked(peekBam)).not.toHaveBeenCalled();
-            } finally {
-                vi.mocked(validateIpcFilePath).mockReset();
-            }
-        });
-
-        it.each([
-            ["", "bamPath must be a non-empty string"],
-            [123, "bamPath must be a non-empty string"],
-        ])("rejects invalid request argument %s", async (bamPath, message) => {
-            await expect(
-                ipcHandlers.get("peek-bam")?.(undefined, bamPath),
-            ).rejects.toThrow(message);
-
-            expect(vi.mocked(peekBam)).not.toHaveBeenCalled();
-        });
     });
 
     // -------------------------------------------------------------------------
