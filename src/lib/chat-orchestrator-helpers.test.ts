@@ -64,6 +64,7 @@ describe("handleDumpCommand", () => {
         const result = await handleDumpCommand({
             message: "/dump_llm_instructions",
             allowedDir: tmpDir,
+            model: "test-model",
             config: testConfig,
             /**
              * Collects emitted events.
@@ -75,6 +76,7 @@ describe("handleDumpCommand", () => {
             },
             history,
             lastSentMessages,
+            dumpConversationHistory: vi.fn(),
             dumpLlmInstructions: vi.fn(async () => ({
                 log: "ai_chat_output/test.log",
                 html: "ai_chat_output/test.html",
@@ -94,6 +96,7 @@ describe("handleDumpCommand", () => {
         const result = await handleDumpCommand({
             message: "/dump_system_prompt",
             allowedDir: tmpDir,
+            model: "test-model",
             config: testConfig,
             /**
              * Collects emitted events.
@@ -105,6 +108,7 @@ describe("handleDumpCommand", () => {
             },
             history,
             lastSentMessages: null,
+            dumpConversationHistory: vi.fn(),
             dumpLlmInstructions: vi.fn(),
         });
 
@@ -121,6 +125,7 @@ describe("handleDumpCommand", () => {
         const result = await handleDumpCommand({
             message: "hello",
             allowedDir: tmpDir,
+            model: "test-model",
             config: testConfig,
             /**
              * Collects emitted events.
@@ -132,6 +137,7 @@ describe("handleDumpCommand", () => {
             },
             history,
             lastSentMessages: null,
+            dumpConversationHistory: vi.fn(),
             dumpLlmInstructions: vi.fn(),
         });
 
@@ -146,6 +152,7 @@ describe("handleDumpCommand", () => {
         const result = await handleDumpCommand({
             message: "/dump_system_prompt",
             allowedDir: tmpDir,
+            model: "test-model",
             config: testConfig,
             /**
              * Collects emitted events.
@@ -157,6 +164,7 @@ describe("handleDumpCommand", () => {
             },
             history,
             lastSentMessages: null,
+            dumpConversationHistory: vi.fn(),
             dumpLlmInstructions: vi.fn(),
             appendSystemPrompt: "APPENDED DOMAIN CONTEXT",
             replaceSystemPrompt: "BASE PROMPT",

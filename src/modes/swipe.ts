@@ -82,7 +82,7 @@ export async function initializeSwipeReview(
     console.log(`  Window size: ${cliArgs.windowSize}`);
 
     console.log("Reading contig sizes...");
-    contigSizes = await loadContigSizes(cliArgs.bamPath, cliArgs.treatAsUrl);
+    contigSizes = await loadContigSizes(cliArgs.bamPath);
     console.log(`  Found ${Object.keys(contigSizes).length} contigs`);
 
     console.log("Parsing BED file...");
@@ -149,7 +149,6 @@ async function loadCurrentPlotData(): Promise<SwipePlotData | null> {
             modTag,
             modStrand,
             regionExpansion,
-            treatAsUrl: cliArgs.treatAsUrl,
         },
     );
 }

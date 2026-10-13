@@ -5,10 +5,7 @@ import { mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-    validateIpcFilePath,
-    validateIpcRemoteBamUrl,
-} from "./ipc-path-validation";
+import { validateIpcFilePath } from "./ipc-path-validation";
 
 let tmpDir: string;
 let existingFile: string;
@@ -28,26 +25,16 @@ afterAll(async () => {
     await rm(tmpDir, { recursive: true });
 });
 
-describe("validateIpcRemoteBamUrl", () => {
-    it.each([
-        "http://example.com/sample.bam",
-        "https://example.com/sample.bam",
-    ])("accepts %s", (url) => {
-        expect(() => validateIpcRemoteBamUrl(url, "Swipe")).not.toThrow();
-    });
-
-    it.each([
-        "/local/sample.bam",
-        "file:///tmp/sample.bam",
-    ])("rejects %s", (url) => {
-        expect(() => validateIpcRemoteBamUrl(url, "Swipe")).toThrow("BAM URL");
-    });
-});
-
 describe("validateIpcFilePath – read", () => {
     it("rejects a relative path", async () => {
         await expect(
             validateIpcFilePath("relative/path.txt", "read"),
+        ).rejects.toThrow("absolute");
+    });
+
+    it("rejects a remote URL because it is not a local absolute path", async () => {
+        await expect(
+            validateIpcFilePath("https://example.com/sample.bam", "read"),
         ).rejects.toThrow("absolute");
     });
 

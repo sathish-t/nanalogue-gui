@@ -7,6 +7,14 @@ import type {
     OptionalFloatFieldSpec,
 } from "./chat-types";
 
+export const /** Maximum UTF-8 bytes accepted for a user chat message. */ MAX_CHAT_MESSAGE_BYTES =
+        1024 * 1024;
+export const /** Maximum UTF-8 bytes accepted for a replacement system prompt. */ MAX_SYSTEM_PROMPT_BYTES =
+        1024 * 1024;
+export const /** Maximum bytes accepted for a directly executed Python source file. */ MAX_PYTHON_SOURCE_BYTES =
+        10 * 1024 * 1024;
+export const /** Maximum characters accepted for a user-supplied filesystem path. */ MAX_INPUT_PATH_LENGTH = 2000;
+
 export const /** Upper bound for maxCodeRounds to prevent runaway loops. */ MAX_CODE_ROUNDS_LIMIT = 50;
 
 export const /** Validation specs for each integer AiChatConfig field (temperature excluded). */ CONFIG_FIELD_SPECS: Record<
@@ -22,10 +30,10 @@ export const /** Validation specs for each integer AiChatConfig field (temperatu
         },
         /** At least one attempt; cap to avoid runaway retry loops. */
         maxRetries: { min: 1, max: 20, fallback: 5, label: "max retries" },
-        /** Per-request HTTP timeout; 1 s floor, 2-minute ceiling. */
+        /** Per-request HTTP timeout; 1 s floor, 20-minute ceiling. */
         timeoutSeconds: {
             min: 1,
-            max: 120,
+            max: 1_200,
             fallback: 60,
             label: "timeout seconds",
         },

@@ -42,7 +42,7 @@ interface LocateConfigApi {
         request: LocateGenerateBedRequest,
     ) => Promise<LocateResult>;
     /** Peeks at a BAM file to extract header metadata. */
-    peekBam: (bamPath: string, treatAsUrl: boolean) => Promise<PeekResult>;
+    peekBam: (bamPath: string) => Promise<PeekResult>;
     /** Navigates back to the landing page. */
     locateGoBack: () => Promise<void>;
 }
@@ -282,14 +282,13 @@ function updateGenerateButton(): void {
     const allFilled =
         bamValue.length > 0 && readIdValue.length > 0 && outputValue.length > 0;
 
-    // Check for path collisions (only local paths can collide)
+    // Check for path collisions.
     let hasCollision = false;
     if (allFilled) {
-        const localBam = !bamSource.isUrl ? bamValue : null;
-        if (localBam && localBam === readIdValue) {
+        if (bamValue === readIdValue) {
             hasCollision = true;
         }
-        if (localBam && localBam === outputValue) {
+        if (bamValue === outputValue) {
             hasCollision = true;
         }
         if (outputValid && readIdValue === outputValue) {
@@ -341,15 +340,17 @@ outputSource.checkExistsFn = (p) => api.locateCheckFileExists(p);
 
 // BAM selected
 bamSource.addEventListener("bam-selected", async (e) => {
-    const { value, isUrl } = (e as CustomEvent<BamSelectedDetail>).detail;
+    const { value } = (e as CustomEvent<BamSelectedDetail>).detail;
     if (!value.trim()) return;
 
     const currentRequestId = ++peekRequestId;
+    bamPeekResult = null;
+    updateSummary();
     updateGenerateButton();
 
     let peekResult: PeekResult | null;
     try {
-        peekResult = await api.peekBam(value, isUrl);
+        peekResult = await api.peekBam(value);
     } catch (error) {
         console.error("Failed to peek BAM:", error);
         peekResult = null;
@@ -359,13 +360,6 @@ bamSource.addEventListener("bam-selected", async (e) => {
     if (value !== bamSource.value) return;
 
     bamPeekResult = peekResult;
-    updateSummary();
-});
-
-bamSource.addEventListener("source-type-changed", () => {
-    peekRequestId++;
-    bamPeekResult = null;
-    updateGenerateButton();
     updateSummary();
 });
 
@@ -432,8 +426,6 @@ elements.btnGenerate.addEventListener("click", async () => {
 
     const region = regionInput || undefined;
     const fullRegion = region ? elements.fullRegion.checked : undefined;
-    const treatAsUrl = bamSource.isUrl;
-
     elements.btnGenerate.disabled = true;
     elements.btnBack.disabled = true;
     bamSource.disabled = true;
@@ -448,7 +440,6 @@ elements.btnGenerate.addEventListener("click", async () => {
                   readIdPath,
                   outputPath,
                   overwriteConfirmed: outputSource.overwriteConfirmed,
-                  treatAsUrl,
                   region,
                   fullRegion,
               }
@@ -457,7 +448,6 @@ elements.btnGenerate.addEventListener("click", async () => {
                   readIdPath,
                   outputPath,
                   overwriteConfirmed: outputSource.overwriteConfirmed,
-                  treatAsUrl,
               };
         const result = await api.locateGenerateBed(request);
 

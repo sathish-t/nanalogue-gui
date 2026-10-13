@@ -14,7 +14,6 @@ vi.mock("../shared/window-size-input", () => ({}));
 
 interface TestBamInput extends HTMLElement {
     value: string;
-    isUrl: boolean;
     disabled: boolean;
 }
 
@@ -40,7 +39,7 @@ async function loadQCHandlers(api: Record<string, unknown>) {
         "utf-8",
     );
     const bam = document.getElementById("bam-source") as TestBamInput;
-    Object.assign(bam, { value: "/reads.bam", isUrl: false, disabled: false });
+    Object.assign(bam, { value: "/reads.bam", disabled: false });
     const mod = document.getElementById("mod-filter") as TestModFilter;
     Object.assign(mod, {
         tag: "T+a",
@@ -89,7 +88,7 @@ describe("QC config form handlers", () => {
         const { bam } = await loadQCHandlers(api);
         bam.dispatchEvent(
             new CustomEvent("bam-selected", {
-                detail: { value: bam.value, isUrl: false },
+                detail: { value: bam.value },
             }),
         );
         await vi.waitFor(() =>
@@ -100,16 +99,25 @@ describe("QC config form handlers", () => {
             ).toBe(false),
         );
 
+        const region = document.getElementById("region") as HTMLInputElement;
+        region.value = "chr1:100-300";
+        region.dispatchEvent(new Event("input"));
+        const mapq = document.getElementById("mapq-filter") as HTMLInputElement;
+        mapq.value = "25";
         (document.getElementById("btn-generate") as HTMLButtonElement).click();
         await vi.waitFor(() => expect(generateQC).toHaveBeenCalledOnce());
         expect(removeProgressListener).not.toHaveBeenCalled();
         expect(generateQC).toHaveBeenCalledWith(
             expect.objectContaining<Partial<QCConfig>>({
                 bamPath: "/reads.bam",
-                treatAsUrl: false,
                 tag: "T+a",
                 modStrand: "bc",
+                region: "chr1:100-300",
+                mapqFilter: 25,
             }),
+        );
+        expect(document.getElementById("progress-sequences")?.textContent).toBe(
+            "Loading reads for sequences:",
         );
         progress?.("windows", 12_345);
         expect(
@@ -139,7 +147,7 @@ describe("QC config form handlers", () => {
         const { bam } = await loadQCHandlers(api);
         bam.dispatchEvent(
             new CustomEvent("bam-selected", {
-                detail: { value: bam.value, isUrl: false },
+                detail: { value: bam.value },
             }),
         );
         await vi.waitFor(() =>
@@ -165,10 +173,10 @@ describe("QC config form handlers", () => {
         );
     });
 
-    it("ignores a late peek completion after the source is cancelled", async () => {
+    it("ignores a late peek completion after a newer BAM selection", async () => {
         let resolvePeek: ((result: PeekResult) => void) | undefined;
         const api = {
-            peekBam: vi.fn(
+            peekBam: vi.fn().mockImplementationOnce(
                 () =>
                     new Promise<PeekResult>((resolve) => {
                         resolvePeek = resolve;
@@ -184,23 +192,35 @@ describe("QC config form handlers", () => {
         const { bam, mod } = await loadQCHandlers(api);
         bam.dispatchEvent(
             new CustomEvent("bam-selected", {
-                detail: { value: bam.value, isUrl: false },
+                detail: { value: bam.value },
             }),
         );
-        expect(api.peekBam).toHaveBeenCalledWith("/reads.bam", false);
+        expect(api.peekBam).toHaveBeenCalledWith("/reads.bam");
         expect(bam.disabled).toBe(true);
-        bam.value = "";
-        bam.dispatchEvent(new CustomEvent("source-type-changed"));
+        bam.value = "/newer.bam";
+        api.peekBam.mockResolvedValue({
+            ...peekResult,
+            modifications: ["C+m"],
+            allContigs: { chr2: 20_000 },
+        });
+        bam.dispatchEvent(
+            new CustomEvent("bam-selected", {
+                detail: { value: bam.value },
+            }),
+        );
+        await vi.waitFor(() =>
+            expect(mod.autoPopulate).toHaveBeenCalledWith(["C+m"]),
+        );
         resolvePeek?.(peekResult);
         await Promise.resolve();
 
-        expect(mod.autoPopulate).not.toHaveBeenCalled();
+        expect(mod.autoPopulate).toHaveBeenCalledOnce();
         expect(
             document.getElementById("file-info-content")?.textContent,
-        ).toContain("Will load upon BAM file specification");
+        ).toContain("chr2");
         expect(
             (document.getElementById("btn-generate") as HTMLButtonElement)
                 .disabled,
-        ).toBe(true);
+        ).toBe(false);
     });
 });

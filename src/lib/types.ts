@@ -140,10 +140,8 @@ export interface SeqTableRow {
  * Configuration parameters for a quality-control analysis run.
  */
 export interface QCConfig {
-    /** The file path or URL to the BAM alignment file. */
+    /** The local file path to the BAM alignment file. */
     bamPath: string;
-    /** Whether the BAM path should be treated as a remote URL. */
-    treatAsUrl: boolean;
     /** The optional BAM tag used to filter or group reads. */
     tag?: string;
     /** The strand convention for modification calls. */

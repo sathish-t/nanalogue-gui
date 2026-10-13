@@ -19,7 +19,11 @@ import { generateChatHtml } from "./log-to-html.js";
  * @returns The full HTML document string for the single-message session.
  */
 function htmlFor(role: string, content: string): string {
-    return generateChatHtml([{ role, content }], "test-snapshot-id");
+    return generateChatHtml(
+        [{ role, content }],
+        "test-snapshot-id",
+        "test-model",
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -35,7 +39,7 @@ describe("generateChatHtml page skeleton", () => {
     });
 
     it("includes the snapshot id in the title", () => {
-        const html = generateChatHtml([], "my-uuid-123");
+        const html = generateChatHtml([], "my-uuid-123", "test-model");
         expect(html).toContain("my-uuid-123");
     });
 
@@ -44,8 +48,13 @@ describe("generateChatHtml page skeleton", () => {
             { role: "system", content: "sys" },
             { role: "user", content: "hi" },
         ];
-        const html = generateChatHtml(msgs, "x");
+        const html = generateChatHtml(msgs, "x", "test-model");
         expect(html).toContain("2 messages");
+    });
+
+    it("includes only the selected model name in the header meta", () => {
+        const html = generateChatHtml([], "x", "gpt-5-mini");
+        expect(html).toContain("gpt-5-mini · generated");
     });
 
     it("uses singular 'message' when there is exactly one message", () => {
@@ -306,7 +315,17 @@ describe("HTML escaping", () => {
     });
 
     it("escapes the snapshot id in the title", () => {
-        const html = generateChatHtml([], "<script>alert(1)</script>");
+        const html = generateChatHtml(
+            [],
+            "<script>alert(1)</script>",
+            "test-model",
+        );
+        expect(html).not.toContain("<script>alert(1)</script>");
+        expect(html).toContain("&lt;script&gt;");
+    });
+
+    it("escapes the model name in the header meta", () => {
+        const html = generateChatHtml([], "x", "<script>alert(1)</script>");
         expect(html).not.toContain("<script>alert(1)</script>");
         expect(html).toContain("&lt;script&gt;");
     });

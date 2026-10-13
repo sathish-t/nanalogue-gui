@@ -1,5 +1,5 @@
 // Reusable chat session state for the AI Chat feature.
-// Wraps conversation history, facts, and abort handling so both the GUI and CLI share the same logic.
+// Wraps conversation history and abort handling so both the GUI and CLI share the same logic.
 
 import { handleUserMessage, resetLastSentMessages } from "./chat-orchestrator";
 import type {
@@ -7,7 +7,6 @@ import type {
     AiChatConsentRequiredResult,
     AiChatEvent,
     AiChatSendMessageResult,
-    Fact,
     HistoryEntry,
 } from "./chat-types";
 
@@ -35,9 +34,8 @@ export interface SendMessageOptions {
     /**
      * Optional text to replace the default system prompt entirely. When
      * provided, the built-in sandbox prompt is not used; this text becomes
-     * the base instead. AppendSystemPrompt (from SYSTEM_APPEND.md) and the
-     * dynamic facts block are still appended on top. CLI-only feature;
-     * pass the content directly (e.g. From a shell variable).
+     * the base instead. AppendSystemPrompt (from SYSTEM_APPEND.md) is still
+     * appended when provided.
      */
     replaceSystemPrompt?: string;
     /**
@@ -60,8 +58,6 @@ export type SendMessageResult = Exclude<
 export class ChatSession {
     /** Conversation history for the current session. */
     history: HistoryEntry[] = [];
-    /** Accumulated facts from successful code execution results. */
-    facts: Fact[] = [];
     /** Monotonic request counter for stale response detection. */
     requestId = 0;
     /** Abort controller for the current in-flight request. */
@@ -102,7 +98,6 @@ export class ChatSession {
                 config,
                 emitEvent,
                 history: this.history,
-                facts: this.facts,
                 signal: localSignal,
                 appendSystemPrompt,
                 replaceSystemPrompt,
@@ -174,7 +169,6 @@ export class ChatSession {
      */
     reset(): void {
         this.history = [];
-        this.facts = [];
         this.requestId += 1;
         this.currentAbortController?.abort();
         this.currentAbortController = null;

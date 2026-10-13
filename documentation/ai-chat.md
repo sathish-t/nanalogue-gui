@@ -15,7 +15,7 @@ User message
      │
      ▼
 ChatSession (src/lib/chat-session.ts)
-     │  owns history, facts, abort controller
+     │  owns history and abort controller
      ▼
 handleUserMessage (src/lib/chat-orchestrator.ts)
      │  builds system prompt, manages the agentic loop
@@ -40,9 +40,8 @@ duplicated between them.
 Each user message triggers a multi-round execution loop in
 `handleUserMessage()`:
 
-1. **Build context** — call `transformContext()` to prune old failed rounds
-   and apply the sliding window, then `convertToLlmMessages()` to strip
-   internal metadata before sending.
+1. **Build context** — call `transformContext()` to apply the sliding window,
+   then `convertToLlmMessages()` to strip internal metadata before sending.
 2. **Call the LLM** — `fetchChatCompletion()` sends a plain
    `/chat/completions` request. The response is Python code (no tool
    calling, no structured JSON schema).
@@ -70,7 +69,7 @@ Each user message triggers a multi-round execution loop in
 
 All execution feedback messages are marked `isExecutionResult: true` on
 the `UserMessage` so they can be distinguished from real user input by the
-renderer and by `pruneFailedRounds()`.
+renderer.
 
 ---
 
@@ -130,21 +129,10 @@ Two layers of limits protect the host process:
 
 ## Context management
 
-Long conversations are handled by a two-phase pipeline called before every
-LLM request:
-
-1. **`pruneFailedRounds()`** — removes old assistant-code + user-error pairs
-   from history, keeping only the most recent failed pair so the LLM can see
-   its last error without accumulating noise from earlier failures.
-2. **`applySlidingWindow()`** — drops the oldest messages to keep the
-   assembled context within ~80% of the model's context budget.
-
-In addition, a **facts array** accumulates structured facts extracted from
-each round's sandbox result (which files were referenced, which filters were
-applied, what outputs were written). Facts are rendered as a JSON data block
-in the system prompt so the LLM always has key session context even after old
-messages slide out of the window. Facts from truncated outputs are not
-extracted. The facts array is cleared on "New Chat".
+Before every LLM request, `applySlidingWindow()` drops the oldest messages to
+keep the assembled context within ~80% of the model's context budget. Failed
+assistant-code + user-error pairs remain in history and are sent in later
+requests until this normal context-window limit evicts them.
 
 ---
 
@@ -155,12 +143,13 @@ outside `allowedDir` or consuming excessive resources. It is **not** a
 hardened sandbox against a determined adversary — it is designed for safe
 accidental use.
 
-The LLM endpoint receives the full conversation, including sandbox results
-containing BAM data. This is unavoidable — the LLM needs to see the data to
-answer questions about it. Choosing a trusted endpoint is the user's
-responsibility. A consent modal appears the first time a non-localhost
-endpoint is used. Consent is keyed by full origin (scheme + host + port)
-so a protocol downgrade requires fresh consent.
+The LLM endpoint receives the current conversation context (the windowed
+history), including sandbox results containing BAM data. This
+is unavoidable — the LLM needs to see the data to answer questions about it.
+Choosing a trusted endpoint is the user's responsibility. A consent modal
+appears the first time a non-localhost endpoint is used. Consent is keyed by
+full origin (scheme + host + port) so a protocol downgrade requires fresh
+consent.
 
 API keys are held in memory only — never written to disk, logs, or error
 messages.
@@ -186,13 +175,8 @@ messages.
   produce a premature answer rather than no answer at all.
 - **Deterministic sliding window instead of LLM summarisation.** Scientific
   workflows depend on exact filter values, coordinate ranges, and filenames.
-  Lossy LLM summarisation can silently corrupt facts. The sliding window
-  keeps the most recent messages verbatim and the facts array preserves
-  key structured data exactly.
-- **Facts rendered as a JSON data block, not prose.** Untrusted strings
-  (filenames, filter descriptions) injected verbatim into the system prompt
-  as prose is a prompt-injection path. A structured JSON block reduces that
-  surface.
+  Lossy LLM summarisation can silently corrupt those details. The sliding
+  window keeps the most recent messages verbatim.
 
 ---
 
@@ -200,9 +184,9 @@ messages.
 
 | File | Role |
 |---|---|
-| `src/lib/chat-orchestrator.ts` | `handleUserMessage()`, agentic loop, context pipeline, `fetchChatCompletion()`, facts extraction |
-| `src/lib/chat-session.ts` | `ChatSession` class — owns history, facts, abort controller; shared by GUI and CLI |
-| `src/lib/chat-types.ts` | Shared types: `HistoryEntry`, `SandboxResult`, `AiChatConfig`, `AiChatEvent`, `Fact` |
+| `src/lib/chat-orchestrator.ts` | `handleUserMessage()`, agentic loop, context pipeline, `fetchChatCompletion()` |
+| `src/lib/chat-session.ts` | `ChatSession` class — owns history and abort controller; shared by GUI and CLI |
+| `src/lib/chat-types.ts` | Shared types: `HistoryEntry`, `SandboxResult`, `AiChatConfig`, `AiChatEvent` |
 | `src/lib/monty-sandbox.ts` | Sandbox wrapper — external functions, path validation, resource limits, `runSandboxCode` |
 | `src/lib/sandbox-prompt.ts` | `buildSandboxPrompt()` — the system prompt template sent to the LLM each round |
 | `src/lib/ai-chat-shared-constants.ts` | `CONFIG_FIELD_SPECS`, `TEMPERATURE_SPEC`, default values |

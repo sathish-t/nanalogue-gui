@@ -1,5 +1,5 @@
 // Tests for model-listing provider detection and model fetching.
-// Verifies detectProvider and fetchModels against real HTTP servers.
+// Verifies model-discovery provider detection and fetching against real HTTP servers.
 
 import {
     createServer,
@@ -8,41 +8,45 @@ import {
     type ServerResponse,
 } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
-import { detectProvider, fetchModels } from "./model-listing";
+import { detectProviderForModelDiscovery, fetchModels } from "./model-listing";
 
-describe("detectProvider", () => {
+describe("detectProviderForModelDiscovery", () => {
     it('returns "anthropic" for api.anthropic.com', () => {
-        expect(detectProvider("https://api.anthropic.com/v1")).toBe(
-            "anthropic",
-        );
+        expect(
+            detectProviderForModelDiscovery("https://api.anthropic.com/v1"),
+        ).toBe("anthropic");
     });
 
     it('returns "google-gemini" for generativelanguage.googleapis.com', () => {
         expect(
-            detectProvider("https://generativelanguage.googleapis.com/v1beta"),
+            detectProviderForModelDiscovery(
+                "https://generativelanguage.googleapis.com/v1beta",
+            ),
         ).toBe("google-gemini");
     });
 
     it('returns "openai-compat" for localhost', () => {
-        expect(detectProvider("http://localhost:11434/v1")).toBe(
-            "openai-compat",
-        );
+        expect(
+            detectProviderForModelDiscovery("http://localhost:11434/v1"),
+        ).toBe("openai-compat");
     });
 
     it('returns "openai-compat" for api.openai.com', () => {
-        expect(detectProvider("https://api.openai.com/v1")).toBe(
-            "openai-compat",
-        );
+        expect(
+            detectProviderForModelDiscovery("https://api.openai.com/v1"),
+        ).toBe("openai-compat");
     });
 
     it('returns "openai-compat" for api.groq.com', () => {
-        expect(detectProvider("https://api.groq.com/openai/v1")).toBe(
-            "openai-compat",
-        );
+        expect(
+            detectProviderForModelDiscovery("https://api.groq.com/openai/v1"),
+        ).toBe("openai-compat");
     });
 
     it('returns "openai-compat" for unparseable URLs', () => {
-        expect(detectProvider("not a url")).toBe("openai-compat");
+        expect(detectProviderForModelDiscovery("not a url")).toBe(
+            "openai-compat",
+        );
     });
 });
 

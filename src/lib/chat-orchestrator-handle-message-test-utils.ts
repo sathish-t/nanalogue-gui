@@ -1,11 +1,6 @@
 // Shared helpers for handleUserMessage integration tests.
 
-import type {
-    AiChatConfig,
-    AiChatEvent,
-    Fact,
-    HistoryEntry,
-} from "./chat-types";
+import type { AiChatConfig, AiChatEvent, HistoryEntry } from "./chat-types";
 
 /** Shared state returned by createHandleMessageHarness. */
 export interface HandleMessageHarness {
@@ -13,8 +8,6 @@ export interface HandleMessageHarness {
     config: AiChatConfig;
     /** Conversation history. */
     history: HistoryEntry[];
-    /** Facts array. */
-    facts: Fact[];
     /** Collected events. */
     events: AiChatEvent[];
     /** Abort signal. */
@@ -65,7 +58,6 @@ export function createHandleMessageHarness(options?: {
     return {
         config: createAiChatConfig(options?.config),
         history: [],
-        facts: [],
         events: [],
         signal: AbortSignal.timeout(options?.signalTimeoutMs ?? 10_000),
     };

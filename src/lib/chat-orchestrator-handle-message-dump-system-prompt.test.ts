@@ -21,7 +21,7 @@ describe("/dump_system_prompt slash command", () => {
     });
 
     it("dumps system prompt even when no LLM call has been made yet", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -40,20 +40,23 @@ describe("/dump_system_prompt slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
         expect(result.text).toContain("System prompt dumped to");
         expect(result.text).toContain("not fed back to the LLM");
         expect(result.steps).toHaveLength(0);
+        expect(events.map((event) => event.type)).toEqual([
+            "turn_start",
+            "turn_end",
+        ]);
 
         const files = await readdir(join(tmpDir, "ai_chat_output"));
         expect(files).toHaveLength(1);
     });
 
     it("does not add command to conversation history", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await handleUserMessage({
@@ -72,7 +75,6 @@ describe("/dump_system_prompt slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -80,7 +82,7 @@ describe("/dump_system_prompt slash command", () => {
     });
 
     it("writes non-empty content to the dump file", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await handleUserMessage({
@@ -99,7 +101,6 @@ describe("/dump_system_prompt slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -110,7 +111,7 @@ describe("/dump_system_prompt slash command", () => {
     });
 
     it("filename matches nanalogue-chat-{date}-{uuid}.log pattern", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await handleUserMessage({
@@ -129,7 +130,6 @@ describe("/dump_system_prompt slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -140,7 +140,7 @@ describe("/dump_system_prompt slash command", () => {
     });
 
     it("writes a new file each invocation rather than overwriting", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
         const opts = {
             message: "/dump_system_prompt",
@@ -158,7 +158,6 @@ describe("/dump_system_prompt slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         };
 
@@ -171,7 +170,7 @@ describe("/dump_system_prompt slash command", () => {
     });
 
     it("handles trailing whitespace in command", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -190,7 +189,6 @@ describe("/dump_system_prompt slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -205,7 +203,7 @@ describe("/dump_system_prompt slash command", () => {
         try {
             await symlink(outsideDir, join(tmpDir, "ai_chat_output"));
 
-            const { config, history, facts, events, signal } =
+            const { config, history, events, signal } =
                 createHandleMessageHarness();
 
             await expect(
@@ -225,7 +223,6 @@ describe("/dump_system_prompt slash command", () => {
                         events.push(e);
                     },
                     history,
-                    facts,
                     signal,
                 }),
             ).rejects.toThrow();
@@ -235,6 +232,44 @@ describe("/dump_system_prompt slash command", () => {
             expect(outsideFiles).toHaveLength(0);
         } finally {
             await rm(outsideDir, { recursive: true, force: true });
+        }
+    });
+
+    it("reports a sandbox-relative path when allowedDir is a symlink", async () => {
+        const linkedDir = `${tmpDir}-link`;
+        await symlink(tmpDir, linkedDir);
+        try {
+            const { config, history, events, signal } =
+                createHandleMessageHarness();
+
+            const result = await handleUserMessage({
+                message: "/dump_system_prompt",
+                endpointUrl: "http://localhost:1234/v1",
+                apiKey: "",
+                model: "test-model",
+                allowedDir: linkedDir,
+                config,
+                /**
+                 * Collects emitted events.
+                 *
+                 * @param event - The event to collect.
+                 */
+                emitEvent: (event: AiChatEvent) => {
+                    events.push(event);
+                },
+                history,
+                signal,
+            });
+
+            const dumpedPath = result.text.match(
+                /^System prompt dumped to (.+)$/m,
+            )?.[1];
+            expect(dumpedPath).toMatch(
+                /^ai_chat_output[/\\]nanalogue-chat-.+\.log$/,
+            );
+            expect(dumpedPath).not.toContain("..");
+        } finally {
+            await rm(linkedDir, { force: true });
         }
     });
 });

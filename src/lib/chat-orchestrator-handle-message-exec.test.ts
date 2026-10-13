@@ -21,7 +21,7 @@ describe("/exec slash command", () => {
 
     it("executes a Python file and returns output", async () => {
         await writeFile(join(tmpDir, "hello.py"), 'print("hello")', "utf-8");
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -40,7 +40,6 @@ describe("/exec slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -59,7 +58,7 @@ describe("/exec slash command", () => {
     });
 
     it("rejects files outside allowedDir", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await expect(
@@ -79,21 +78,20 @@ describe("/exec slash command", () => {
                     events.push(e);
                 },
                 history,
-                facts,
                 signal,
             }),
         ).rejects.toThrow();
 
         expect(history).toHaveLength(0);
         const types = events.map((e) => e.type);
-        expect(types).toContain("turn_start");
+        expect(types).not.toContain("turn_start");
         // turn_error is emitted by ChatSession.sendMessage, not handleUserMessage
         expect(types).not.toContain("turn_error");
     });
 
     it("rejects non-.py files", async () => {
         await writeFile(join(tmpDir, "data.bam"), "not a bam", "utf-8");
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await expect(
@@ -113,17 +111,17 @@ describe("/exec slash command", () => {
                     events.push(e);
                 },
                 history,
-                facts,
                 signal,
             }),
         ).rejects.toThrow(".py");
 
         expect(history).toHaveLength(0);
+        expect(events.map((event) => event.type)).not.toContain("turn_start");
     });
 
     it("handles extra whitespace between /exec and filename", async () => {
         await writeFile(join(tmpDir, "spaces.py"), "print(42)", "utf-8");
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -142,7 +140,6 @@ describe("/exec slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -155,7 +152,7 @@ describe("/exec slash command", () => {
             "print(undefined_var)",
             "utf-8",
         );
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -174,7 +171,6 @@ describe("/exec slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -191,7 +187,7 @@ describe("/exec slash command", () => {
             'print("before")\nprint(undefined_var)',
             "utf-8",
         );
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -210,7 +206,6 @@ describe("/exec slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -223,7 +218,7 @@ describe("/exec slash command", () => {
 
     it("respects removedTools when executing via /exec", async () => {
         await writeFile(join(tmpDir, "use_ls.py"), "ls()", "utf-8");
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -242,7 +237,6 @@ describe("/exec slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
             removedTools: new Set(["ls"]),
         });

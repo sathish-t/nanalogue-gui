@@ -25,7 +25,7 @@ describe("/dump_llm_instructions slash command", () => {
     });
 
     it("returns nothing-to-dump when no LLM call has been attempted", async () => {
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -44,7 +44,6 @@ describe("/dump_llm_instructions slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -52,6 +51,10 @@ describe("/dump_llm_instructions slash command", () => {
             "No LLM call has been made yet, nothing to dump.",
         );
         expect(result.steps).toHaveLength(0);
+        expect(events.map((event) => event.type)).toEqual([
+            "turn_start",
+            "turn_end",
+        ]);
 
         // Verify no file was written
         const outputDir = join(tmpDir, "ai_chat_output");
@@ -60,14 +63,14 @@ describe("/dump_llm_instructions slash command", () => {
 
     it("does not add command to conversation history", async () => {
         setLastSentMessages([{ role: "system", content: "test prompt" }]);
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await handleUserMessage({
             message: "/dump_llm_instructions",
             endpointUrl: "http://localhost:1234/v1",
             apiKey: "",
-            model: "test",
+            model: "selected-model",
             allowedDir: tmpDir,
             config,
             /**
@@ -79,26 +82,25 @@ describe("/dump_llm_instructions slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
         expect(history).toHaveLength(0);
     });
 
-    it("writes plain-text sections with message headers", async () => {
+    it("writes transcript headers with the selected model", async () => {
         setLastSentMessages([
             { role: "system", content: "You are a helpful assistant." },
             { role: "user", content: "Hello there." },
         ]);
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await handleUserMessage({
             message: "/dump_llm_instructions",
             endpointUrl: "http://localhost:1234/v1",
             apiKey: "",
-            model: "test",
+            model: "selected-model",
             allowedDir: tmpDir,
             config,
             /**
@@ -110,7 +112,6 @@ describe("/dump_llm_instructions slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -127,11 +128,19 @@ describe("/dump_llm_instructions slash command", () => {
         expect(content).toContain("You are a helpful assistant.");
         expect(content).toContain("=== Message 2: user ===");
         expect(content).toContain("Hello there.");
+
+        const htmlFile = files.find((f) => f.endsWith(".html"));
+        expect(htmlFile).toBeDefined();
+        const htmlContent = await readFile(
+            join(outputDir, htmlFile as string),
+            "utf-8",
+        );
+        expect(htmlContent).toContain("selected-model · generated");
     });
 
     it("filename matches nanalogue-chat-{date}-{uuid}.log pattern", async () => {
         setLastSentMessages([{ role: "system", content: "test prompt" }]);
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         await handleUserMessage({
@@ -150,7 +159,6 @@ describe("/dump_llm_instructions slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -169,7 +177,7 @@ describe("/dump_llm_instructions slash command", () => {
 
     it("produces unique files on repeated invocations", async () => {
         setLastSentMessages([{ role: "system", content: "test prompt" }]);
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
         const opts = {
             message: "/dump_llm_instructions",
@@ -187,7 +195,6 @@ describe("/dump_llm_instructions slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         };
 
@@ -206,7 +213,7 @@ describe("/dump_llm_instructions slash command", () => {
 
     it("handles trailing whitespace in command", async () => {
         setLastSentMessages([{ role: "system", content: "test prompt" }]);
-        const { config, history, facts, events, signal } =
+        const { config, history, events, signal } =
             createHandleMessageHarness();
 
         const result = await handleUserMessage({
@@ -225,7 +232,6 @@ describe("/dump_llm_instructions slash command", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal,
         });
 
@@ -243,7 +249,7 @@ describe("/dump_llm_instructions slash command", () => {
         try {
             await symlink(outsideDir, join(tmpDir, "ai_chat_output"));
 
-            const { config, history, facts, events, signal } =
+            const { config, history, events, signal } =
                 createHandleMessageHarness();
 
             await expect(
@@ -263,7 +269,6 @@ describe("/dump_llm_instructions slash command", () => {
                         events.push(e);
                     },
                     history,
-                    facts,
                     signal,
                 }),
             ).rejects.toThrow();

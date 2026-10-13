@@ -44,7 +44,7 @@ if git diff --cached --name-only | grep -q '^package\(-lock\)\?\.json$'; then
 
   # Use Node 22 (minimum supported version) so the lock file is
   # compatible with npm ci on both Node 22 and Node 24 in CI.
-  if ! nvm exec 22 npm install --package-lock-only --ignore-scripts; then
+  if ! nvm exec 22.16.0 npm install --package-lock-only --ignore-scripts; then
     echo "pre-commit: npm install --package-lock-only failed, aborting commit" >&2
     exit 1
   fi
@@ -68,6 +68,14 @@ fi
 if git diff --cached --name-only | grep -q '\.md$'; then
   if ! node scripts/check-md-links.mjs --cached-only; then
     echo "pre-commit: markdown link check failed, aborting commit" >&2
+    exit 1
+  fi
+fi
+
+# Run the full lint suite whenever staged files touch linted source trees.
+if git diff --cached --name-only | grep -qE '^(src/|scripts/|demo/)'; then
+  if ! npm run lint; then
+    echo "pre-commit: lint failed, aborting commit" >&2
     exit 1
   fi
 fi
@@ -97,10 +105,10 @@ if git diff --cached --name-only | grep -q '^src/'; then
   git add documentation/script-tree.md
 fi
 
-# Enforce coverage floor whenever any src/ TypeScript file is staged.
+# Enforce coverage floor whenever source code or test fixtures are staged.
 # New files must debut at 100%; existing files must not regress.
 # On a clean pass the TSV floor is updated and staged automatically.
-if git diff --cached --name-only | grep -q '^src/.*\.ts$'; then
+if git diff --cached --name-only | grep -qE '^(src/.*\.ts|tests/)'; then
   if ! node scripts/check-coverage.mjs; then
     echo "pre-commit: coverage check failed, aborting commit" >&2
     exit 1

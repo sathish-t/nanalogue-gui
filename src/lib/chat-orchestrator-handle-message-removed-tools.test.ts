@@ -10,7 +10,7 @@ import {
     type MockServer,
     startMockServer,
 } from "./chat-orchestrator-test-utils";
-import type { Fact, HistoryEntry } from "./chat-types";
+import type { HistoryEntry } from "./chat-types";
 
 // Tests for the --rm-tools CLI flag support via removedTools.
 describe("removedTools", () => {
@@ -62,7 +62,6 @@ describe("removedTools", () => {
         ]);
 
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         const result = await handleUserMessage({
             message: "test",
             endpointUrl: mockServer.url,
@@ -75,7 +74,6 @@ describe("removedTools", () => {
                 /* no-op */
             },
             history,
-            facts,
             signal: new AbortController().signal,
             removedTools: new Set(["peek"]),
         });
@@ -114,7 +112,6 @@ describe("removedTools", () => {
         ]);
 
         const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
         const result = await handleUserMessage({
             message: "test",
             endpointUrl: mockServer.url,
@@ -127,7 +124,6 @@ describe("removedTools", () => {
                 /* no-op */
             },
             history,
-            facts,
             signal: new AbortController().signal,
             removedTools: new Set(["peek"]),
         });

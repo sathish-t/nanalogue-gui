@@ -95,15 +95,8 @@ export function registerLocateIpcHandlers(): void {
 
     ipcMain.handle("locate-generate-bed", async (_event, payload: unknown) => {
         const request = validateLocateGenerateBedRequest(payload);
-        const {
-            bamPath,
-            readIdPath,
-            outputPath,
-            treatAsUrl,
-            region,
-            fullRegion,
-        } = request;
-        if (!treatAsUrl) await validateIpcFilePath(bamPath, "read");
+        const { bamPath, readIdPath, outputPath, region, fullRegion } = request;
+        await validateIpcFilePath(bamPath, "read");
         await validateIpcFilePath(readIdPath, "read");
         await validateIpcFilePath(outputPath, "write");
 
@@ -116,12 +109,11 @@ export function registerLocateIpcHandlers(): void {
         const options = region
             ? {
                   bamPath,
-                  treatAsUrl,
                   readIdSet: parseResult.ids,
                   region,
                   fullRegion,
               }
-            : { bamPath, treatAsUrl, readIdSet: parseResult.ids };
+            : { bamPath, readIdSet: parseResult.ids };
         const records = await readInfo(options);
         const { lines, summary } = generateBedLines(
             records,
@@ -130,10 +122,7 @@ export function registerLocateIpcHandlers(): void {
         // Recheck filesystem identity at the write boundary. A hostile process
         // can still replace a parent directory after this check; Node does not
         // expose an openat-style API for anchoring traversal to a directory fd.
-        assertLocateOutputIsNotInput(
-            treatAsUrl ? [readIdPath] : [bamPath, readIdPath],
-            outputPath,
-        );
+        assertLocateOutputIsNotInput([bamPath, readIdPath], outputPath);
         // "wx" creates the file exclusively, failing instead of truncating it
         // if it appeared after the renderer's existence check.
         writeFileSync(

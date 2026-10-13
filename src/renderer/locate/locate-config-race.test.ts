@@ -64,7 +64,7 @@ function selectBam(path: string): void {
     bamSource.value = path;
     bamSource.dispatchEvent(
         new CustomEvent("bam-selected", {
-            detail: { value: path, isUrl: false },
+            detail: { value: path },
         }),
     );
 }
@@ -73,7 +73,6 @@ const stalePeek = createDeferredPromise<PeekResult>();
 const staleFailedPeek = createDeferredPromise<PeekResult>();
 const staleReadIdCount = createDeferredPromise<number>();
 const staleSuccessfulReadIdCount = createDeferredPromise<number>();
-const sourceChangePeek = createDeferredPromise<PeekResult>();
 const currentPeek = createPeekResult("current");
 const pickedReadIdPaths: string[] = [];
 const samePathPeekResponses: Array<Promise<PeekResult>> = [];
@@ -114,8 +113,6 @@ beforeAll(async () => {
                 if (path === "stale-failure.bam") {
                     return staleFailedPeek.promise;
                 }
-                if (path === "source-change.bam")
-                    return sourceChangePeek.promise;
                 if (path === "same-path.bam") {
                     return (
                         samePathPeekResponses.shift() ??
@@ -194,30 +191,6 @@ describe("Locate config metadata request ordering", () => {
         expect(document.getElementById("file-summary")?.textContent).toContain(
             "current",
         );
-    });
-
-    it("invalidates an in-flight peek when the BAM source type changes", async () => {
-        selectBam("source-change.bam");
-        const bamSource = document.getElementById(
-            "bam-source",
-        ) as BamResourceInput;
-        const urlRadio = Array.from(
-            bamSource.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
-        ).find((radio) => radio.value === "url");
-        if (!urlRadio) throw new Error("URL source radio not found");
-        urlRadio.click();
-
-        bamSource.value = "source-change.bam";
-        sourceChangePeek.resolve(createPeekResult("source-change"));
-        await settleEventHandlers();
-
-        pickedReadIdPaths.push("current.txt");
-        document.getElementById("btn-browse-read-ids")?.click();
-        await settleEventHandlers();
-
-        expect(
-            document.getElementById("file-summary")?.textContent,
-        ).not.toContain("source-change");
     });
 
     it("does not expose a stale successful read ID count after a later refresh", async () => {

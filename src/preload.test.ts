@@ -291,7 +291,6 @@ describe("invoke routing", () => {
             modStrand: "bc",
             regionExpansion: 500,
             showAnnotationHighlight: true,
-            treatAsUrl: false,
         };
         (exposedApi.swipeStart as (request: object) => void)(request);
 
@@ -316,15 +315,11 @@ describe("invoke routing", () => {
     // QC config
     // -----------------------------------------------------------------------
 
-    it("peekBam forwards to peek-bam with bamPath and treatAsUrl", () => {
-        (exposedApi.peekBam as (p: string, url: boolean) => void)(
-            "/data/sample.bam",
-            false,
-        );
+    it("peekBam forwards the local BAM path to peek-bam", () => {
+        (exposedApi.peekBam as (path: string) => void)("/data/sample.bam");
         expect(ipcRenderer.invoke).toHaveBeenCalledWith(
             "peek-bam",
             "/data/sample.bam",
-            false,
         );
     });
 
@@ -422,7 +417,6 @@ describe("invoke routing", () => {
             bamPath: "/bam",
             readIdPath: "/ids.txt",
             outputPath: "/out.bed",
-            treatAsUrl: false,
             region: "chr1:0-1000",
             fullRegion: true,
         };

@@ -96,6 +96,8 @@ interface AiChatElements {
     optMaxAllocations: HTMLInputElement;
     /** Advanced option: temperature. */
     optTemperature: HTMLInputElement;
+    /** Advanced option: use SYSTEM_APPEND.md as the full base prompt. */
+    optOnlySystemAppend: HTMLInputElement;
     /** Advanced option: max read MB. */
     optMaxReadMB: HTMLInputElement;
     /** Advanced option: max write MB. */
@@ -211,6 +213,9 @@ const elements: AiChatElements = {
     ) as HTMLInputElement,
     optTemperature: document.getElementById(
         "opt-temperature",
+    ) as HTMLInputElement,
+    optOnlySystemAppend: document.getElementById(
+        "opt-only-system-append",
     ) as HTMLInputElement,
     optMaxReadMB: document.getElementById(
         "opt-max-read-mb",

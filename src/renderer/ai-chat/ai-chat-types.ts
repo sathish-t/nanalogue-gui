@@ -45,6 +45,8 @@ export interface AiChatApi {
         config: Record<string, unknown>;
         /** The analysis directory for SYSTEM_APPEND.md lookup (optional). */
         allowedDir?: string;
+        /** Whether to replace the built-in prompt with SYSTEM_APPEND.md. */
+        onlySystemAppend?: boolean;
     }) => Promise<GetSystemPromptResult>;
     /** Query endpoint for available models. */
     aiChatListModels: (payload: {
@@ -67,6 +69,8 @@ export interface AiChatApi {
         allowedDir: string;
         /** Advanced configuration options. */
         config: Record<string, unknown>;
+        /** Whether to replace the built-in prompt with SYSTEM_APPEND.md. */
+        onlySystemAppend?: boolean;
     }) => Promise<AiChatSendMessageResult>;
     /** Cancel the current request. */
     aiChatCancel: () => Promise<void>;

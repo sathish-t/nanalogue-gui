@@ -65,7 +65,6 @@ async function generateLocateBed(
             bamPath,
             readIdPath,
             outputPath,
-            treatAsUrl: false,
             overwriteConfirmed: true,
         },
     );

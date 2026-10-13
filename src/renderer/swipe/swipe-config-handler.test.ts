@@ -28,9 +28,8 @@ async function loadSwipeHandlers(api: Record<string, unknown>) {
     );
     const bam = document.getElementById("bam-source") as HTMLElement & {
         value: string;
-        isUrl: boolean;
     };
-    Object.assign(bam, { value: "/reads.bam", isUrl: false });
+    Object.assign(bam, { value: "/reads.bam" });
     Object.assign(document.getElementById("mod-filter") as HTMLElement, {
         tag: "T+a",
         modStrand: "bc",
@@ -127,10 +126,10 @@ describe("Swipe config form handlers", () => {
             swipeStart,
             swipeGoBack: vi.fn(),
         };
-        const { bam } = await loadSwipeHandlers(api);
+        const { bam, output } = await loadSwipeHandlers(api);
         bam.dispatchEvent(
             new CustomEvent("bam-selected", {
-                detail: { value: "/reads.bam", isUrl: false },
+                detail: { value: "/reads.bam" },
             }),
         );
         (
@@ -142,6 +141,24 @@ describe("Swipe config form handlers", () => {
                     .disabled,
             ).toBe(false),
         );
+        Object.assign(output, { requiresOverwrite: true });
+        output.dispatchEvent(new Event("output-selected"));
+        expect(
+            (document.getElementById("btn-start") as HTMLButtonElement)
+                .disabled,
+        ).toBe(true);
+        Object.assign(output, { overwriteConfirmed: true });
+        output.dispatchEvent(new Event("overwrite-confirmed"));
+        const expansion = document.getElementById(
+            "flanking-region",
+        ) as HTMLInputElement;
+        expansion.value = "-1";
+        (document.getElementById("btn-start") as HTMLButtonElement).click();
+        expect(swipeStart).not.toHaveBeenCalled();
+        expect(alert).toHaveBeenCalledWith(
+            "Flanking region must be a non-negative integer.",
+        );
+        expansion.value = "1000";
         (document.getElementById("btn-start") as HTMLButtonElement).click();
         await vi.waitFor(() => expect(swipeStart).toHaveBeenCalledOnce());
         expect(
@@ -162,6 +179,7 @@ describe("Swipe config form handlers", () => {
                 outputPath: "/output.bed",
                 modTag: "T+a",
                 regionExpansion: 1000,
+                overwriteConfirmed: true,
             }),
         );
         rejectLaunch?.({ success: false, reason: "BED changed" });
@@ -196,7 +214,7 @@ describe("Swipe config form handlers", () => {
         const { bam } = await loadSwipeHandlers(api);
         bam.dispatchEvent(
             new CustomEvent("bam-selected", {
-                detail: { value: "/reads.bam", isUrl: false },
+                detail: { value: "/reads.bam" },
             }),
         );
         (

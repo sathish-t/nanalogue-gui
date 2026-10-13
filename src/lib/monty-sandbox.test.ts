@@ -576,6 +576,14 @@ it("continue_thinking returns false when not called", async () => {
     const result = await runSandboxCode("1 + 1", allowedDir);
     expect(result.success).toBe(true);
     expect(result.continueThinkingCalled).toBe(false);
+    expect(result.sandboxToolCalled).toBe(false);
+});
+
+it("records sandbox tool calls separately from continue_thinking", async () => {
+    const result = await runSandboxCode("ls()", allowedDir);
+    expect(result.success).toBe(true);
+    expect(result.continueThinkingCalled).toBe(false);
+    expect(result.sandboxToolCalled).toBe(true);
 });
 
 // --- wrapForMonty error conversion ---
@@ -787,8 +795,10 @@ it("collectTerminalOutput uses safeStringify fallback for non-serializable value
         endedWithExpression: true,
         value: BigInt(42),
         continueThinkingCalled: false,
+        sandboxToolCalled: false,
         prints: [],
         printsTruncated: false,
+        truncated: false,
     });
     expect(result).toContain("cyclic or non-serializable");
 });
@@ -799,8 +809,10 @@ it("collectTerminalOutput joins prints with serialized expression value", () => 
         endedWithExpression: true,
         value: 99,
         continueThinkingCalled: false,
+        sandboxToolCalled: false,
         prints: ["hello\n"],
         printsTruncated: false,
+        truncated: false,
     });
     expect(result).toBe("hello\n99\n");
 });

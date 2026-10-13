@@ -19,7 +19,6 @@ describe("validateSwipeStartRequest", () => {
             validateSwipeStartRequest({
                 ...VALID_REQUEST,
                 regionExpansion: 100,
-                treatAsUrl: false,
                 unexpected: "discarded",
             }),
         ).toEqual({
@@ -28,7 +27,6 @@ describe("validateSwipeStartRequest", () => {
             modStrand: undefined,
             regionExpansion: 100,
             showAnnotationHighlight: undefined,
-            treatAsUrl: false,
         });
     });
 
@@ -40,10 +38,9 @@ describe("validateSwipeStartRequest", () => {
         [{ ...VALID_REQUEST, modTag: 42 }, "modTag"],
         [{ ...VALID_REQUEST, modStrand: "invalid" }, "modStrand"],
         [{ ...VALID_REQUEST, regionExpansion: -1 }, "regionExpansion"],
-        [{ ...VALID_REQUEST, treatAsUrl: "false" }, "treatAsUrl"],
         [
-            { ...VALID_REQUEST, bamPath: "/local.bam", treatAsUrl: true },
-            "BAM URL",
+            { ...VALID_REQUEST, showAnnotationHighlight: "yes" },
+            "showAnnotationHighlight",
         ],
     ])("rejects invalid payload %#", (payload, message) => {
         expect(() => validateSwipeStartRequest(payload)).toThrow(message);

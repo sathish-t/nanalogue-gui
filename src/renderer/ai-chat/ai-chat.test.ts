@@ -668,7 +668,7 @@ describe("AI Chat permanent session config locking", () => {
         "btn-fetch-models",
     ];
 
-    /** All 18 disableable field/button IDs that lock on first successful send. */
+    /** All disableable field/button IDs that lock on first successful send. */
     const allLockableIds = [
         ...mainConfigIds,
         "opt-context-window",
@@ -683,6 +683,7 @@ describe("AI Chat permanent session config locking", () => {
         "opt-max-memory",
         "opt-max-allocations",
         "opt-temperature",
+        "opt-only-system-append",
     ];
 
     beforeEach(async () => {
@@ -783,6 +784,182 @@ describe("AI Chat permanent session config locking", () => {
         }
     });
 
+    it("lets the send handler validate SYSTEM_APPEND.md", async () => {
+        fillRequiredFields();
+        const checkbox = document.getElementById(
+            "opt-only-system-append",
+        ) as HTMLInputElement;
+        checkbox.click();
+        expect(checkbox.checked).toBe(true);
+
+        mockApi.aiChatSendMessage.mockResolvedValueOnce({
+            success: false,
+            error: "SYSTEM_APPEND.md is required when only-system-append is enabled",
+        });
+        await sendMessage("hello");
+
+        expect(mockApi.aiChatSendMessage).toHaveBeenCalledWith(
+            expect.objectContaining({ onlySystemAppend: true }),
+        );
+        expect(document.getElementById("chat-messages")?.textContent).toContain(
+            "SYSTEM_APPEND.md is required",
+        );
+    });
+
+    it("alerts when no directory is selected for the checkbox", async () => {
+        const alertSpy = vi
+            .spyOn(window, "alert")
+            .mockImplementation(() => undefined);
+
+        const checkbox = document.getElementById(
+            "opt-only-system-append",
+        ) as HTMLInputElement;
+        checkbox.click();
+        await flushMicrotasks();
+
+        expect(alertSpy).toHaveBeenCalledWith(
+            "Please select a BAM directory first.",
+        );
+        expect(checkbox.checked).toBe(false);
+        alertSpy.mockRestore();
+    });
+
+    it("forwards onlySystemAppend when the checkbox is enabled", async () => {
+        fillRequiredFields();
+        const checkbox = document.getElementById(
+            "opt-only-system-append",
+        ) as HTMLInputElement;
+        checkbox.click();
+        await flushMicrotasks();
+
+        mockApi.aiChatSendMessage.mockResolvedValueOnce({
+            success: true,
+            text: "ok",
+        });
+        await sendMessage("hello");
+
+        const payload = mockApi.aiChatSendMessage.mock.calls[0]?.[0] as {
+            /** Whether the SYSTEM_APPEND-only mode was forwarded. */
+            onlySystemAppend?: boolean;
+        };
+        expect(payload.onlySystemAppend).toBe(true);
+    });
+
+    it("keeps the first-send prompt mode fixed while the request is pending", async () => {
+        let resolveSend!: (value: SendMessageResult) => void;
+        mockApi.aiChatSendMessage.mockReturnValueOnce(
+            new Promise<SendMessageResult>((resolve) => {
+                resolveSend = resolve;
+            }),
+        );
+        fillRequiredFields();
+        const checkbox = document.getElementById(
+            "opt-only-system-append",
+        ) as HTMLInputElement;
+        const defaultsButton = document.getElementById(
+            "btn-defaults",
+        ) as HTMLButtonElement;
+        checkbox.click();
+
+        await sendMessage("hello");
+
+        expect(checkbox.disabled).toBe(true);
+        expect(defaultsButton.disabled).toBe(true);
+        checkbox.checked = false;
+        checkbox.dispatchEvent(new Event("change"));
+
+        resolveSend({ success: true, text: "ok" });
+        await flushMicrotasks();
+
+        expect(mockApi.aiChatSendMessage).toHaveBeenCalledWith(
+            expect.objectContaining({ onlySystemAppend: true }),
+        );
+        expect(checkbox.checked).toBe(true);
+        expect(checkbox.disabled).toBe(true);
+    });
+
+    it("uses the first-send prompt mode when retrying after consent", async () => {
+        fillRequiredFields();
+        (document.getElementById("input-endpoint") as HTMLInputElement).value =
+            "https://api.example.com/v1";
+        const checkbox = document.getElementById(
+            "opt-only-system-append",
+        ) as HTMLInputElement;
+        checkbox.click();
+        mockApi.aiChatSendMessage
+            .mockResolvedValueOnce({
+                success: false,
+                reason: "consent_required",
+                error: "CONSENT_REQUIRED",
+                origin: "https://api.example.com",
+            })
+            .mockResolvedValueOnce({ success: true, text: "ok" });
+
+        await sendMessage("hello");
+        checkbox.checked = false;
+        checkbox.dispatchEvent(new Event("change"));
+        (
+            document.getElementById("btn-consent-accept") as HTMLButtonElement
+        ).click();
+        await flushMicrotasks();
+
+        expect(mockApi.aiChatSendMessage).toHaveBeenCalledTimes(2);
+        expect(mockApi.aiChatSendMessage.mock.calls[1]?.[0]).toEqual(
+            expect.objectContaining({ onlySystemAppend: true }),
+        );
+        expect(checkbox.checked).toBe(true);
+    });
+
+    it("updates the prompt preview when onlySystemAppend is enabled", async () => {
+        fillRequiredFields();
+        const checkbox = document.getElementById(
+            "opt-only-system-append",
+        ) as HTMLInputElement;
+        checkbox.click();
+        await flushMicrotasks();
+
+        const btnViewSystemPrompt = document.getElementById(
+            "btn-view-system-prompt",
+        ) as HTMLButtonElement;
+        btnViewSystemPrompt.click();
+        await flushMicrotasks();
+
+        expect(mockApi.aiChatGetSystemPrompt).toHaveBeenCalledWith(
+            expect.objectContaining({
+                onlySystemAppend: true,
+            }),
+        );
+        expect(
+            document.getElementById("system-prompt-config-note")?.textContent,
+        ).toContain("SYSTEM_APPEND.md as the full prompt");
+    });
+
+    it("clears onlySystemAppend when the directory changes", async () => {
+        fillRequiredFields();
+        const checkbox = document.getElementById(
+            "opt-only-system-append",
+        ) as HTMLInputElement;
+        checkbox.click();
+        await flushMicrotasks();
+
+        mockApi.aiChatPickDirectory.mockResolvedValueOnce("/tmp/new-dir");
+        (document.getElementById("btn-browse") as HTMLButtonElement).click();
+        await flushMicrotasks();
+
+        expect(checkbox.checked).toBe(false);
+        mockApi.aiChatSendMessage.mockResolvedValueOnce({
+            success: true,
+            text: "ok",
+        });
+        await sendMessage("hello");
+
+        const payload = mockApi.aiChatSendMessage.mock.calls[0]?.[0] as {
+            /** Whether the SYSTEM_APPEND-only mode was forwarded. */
+            onlySystemAppend?: boolean;
+        };
+        expect(payload.onlySystemAppend).toBe(false);
+    });
+
     it("keeps config fields editable after consent denial", async () => {
         fillRequiredFields();
         mockApi.aiChatSendMessage.mockResolvedValueOnce({
@@ -838,6 +1015,10 @@ describe("AI Chat permanent session config locking", () => {
                 `${id} should be re-enabled after New Chat`,
             ).toBe(false);
         }
+        expect(
+            (document.getElementById("btn-defaults") as HTMLButtonElement)
+                .disabled,
+        ).toBe(false);
     });
 
     it("hides model dropdown after lock", async () => {

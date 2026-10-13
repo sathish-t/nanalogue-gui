@@ -1,11 +1,10 @@
 // Locate-reads data loader for parsing read ID files and generating BED output
 
 import type { ReadInfoRecord } from "@nanalogue/node";
-import { validateIpcRemoteBamUrl } from "./ipc-path-validation";
 
 /** Named request used to generate a Locate BED file. */
 export type LocateGenerateBedRequest = {
-    /** BAM file path or URL. */
+    /** Local BAM file path. */
     bamPath: string;
     /** Path to the read ID text file. */
     readIdPath: string;
@@ -13,8 +12,6 @@ export type LocateGenerateBedRequest = {
     outputPath: string;
     /** Whether the user authorized replacing an existing output file. */
     overwriteConfirmed: boolean;
-    /** Whether bamPath is a remote URL. */
-    treatAsUrl: boolean;
 } & (
     | {
           /** No genomic region constraint. */
@@ -50,9 +47,6 @@ export function validateLocateGenerateBedRequest(
             );
         }
     }
-    if (typeof request.treatAsUrl !== "boolean") {
-        throw new Error("Invalid Locate request: treatAsUrl must be a boolean");
-    }
     if (typeof request.overwriteConfirmed !== "boolean") {
         throw new Error(
             "Invalid Locate request: overwriteConfirmed must be a boolean",
@@ -76,9 +70,6 @@ export function validateLocateGenerateBedRequest(
     if (request.fullRegion !== undefined && request.region === undefined) {
         throw new Error("Invalid Locate request: fullRegion requires region");
     }
-    if (request.treatAsUrl) {
-        validateIpcRemoteBamUrl(request.bamPath as string, "Locate");
-    }
     const region = request.region as string | undefined;
     if (region !== undefined) {
         return {
@@ -86,7 +77,6 @@ export function validateLocateGenerateBedRequest(
             readIdPath: request.readIdPath as string,
             outputPath: request.outputPath as string,
             overwriteConfirmed: request.overwriteConfirmed as boolean,
-            treatAsUrl: request.treatAsUrl as boolean,
             region,
             fullRegion: request.fullRegion as boolean | undefined,
         };
@@ -96,7 +86,6 @@ export function validateLocateGenerateBedRequest(
         readIdPath: request.readIdPath as string,
         outputPath: request.outputPath as string,
         overwriteConfirmed: request.overwriteConfirmed as boolean,
-        treatAsUrl: request.treatAsUrl as boolean,
     };
 }
 

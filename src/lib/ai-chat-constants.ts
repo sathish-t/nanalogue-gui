@@ -3,6 +3,7 @@
 
 export {
     CONFIG_FIELD_SPECS,
+    MAX_CHAT_MESSAGE_BYTES as MAX_MESSAGE_BYTES,
     TEMPERATURE_SPEC,
 } from "./ai-chat-shared-constants";
 
@@ -19,7 +20,7 @@ export const /** Timeout in milliseconds for the model-list fetch request. */ MO
 
 export const /** Default maximum cumulative sandbox runtime per turn in milliseconds (30 minutes). */ DEFAULT_MAX_CUMULATIVE_SANDBOX_MS =
         30 * 60 * 1000;
-export const /** Maximum serialized size for the facts array in bytes. */ MAX_FACTS_BYTES = 2048;
+export const /** Default maximum retries after a blank or missing assistant response. */ DEFAULT_MAX_BLANK_RETRIES = 3;
 export const /** Default maximum code execution rounds per user message. */ DEFAULT_MAX_CODE_ROUNDS = 10;
 
 // --- Sandbox execution defaults ---
@@ -51,12 +52,7 @@ export const /** Maximum bytes for execution feedback sent back to the LLM. */ F
 
 // --- LLM request parameters ---
 
-export const /** Maximum completion tokens sent to the LLM per request. */ DEFAULT_MAX_COMPLETION_TOKENS = 4096;
-
-// --- Message size limits ---
-
-export const /** Maximum bytes for a single user message (100 KB). */ MAX_MESSAGE_BYTES =
-        100 * 1024;
+export const /** Maximum completion tokens sent to the LLM per request. */ DEFAULT_MAX_COMPLETION_TOKENS = 16_384;
 
 // --- Print capture limits ---
 

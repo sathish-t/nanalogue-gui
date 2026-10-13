@@ -5,30 +5,37 @@
 
 ```
 src/
-  cli.ts                # Standalone CLI for the nanalogue AI Chat feature.
-  execute-cli.ts        # Standalone CLI for running a Python file directly in the Monty sandbox.
-  exit-watchdog.ts      # Watchdog child process that force-kills the parent on demand.
-  font-size.ts          # Shared font-size state for the main process.
-  main.ts               # Electron main process for nanalogue-gui with multi-mode support
-  preload.ts            # Preload script for nanalogue-gui
-  test-helpers.ts       # Shared test helpers that centralise repeated mock/setup patterns.
+  cli-terminal-formatting.ts  # Shared ANSI formatting constants for the standalone nanalogue-chat CLI.
+  cli-terminal-output.ts      # Terminal output helpers for the standalone nanalogue-chat CLI.
+  cli.ts                      # Standalone CLI for the nanalogue AI Chat feature.
+  execute-cli.ts              # Standalone CLI for running a Python file directly in the Monty sandbox.
+  exit-watchdog.ts            # Watchdog child process that force-kills the parent on demand.
+  font-size.ts                # Shared font-size state for the main process.
+  main.ts                     # Electron main process for nanalogue-gui with multi-mode support
+  preload.ts                  # Preload script for nanalogue-gui
+  test-helpers.ts             # Shared test helpers that centralise repeated mock/setup patterns.
   lib/
     ai-chat-constants.ts                            # Main-process constants for the AI Chat feature.
     ai-chat-ipc-validation.ts                       # Per-channel IPC payload validation for AI Chat mode.
     ai-chat-shared-constants.ts                     # Config field specs and shared constants for the AI Chat feature.
     bed-parser.ts                                   # BED file parser for nanalogue-swipe
+    chat-filesystem-input-checks.ts                 # Node-only checks for chat analysis directories and Python source files.
     chat-orchestrator-execution.ts                  # Sandbox execution and feedback helpers for AI chat orchestration.
-    chat-orchestrator-facts.ts                      # Fact extraction and eviction helpers for AI chat orchestration.
     chat-orchestrator-handle-message-test-utils.ts  # Shared helpers for handleUserMessage integration tests.
     chat-orchestrator-helpers.ts                    # Helper utilities for chat-orchestrator.
     chat-orchestrator-history.ts                    # History and context helpers for AI chat orchestration.
     chat-orchestrator-llm.ts                        # LLM transport helpers for AI chat orchestration.
     chat-orchestrator-test-utils.ts                 # Shared mock server infrastructure for chat-orchestrator tests.
     chat-orchestrator.ts                            # Chat orchestrator for AI Chat mode.
+    chat-provider-input-checks.ts                   # Validation for endpoint URL, API key, and model inputs used by chat providers.
+    chat-provider-payload-adjustments.ts            # Provider-specific adjustments for OpenAI-compatible chat completion payloads.
     chat-session.ts                                 # Reusable chat session state for the AI Chat feature.
+    chat-transcript-dump.ts                         # Persists LLM request and conversation history transcripts for human review.
     chat-types.ts                                   # Shared types for the AI Chat feature.
+    chat-user-input-parsing.ts                      # Browser-safe parsing and measurement for chat user inputs.
+    cli-user-input-parsing.ts                       # Parsing checks for command-line option structure and comma-separated tool names.
     format-utils.ts                                 # Pure formatting and trimming utilities shared across renderer pages.
-    histogram-renderer.ts                           # Histogram SVG renderer backed by Vega-Lite.
+    histogram-renderer.ts                           # Dependency-free histogram SVG renderer.
     histogram.ts                                    # Streaming histogram accumulator for binning data without storing raw arrays
     ipc-path-validation.ts                          # IPC path validation: guards file-path arguments in main-process IPC handlers
     line-counter.ts                                 # Streaming utilities for counting lines in text and BED files
@@ -40,17 +47,19 @@ src/
     monty-sandbox-helpers.ts                        # Utility helpers for monty-sandbox: path security, option translation,
     monty-sandbox.ts                                # Monty sandbox wrapper for AI Chat mode.
     qc-config-builder.ts                            # Pure validation and construction of QC configuration form snapshots.
+    qc-contract.ts
     qc-data-loader.ts                               # QC data loader: paginated BAM data retrieval with streaming histograms
     region-parser.ts                                # Parses and validates genomic region strings (e.g. "chr3", "chrI:1000-50000")
     sandbox-cli-args.ts                             # Shared sandbox CLI argument definitions, numeric arg parser, and sandbox
     sandbox-prompt-text.ts                          # Contains the large built-in sandbox prompt template used for AI chat.
     sandbox-prompt.ts                               # Builds the LLM system prompt and assembles the full system message sent on every turn.
     stats.ts                                        # Statistics utilities for QC calculations
+    svg-plot-primitives.ts                          # Dependency-free SVG primitives shared by histogram and x/y plot renderers.
     swipe-contract.ts
     swipe-data-loader.ts                            # Swipe data loader using nanalogue-node
     system-append.ts                                # Loads the optional SYSTEM_APPEND.md file from an analysis directory.
     types.ts                                        # Type definitions shared across nanalogue-gui modes
-    xy-renderer.ts                                  # XY series SVG renderer backed by Vega-Lite.
+    xy-renderer.ts                                  # Dependency-free x/y series SVG renderer.
     ai-external-tools/
       bam-mods.ts           # External tool: bam_mods
       bash.ts               # External tool: bash
@@ -109,7 +118,7 @@ src/
       seq-mini-charts.ts       # Mini sparkline histograms for the QC Sequences tab.
     shared/
       apply-font-size.ts     # Reads the fontSize URL query parameter and applies the matching CSS class
-      bam-resource-input.ts  # Reusable custom element for BAM file/URL source selection
+      bam-resource-input.ts  # Reusable custom element for local BAM file selection.
       chart-font-size.ts     # Reads the font-size CSS class applied to <html> by applyFontSize() and
       mod-filter-input.ts    # Reusable custom element for modification filter input with validation.
       output-file-input.ts   # Reusable custom element for output file selection with overwrite confirmation.

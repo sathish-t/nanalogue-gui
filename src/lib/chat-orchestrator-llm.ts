@@ -2,6 +2,10 @@
 // Keeps API retries and prompt-token calibration separate from the main turn loop.
 
 import { DEFAULT_MAX_COMPLETION_TOKENS } from "./ai-chat-constants";
+import {
+    adjustChatCompletionPayloadForProvider,
+    type ChatCompletionPayload,
+} from "./chat-provider-payload-adjustments";
 
 /** Response from the /chat/completions endpoint. */
 export interface ChatCompletionResponse {
@@ -94,25 +98,20 @@ export async function fetchChatCompletion(
 ): Promise<ChatCompletionResponse> {
     const base = endpointUrl.endsWith("/") ? endpointUrl : `${endpointUrl}/`;
     const url = new URL("chat/completions", base).href;
-    // Mistral and chutes.ai use the older max_tokens field; all other
-    // OpenAI-compatible providers use max_completion_tokens. Sending both
-    // causes errors on providers that validate for unknown fields, so we
-    // pick one based on the endpoint URL — same approach as pi-mono's
-    // openai-completions provider.
-    const maxTokensField =
-        endpointUrl.includes("mistral.ai") || endpointUrl.includes("chutes.ai")
-            ? "max_tokens"
-            : "max_completion_tokens";
-    const payload: Record<string, unknown> = {
+    const providerNeutralPayload: ChatCompletionPayload = {
         model,
-        [maxTokensField]: DEFAULT_MAX_COMPLETION_TOKENS,
+        max_completion_tokens: DEFAULT_MAX_COMPLETION_TOKENS,
         messages: [{ role: "system", content: systemPrompt }, ...messages],
     };
     // Only include temperature when explicitly set — omitting lets the
     // provider choose its own default, which is the safest universal behavior.
     if (temperature !== undefined) {
-        payload.temperature = temperature;
+        providerNeutralPayload.temperature = temperature;
     }
+    const payload = adjustChatCompletionPayloadForProvider(
+        providerNeutralPayload,
+        endpointUrl,
+    );
     const body = JSON.stringify(payload);
 
     let lastError: Error | undefined;

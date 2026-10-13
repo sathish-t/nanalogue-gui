@@ -22,6 +22,8 @@ export type SandboxResult =
           endedWithExpression: boolean;
           /** Whether continue_thinking() was called in the sandbox code. */
           continueThinkingCalled: boolean;
+          /** Whether a sandbox data, file, plotting, or command tool was called. */
+          sandboxToolCalled: boolean;
       })
     | (SandboxPrintMetadata & {
           /** The code failed to execute. */
@@ -80,48 +82,10 @@ export interface UserMessage {
     content: string;
     /** Whether this message is a code execution result (not real user input). */
     isExecutionResult?: boolean;
-    /** Typed execution status for pruning (replaces string-prefix detection). */
-    executionStatus?: "ok" | "error";
 }
 
 /** A single entry in the conversation history. */
 export type HistoryEntry = UserMessage | AssistantMessage;
-
-/**
- * A typed fact recording key information from successful code execution results.
- * Facts are extracted by pattern matching, not LLM summarization.
- */
-export type Fact =
-    | {
-          /** The fact kind discriminator. */
-          type: "file";
-          /** The file that was referenced. */
-          filename: string;
-          /** The execution round that produced this fact. */
-          roundId: string;
-          /** When this fact was extracted (epoch ms). */
-          timestamp: number;
-      }
-    | {
-          /** The fact kind discriminator. */
-          type: "filter";
-          /** Human-readable description of the filter. */
-          description: string;
-          /** The execution round that produced this fact. */
-          roundId: string;
-          /** When this fact was extracted (epoch ms). */
-          timestamp: number;
-      }
-    | {
-          /** The fact kind discriminator. */
-          type: "output";
-          /** The filesystem path of the output file. */
-          path: string;
-          /** The execution round that produced this fact. */
-          roundId: string;
-          /** When this fact was extracted (epoch ms). */
-          timestamp: number;
-      };
 
 /**
  * Events sent from main process to renderer for AI Chat progress.
@@ -227,14 +191,24 @@ interface AiChatSendFailure {
     error: string;
     /** Whether the request timed out. */
     isTimeout: boolean;
+    /** Whether the failure describes user input that should be corrected before retrying. */
+    inputError?: boolean;
 }
+
+/** Send result returned after prompt preflight may have committed session state. */
+type AiChatSendCompletedResult = (
+    | AiChatSendSuccess
+    | AiChatSendCancelled
+    | AiChatSendFailure
+) & {
+    /** Whether prompt preflight succeeded and session configuration is now locked. */
+    promptSnapshotAccepted?: boolean;
+};
 
 /** Result returned by the send-message IPC handler. */
 export type AiChatSendMessageResult =
-    | AiChatSendSuccess
     | AiChatConsentRequiredResult
-    | AiChatSendCancelled
-    | AiChatSendFailure;
+    | AiChatSendCompletedResult;
 
 /** Successful list-models IPC result. */
 interface AiChatListModelsSuccess {

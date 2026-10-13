@@ -193,7 +193,7 @@ describe("swipe mode — initialize()", () => {
         setMockResolvedValue(loadContigSizes, { chr1: 5000 });
     });
 
-    it("calls loadContigSizes with the BAM path and treatAsUrl flag", async () => {
+    it("calls loadContigSizes with the local BAM path", async () => {
         setMockReturnValue(parseBedFile, {
             capped: false,
             annotations: [...FAKE_ANNOTATIONS],
@@ -203,7 +203,6 @@ describe("swipe mode — initialize()", () => {
 
         expect(vi.mocked(loadContigSizes)).toHaveBeenCalledWith(
             "/data/sample.bam",
-            undefined,
         );
     });
 

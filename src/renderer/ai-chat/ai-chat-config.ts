@@ -1,6 +1,18 @@
 // Advanced configuration helpers for the AI Chat renderer.
 
-import { CONFIG_FIELD_SPECS } from "../../lib/ai-chat-shared-constants";
+import {
+    CONFIG_FIELD_SPECS,
+    MAX_INPUT_PATH_LENGTH,
+} from "../../lib/ai-chat-shared-constants";
+import {
+    isValidApiKey,
+    isValidEndpointUrl,
+    isValidModel,
+} from "../../lib/chat-provider-input-checks";
+import {
+    parseCanonicalInteger,
+    parseCanonicalTemperature,
+} from "../../lib/chat-user-input-parsing";
 import { getAiChatElements } from "./ai-chat-elements";
 
 const {
@@ -22,6 +34,7 @@ const {
     optMaxSeqTable,
     optMaxWindowReads,
     optMaxWriteMB,
+    optOnlySystemAppend,
     optTemperature,
     optTimeout,
 } = getAiChatElements();
@@ -50,38 +63,67 @@ const ADVANCED_OPTION_FIELDS: ReadonlyArray<
     [optMaxWriteMB, "maxWriteMB"],
 ] as const;
 
-/**
- * Returns the current advanced options config values.
- *
- * @returns A config object with the current field values.
- */
-export function getConfig(): Record<string, unknown> {
-    /**
-     * Parses a numeric input value, returning the fallback if the value is
-     * not a finite number. Unlike `Number(x) || fallback`, this preserves 0.
-     *
-     * @param raw - The raw string from the input element.
-     * @param fallback - The fallback value from CONFIG_FIELD_SPECS.
-     * @returns The parsed number or the fallback.
-     */
-    const parse = (raw: string, fallback: number): number => {
-        const value = Number(raw);
-        return Number.isFinite(value) ? value : fallback;
-    };
+/** Result of parsing every advanced configuration input. */
+type AdvancedConfigInputResult =
+    | {
+          /** Indicates all inputs passed validation. */
+          valid: true;
+          /** Parsed values ready for IPC. */
+          config: Record<string, number | undefined>;
+      }
+    | {
+          /** Indicates at least one input failed validation. */
+          valid: false;
+          /** Concise validation failure. */
+          error: string;
+      };
 
-    const config: Record<string, unknown> = {};
+/**
+ * Validates and parses every advanced configuration input.
+ *
+ * @returns Parsed config values or the first validation failure.
+ */
+function parseAdvancedConfigInput(): AdvancedConfigInputResult {
+    const config: Record<string, number | undefined> = {};
     for (const [input, key] of ADVANCED_OPTION_FIELDS) {
-        config[key] = parse(input.value, CONFIG_FIELD_SPECS[key].fallback);
+        const spec = CONFIG_FIELD_SPECS[key];
+        const result = parseCanonicalInteger(spec.label, input.value, spec);
+        if (!result.valid) return result;
+        config[key] = result.value;
     }
-    // Temperature is optional — empty string means undefined (omit from request)
-    config.temperature = optTemperature.value.trim()
-        ? Number.parseFloat(optTemperature.value)
-        : undefined;
-    return config;
+    const temperatureResult = parseCanonicalTemperature(
+        "temperature",
+        optTemperature.value,
+    );
+    if (!temperatureResult.valid) return temperatureResult;
+    config.temperature = temperatureResult.value;
+    return { valid: true, config };
 }
 
 /**
- * Disables all session config fields after the first successful send.
+ * Returns validated and parsed current advanced options config values.
+ *
+ * @returns A config object with the current field values.
+ * @throws {Error} If any advanced configuration input is invalid.
+ */
+export function getConfig(): Record<string, unknown> {
+    const result = parseAdvancedConfigInput();
+    if (!result.valid) throw new Error(result.error);
+    return result.config;
+}
+
+/**
+ * Validates every advanced numeric option using strict canonical syntax.
+ *
+ * @returns An alert message string, or null when all advanced options are valid.
+ */
+export function validateAdvancedConfig(): string | null {
+    const result = parseAdvancedConfigInput();
+    return result.valid ? null : `Invalid ${result.error}.`;
+}
+
+/**
+ * Disables all session config fields after prompt preflight accepts the session.
  */
 export function lockSessionConfig(): void {
     inputDir.disabled = true;
@@ -94,6 +136,7 @@ export function lockSessionConfig(): void {
         input.disabled = true;
     }
     optTemperature.disabled = true;
+    optOnlySystemAppend.disabled = true;
 }
 
 /**
@@ -110,6 +153,7 @@ export function unlockSessionConfig(): void {
         input.disabled = false;
     }
     optTemperature.disabled = false;
+    optOnlySystemAppend.disabled = false;
 }
 
 /**
@@ -131,16 +175,39 @@ export function resetDefaults(): void {
         input.value = String(CONFIG_FIELD_SPECS[key].fallback);
     }
     optTemperature.value = "";
+    optOnlySystemAppend.checked = false;
+}
+
+/**
+ * Validates the provider fields required to fetch models.
+ *
+ * @returns An alert message string, or null if the endpoint and API key are valid.
+ */
+export function validateConnectionConfig(): string | null {
+    if (!inputEndpoint.value) return "Please enter an endpoint URL.";
+    if (!isValidEndpointUrl(inputEndpoint.value)) {
+        return "Invalid endpoint URL.";
+    }
+    if (!isValidApiKey(inputApiKey.value)) return "Invalid API key.";
+    return null;
 }
 
 /**
  * Validates that required config fields are filled before sending.
  *
- * @returns An error message string, or null if valid.
+ * @returns An alert message string, or null if valid.
  */
 export function validateConfig(): string | null {
     if (!inputDir.value) return "Please select a BAM directory.";
-    if (!inputEndpoint.value) return "Please enter an endpoint URL.";
+    if (
+        inputDir.value !== inputDir.value.trim() ||
+        inputDir.value.length > MAX_INPUT_PATH_LENGTH
+    ) {
+        return "Invalid BAM directory path.";
+    }
+    const connectionError = validateConnectionConfig();
+    if (connectionError) return connectionError;
     if (!inputModel.value) return "Please enter a model name.";
-    return null;
+    if (!isValidModel(inputModel.value)) return "Invalid model name.";
+    return validateAdvancedConfig();
 }

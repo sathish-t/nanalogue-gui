@@ -32,7 +32,7 @@ export type FetchModelsResult = Exclude<
  * @param endpoint - The base URL of the LLM API endpoint.
  * @returns The detected provider, or "openai-compat" as a fallback.
  */
-export function detectProvider(endpoint: string): Provider {
+export function detectProviderForModelDiscovery(endpoint: string): Provider {
     let hostname: string;
     try {
         hostname = new URL(endpoint).hostname;
@@ -279,7 +279,8 @@ export async function fetchModels(
     providerOverride?: Provider,
     timeoutMs?: number,
 ): Promise<FetchModelsResult> {
-    const provider = providerOverride ?? detectProvider(endpointUrl);
+    const provider =
+        providerOverride ?? detectProviderForModelDiscovery(endpointUrl);
     const timeout = timeoutMs ?? MODEL_LIST_TIMEOUT_MS;
 
     try {

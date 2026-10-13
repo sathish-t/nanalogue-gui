@@ -1,21 +1,17 @@
 // Unit tests for chat orchestrator pure functions and adversarial edge cases.
-// Tests pruneFailedRounds, facts extraction, context pipeline, runSandboxGuarded, and adversarial edge cases.
+// Tests context limits, runSandboxGuarded, and adversarial edge cases.
 // handleUserMessage end-to-end tests live in chat-orchestrator-handle-message.test.ts.
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-    addFact,
     applySlidingWindow,
     deriveHistoryBudgetTokens,
-    evictFacts,
     extractCodeFromFences,
-    extractFacts,
     getLastSentMessages,
     handleUserMessage,
-    pruneFailedRounds,
     resetLastSentMessages,
     runSandboxGuarded,
     transformContext,
@@ -25,136 +21,7 @@ import {
     type MockServer,
     startMockServer,
 } from "./chat-orchestrator-test-utils";
-import type {
-    AiChatConfig,
-    AiChatEvent,
-    Fact,
-    HistoryEntry,
-} from "./chat-types";
-import { renderFactsBlock } from "./sandbox-prompt";
-
-describe("pruneFailedRounds", () => {
-    it("drops old failed rounds but keeps the most recent one", () => {
-        const history: HistoryEntry[] = [
-            { role: "user", content: "How many reads?" },
-            { role: "assistant", content: "x = bad_code1" },
-            {
-                role: "user",
-                content: 'Code execution result: {"success":false}',
-                isExecutionResult: true,
-                executionStatus: "error",
-            },
-            { role: "assistant", content: "x = bad_code2" },
-            {
-                role: "user",
-                content: 'Code execution result: {"success":false}',
-                isExecutionResult: true,
-                executionStatus: "error",
-            },
-            { role: "assistant", content: "print('good')" },
-            {
-                role: "user",
-                content: 'Code execution result: {"success":true}',
-                isExecutionResult: true,
-                executionStatus: "ok",
-            },
-            { role: "assistant", content: "There are 42 reads." },
-        ];
-        const pruned = pruneFailedRounds(history);
-        // First failed pair removed, second (most recent) kept
-        expect(pruned).toHaveLength(6);
-        expect(pruned.some((m) => m.content === "x = bad_code1")).toBe(false);
-        expect(pruned.some((m) => m.content === "x = bad_code2")).toBe(true);
-    });
-
-    it("keeps the only failed round (it is the most recent)", () => {
-        const history: HistoryEntry[] = [
-            { role: "user", content: "How many reads?" },
-            { role: "assistant", content: "x = bad_code" },
-            {
-                role: "user",
-                content: 'Code execution result: {"success":false}',
-                isExecutionResult: true,
-                executionStatus: "error",
-            },
-            { role: "assistant", content: "print('good')" },
-            {
-                role: "user",
-                content: 'Code execution result: {"success":true}',
-                isExecutionResult: true,
-                executionStatus: "ok",
-            },
-            { role: "assistant", content: "There are 42 reads." },
-        ];
-        const pruned = pruneFailedRounds(history);
-        // Single failed pair is the most recent — kept
-        expect(pruned).toHaveLength(6);
-        expect(pruned.some((m) => m.content === "x = bad_code")).toBe(true);
-    });
-
-    it("preserves all-successful rounds unchanged", () => {
-        const history: HistoryEntry[] = [
-            { role: "user", content: "Count reads" },
-            { role: "assistant", content: "print(100)" },
-            {
-                role: "user",
-                content: 'Code execution result: {"success":true}',
-                isExecutionResult: true,
-                executionStatus: "ok",
-            },
-            { role: "assistant", content: "100 reads." },
-        ];
-        const pruned = pruneFailedRounds(history);
-        expect(pruned).toHaveLength(4);
-    });
-
-    it("handles turns with no execution results", () => {
-        const history: HistoryEntry[] = [
-            { role: "user", content: "Hello" },
-            { role: "assistant", content: "Hi there!" },
-        ];
-        const pruned = pruneFailedRounds(history);
-        expect(pruned).toHaveLength(2);
-    });
-
-    it("prunes all but most recent consecutive failed round", () => {
-        const history: HistoryEntry[] = [
-            { role: "user", content: "query" },
-            { role: "assistant", content: "bad1" },
-            {
-                role: "user",
-                content: "error1",
-                isExecutionResult: true,
-                executionStatus: "error",
-            },
-            { role: "assistant", content: "bad2" },
-            {
-                role: "user",
-                content: "error2",
-                isExecutionResult: true,
-                executionStatus: "error",
-            },
-            { role: "assistant", content: "print('ok')" },
-        ];
-        const pruned = pruneFailedRounds(history);
-        // First failed pair pruned, second (most recent) kept, plus query + final
-        expect(pruned).toHaveLength(4);
-        expect(pruned[0].content).toBe("query");
-        expect(pruned[1].content).toBe("bad2");
-        expect(pruned[2].content).toBe("error2");
-        expect(pruned[3].content).toBe("print('ok')");
-    });
-
-    it("does not prune user messages without executionStatus", () => {
-        const history: HistoryEntry[] = [
-            { role: "user", content: "Hello" },
-            { role: "assistant", content: "print('hi')" },
-            { role: "user", content: "Another question" },
-        ];
-        const pruned = pruneFailedRounds(history);
-        expect(pruned).toHaveLength(3);
-    });
-});
+import type { AiChatConfig, AiChatEvent, HistoryEntry } from "./chat-types";
 
 describe("applySlidingWindow", () => {
     it("keeps all messages when within budget", () => {
@@ -258,7 +125,7 @@ describe("deriveHistoryBudgetTokens", () => {
 });
 
 describe("transformContext", () => {
-    it("combines pruning and sliding window", () => {
+    it("preserves failed rounds while they fit within the context budget", () => {
         const history: HistoryEntry[] = [
             { role: "user", content: "test" },
             { role: "assistant", content: "bad_code_old" },
@@ -266,255 +133,31 @@ describe("transformContext", () => {
                 role: "user",
                 content: "error_old",
                 isExecutionResult: true,
-                executionStatus: "error",
             },
             { role: "assistant", content: "bad_code_recent" },
             {
                 role: "user",
                 content: "error_recent",
                 isExecutionResult: true,
-                executionStatus: "error",
             },
             { role: "assistant", content: "Done" },
         ];
         const result = transformContext(history, {
             contextBudgetTokens: 10000,
         });
-        // Old failed round should be pruned, most recent kept
-        expect(result.some((m) => m.content === "bad_code_old")).toBe(false);
-        expect(result.some((m) => m.content === "error_old")).toBe(false);
-        expect(result.some((m) => m.content === "bad_code_recent")).toBe(true);
-        expect(result.some((m) => m.content === "error_recent")).toBe(true);
+        expect(result).toEqual(history);
     });
-});
 
-describe("addFact", () => {
-    it("adds a new fact", () => {
-        const facts: Fact[] = [];
-        addFact(facts, {
-            type: "file",
-            filename: "test.bam",
-            roundId: "round-1",
-            timestamp: 1000,
+    it("still drops the oldest messages when the context budget is exceeded", () => {
+        const history: HistoryEntry[] = Array.from({ length: 20 }, (_, i) => ({
+            role: "user" as const,
+            content: `Message ${i} ${"x".repeat(200)}`,
+        }));
+        const result = transformContext(history, {
+            contextBudgetTokens: 100,
         });
-        expect(facts).toHaveLength(1);
-    });
-
-    it("replaces fact with same key", () => {
-        const facts: Fact[] = [
-            {
-                type: "file",
-                filename: "test.bam",
-                roundId: "round-1",
-                timestamp: 1000,
-            },
-        ];
-        addFact(facts, {
-            type: "file",
-            filename: "test.bam",
-            roundId: "round-2",
-            timestamp: 2000,
-        });
-        expect(facts).toHaveLength(1);
-        expect(facts[0].roundId).toBe("round-2");
-    });
-});
-
-describe("evictFacts", () => {
-    it("does not evict when under limit", () => {
-        const facts: Fact[] = [
-            {
-                type: "file",
-                filename: "test.bam",
-                roundId: "round-1",
-                timestamp: 1000,
-            },
-        ];
-        evictFacts(facts);
-        expect(facts).toHaveLength(1);
-    });
-
-    it("evicts oldest filter facts when over limit", () => {
-        const facts: Fact[] = [];
-        // Add many filter facts to exceed 2KB
-        for (let i = 0; i < 50; i++) {
-            facts.push({
-                type: "filter",
-                description: `filter_${i}_${"x".repeat(50)}`,
-                roundId: `round-${i}`,
-                timestamp: i,
-            });
-        }
-        evictFacts(facts);
-        expect(facts.length).toBeLessThan(50);
-    });
-
-    it("evicts oldest file facts after exhausting filter facts", () => {
-        const facts: Fact[] = [];
-        // Add many file facts (no filter facts) to exceed 2KB
-        for (let i = 0; i < 50; i++) {
-            facts.push({
-                type: "file",
-                filename: `sample_${i}_${"x".repeat(50)}.bam`,
-                roundId: `round-${i}`,
-                timestamp: i,
-            });
-        }
-        evictFacts(facts);
-        expect(facts.length).toBeLessThan(50);
-        // Oldest should be evicted first — remaining should have higher timestamps
-        const timestamps = facts.map((f) => f.timestamp);
-        expect(timestamps).toEqual([...timestamps].sort((a, b) => a - b));
-    });
-
-    it("preserves output facts during eviction", () => {
-        const facts: Fact[] = [
-            {
-                type: "output",
-                path: "ai_chat_output/results.bed",
-                roundId: "round-0",
-                timestamp: 0,
-            },
-        ];
-        // Add many filter facts
-        for (let i = 0; i < 50; i++) {
-            facts.push({
-                type: "filter",
-                description: `filter_${i}_${"x".repeat(50)}`,
-                roundId: `round-${i + 1}`,
-                timestamp: i + 1,
-            });
-        }
-        evictFacts(facts);
-        const outputFact = facts.find((f) => f.type === "output");
-        expect(outputFact).toBeDefined();
-    });
-
-    it("evicts filter facts before file facts when both are present", () => {
-        const facts: Fact[] = [];
-        for (let i = 0; i < 30; i++) {
-            facts.push({
-                type: "file",
-                filename: `file_${i}_${"x".repeat(80)}.bam`,
-                roundId: `file-round-${i}`,
-                timestamp: i,
-            });
-            facts.push({
-                type: "filter",
-                description: `filter_${i}_${"x".repeat(80)}`,
-                roundId: `filter-round-${i}`,
-                timestamp: i,
-            });
-        }
-
-        evictFacts(facts);
-
-        expect(facts.some((fact) => fact.type === "file")).toBe(true);
-        const remainingFilterTimestamps = facts
-            .filter((fact) => fact.type === "filter")
-            .map((fact) => fact.timestamp);
-        if (remainingFilterTimestamps.length > 0) {
-            expect(Math.min(...remainingFilterTimestamps)).toBeGreaterThan(0);
-        }
-    });
-});
-
-describe("renderFactsBlock", () => {
-    it("returns empty string for no facts", () => {
-        expect(renderFactsBlock([])).toBe("");
-    });
-
-    it("renders facts as JSON block", () => {
-        const facts: Fact[] = [
-            {
-                type: "file",
-                filename: "test.bam",
-                roundId: "round-1",
-                timestamp: 1000,
-            },
-        ];
-        const block = renderFactsBlock(facts);
-        expect(block).toContain("Conversation facts");
-        expect(block).toContain("test.bam");
-        expect(block).toContain("```json");
-        // Should not include internal fields
-        expect(block).not.toContain("roundId");
-        expect(block).not.toContain("timestamp");
-    });
-});
-
-describe("extractFacts", () => {
-    it("extracts file facts from successful result", () => {
-        const facts: Fact[] = [];
-        extractFacts(
-            { success: true, value: 42 },
-            { code: 'x = read_info("test.bam")' },
-            "round-1",
-            facts,
-        );
-        expect(facts).toHaveLength(1);
-        expect(facts[0].type).toBe("file");
-        const fileFact = facts[0] as { /** Filename. */ filename: string };
-        expect(fileFact.filename).toBe("test.bam");
-    });
-
-    it("skips extraction for failed results", () => {
-        const facts: Fact[] = [];
-        extractFacts(
-            { success: false, errorType: "RuntimeError", message: "bad" },
-            { code: 'x = read_info("test.bam")' },
-            "round-1",
-            facts,
-        );
-        expect(facts).toHaveLength(0);
-    });
-
-    it("extracts filter facts from kwargs in successful result", () => {
-        const facts: Fact[] = [];
-        extractFacts(
-            { success: true, value: "ok" },
-            { code: 'window_reads("f.bam", region="chr1:1-100")' },
-            "round-1",
-            facts,
-        );
-        const filterFact = facts.find((f) => f.type === "filter");
-        expect(filterFact).toBeDefined();
-        const desc = (filterFact as { /** Desc. */ description: string })
-            .description;
-        expect(desc).toContain("region=chr1:1-100");
-    });
-
-    it("does not extract filter facts from failed result", () => {
-        const facts: Fact[] = [];
-        extractFacts(
-            { success: false, errorType: "RuntimeError", message: "bad" },
-            { code: 'window_reads("f.bam", region="chr1:1-100")' },
-            "round-1",
-            facts,
-        );
-        expect(facts).toHaveLength(0);
-    });
-
-    it("extracts output facts from successful write_file results", () => {
-        const facts: Fact[] = [];
-        extractFacts(
-            {
-                success: true,
-                value: {
-                    path: "ai_chat_output/results.bed",
-                    bytes_written: 123,
-                },
-            },
-            { code: 'write_file("results.bed", "hello")' },
-            "round-1",
-            facts,
-        );
-        expect(facts).toContainEqual({
-            type: "output",
-            path: "ai_chat_output/results.bed",
-            roundId: "round-1",
-            timestamp: expect.any(Number),
-        });
+        expect(result.length).toBeLessThan(history.length);
+        expect(result[result.length - 1]).toEqual(history[history.length - 1]);
     });
 });
 
@@ -629,7 +272,8 @@ describe("adversarial/edge-case tests", () => {
      * @param options.signal - Abort signal.
      * @param options.config - Config overrides.
      * @param options.appendSystemPrompt - Optional text to append to the system prompt.
-     * @returns The orchestrator result, history, facts, and events.
+     * @param options.history - Optional pre-seeded conversation history.
+     * @returns The orchestrator result, history, and events.
      */
     async function callOrchestrator(
         serverUrl: string,
@@ -642,19 +286,18 @@ describe("adversarial/edge-case tests", () => {
             config?: Partial<AiChatConfig>;
             /** Optional text to append to the system prompt. */
             appendSystemPrompt?: string;
+            /** Optional pre-seeded conversation history. */
+            history?: HistoryEntry[];
         } = {},
     ): Promise<{
         /** Orchestrator return value. */
         result: Awaited<ReturnType<typeof handleUserMessage>>;
         /** History after call. */
         history: HistoryEntry[];
-        /** Facts after call. */
-        facts: Fact[];
         /** Events emitted. */
         events: AiChatEvent[];
     }> {
-        const history: HistoryEntry[] = [];
-        const facts: Fact[] = [];
+        const history = options.history ?? [];
         const events: AiChatEvent[] = [];
 
         const result = await handleUserMessage({
@@ -673,12 +316,11 @@ describe("adversarial/edge-case tests", () => {
                 events.push(e);
             },
             history,
-            facts,
             signal: options.signal ?? new AbortController().signal,
             appendSystemPrompt: options.appendSystemPrompt,
         });
 
-        return { result, history, facts, events };
+        return { result, history, events };
     }
 
     it("throws SyntaxError immediately on malformed JSON 200 response", async () => {
@@ -787,6 +429,66 @@ describe("adversarial/edge-case tests", () => {
         expect(result.text).toContain("forced");
     });
 
+    it("stops executing code after the cumulative sandbox budget is exhausted", async () => {
+        const responses: MockCompletion[] = [
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "continue_thinking()\n42",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: 'print("must not execute")',
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ];
+        mockServer = await startMockServer(responses);
+        const nowSpy = vi
+            .spyOn(Date, "now")
+            // First response timestamp, then sandbox execution start/end.
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(30 * 60 * 1000)
+            .mockReturnValue(30 * 60 * 1000);
+
+        try {
+            const { result, history, events } = await callOrchestrator(
+                mockServer.url,
+                { config: { maxCodeRounds: 3 } },
+            );
+
+            expect(mockServer.requestCount()).toBe(2);
+            expect(result.steps).toHaveLength(1);
+            expect(result.text).toBe(
+                "(Sandbox execution budget exhausted. The model's response could not be executed.)",
+            );
+            expect(
+                events.filter((event) => event.type === "code_execution_start"),
+            ).toHaveLength(1);
+            expect(
+                history.some((entry) =>
+                    entry.content.includes(
+                        "Maximum cumulative sandbox runtime exceeded",
+                    ),
+                ),
+            ).toBe(true);
+        } finally {
+            nowSpy.mockRestore();
+        }
+    });
+
     it("forced-final with finish_reason length pushes rawFinal to history", async () => {
         const responses: MockCompletion[] = [
             // Round 1: continue_thinking (exhausts maxRounds=1)
@@ -824,6 +526,51 @@ describe("adversarial/edge-case tests", () => {
         const last = history[history.length - 1];
         expect(last.role).toBe("assistant");
         expect(last.content).toBe("print('truncated");
+    });
+
+    it("forced-final rejects malformed native tool markup", async () => {
+        const malformedResponse =
+            '<tool_calls><invoke name="ls"></invoke></tool_calls>';
+        const responses: MockCompletion[] = [
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "continue_thinking()\n42",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: malformedResponse,
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ];
+        mockServer = await startMockServer(responses);
+
+        const { result, history, events } = await callOrchestrator(
+            mockServer.url,
+            { config: { maxCodeRounds: 1 } },
+        );
+
+        expect(result.text).toContain("did not produce a usable response");
+        expect(
+            events.filter((event) => event.type === "code_execution_start"),
+        ).toHaveLength(1);
+        expect(history).toContainEqual({
+            role: "assistant",
+            content: malformedResponse,
+        });
+        expect(history.at(-1)?.content).toContain("MalformedAssistantProtocol");
     });
 
     it("forced-final fence-extraction retry on SyntaxError", async () => {
@@ -917,6 +664,136 @@ describe("adversarial/edge-case tests", () => {
         expect(stored?.[stored.length - 1].content).toBe("ok\n");
     });
 
+    it("sends all earlier failed rounds in the next LLM request", async () => {
+        const responses: MockCompletion[] = [
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "if True print('first')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "if False print('second')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('ok')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ];
+        mockServer = await startMockServer(responses);
+
+        const { result, history } = await callOrchestrator(mockServer.url, {
+            config: { maxCodeRounds: 3 },
+        });
+
+        expect(result.text).toBe("ok\n");
+        const finalRequestMessages = mockServer.requestBodies()[2]
+            .messages as Array<{
+            /** Message role sent to the mock LLM. */
+            role: string;
+            /** Message content sent to the mock LLM. */
+            content: string;
+        }>;
+        const finalRequestContents = finalRequestMessages.map(
+            (message) => message.content,
+        );
+        const firstCodeIndex = finalRequestContents.indexOf(
+            "if True print('first')",
+        );
+        const secondCodeIndex = finalRequestContents.indexOf(
+            "if False print('second')",
+        );
+        expect(firstCodeIndex).toBeGreaterThanOrEqual(0);
+        expect(finalRequestContents[firstCodeIndex + 1]).toContain(
+            "SyntaxError",
+        );
+        expect(secondCodeIndex).toBeGreaterThan(firstCodeIndex + 1);
+        expect(finalRequestContents[secondCodeIndex + 1]).toContain(
+            "SyntaxError",
+        );
+
+        const historyContents = history.map((message) => message.content);
+        const firstHistoryCodeIndex = historyContents.indexOf(
+            "if True print('first')",
+        );
+        const secondHistoryCodeIndex = historyContents.indexOf(
+            "if False print('second')",
+        );
+        expect(historyContents[firstHistoryCodeIndex + 1]).toContain(
+            "SyntaxError",
+        );
+        expect(secondHistoryCodeIndex).toBeGreaterThan(
+            firstHistoryCodeIndex + 1,
+        );
+        expect(historyContents[secondHistoryCodeIndex + 1]).toContain(
+            "SyntaxError",
+        );
+    });
+
+    it("windows old failed rounds out of the LLM request but not raw history", async () => {
+        const oldCode = `old_failed_code_marker\n${"x".repeat(100_000)}`;
+        const oldFeedback = `Code execution result: old_failure_marker\n${"y".repeat(100_000)}`;
+        const history: HistoryEntry[] = [
+            { role: "assistant", content: oldCode },
+            {
+                role: "user",
+                content: oldFeedback,
+                isExecutionResult: true,
+            },
+        ];
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "print('ok')",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        const { result } = await callOrchestrator(mockServer.url, {
+            message: "newest_user_prompt_marker",
+            history,
+        });
+
+        expect(result.text).toBe("ok\n");
+        expect(history[0].content).toBe(oldCode);
+        expect(history[1].content).toBe(oldFeedback);
+        const requestContents = (
+            mockServer.requestBodies()[0].messages as Array<{
+                /** Message content sent to the mock LLM. */
+                content: string;
+            }>
+        ).map((message) => message.content);
+        expect(requestContents).not.toContain(oldCode);
+        expect(requestContents).not.toContain(oldFeedback);
+        expect(requestContents).toContain("newest_user_prompt_marker");
+    });
+
     it("lastSentMessages includes assistant response from forced-final path", async () => {
         resetLastSentMessages();
         const responses: MockCompletion[] = [
@@ -981,9 +858,9 @@ describe("adversarial/edge-case tests", () => {
         ];
         mockServer = await startMockServer(responses);
 
-        const start = Date.now();
+        const start = performance.now();
         const { result } = await callOrchestrator(mockServer.url);
-        const elapsed = Date.now() - start;
+        const elapsed = performance.now() - start;
 
         expect(result.text).toBe("ok\n");
         // Retry-After: 1 means 1 second delay; 500 ms lower bound gives
@@ -1213,13 +1090,13 @@ describe("startMockServer utility", () => {
                 _delayMs: 50,
             },
         ]);
-        const start = Date.now();
+        const start = performance.now();
         const res = await fetch(`${server.url}/chat/completions`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ messages: [] }),
         });
-        const elapsed = Date.now() - start;
+        const elapsed = performance.now() - start;
         await server.close();
         expect(res.status).toBe(200);
         expect(elapsed).toBeGreaterThanOrEqual(40);

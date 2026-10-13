@@ -12,7 +12,6 @@ function minimalInput(
 ): QCConfigInputSnapshot {
     return {
         bamPath: "/data/sample.bam",
-        treatAsUrl: false,
         tag: "m",
         modStrand: "bc",
         sampleFraction: "5",
@@ -55,7 +54,6 @@ describe("buildQCConfig", () => {
             success: true,
             config: {
                 bamPath: "/data/sample.bam",
-                treatAsUrl: false,
                 tag: "m",
                 modStrand: "bc",
                 region: undefined,
@@ -81,7 +79,6 @@ describe("buildQCConfig", () => {
     it("builds a full config with region, probability, and read filters", () => {
         const result = buildQCConfig(
             minimalInput({
-                treatAsUrl: true,
                 region: " chr1:100-500 ",
                 modRegion: "chr1:200-300",
                 fullRegion: true,
@@ -100,7 +97,6 @@ describe("buildQCConfig", () => {
         expect(result.success).toBe(true);
         if (result.success) {
             expect(result.config).toMatchObject({
-                treatAsUrl: true,
                 region: "chr1:100-500",
                 modRegion: "chr1:200-300",
                 fullRegion: true,

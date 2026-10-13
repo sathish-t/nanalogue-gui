@@ -26,10 +26,9 @@ async function loadLocateHandlers(api: Record<string, unknown>) {
     );
     const bam = document.getElementById("bam-source") as HTMLElement & {
         value: string;
-        isUrl: boolean;
         disabled: boolean;
     };
-    Object.assign(bam, { value: "/reads.bam", isUrl: false, disabled: false });
+    Object.assign(bam, { value: "/reads.bam", disabled: false });
     const output = document.getElementById("output-source") as HTMLElement & {
         value: string;
         disabled: boolean;
@@ -99,6 +98,85 @@ describe("Locate config form handlers", () => {
         );
     });
 
+    it("does not validate a new BAM against old metadata while its peek is pending", async () => {
+        let resolvePeek: ((value: PeekResult) => void) | undefined;
+        const api = {
+            locatePickBam: vi.fn(),
+            locatePickReadIds: vi.fn().mockResolvedValue("/ids.txt"),
+            locatePickOutput: vi.fn(),
+            locateCheckFileExists: vi.fn(),
+            locateCountReadIds: vi.fn().mockResolvedValue(4),
+            locateGenerateBed: vi.fn().mockResolvedValue({
+                totalIds: 4,
+                found: 4,
+                bedEntries: 4,
+                notFound: 0,
+                unmapped: 0,
+            }),
+            peekBam: vi
+                .fn()
+                .mockResolvedValueOnce(peekResult)
+                .mockImplementationOnce(
+                    () =>
+                        new Promise<PeekResult>((resolve) => {
+                            resolvePeek = resolve;
+                        }),
+                ),
+            locateGoBack: vi.fn(),
+        };
+        const { bam } = await loadLocateHandlers(api);
+        bam.dispatchEvent(
+            new CustomEvent("bam-selected", { detail: { value: bam.value } }),
+        );
+        await vi.waitFor(() =>
+            expect(
+                document.getElementById("file-summary")?.textContent,
+            ).toContain("chr1"),
+        );
+        (
+            document.getElementById("btn-browse-read-ids") as HTMLButtonElement
+        ).click();
+        await vi.waitFor(() =>
+            expect(
+                document.getElementById("file-summary")?.textContent,
+            ).toContain("4 read IDs"),
+        );
+
+        bam.value = "/newer.bam";
+        bam.dispatchEvent(
+            new CustomEvent("bam-selected", { detail: { value: bam.value } }),
+        );
+        (document.getElementById("region") as HTMLInputElement).value =
+            "chr2:100-900";
+        (document.getElementById("btn-generate") as HTMLButtonElement).click();
+        expect(api.locateGenerateBed).toHaveBeenCalledWith({
+            bamPath: "/newer.bam",
+            readIdPath: "/ids.txt",
+            outputPath: "/output.bed",
+            overwriteConfirmed: false,
+            region: "chr2:100-900",
+            fullRegion: false,
+        });
+        expect(alert).not.toHaveBeenCalled();
+        expect(
+            document.getElementById("file-summary")?.textContent,
+        ).not.toContain("chr1");
+        expect(document.getElementById("file-summary")?.textContent).toContain(
+            "4 read IDs",
+        );
+
+        resolvePeek?.({
+            ...peekResult,
+            contigs: ["chr2"],
+            allContigs: { chr2: 20_000 },
+        });
+        await vi.waitFor(() =>
+            expect(
+                document.getElementById("file-summary")?.textContent,
+            ).toContain("chr2"),
+        );
+    });
+
     it("submits current form values, renders results, and restores controls", async () => {
         const result = {
             totalIds: 4,
@@ -127,7 +205,7 @@ describe("Locate config form handlers", () => {
         const { bam, output } = await loadLocateHandlers(api);
         bam.dispatchEvent(
             new CustomEvent("bam-selected", {
-                detail: { value: "/reads.bam", isUrl: false },
+                detail: { value: "/reads.bam" },
             }),
         );
         (
@@ -139,6 +217,15 @@ describe("Locate config form handlers", () => {
                     .disabled,
             ).toBe(false),
         );
+        const region = document.getElementById("region") as HTMLInputElement;
+        region.value = "chr1:0-20000";
+        region.dispatchEvent(new Event("input"));
+        (document.getElementById("btn-generate") as HTMLButtonElement).click();
+        expect(locateGenerateBed).not.toHaveBeenCalled();
+        expect(alert).toHaveBeenCalledWith(
+            expect.stringContaining("Invalid region"),
+        );
+        region.value = "chr1:100-900";
         (document.getElementById("btn-generate") as HTMLButtonElement).click();
         await vi.waitFor(() =>
             expect(locateGenerateBed).toHaveBeenCalledOnce(),
@@ -161,7 +248,8 @@ describe("Locate config form handlers", () => {
             readIdPath: "/ids.txt",
             outputPath: "/output.bed",
             overwriteConfirmed: false,
-            treatAsUrl: false,
+            region: "chr1:100-900",
+            fullRegion: false,
         });
         finishGeneration?.(result);
         await vi.waitFor(() =>
@@ -209,7 +297,7 @@ describe("Locate config form handlers", () => {
         const { bam, output } = await loadLocateHandlers(api);
         bam.dispatchEvent(
             new CustomEvent("bam-selected", {
-                detail: { value: "/reads.bam", isUrl: false },
+                detail: { value: "/reads.bam" },
             }),
         );
         (

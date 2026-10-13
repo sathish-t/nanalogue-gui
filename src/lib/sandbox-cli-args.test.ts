@@ -22,9 +22,12 @@ describe("parseNumericArg", () => {
         expect(result).toEqual({ ok: true, value: 42 });
     });
 
-    it("rounds a float to the nearest integer", () => {
+    it("rejects a decimal value", () => {
         const result = parseNumericArg("my-flag", "42.7", spec);
-        expect(result).toEqual({ ok: true, value: 43 });
+        expect(result).toEqual({
+            ok: false,
+            error: "--my-flag must contain decimal digits only",
+        });
     });
 
     it("accepts the exact minimum", () => {
@@ -42,8 +45,7 @@ describe("parseNumericArg", () => {
         expect(result.ok).toBe(false);
         if (!result.ok) {
             expect(result.error).toContain("--my-flag");
-            expect(result.error).toContain('"abc"');
-            expect(result.error).toContain("not a valid number");
+            expect(result.error).toContain("only signs");
         }
     });
 
@@ -57,8 +59,7 @@ describe("parseNumericArg", () => {
         expect(result.ok).toBe(false);
         if (!result.ok) {
             expect(result.error).toContain("--my-flag");
-            expect(result.error).toContain("0");
-            expect(result.error).toContain("below the minimum of 1");
+            expect(result.error).toContain("between 1 and 100");
         }
     });
 
@@ -67,8 +68,7 @@ describe("parseNumericArg", () => {
         expect(result.ok).toBe(false);
         if (!result.ok) {
             expect(result.error).toContain("--my-flag");
-            expect(result.error).toContain("101");
-            expect(result.error).toContain("above the maximum of 100");
+            expect(result.error).toContain("between 1 and 100");
         }
     });
 
@@ -76,8 +76,18 @@ describe("parseNumericArg", () => {
         const result = parseNumericArg("max-duration-secs", "0", spec);
         expect(result.ok).toBe(false);
         if (!result.ok) {
-            expect(result.error).toMatch(/^--max-duration-secs:/);
+            expect(result.error).toMatch(/^--max-duration-secs /);
         }
+    });
+
+    it.each([
+        " 42",
+        "42 ",
+        "+42",
+        "1e1",
+        "0x2a",
+    ])("rejects non-canonical integer syntax %j", (value) => {
+        expect(parseNumericArg("my-flag", value, spec).ok).toBe(false);
     });
 });
 

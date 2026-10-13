@@ -21,15 +21,13 @@
     </header>
 
     <main>
-      <!-- Disclaimer about performance with large or remote BAM files. -->
+      <!-- Disclaimer about performance with large BAM files. -->
       <div class="disclaimer-info">
-        If the BAM file is large, this operation may take some time. If the file
-        is remote, a significant amount of data may be downloaded. Restricting to a
-        region of interest speeds up processing and significantly reduces
-        download sizes.
+        If the BAM file is large, this operation may take some time. Restricting
+        to a region of interest speeds up processing.
       </div>
 
-      <!-- BAM source selection: local file or remote URL. -->
+      <!-- Local BAM file selection. -->
       <section class="config-section">
         <h2>BAM Source</h2>
         <bam-resource-input id="bam-source"></bam-resource-input>

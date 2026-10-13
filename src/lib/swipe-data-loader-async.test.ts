@@ -128,17 +128,16 @@ describe("loadContigSizes", () => {
         expect(result).toEqual({ chr1: 5000, chr2: 10000 });
     });
 
-    it("passes bamPath and treatAsUrl to peek", async () => {
+    it("passes the local BAM path to peek", async () => {
         setMockResolvedValue(peek, {
             contigs: { chr1: 5000 },
             modifications: [],
         });
 
-        await loadContigSizes("http://example.com/file.bam", true);
+        await loadContigSizes("/data/sample.bam");
 
         expect(peek).toHaveBeenCalledWith({
-            bamPath: "http://example.com/file.bam",
-            treatAsUrl: true,
+            bamPath: "/data/sample.bam",
         });
     });
 
@@ -153,7 +152,7 @@ describe("loadContigSizes", () => {
         expect(result).toEqual({});
     });
 
-    it("treats undefined treatAsUrl as falsy (no explicit true)", async () => {
+    it("does not set the native URL option", async () => {
         setMockResolvedValue(peek, {
             contigs: { chr1: 5000 },
             modifications: [],
@@ -161,8 +160,9 @@ describe("loadContigSizes", () => {
 
         await loadContigSizes("/data/sample.bam");
 
-        const callArg = vi.mocked(peek).mock.calls[0][0];
-        expect(callArg.treatAsUrl).toBeUndefined();
+        expect(vi.mocked(peek).mock.calls[0][0]).toEqual({
+            bamPath: "/data/sample.bam",
+        });
     });
 });
 

@@ -32,9 +32,8 @@ are created.
 | `swipe-data-loader.ts` | `swipe-data-loader.test.ts`, `swipe-data-loader-async.test.ts` | A | Pure helpers + async functions (`loadContigSizes`, `loadPlotData`) covered via mocked `@nanalogue/node`; 100% line coverage |
 | `swipe-contract.ts` | `swipe-contract.test.ts` | A | Swipe request validation and normalization; 100% line coverage |
 | `locate-data-loader.ts` | `locate-data-loader.test.ts` | A | |
-| `chat-orchestrator.ts` | `chat-orchestrator.test.ts`, `chat-orchestrator-handle-message-*.test.ts`, `cross-endpoint.test.ts` | A | Mocked LLM responses in `tests/fixtures/`; split handle-message suites cover multi-round, recovery, dump-command, and prompt-option paths; 98.68% line coverage |
+| `chat-orchestrator.ts` | `chat-orchestrator.test.ts`, `chat-orchestrator-handle-message-*.test.ts`, `cross-endpoint.test.ts` | A | Mocked LLM responses in `tests/fixtures/`; split handle-message suites cover multi-round, recovery, dump-command, and prompt-option paths; 100% line coverage |
 | `chat-orchestrator-execution.ts` | `chat-orchestrator-split-modules.test.ts`, handle-message suites | A | Sandbox locking, feedback truncation, and terminal overflow; 100% line coverage |
-| `chat-orchestrator-facts.ts` | handle-message suites | A | Runtime fact collection; 100% line coverage |
 | `chat-orchestrator-helpers.ts` | `chat-orchestrator-helpers.test.ts`, handle-message suites | A | Dump commands and orchestration helpers; 100% line coverage |
 | `chat-orchestrator-history.ts` | handle-message suites | A | Conversation-history preparation; 100% line coverage |
 | `chat-orchestrator-llm.ts` | `chat-orchestrator-split-modules.test.ts`, `cross-endpoint.test.ts` | A | Provider requests, retry paths, and token estimates; 100% line coverage |

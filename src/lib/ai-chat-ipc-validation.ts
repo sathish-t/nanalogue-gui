@@ -7,6 +7,11 @@ import {
     MAX_MESSAGE_BYTES,
     TEMPERATURE_SPEC,
 } from "./ai-chat-constants";
+import {
+    isValidApiKey,
+    isValidEndpointUrl,
+    isValidModel,
+} from "./chat-provider-input-checks";
 import type { AiChatConfig, ConfigFieldSpec } from "./chat-types";
 
 /** Successful validation result with typed data. */
@@ -28,25 +33,6 @@ interface InvalidResult {
 /** Result of IPC payload validation. */
 type ValidationResult<T> = ValidResult<T> | InvalidResult;
 
-/** Successful URL validation result. */
-interface ValidUrlResult {
-    /** Indicates the URL passed validation. */
-    ok: true;
-    /** The parsed URL object. */
-    url: URL;
-}
-
-/** Failed URL validation result. */
-interface InvalidUrlResult {
-    /** Indicates the URL failed validation. */
-    ok: false;
-    /** Description of the URL validation failure. */
-    error: string;
-}
-
-/** Result of URL validation. */
-type UrlValidationResult = ValidUrlResult | InvalidUrlResult;
-
 /** Validated payload for ai-chat-list-models. */
 export interface ListModelsPayload {
     /** The endpoint URL to query for models. */
@@ -64,6 +50,8 @@ export interface GetSystemPromptPayload {
      * Optional — when absent the prompt is shown without any custom append.
      */
     allowedDir?: string;
+    /** Whether SYSTEM_APPEND.md should replace the built-in sandbox prompt. */
+    onlySystemAppend?: boolean;
 }
 
 /** Validated payload for ai-chat-send-message. */
@@ -80,42 +68,33 @@ export interface SendMessagePayload {
     allowedDir: string;
     /** The orchestrator configuration. */
     config: AiChatConfig;
+    /** Whether SYSTEM_APPEND.md should replace the built-in sandbox prompt. */
+    onlySystemAppend?: boolean;
 }
 
 /**
- * Validates a URL string, rejecting malformed URLs and embedded credentials.
+ * Validates the optional SYSTEM_APPEND-only prompt mode flag.
  *
- * @param url - The URL string to validate.
- * @returns The parsed URL or an error string.
+ * @param value - The untrusted onlySystemAppend field value.
+ * @returns The boolean or undefined when valid, otherwise an error.
  */
-function validateUrl(url: string): UrlValidationResult {
-    let parsed: URL;
-    try {
-        parsed = new URL(url);
-    } catch {
-        return { ok: false, error: `Invalid URL: ${url}` };
-    }
-    if (parsed.username || parsed.password) {
+function validateOnlySystemAppend(
+    value: unknown,
+): ValidationResult<boolean | undefined> {
+    if (value !== undefined && typeof value !== "boolean") {
         return {
-            ok: false,
-            error: "URL must not contain embedded credentials",
+            valid: false,
+            error: "onlySystemAppend must be a boolean",
         };
     }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        return {
-            ok: false,
-            error: `Unsupported URL scheme: ${parsed.protocol}`,
-        };
-    }
-    return { ok: true, url: parsed };
+    return { valid: true, data: value as boolean | undefined };
 }
 
 /**
  * Validates a numeric config field against its spec.
  *
- * Non-numeric or missing values fall back to the spec default.
- * Numeric values outside [min, max] are rejected with an error string.
- * Valid numbers are rounded to the nearest integer.
+ * Missing values fall back to the spec default. Present values must be finite
+ * integers inside [min, max].
  *
  * @param value - The raw input value.
  * @param spec - The field specification with min, max, fallback, and label.
@@ -125,23 +104,25 @@ function validateNumber(
     value: unknown,
     spec: ConfigFieldSpec,
 ): number | string {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
+    if (value === undefined) {
         return spec.fallback;
     }
-    const rounded = Math.round(value);
-    if (rounded < spec.min || rounded > spec.max) {
-        return `${spec.label} must be between ${spec.min.toLocaleString()} and ${spec.max.toLocaleString()} (got ${rounded.toLocaleString()})`;
+    if (typeof value !== "number" || !Number.isSafeInteger(value)) {
+        return `${spec.label} must be an integer`;
     }
-    return rounded;
+    if (value < spec.min || value > spec.max) {
+        return `${spec.label} must be between ${spec.min.toLocaleString()} and ${spec.max.toLocaleString()} (got ${value.toLocaleString()})`;
+    }
+    return value;
 }
 
 /**
  * Validates a raw config object against CONFIG_FIELD_SPECS and TEMPERATURE_SPEC.
  *
- * Iterates over all integer field specs, falling back to defaults for missing
- * or non-numeric values. Temperature is handled separately as an optional
- * float (no rounding, no fallback). Returns a typed AiChatConfig on success
- * or an error string collecting all violations.
+ * Iterates over all integer field specs, falling back only for missing values
+ * and rejecting malformed present values. Temperature is handled separately
+ * as an optional float. Returns a typed AiChatConfig on success or an error
+ * string collecting all violations.
  *
  * @param raw - The raw config record (treated as untrusted input).
  * @returns A validated AiChatConfig or a semicolon-separated error string.
@@ -161,12 +142,12 @@ function validateConfig(raw: Record<string, unknown>): AiChatConfig | string {
     // Temperature is optional and float-valued — handled separately from
     // the integer CONFIG_FIELD_SPECS loop (no Math.round, no fallback).
     let temperature: number | undefined;
-    if (raw.temperature !== undefined && raw.temperature !== null) {
+    if (raw.temperature !== undefined) {
         if (
             typeof raw.temperature !== "number" ||
             !Number.isFinite(raw.temperature)
         ) {
-            temperature = undefined;
+            configErrors.push("temperature must be a finite number");
         } else if (
             raw.temperature < TEMPERATURE_SPEC.min ||
             raw.temperature > TEMPERATURE_SPEC.max
@@ -192,9 +173,9 @@ function validateConfig(raw: Record<string, unknown>): AiChatConfig | string {
 /**
  * Validates the payload for the ai-chat-get-system-prompt IPC channel.
  *
- * The config field is optional — any missing or non-numeric field falls back
- * to its spec default rather than causing a hard error. An absent config
- * object is treated the same as an empty one.
+ * The config field is optional. Missing fields use spec defaults, while
+ * malformed present fields are rejected. An absent config object is treated
+ * the same as an empty one.
  *
  * @param payload - The raw IPC payload.
  * @returns A validation result with the typed payload.
@@ -202,31 +183,52 @@ function validateConfig(raw: Record<string, unknown>): AiChatConfig | string {
 export function validateGetSystemPrompt(
     payload: unknown,
 ): ValidationResult<GetSystemPromptPayload> {
-    const p =
-        typeof payload === "object" && payload !== null
-            ? (payload as Record<string, unknown>)
-            : {};
+    if (typeof payload !== "object" || payload === null) {
+        return { valid: false, error: "Payload must be an object" };
+    }
+    const p = payload as Record<string, unknown>;
 
-    const rawConfig =
-        typeof p.config === "object" && p.config !== null
-            ? (p.config as Record<string, unknown>)
-            : {};
+    if (
+        p.config !== undefined &&
+        (typeof p.config !== "object" ||
+            p.config === null ||
+            Array.isArray(p.config))
+    ) {
+        return { valid: false, error: "config must be an object" };
+    }
+    const rawConfig = (p.config as Record<string, unknown> | undefined) ?? {};
 
     const configResult = validateConfig(rawConfig);
     if (typeof configResult === "string") {
         return { valid: false, error: configResult };
     }
 
-    // allowedDir is optional — accept a non-empty absolute path only,
-    // matching the same constraint enforced by ai-chat-send-message.
-    const allowedDir =
-        typeof p.allowedDir === "string" &&
-        p.allowedDir.length > 0 &&
-        isAbsolute(p.allowedDir)
-            ? p.allowedDir
-            : undefined;
+    const onlySystemAppendResult = validateOnlySystemAppend(p.onlySystemAppend);
+    if (!onlySystemAppendResult.valid) return onlySystemAppendResult;
+    const onlySystemAppend = onlySystemAppendResult.data;
 
-    return { valid: true, data: { config: configResult, allowedDir } };
+    // allowedDir is optional unless onlySystemAppend is requested — that mode
+    // requires SYSTEM_APPEND.md to be looked up in a real analysis directory.
+    if (
+        p.allowedDir !== undefined &&
+        (typeof p.allowedDir !== "string" ||
+            p.allowedDir.length === 0 ||
+            !isAbsolute(p.allowedDir))
+    ) {
+        return { valid: false, error: "allowedDir must be an absolute path" };
+    }
+    const allowedDir = p.allowedDir as string | undefined;
+    if (onlySystemAppend && allowedDir === undefined) {
+        return {
+            valid: false,
+            error: "allowedDir is required when only-system-append is enabled",
+        };
+    }
+
+    return {
+        valid: true,
+        data: { config: configResult, allowedDir, onlySystemAppend },
+    };
 }
 
 /**
@@ -246,10 +248,17 @@ export function validateListModels(
     if (typeof p.endpointUrl !== "string" || p.endpointUrl.length === 0) {
         return { valid: false, error: "endpointUrl is required" };
     }
-    const urlResult = validateUrl(p.endpointUrl);
-    if (!urlResult.ok) return { valid: false, error: urlResult.error };
+    if (!isValidEndpointUrl(p.endpointUrl)) {
+        return { valid: false, error: "Invalid endpoint URL" };
+    }
 
-    const apiKey = typeof p.apiKey === "string" ? p.apiKey : "";
+    if (p.apiKey !== undefined && typeof p.apiKey !== "string") {
+        return { valid: false, error: "apiKey must be a string" };
+    }
+    const apiKey = p.apiKey ?? "";
+    if (!isValidApiKey(apiKey)) {
+        return { valid: false, error: "Invalid API key" };
+    }
 
     return {
         valid: true,
@@ -274,20 +283,36 @@ export function validateSendMessage(
     if (typeof p.endpointUrl !== "string" || p.endpointUrl.length === 0) {
         return { valid: false, error: "endpointUrl is required" };
     }
-    const urlResult = validateUrl(p.endpointUrl);
-    if (!urlResult.ok) return { valid: false, error: urlResult.error };
+    if (!isValidEndpointUrl(p.endpointUrl)) {
+        return { valid: false, error: "Invalid endpoint URL" };
+    }
 
-    const apiKey = typeof p.apiKey === "string" ? p.apiKey : "";
+    if (p.apiKey !== undefined && typeof p.apiKey !== "string") {
+        return { valid: false, error: "apiKey must be a string" };
+    }
+    const apiKey = p.apiKey ?? "";
+    if (!isValidApiKey(apiKey)) {
+        return { valid: false, error: "Invalid API key" };
+    }
 
     if (typeof p.model !== "string" || p.model.length === 0) {
         return { valid: false, error: "model is required" };
+    }
+    if (!isValidModel(p.model)) {
+        return { valid: false, error: "Invalid model name" };
     }
 
     if (typeof p.message !== "string" || p.message.length === 0) {
         return { valid: false, error: "message is required" };
     }
+    if (p.message.trim().length === 0) {
+        return {
+            valid: false,
+            error: "message must not contain only whitespace",
+        };
+    }
     if (Buffer.byteLength(p.message, "utf-8") > MAX_MESSAGE_BYTES) {
-        return { valid: false, error: "message exceeds 100 KB limit" };
+        return { valid: false, error: "message exceeds 1 MiB limit" };
     }
 
     if (typeof p.allowedDir !== "string" || p.allowedDir.length === 0) {
@@ -297,15 +322,24 @@ export function validateSendMessage(
         return { valid: false, error: "allowedDir must be an absolute path" };
     }
 
-    const rawConfig =
-        typeof p.config === "object" && p.config !== null
-            ? (p.config as Record<string, unknown>)
-            : {};
+    if (
+        p.config !== undefined &&
+        (typeof p.config !== "object" ||
+            p.config === null ||
+            Array.isArray(p.config))
+    ) {
+        return { valid: false, error: "config must be an object" };
+    }
+    const rawConfig = (p.config as Record<string, unknown> | undefined) ?? {};
 
     const configResult = validateConfig(rawConfig);
     if (typeof configResult === "string") {
         return { valid: false, error: configResult };
     }
+
+    const onlySystemAppendResult = validateOnlySystemAppend(p.onlySystemAppend);
+    if (!onlySystemAppendResult.valid) return onlySystemAppendResult;
+    const onlySystemAppend = onlySystemAppendResult.data;
 
     return {
         valid: true,
@@ -316,6 +350,7 @@ export function validateSendMessage(
             message: p.message,
             allowedDir: p.allowedDir,
             config: configResult,
+            onlySystemAppend,
         },
     };
 }

@@ -75,7 +75,6 @@ describe("ChatSession", () => {
             expect(args.emitEvent).toBe(emitEvent);
             expect(args.signal).toBeInstanceOf(AbortSignal);
             expect(args.history).toEqual(expect.any(Array));
-            expect(args.facts).toEqual(expect.any(Array));
         });
 
         it("returns the orchestrator result on success", async () => {
@@ -213,16 +212,10 @@ describe("ChatSession", () => {
     });
 
     describe("reset", () => {
-        it("clears history and facts", async () => {
+        it("clears history", async () => {
             setMockImplementation(handleUserMessage, async (opts) => {
-                // Simulate adding to history/facts inside orchestrator
+                // Simulate adding to history inside orchestrator
                 opts.history.push({ role: "user", content: "test" });
-                opts.facts.push({
-                    type: "file",
-                    filename: "x.bam",
-                    roundId: "round-1",
-                    timestamp: 1,
-                });
                 return { text: "", steps: [] };
             });
 
@@ -238,12 +231,10 @@ describe("ChatSession", () => {
 
             // State should be populated
             expect(session.history.length).toBeGreaterThan(0);
-            expect(session.facts.length).toBeGreaterThan(0);
 
             session.reset();
 
             expect(session.history).toHaveLength(0);
-            expect(session.facts).toHaveLength(0);
         });
 
         it("calls resetLastSentMessages to clear dump state", () => {

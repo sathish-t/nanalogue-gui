@@ -37,7 +37,6 @@ const { peekBam, generateQCData } = await import("./qc-data-loader");
 /** Minimal valid QCConfig for most tests (no region, no tag). */
 const BASE_CONFIG: QCConfig = {
     bamPath: "/data/sample.bam",
-    treatAsUrl: false,
     sampleFraction: 5,
     sampleSeed: 42,
     windowSize: 300,
@@ -114,7 +113,7 @@ describe("peekBam", () => {
             ],
         });
 
-        const result = await peekBam("/data/sample.bam", false);
+        const result = await peekBam("/data/sample.bam");
 
         expect(result.contigs).toEqual(["chr1", "chr2", "chr3"]);
         expect(result.totalContigs).toBe(3);
@@ -132,7 +131,7 @@ describe("peekBam", () => {
             modifications: [],
         });
 
-        const result = await peekBam("/data/sample.bam", false);
+        const result = await peekBam("/data/sample.bam");
 
         expect(result.contigs).toHaveLength(3);
         expect(result.totalContigs).toBe(5);
@@ -148,7 +147,7 @@ describe("peekBam", () => {
             ],
         });
 
-        const result = await peekBam("/data/sample.bam", false);
+        const result = await peekBam("/data/sample.bam");
 
         expect(result.modifications).toEqual(["+m", "-a"]);
     });
@@ -159,22 +158,21 @@ describe("peekBam", () => {
             modifications: [["C", "-", "m"]],
         });
 
-        const result = await peekBam("/data/sample.bam", false);
+        const result = await peekBam("/data/sample.bam");
 
         expect(result.modifications).toEqual(["-m"]);
     });
 
-    it("passes bamPath and treatAsUrl through to peek", async () => {
+    it("passes the local BAM path to peek", async () => {
         setMockResolvedValue(peek, {
             contigs: { chr1: 5000 },
             modifications: [],
         });
 
-        await peekBam("http://example.com/file.bam", true);
+        await peekBam("/data/sample.bam");
 
         expect(peek).toHaveBeenCalledWith({
-            bamPath: "http://example.com/file.bam",
-            treatAsUrl: true,
+            bamPath: "/data/sample.bam",
         });
     });
 
@@ -184,7 +182,7 @@ describe("peekBam", () => {
             modifications: [],
         });
 
-        const result = await peekBam("/data/sample.bam", false);
+        const result = await peekBam("/data/sample.bam");
 
         expect(result.modifications).toEqual([]);
     });
@@ -195,7 +193,7 @@ describe("peekBam", () => {
             modifications: [],
         });
 
-        const result = await peekBam("/data/sample.bam", false);
+        const result = await peekBam("/data/sample.bam");
 
         expect(result.contigs).toEqual([]);
         expect(result.totalContigs).toBe(0);
@@ -441,7 +439,6 @@ describe("generateQCData", () => {
         expect(bamMods).toHaveBeenCalledWith(
             expect.objectContaining({
                 bamPath: BASE_CONFIG.bamPath,
-                treatAsUrl: BASE_CONFIG.treatAsUrl,
                 sampleFraction: BASE_CONFIG.sampleFraction / 100,
                 region: "chr1:0-400",
                 fullRegion: false,

@@ -28,7 +28,6 @@ vi.mock("node:fs", () => ({
 vi.mock("@nanalogue/node", () => ({ readInfo: vi.fn() }));
 vi.mock("../lib/ipc-path-validation", () => ({
     validateIpcFilePath: vi.fn(),
-    validateIpcRemoteBamUrl: vi.fn(),
 }));
 vi.mock("../lib/line-counter", () => ({ countNonEmptyLines: vi.fn() }));
 
@@ -77,7 +76,6 @@ describe("Locate IPC handlers", () => {
                     bamPath: "/a.bam",
                     readIdPath: "/ids",
                     outputPath: "/out",
-                    treatAsUrl: false,
                     overwriteConfirmed: false,
                     fullRegion: true,
                 },
@@ -95,7 +93,6 @@ describe("Locate IPC handlers", () => {
                 bamPath: "/a.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
-                treatAsUrl: false,
                 overwriteConfirmed: false,
             },
         );
@@ -118,10 +115,9 @@ describe("Locate IPC handlers", () => {
             generate(
                 {},
                 {
-                    bamPath: "https://x",
+                    bamPath: "/a.bam",
                     readIdPath: "/ids",
                     outputPath: "/out",
-                    treatAsUrl: true,
                     overwriteConfirmed: false,
                 },
             ),
@@ -143,10 +139,9 @@ describe("Locate IPC handlers", () => {
         const result = await generate(
             {},
             {
-                bamPath: "https://x",
+                bamPath: "/a.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
-                treatAsUrl: true,
                 overwriteConfirmed: false,
             },
         );
@@ -170,10 +165,9 @@ describe("Locate IPC handlers", () => {
         await generate(
             {},
             {
-                bamPath: "https://x",
+                bamPath: "/a.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
-                treatAsUrl: true,
                 overwriteConfirmed: true,
             },
         );
@@ -197,10 +191,9 @@ describe("Locate IPC handlers", () => {
             generate(
                 {},
                 {
-                    bamPath: "https://x",
+                    bamPath: "/a.bam",
                     readIdPath: "/ids",
                     outputPath: "/out",
-                    treatAsUrl: true,
                     overwriteConfirmed: false,
                 },
             ),
@@ -249,18 +242,16 @@ describe("Locate IPC handlers", () => {
         await generate(
             {},
             {
-                bamPath: "https://example.com/sample.bam",
+                bamPath: "/data/sample.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
-                treatAsUrl: true,
                 overwriteConfirmed: false,
                 region: "chr1:10-20",
                 fullRegion: true,
             },
         );
         expect(readInfo).toHaveBeenCalledWith({
-            bamPath: "https://example.com/sample.bam",
-            treatAsUrl: true,
+            bamPath: "/data/sample.bam",
             readIdSet: ["read-1"],
             region: "chr1:10-20",
             fullRegion: true,

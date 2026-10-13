@@ -1,54 +1,77 @@
 // Standalone CLI for the nanalogue AI Chat feature.
 // Provides an interactive REPL for LLM-powered BAM analysis without the Electron GUI.
 
-import { resolve } from "node:path";
+import assert from "node:assert/strict";
 import { createInterface } from "node:readline";
 import { parseArgs } from "node:util";
 import { version } from "../package.json";
-import { EXTERNAL_FUNCTIONS } from "./lib/ai-chat-constants";
-import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
 import {
+    TERMINAL_BOLD,
+    TERMINAL_RED,
+    TERMINAL_RESET,
+    TERMINAL_YELLOW,
+} from "./cli-terminal-formatting";
+import { color, emitEvent, printUsage } from "./cli-terminal-output";
+import { EXTERNAL_FUNCTIONS } from "./lib/ai-chat-constants";
+import {
+    CONFIG_FIELD_SPECS,
+    MAX_CHAT_MESSAGE_BYTES,
+    MAX_SYSTEM_PROMPT_BYTES,
+} from "./lib/ai-chat-shared-constants";
+import { validateAnalysisDirectory } from "./lib/chat-filesystem-input-checks";
+import {
+    dumpConversationHistory,
     dumpLlmInstructions,
     getLastSentMessages,
 } from "./lib/chat-orchestrator";
+import {
+    isValidApiKey,
+    isValidEndpointUrl,
+    isValidModel,
+} from "./lib/chat-provider-input-checks";
 import { ChatSession } from "./lib/chat-session";
-import type {
-    AiChatConfig,
-    AiChatEvent,
-    SandboxResult,
-} from "./lib/chat-types";
+import type { AiChatConfig } from "./lib/chat-types";
+import {
+    getUtf8ByteLength,
+    parseCanonicalTemperature,
+} from "./lib/chat-user-input-parsing";
+import {
+    findDuplicateCliOption,
+    parseRemovedToolNames,
+} from "./lib/cli-user-input-parsing";
 import { fetchModels } from "./lib/model-listing";
+import { deriveMaxOutputBytes } from "./lib/monty-sandbox-helpers";
 import { parseNumericArg, SANDBOX_ARG_DEFS } from "./lib/sandbox-cli-args";
+import { buildCompleteSystemPrompt } from "./lib/sandbox-prompt";
 import { loadSystemAppend } from "./lib/system-append";
 
-// --- ANSI color helpers ---
+/** System prompt inputs captured for one CLI conversation. */
+interface CliSystemPromptSnapshot {
+    /** Optional text appended to the default prompt. */
+    appendSystemPrompt?: string;
+    /** Optional complete replacement for the default prompt. */
+    replaceSystemPrompt?: string;
+}
 
-/** ANSI escape code prefix. */
-const ESC = "\x1b[";
-
-/** Resets all ANSI formatting. */
-const RESET = `${ESC}0m`;
-/** Bold text. */
-const BOLD = `${ESC}1m`;
-/** Dim/grey text for sandbox results. */
-const DIM = `${ESC}2m`;
-/** Red text for errors. */
-const RED = `${ESC}31m`;
-/** Yellow text for progress indicators. */
-const YELLOW = `${ESC}33m`;
-/** Light blue text for code blocks. */
-const LIGHT_BLUE = `${ESC}94m`;
+/** Whether a CLI message captures, previews, or does not use the system prompt. */
+type CliPromptRequirement = "capture" | "preview" | "none";
 
 /**
- * Wraps text with an ANSI color code and reset suffix.
+ * Classifies how a CLI message interacts with the conversation system prompt.
  *
- * @param code - The ANSI escape sequence for the color.
- * @param text - The text to colorize.
- * @returns The colorized string.
+ * @param message - Trimmed CLI message.
+ * @returns The prompt behavior required before dispatching the message.
  */
-function color(code: string, text: string): string {
-    if ("NO_COLOR" in process.env) return text;
-    return `${code}${text}${RESET}`;
+function classifyCliPromptRequirement(message: string): CliPromptRequirement {
+    if (/^\/dump_system_prompt\s*$/.test(message)) return "preview";
+    if (
+        /^\/exec\s+/.test(message) ||
+        /^\/dump_history\s*$/.test(message) ||
+        /^\/dump_llm_instructions\s*$/.test(message)
+    ) {
+        return "none";
+    }
+    return "capture";
 }
 
 // --- Argument parsing ---
@@ -67,158 +90,17 @@ const argConfig = {
         temperature: { type: "string" as const },
         "non-interactive": { type: "string" as const },
         "system-prompt": { type: "string" as const },
+        "only-system-append": { type: "boolean" as const, default: false },
         "rm-tools": { type: "string" as const },
+        "dump-history": { type: "boolean" as const, default: false },
         "dump-llm-instructions": { type: "boolean" as const, default: false },
         "list-models": { type: "boolean" as const, default: false },
         version: { type: "boolean" as const, short: "v", default: false },
         help: { type: "boolean" as const, short: "h", default: false },
     },
     strict: true,
+    tokens: true,
 } as const;
-
-/**
- * Prints CLI usage information and exits.
- */
-function printUsage(): void {
-    console.log(`${BOLD}nanalogue-chat${RESET} — AI-powered BAM analysis from the terminal
-
-${BOLD}Usage:${RESET}
-  nanalogue-chat --endpoint <url> --model <name> --dir <path> [options]
-
-${BOLD}Required:${RESET}
-  --endpoint <url>         LLM endpoint URL (e.g. http://localhost:11434/v1)
-  --model <name>           Model identifier (e.g. llama3)
-  --dir <path>             Directory containing BAM files to analyze
-
-${BOLD}Authentication:${RESET}
-  --api-key <key>          API key (default: $API_KEY environment variable)
-
-${BOLD}Advanced options:${RESET}
-  --context-window <n>     Context window tokens (default: ${CONFIG_FIELD_SPECS.contextWindowTokens.fallback})
-  --max-retries <n>        Max retries per turn (default: ${CONFIG_FIELD_SPECS.maxRetries.fallback})
-  --timeout <n>            Timeout in seconds (default: ${CONFIG_FIELD_SPECS.timeoutSeconds.fallback})
-  --max-records-read-info <n>    Max read_info records (default: ${CONFIG_FIELD_SPECS.maxRecordsReadInfo.fallback})
-  --max-records-bam-mods <n>     Max bam_mods records (default: ${CONFIG_FIELD_SPECS.maxRecordsBamMods.fallback})
-  --max-records-window-reads <n> Max window_reads records (default: ${CONFIG_FIELD_SPECS.maxRecordsWindowReads.fallback})
-  --max-records-seq-table <n>    Max seq_table records (default: ${CONFIG_FIELD_SPECS.maxRecordsSeqTable.fallback})
-  --max-code-rounds <n>    Max code execution rounds (default: ${CONFIG_FIELD_SPECS.maxCodeRounds.fallback})
-  --max-duration-secs <n>  Best-effort sandbox time limit in seconds (bash cancelled at limit; native reads in progress may finish) (default: ${CONFIG_FIELD_SPECS.maxDurationSecs.fallback})
-  --max-memory-mb <n>      Max sandbox memory in MB (default: ${CONFIG_FIELD_SPECS.maxMemoryMB.fallback})
-  --max-allocations <n>    Max sandbox VM allocations (default: ${CONFIG_FIELD_SPECS.maxAllocations.fallback})
-  --max-read-mb <n>        Max read_file text size in MB (BAM access is not affected) (default: ${CONFIG_FIELD_SPECS.maxReadMB.fallback})
-  --max-write-mb <n>       Max write_file text size in MB (BAM access is not affected) (default: ${CONFIG_FIELD_SPECS.maxWriteMB.fallback})
-  --temperature <n>        LLM sampling temperature 0-2 (default: provider default)
-
-${BOLD}Other:${RESET}
-  --non-interactive <msg>  Send a single message, print the response, and exit
-  --dump-llm-instructions  Dump the LLM request payload to a log file
-                           (only valid with --non-interactive)
-  --list-models            List available models and exit
-  Note: --list-models takes precedence over --non-interactive if both are passed.
-  -v, --version            Print version and exit
-
-${BOLD}Custom system prompt:${RESET}
-  --system-prompt <text>       Replace the default system prompt. Pass content
-                               directly or via a shell variable:
-                               --system-prompt "$MY_PROMPT"
-                               --system-prompt "$(cat prompt.md)"
-                               SYSTEM_APPEND.md and the facts block still apply.
-                               Run /dump_system_prompt to verify.
-
-  Place a SYSTEM_APPEND.md file in the analysis directory (--dir) to append
-  additional instructions to the default (or replaced) system prompt. The
-  file is read once at startup. Use /dump_system_prompt to verify the full
-  effective prompt.
-
-  --rm-tools <t1,t2,...>       Comma-separated (no spaces) list of sandbox tool
-                               names to remove. Requires --system-prompt.
-                               Valid names: ${EXTERNAL_FUNCTIONS.slice(0, 4).join(", ")},
-                                            ${EXTERNAL_FUNCTIONS.slice(4, 8).join(", ")},
-                                            ${EXTERNAL_FUNCTIONS.slice(8).join(", ")}.
-                               Hard error on unknown names.
-
-${BOLD}REPL commands:${RESET}
-  /new                     Start a new conversation
-  /exec <file.py>          Run a Python file directly in the sandbox
-  /dump_llm_instructions   Dump the last LLM request payload to a log file
-  /dump_system_prompt      Dump the static system prompt to a log file
-  /quit                    Exit the CLI
-  Ctrl+C during request    Cancel current request
-  Ctrl+C at prompt         Exit`);
-}
-
-/**
- * Formats a sandbox result for terminal display.
- *
- * @param result - The sandbox execution result.
- * @returns A formatted string representation.
- */
-function formatSandboxResult(result: SandboxResult): string {
-    if (result.success) {
-        const parts: string[] = [];
-        if (result.prints?.length) {
-            parts.push(result.prints.join(""));
-        }
-        if (result.endedWithExpression && result.value != null) {
-            const value =
-                typeof result.value === "string"
-                    ? result.value
-                    : JSON.stringify(result.value, null, 2);
-            parts.push(value);
-        }
-        const text = parts.join("") || "(no output)";
-        const truncNote = result.truncated ? " [truncated]" : "";
-        return `${text}${truncNote}`;
-    }
-    return `${result.errorType}: ${result.message}`;
-}
-
-/**
- * Handles a progress event from the orchestrator by printing to the terminal.
- *
- * @param event - The AI Chat event to display.
- */
-function emitEvent(event: AiChatEvent): void {
-    switch (event.type) {
-        case "turn_start":
-            process.stdout.write(color(YELLOW, "[thinking...]"));
-            break;
-        case "code_execution_start":
-            // Clear the thinking indicator and show code
-            process.stdout.write("\r\x1b[K");
-            console.log(
-                color(LIGHT_BLUE, `\`\`\`python\n${event.code}\n\`\`\``),
-            );
-            process.stdout.write(color(YELLOW, "[running code...]"));
-            break;
-        case "code_execution_end":
-            process.stdout.write("\r\x1b[K");
-            console.log(color(DIM, formatSandboxResult(event.result)));
-            break;
-        case "turn_end":
-            process.stdout.write("\r\x1b[K");
-            break;
-        case "turn_error":
-            process.stdout.write("\r\x1b[K");
-            console.error(
-                color(
-                    RED,
-                    `Error: ${
-                        event.isTimeout
-                            ? "LLM response timed out (i.e. a message from the LLM took too much time to arrive)"
-                            : event.error
-                    }`,
-                ),
-            );
-            break;
-        case "turn_cancelled":
-            process.stdout.write("\r\x1b[K");
-            console.log(color(YELLOW, "[cancelled]"));
-            break;
-        default:
-            break;
-    }
-}
 
 /**
  * Main entry point for the CLI.
@@ -229,19 +111,31 @@ async function main(): Promise<void> {
     try {
         parsed = parseArgs(argConfig);
     } catch (error) {
-        console.error(
-            color(
-                RED,
-                `Error: ${error instanceof Error ? error.message : String(error)}`,
-            ),
+        const errorMsg: string =
+            error instanceof Error ? error.message : String(error);
+        assert(errorMsg.length > 0, "No error message available!");
+        assert(
+            errorMsg.length <= 3000,
+            "Error message is too long (length > 3000)!",
         );
+        console.error(color(TERMINAL_RED, `Error: ${errorMsg}`));
         printUsage();
         process.exit(1);
     }
 
-    const { values } = parsed;
+    const { tokens, values } = parsed;
+    const duplicateOption = findDuplicateCliOption(tokens);
+    if (duplicateOption !== null) {
+        console.error(`Error: --${duplicateOption} may only be supplied once`);
+        process.exitCode = 1;
+        return;
+    }
 
     if (values.version) {
+        assert(
+            version.length > 0 && version.length <= 20,
+            "Malformed version length (zero length or more than 20 characters)!",
+        );
         console.log(version);
         process.exit(0);
     }
@@ -254,37 +148,78 @@ async function main(): Promise<void> {
     const endpointUrl = values.endpoint;
     const apiKey = values["api-key"] ?? process.env.API_KEY ?? "";
     const model = values.model;
-    const allowedDir = values.dir
-        ? resolve(process.cwd(), values.dir)
-        : values.dir;
+
+    // require endpointUrl
+    if (!endpointUrl) {
+        console.error(color(TERMINAL_RED, "Error: --endpoint is required"));
+        process.exit(1);
+    }
+    if (!isValidEndpointUrl(endpointUrl)) {
+        console.error(color(TERMINAL_RED, "Error: invalid endpoint URL"));
+        process.exit(1);
+    }
+
+    // check api key
+    if (!isValidApiKey(apiKey)) {
+        console.error(color(TERMINAL_RED, "Error: invalid API key"));
+        process.exit(1);
+    }
+
     // --list-models mode
     if (values["list-models"]) {
-        if (!endpointUrl) {
-            console.error(
-                color(RED, "Error: --endpoint is required for --list-models"),
-            );
-            process.exit(1);
-        }
-        console.log(color(YELLOW, "[fetching models...]"));
+        console.log(color(TERMINAL_YELLOW, "[fetching models...]"));
         const result = await fetchModels(endpointUrl, apiKey);
         if (result.success) {
             for (const m of result.models) {
+                assert(
+                    typeof m === "string",
+                    "Model identifier is not a string!",
+                );
+                assert(
+                    m.trim() === m,
+                    "Model string has spurious whitespaces!",
+                );
+                assert(m.length > 0, "Model string is empty!");
+                assert(
+                    m.length <= 200,
+                    "Model string is pathological (length > 200)!",
+                );
                 console.log(m);
             }
         } else {
-            console.error(color(RED, `Error: ${result.error}`));
+            const errorMsg: string = result.error;
+            assert(errorMsg.length > 0, "Error message is empty!");
+            assert(
+                errorMsg.length <= 3000,
+                "Error message is pathological (length > 3000)!",
+            );
+            console.error(color(TERMINAL_RED, `Error: ${errorMsg}`));
             process.exit(1);
         }
         return;
     }
 
     // Validate required arguments
-    if (!endpointUrl || !model || !allowedDir) {
+    if (!model || !values.dir) {
         console.error(
-            color(RED, "Error: --endpoint, --model, and --dir are required"),
+            color(TERMINAL_RED, "Error: --model and --dir are required"),
         );
         printUsage();
         process.exit(1);
+    }
+    if (!isValidModel(model)) {
+        console.error(color(TERMINAL_RED, "Error: invalid model name"));
+        process.exit(1);
+    }
+    let allowedDir: string;
+    try {
+        allowedDir = await validateAnalysisDirectory(values.dir, process.cwd());
+    } catch (error) {
+        console.error(
+            `Error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        process.exitCode = 1;
+        return;
     }
 
     // --dump-llm-instructions is only valid alongside --non-interactive.
@@ -299,6 +234,13 @@ async function main(): Promise<void> {
         return;
     }
 
+    // --dump-history is only valid alongside --non-interactive.
+    if (values["dump-history"] && values["non-interactive"] === undefined) {
+        console.error("Error: --dump-history requires --non-interactive");
+        process.exitCode = 1;
+        return;
+    }
+
     // Guard against an empty or whitespace-only --non-interactive message.
     // Using process.exitCode + return rather than process.exit() so Node drains
     // stdout and stderr naturally before terminating.
@@ -307,6 +249,16 @@ async function main(): Promise<void> {
         values["non-interactive"].trim() === ""
     ) {
         console.error("Error: --non-interactive message cannot be empty");
+        process.exitCode = 1;
+        return;
+    }
+    if (
+        values["non-interactive"] !== undefined &&
+        getUtf8ByteLength(values["non-interactive"]) > MAX_CHAT_MESSAGE_BYTES
+    ) {
+        console.error(
+            "Error: --non-interactive message exceeds the 1 MiB limit",
+        );
         process.exitCode = 1;
         return;
     }
@@ -405,15 +357,15 @@ async function main(): Promise<void> {
         // Temperature is optional — undefined means omit from request body.
         // Reject non-finite or out-of-range values to avoid sending NaN/null to the API.
         temperature: (() => {
-            if (values.temperature === undefined) return undefined;
-            const t = Number.parseFloat(values.temperature);
-            if (!Number.isFinite(t) || t < 0 || t > 2) {
-                console.warn(
-                    `Warning: ignoring invalid --temperature "${values.temperature}" (must be a number between 0 and 2)`,
-                );
+            const result = parseCanonicalTemperature(
+                "--temperature",
+                values.temperature ?? "",
+            );
+            if (!result.valid) {
+                configErrors.push(result.error);
                 return undefined;
             }
-            return t;
+            return result.value;
         })(),
     };
 
@@ -426,18 +378,7 @@ async function main(): Promise<void> {
         return;
     }
 
-    // Load SYSTEM_APPEND.md from the analysis directory if present.
-    // Declared as let so it can be reloaded when the user starts a new
-    // conversation with /new — ensuring any edits to the file take effect
-    // immediately rather than requiring a full process restart.
-    let appendSystemPrompt = await loadSystemAppend(allowedDir);
-
-    // --system-prompt replaces the built-in sandbox prompt entirely.
-    // Declared as const — it is a startup flag, not a per-directory
-    // convention, so it does not reload on /new.
-    // Reject empty or whitespace-only values — most likely an unset shell
-    // variable (`--system-prompt "$UNSET_VAR"`), which would silently wipe
-    // all built-in instructions.
+    const onlySystemAppend = values["only-system-append"] === true;
     if (
         values["system-prompt"] !== undefined &&
         values["system-prompt"].trim() === ""
@@ -446,33 +387,45 @@ async function main(): Promise<void> {
         process.exitCode = 1;
         return;
     }
-    const replaceSystemPrompt: string | undefined = values["system-prompt"];
+    if (
+        values["system-prompt"] !== undefined &&
+        getUtf8ByteLength(values["system-prompt"]) > MAX_SYSTEM_PROMPT_BYTES
+    ) {
+        console.error("Error: --system-prompt exceeds the 1 MiB limit");
+        process.exitCode = 1;
+        return;
+    }
+    const replaceSystemPrompt = values["system-prompt"];
+    if (onlySystemAppend && replaceSystemPrompt !== undefined) {
+        console.error(
+            "Error: --only-system-append cannot be combined with --system-prompt",
+        );
+        process.exitCode = 1;
+        return;
+    }
 
     // --rm-tools: parse, validate, and build the removal set.
     let removedTools: ReadonlySet<string> | undefined;
     if (values["rm-tools"] !== undefined) {
-        const names = values["rm-tools"].split(",").filter(Boolean);
-        if (names.length === 0) {
-            console.error("Error: --rm-tools value cannot be empty");
+        const result = parseRemovedToolNames(
+            values["rm-tools"],
+            EXTERNAL_FUNCTIONS,
+        );
+        if (!result.valid) {
+            console.error(`Error: ${result.error}`);
             process.exitCode = 1;
             return;
         }
-        const validTools = new Set<string>(EXTERNAL_FUNCTIONS);
-        for (const name of names) {
-            if (!validTools.has(name)) {
-                console.error(
-                    `Error: --rm-tools: unknown tool "${name}". Valid tools: ${[...EXTERNAL_FUNCTIONS].join(", ")}`,
-                );
-                process.exitCode = 1;
-                return;
-            }
-        }
-        removedTools = new Set(names);
+        removedTools = new Set(result.names);
     }
 
-    if (removedTools !== undefined && replaceSystemPrompt === undefined) {
+    if (
+        removedTools !== undefined &&
+        !onlySystemAppend &&
+        replaceSystemPrompt === undefined
+    ) {
         console.error(
-            "Error: --rm-tools requires --system-prompt. " +
+            "Error: --rm-tools requires --system-prompt or --only-system-append. " +
                 "Provide a custom system prompt that describes only the tools you are keeping.",
         );
         process.exitCode = 1;
@@ -480,11 +433,57 @@ async function main(): Promise<void> {
     }
 
     const session = new ChatSession();
+    let systemPromptSnapshot: CliSystemPromptSnapshot | undefined;
+
+    /**
+     * Loads and validates the current prompt inputs without storing them.
+     *
+     * @returns Effective prompt inputs for the current file contents.
+     */
+    const loadCurrentSystemPrompt =
+        async (): Promise<CliSystemPromptSnapshot> => {
+            const appendSystemPrompt = await loadSystemAppend(allowedDir);
+            if (onlySystemAppend && appendSystemPrompt === undefined) {
+                throw new Error(
+                    "--only-system-append requires SYSTEM_APPEND.md to exist and be non-empty",
+                );
+            }
+            const prompt = {
+                appendSystemPrompt: onlySystemAppend
+                    ? undefined
+                    : appendSystemPrompt,
+                replaceSystemPrompt: onlySystemAppend
+                    ? appendSystemPrompt
+                    : replaceSystemPrompt,
+            };
+            const maxOutputBytes = deriveMaxOutputBytes(
+                config.contextWindowTokens,
+            );
+            buildCompleteSystemPrompt({
+                config,
+                maxOutputKB: Math.round(maxOutputBytes / 1024),
+                ...prompt,
+            });
+            return prompt;
+        };
 
     // Non-interactive mode: send a single message, print the response, and exit.
     // No banner, no readline, no progress indicators — clean for scripting and piping.
     if (values["non-interactive"] !== undefined) {
-        const message = values["non-interactive"];
+        const message = values["non-interactive"].trim();
+        const promptRequirement = classifyCliPromptRequirement(message);
+        let promptForMessage: CliSystemPromptSnapshot | undefined;
+        if (promptRequirement !== "none") {
+            try {
+                promptForMessage = await loadCurrentSystemPrompt();
+            } catch (error) {
+                console.error(
+                    `Error: ${error instanceof Error ? error.message : String(error)}`,
+                );
+                process.exitCode = 1;
+                return;
+            }
+        }
         const result = await session.sendMessage({
             endpointUrl,
             apiKey,
@@ -492,8 +491,7 @@ async function main(): Promise<void> {
             message,
             allowedDir,
             config,
-            appendSystemPrompt,
-            replaceSystemPrompt,
+            ...promptForMessage,
             removedTools,
             /**
              * Suppresses all progress events in non-interactive mode.
@@ -504,7 +502,13 @@ async function main(): Promise<void> {
         if (result.success && result.text) {
             console.log(result.text);
         } else if (!result.success) {
-            console.error(`Error: ${result.error}`);
+            const errorMsg: string = result.error;
+            assert(errorMsg.length > 0, "Error message not produced!");
+            assert(
+                errorMsg.length <= 3000,
+                "Error message is pathologically long (length > 3000)!",
+            );
+            console.error(`Error: ${errorMsg}`);
         }
 
         // If --dump-llm-instructions was requested, write the last LLM request
@@ -516,9 +520,25 @@ async function main(): Promise<void> {
             try {
                 const lastSentMessages = getLastSentMessages();
                 const dump = lastSentMessages
-                    ? await dumpLlmInstructions(allowedDir, lastSentMessages)
+                    ? await dumpLlmInstructions(
+                          allowedDir,
+                          lastSentMessages,
+                          model,
+                      )
                     : null;
                 if (dump) {
+                    assert(
+                        dump.log.length <= 500 &&
+                            dump.log.endsWith(".log") &&
+                            dump.log.length > 4,
+                        "dump.log is pathological!",
+                    );
+                    assert(
+                        dump.html.length <= 500 &&
+                            dump.html.endsWith(".html") &&
+                            dump.html.length > 5,
+                        "dump.html is pathological!",
+                    );
                     console.error(`LLM instructions dumped to ${dump.log}`);
                     console.error(`HTML view: ${dump.html}`);
                 } else {
@@ -527,8 +547,61 @@ async function main(): Promise<void> {
                     );
                 }
             } catch (err) {
+                const errorMsg: string =
+                    err instanceof Error ? err.message : String(err);
+                assert(errorMsg.length > 0, "Error message not produced!");
+                assert(
+                    errorMsg.length <= 3000,
+                    "Error message is pathologically long (length > 3000)!",
+                );
                 console.error(
-                    `Warning: failed to dump LLM instructions: ${err instanceof Error ? err.message : String(err)}`,
+                    `Warning: failed to dump LLM instructions: ${errorMsg}`,
+                );
+            }
+        }
+
+        // If --dump-history was requested, write the complete raw session
+        // history without the system prompt or internal metadata.
+        if (values["dump-history"]) {
+            try {
+                const dump =
+                    session.history.length > 0
+                        ? await dumpConversationHistory(
+                              allowedDir,
+                              session.history,
+                              model,
+                          )
+                        : null;
+                if (dump) {
+                    assert(
+                        dump.log.length <= 500 &&
+                            dump.log.endsWith(".log") &&
+                            dump.log.length > 4,
+                        "dump.log is pathological!",
+                    );
+                    assert(
+                        dump.html.length <= 500 &&
+                            dump.html.endsWith(".html") &&
+                            dump.html.length > 5,
+                        "dump.html is pathological!",
+                    );
+                    console.error(`Conversation history dumped to ${dump.log}`);
+                    console.error(`HTML view: ${dump.html}`);
+                } else {
+                    console.error(
+                        "Warning: no conversation history; nothing to dump.",
+                    );
+                }
+            } catch (err) {
+                const errorMsg: string =
+                    err instanceof Error ? err.message : String(err);
+                assert(errorMsg.length > 0, "Error message not produced!");
+                assert(
+                    errorMsg.length <= 3000,
+                    "Error message is pathologically long (length > 3000)!",
+                );
+                console.error(
+                    `Warning: failed to dump conversation history: ${errorMsg}`,
                 );
             }
         }
@@ -540,12 +613,12 @@ async function main(): Promise<void> {
     }
 
     console.log(
-        `${BOLD}nanalogue-chat${RESET} connected to ${endpointUrl} using ${model}`,
+        `${TERMINAL_BOLD}nanalogue-chat${TERMINAL_RESET} connected to ${endpointUrl} using ${model}`,
     );
     console.log(`Analyzing files in: ${allowedDir}`);
     console.log(
         color(
-            YELLOW,
+            TERMINAL_YELLOW,
             "Note: The AI can read and list files in the above directory. " +
                 "A best-effort attempt is made to block common sensitive file types " +
                 "(keys, certificates, credentials), but complete protection cannot " +
@@ -553,40 +626,43 @@ async function main(): Promise<void> {
                 "comfortable sharing.",
         ),
     );
-    if (replaceSystemPrompt !== undefined) {
+    if (onlySystemAppend) {
         console.log(
             color(
-                YELLOW,
+                TERMINAL_YELLOW,
+                "SYSTEM_APPEND.md will be captured as the full system prompt " +
+                    "when the first message is sent. " +
+                    "Run /dump_system_prompt to verify the full effective prompt.",
+            ),
+        );
+    } else if (replaceSystemPrompt !== undefined) {
+        console.log(
+            color(
+                TERMINAL_YELLOW,
                 "Default system prompt replaced via --system-prompt. " +
                     "Run /dump_system_prompt to verify the full effective prompt.",
             ),
         );
     }
-    if (appendSystemPrompt !== undefined) {
-        console.log(
-            color(
-                YELLOW,
-                "Custom system prompt append loaded from SYSTEM_APPEND.md. " +
-                    "Run /dump_system_prompt to verify the full effective prompt.",
-            ),
-        );
-    }
     console.log(
-        `Type ${BOLD}/new${RESET} for new chat, ${BOLD}/quit${RESET} to exit.\n`,
+        `Type ${TERMINAL_BOLD}/new${TERMINAL_RESET} for new chat, ${TERMINAL_BOLD}/quit${TERMINAL_RESET} to exit.\n`,
     );
 
     const rl = createInterface({
         input: process.stdin,
         output: process.stdout,
-        prompt: `${BOLD}You: ${RESET}`,
+        prompt: `${TERMINAL_BOLD}You: ${TERMINAL_RESET}`,
     });
 
     /** Whether a request is currently in flight. */
     let requestInFlight = false;
+    /** Incremented whenever Ctrl+C cancels the active request. */
+    let requestCancellationGeneration = 0;
 
     // Ctrl+C handling: cancel in-flight request or exit at prompt
     rl.on("SIGINT", () => {
         if (requestInFlight) {
+            requestCancellationGeneration += 1;
             session.cancel();
             requestInFlight = false;
         } else {
@@ -606,6 +682,12 @@ async function main(): Promise<void> {
             continue;
         }
 
+        if (getUtf8ByteLength(trimmed) > MAX_CHAT_MESSAGE_BYTES) {
+            console.error("Error: message exceeds the 1 MiB limit");
+            rl.prompt();
+            continue;
+        }
+
         if (trimmed === "/quit") {
             console.log("Goodbye!");
             break;
@@ -613,15 +695,44 @@ async function main(): Promise<void> {
 
         if (trimmed === "/new") {
             session.reset();
-            // Reload SYSTEM_APPEND.md so any edits since startup are picked up
-            // by the fresh session without needing a process restart.
-            appendSystemPrompt = await loadSystemAppend(allowedDir);
-            console.log(color(YELLOW, "[new conversation started]"));
+            systemPromptSnapshot = undefined;
+            console.log(color(TERMINAL_YELLOW, "[new conversation started]"));
             rl.prompt();
             continue;
         }
 
         requestInFlight = true;
+        const requestGeneration = requestCancellationGeneration;
+        const promptRequirement = classifyCliPromptRequirement(trimmed);
+        let promptForMessage = systemPromptSnapshot;
+        try {
+            if (
+                promptRequirement === "preview" &&
+                promptForMessage === undefined
+            ) {
+                promptForMessage = await loadCurrentSystemPrompt();
+            } else if (
+                promptRequirement === "capture" &&
+                promptForMessage === undefined
+            ) {
+                promptForMessage = await loadCurrentSystemPrompt();
+                if (requestGeneration === requestCancellationGeneration) {
+                    systemPromptSnapshot = promptForMessage;
+                }
+            }
+        } catch (error) {
+            requestInFlight = false;
+            console.error(
+                `Error: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            rl.prompt();
+            continue;
+        }
+        if (requestGeneration !== requestCancellationGeneration) {
+            requestInFlight = false;
+            rl.prompt();
+            continue;
+        }
         const result = await session.sendMessage({
             endpointUrl,
             apiKey,
@@ -630,8 +741,7 @@ async function main(): Promise<void> {
             allowedDir,
             config,
             emitEvent,
-            appendSystemPrompt,
-            replaceSystemPrompt,
+            ...promptForMessage,
             removedTools,
         });
         requestInFlight = false;
@@ -650,7 +760,7 @@ async function main(): Promise<void> {
 main().catch((error) => {
     console.error(
         color(
-            RED,
+            TERMINAL_RED,
             `Fatal: ${error instanceof Error ? error.message : String(error)}`,
         ),
     );

@@ -1,5 +1,3 @@
-import { validateIpcRemoteBamUrl } from "./ipc-path-validation";
-
 /** A single annotation row parsed from a BED file. */
 export interface BedAnnotation {
     /** Contig or chromosome name. */
@@ -88,7 +86,7 @@ export type SwipeReviewActionResult =
 
 /** Named request used to start a Swipe review. */
 export interface SwipeStartRequest {
-    /** BAM file path or URL. */
+    /** Local BAM file path. */
     bamPath: string;
     /** Input BED annotation path. */
     bedPath: string;
@@ -106,8 +104,6 @@ export interface SwipeStartRequest {
     regionExpansion?: number;
     /** Whether to display the annotation highlight. */
     showAnnotationHighlight?: boolean;
-    /** Whether bamPath is a remote URL. */
-    treatAsUrl?: boolean;
 }
 
 /** Result returned while launching Swipe. */
@@ -167,14 +163,13 @@ export function validateSwipeStartRequest(value: unknown): SwipeStartRequest {
         throw new Error(
             "Invalid Swipe start request: regionExpansion must be a non-negative integer",
         );
-    for (const field of ["showAnnotationHighlight", "treatAsUrl"] as const) {
-        if (request[field] !== undefined && typeof request[field] !== "boolean")
-            throw new Error(
-                `Invalid Swipe start request: ${field} must be a boolean`,
-            );
-    }
-    if (request.treatAsUrl === true) {
-        validateIpcRemoteBamUrl(request.bamPath as string, "Swipe");
+    if (
+        request.showAnnotationHighlight !== undefined &&
+        typeof request.showAnnotationHighlight !== "boolean"
+    ) {
+        throw new Error(
+            "Invalid Swipe start request: showAnnotationHighlight must be a boolean",
+        );
     }
     return {
         bamPath: request.bamPath as string,
@@ -188,6 +183,5 @@ export function validateSwipeStartRequest(value: unknown): SwipeStartRequest {
         showAnnotationHighlight: request.showAnnotationHighlight as
             | boolean
             | undefined,
-        treatAsUrl: request.treatAsUrl as boolean | undefined,
     };
 }

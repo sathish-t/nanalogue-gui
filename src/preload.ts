@@ -147,12 +147,10 @@ contextBridge.exposeInMainWorld("api", {
     /**
      * Peek at a BAM file to extract header and reference information.
      *
-     * @param bamPath - The file system path or URL pointing to the BAM file.
-     * @param treatAsUrl - Whether to treat the path as a remote URL rather than a local file.
+     * @param bamPath - The local file system path pointing to the BAM file.
      * @returns A promise that resolves with the extracted BAM metadata.
      */
-    peekBam: (bamPath: string, treatAsUrl: boolean) =>
-        ipcRenderer.invoke("peek-bam", bamPath, treatAsUrl),
+    peekBam: (bamPath: string) => ipcRenderer.invoke("peek-bam", bamPath),
 
     /**
      * Generate a QC report with the provided configuration options.
@@ -315,6 +313,7 @@ contextBridge.exposeInMainWorld("api", {
      * @param payload.message - The user's chat message text.
      * @param payload.allowedDir - The directory the sandbox may access.
      * @param payload.config - Advanced configuration options.
+     * @param payload.onlySystemAppend - Whether to replace the built-in prompt with SYSTEM_APPEND.md.
      * @returns A promise with the assistant response.
      */
     aiChatSendMessage: (payload: {
@@ -330,6 +329,8 @@ contextBridge.exposeInMainWorld("api", {
         allowedDir: string;
         /** Advanced configuration options. */
         config: Record<string, unknown>;
+        /** Whether to replace the built-in prompt with SYSTEM_APPEND.md. */
+        onlySystemAppend?: boolean;
     }): Promise<AiChatSendMessageResult> =>
         ipcRenderer.invoke("ai-chat-send-message", payload),
 
@@ -377,11 +378,11 @@ contextBridge.exposeInMainWorld("api", {
      * Retrieve the effective system prompt for the given config.
      *
      * Includes SYSTEM_APPEND.md content when allowedDir is provided.
-     * The dynamic facts block appended during a live session is not included.
      *
      * @param payload - The config and optional directory to build the prompt from.
      * @param payload.config - The advanced configuration options.
      * @param payload.allowedDir - The analysis directory for SYSTEM_APPEND.md lookup.
+     * @param payload.onlySystemAppend - Whether to replace the built-in prompt with SYSTEM_APPEND.md.
      * @returns A promise with the prompt string or an error.
      */
     aiChatGetSystemPrompt: (payload: {
@@ -389,6 +390,8 @@ contextBridge.exposeInMainWorld("api", {
         config: Record<string, unknown>;
         /** The analysis directory for SYSTEM_APPEND.md lookup (optional). */
         allowedDir?: string;
+        /** Whether to replace the built-in prompt with SYSTEM_APPEND.md. */
+        onlySystemAppend?: boolean;
     }) => ipcRenderer.invoke("ai-chat-get-system-prompt", payload),
 
     /**
