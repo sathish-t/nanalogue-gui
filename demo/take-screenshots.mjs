@@ -131,6 +131,7 @@ test("Swipe mode screenshots", async () => {
                 bamPath,
                 bedPath,
                 outputPath,
+                overwriteConfirmed: true,
                 windowSize: 50,
                 modTag: "T",
                 modStrand: "bc",

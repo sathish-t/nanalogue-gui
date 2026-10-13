@@ -10,6 +10,8 @@ export type LocateGenerateBedRequest = {
     readIdPath: string;
     /** Destination BED file path. */
     outputPath: string;
+    /** Whether the user authorized replacing an existing output file. */
+    overwriteConfirmed: boolean;
 } & (
     | {
           /** No genomic region constraint. */
@@ -45,6 +47,11 @@ export function validateLocateGenerateBedRequest(
             );
         }
     }
+    if (typeof request.overwriteConfirmed !== "boolean") {
+        throw new Error(
+            "Invalid Locate request: overwriteConfirmed must be a boolean",
+        );
+    }
     if (
         request.region !== undefined &&
         (typeof request.region !== "string" ||
@@ -69,6 +76,7 @@ export function validateLocateGenerateBedRequest(
             bamPath: request.bamPath as string,
             readIdPath: request.readIdPath as string,
             outputPath: request.outputPath as string,
+            overwriteConfirmed: request.overwriteConfirmed as boolean,
             region,
             fullRegion: request.fullRegion as boolean | undefined,
         };
@@ -77,6 +85,7 @@ export function validateLocateGenerateBedRequest(
         bamPath: request.bamPath as string,
         readIdPath: request.readIdPath as string,
         outputPath: request.outputPath as string,
+        overwriteConfirmed: request.overwriteConfirmed as boolean,
     };
 }
 

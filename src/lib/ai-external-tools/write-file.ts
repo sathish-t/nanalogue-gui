@@ -1,7 +1,7 @@
 // External tool: write_file
 // Writes a new text file into the sandboxed directory (no overwrites allowed).
 
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { MAX_FILENAME_LENGTH } from "../ai-chat-constants";
 import {
@@ -87,15 +87,19 @@ export function makeWriteFile(
         // Symlink-safe resolution: verify canonical path stays within allowedDir.
         const resolved = await resolvePath(allowedDir, filePath);
         try {
-            await access(resolved);
-            throw new SandboxError(
-                "FileExistsError",
-                `File "${filePath}" already exists. Choose a different name.`,
-            );
+            await writeFile(resolved, content, {
+                encoding: "utf-8",
+                flag: "wx",
+            });
         } catch (e) {
-            if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+            if ((e as NodeJS.ErrnoException).code === "EEXIST") {
+                throw new SandboxError(
+                    "FileExistsError",
+                    `File "${filePath}" already exists. Choose a different name.`,
+                );
+            }
+            throw e;
         }
-        await writeFile(resolved, content, "utf-8");
         return {
             path: filePath,
             bytes_written: contentBytes,

@@ -106,6 +106,9 @@ let readIdCount: number | null = null;
 /** Monotonically increasing counter to guard against stale peek responses. */
 let peekRequestId = 0;
 
+/** Monotonically increasing counter to guard against stale read ID count responses. */
+let readIdCountRequestId = 0;
+
 /**
  * Creates a summary line element with a bold label and text value.
  *
@@ -274,6 +277,7 @@ function updateGenerateButton(): void {
     const bamValue = bamSource.value;
     const readIdValue = elements.readIdPath.value;
     const outputValue = outputSource.value;
+    const outputValid = outputSource.isValid;
 
     const allFilled =
         bamValue.length > 0 && readIdValue.length > 0 && outputValue.length > 0;
@@ -287,24 +291,25 @@ function updateGenerateButton(): void {
         if (bamValue === outputValue) {
             hasCollision = true;
         }
-        if (readIdValue === outputValue) {
+        if (outputValid && readIdValue === outputValue) {
             outputSource.showWarning(
                 "Output path cannot be the same as the read ID file.",
                 true,
             );
             hasCollision = true;
-        } else if (outputSource.requiresOverwrite) {
+        } else if (outputValid && outputSource.requiresOverwrite) {
             outputSource.showWarning(
                 "This file already exists and will be overwritten.",
                 false,
             );
-        } else {
+        } else if (outputValid) {
             outputSource.hideWarning();
         }
     }
 
     const overwriteOk =
-        !outputSource.requiresOverwrite || outputSource.overwriteConfirmed;
+        outputValid &&
+        (!outputSource.requiresOverwrite || outputSource.overwriteConfirmed);
 
     elements.btnGenerate.disabled = !allFilled || hasCollision || !overwriteOk;
 }
@@ -341,16 +346,18 @@ bamSource.addEventListener("bam-selected", async (e) => {
     const currentRequestId = ++peekRequestId;
     updateGenerateButton();
 
+    let peekResult: PeekResult | null;
     try {
-        bamPeekResult = await api.peekBam(value);
+        peekResult = await api.peekBam(value);
     } catch (error) {
         console.error("Failed to peek BAM:", error);
-        bamPeekResult = null;
+        peekResult = null;
     }
 
     if (currentRequestId !== peekRequestId) return;
     if (value !== bamSource.value) return;
 
+    bamPeekResult = peekResult;
     updateSummary();
 });
 
@@ -362,13 +369,18 @@ elements.btnBrowseReadIds.addEventListener("click", async () => {
     elements.readIdPath.value = path;
     updateGenerateButton();
 
+    const currentRequestId = ++readIdCountRequestId;
+    let lineCount: number | null;
     try {
-        readIdCount = await api.locateCountReadIds(path);
+        lineCount = await api.locateCountReadIds(path);
     } catch (error) {
         console.error("Failed to count read IDs:", error);
-        readIdCount = null;
+        lineCount = null;
     }
+    if (currentRequestId !== readIdCountRequestId) return;
     if (path !== elements.readIdPath.value) return;
+
+    readIdCount = lineCount;
     updateSummary();
 });
 
@@ -394,6 +406,11 @@ elements.btnGenerate.addEventListener("click", async () => {
     const outputPath = outputSource.value;
 
     if (!bamPath || !readIdPath || !outputPath) return;
+    if (
+        !outputSource.isValid ||
+        (outputSource.requiresOverwrite && !outputSource.overwriteConfirmed)
+    )
+        return;
 
     // Validate region if provided
     const regionInput = elements.region.value.trim();
@@ -420,10 +437,16 @@ elements.btnGenerate.addEventListener("click", async () => {
                   bamPath,
                   readIdPath,
                   outputPath,
+                  overwriteConfirmed: outputSource.overwriteConfirmed,
                   region,
                   fullRegion,
               }
-            : { bamPath, readIdPath, outputPath };
+            : {
+                  bamPath,
+                  readIdPath,
+                  outputPath,
+                  overwriteConfirmed: outputSource.overwriteConfirmed,
+              };
         const result = await api.locateGenerateBed(request);
 
         elements.loadingOverlay.classList.add("hidden");
@@ -436,6 +459,7 @@ elements.btnGenerate.addEventListener("click", async () => {
         bamSource.disabled = false;
         elements.btnBrowseReadIds.disabled = false;
         outputSource.disabled = false;
+        await outputSource.checkCurrentFileExists();
         updateGenerateButton();
     }
 });

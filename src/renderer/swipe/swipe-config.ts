@@ -116,6 +116,12 @@ let bamPeekResult: PeekResult | null = null;
 /** Stores the BED file line count for display in the summary. */
 let bedLineCount: number | null = null;
 
+/** Monotonically increasing counter to guard against stale BAM peek responses. */
+let peekRequestId = 0;
+
+/** Monotonically increasing counter to guard against stale BED count responses. */
+let bedCountRequestId = 0;
+
 /**
  * Creates a summary line element with a bold label and text value.
  *
@@ -292,6 +298,7 @@ function updateSummary(): void {
  * Also blocks start when the output path matches the input BED path or when the mod filter is empty.
  */
 function updateStartButton(): void {
+    const outputValid = outputSource.isValid;
     const allFilled =
         bamSource.value.length > 0 &&
         elements.bedPath.value.length > 0 &&
@@ -300,22 +307,23 @@ function updateStartButton(): void {
     const sameAsBed =
         allFilled && outputSource.value === elements.bedPath.value;
 
-    if (sameAsBed) {
+    if (outputValid && sameAsBed) {
         outputSource.showWarning(
             "Output path cannot be the same as the input BED file.",
             true,
         );
-    } else if (outputSource.requiresOverwrite) {
+    } else if (outputValid && outputSource.requiresOverwrite) {
         outputSource.showWarning(
             "This file already exists and will be overwritten.",
             false,
         );
-    } else {
+    } else if (outputValid) {
         outputSource.hideWarning();
     }
 
     const overwriteOk =
-        !outputSource.requiresOverwrite || outputSource.overwriteConfirmed;
+        outputValid &&
+        (!outputSource.requiresOverwrite || outputSource.overwriteConfirmed);
 
     // Enable flanking region when all paths are valid
     elements.regionExpansion.disabled = !(
@@ -365,16 +373,21 @@ bamSource.addEventListener("bam-selected", async (e) => {
     const { value } = (e as CustomEvent<BamSelectedDetail>).detail;
     if (!value.trim()) return;
 
+    const currentRequestId = ++peekRequestId;
     updateStartButton();
 
     // Peek at BAM for summary
+    let peekResult: PeekResult | null;
     try {
-        bamPeekResult = await api.peekBam(value);
+        peekResult = await api.peekBam(value);
     } catch (error) {
         console.error("Failed to peek BAM:", error);
-        bamPeekResult = null;
+        peekResult = null;
     }
+    if (currentRequestId !== peekRequestId) return;
     if (value !== bamSource.value) return;
+
+    bamPeekResult = peekResult;
 
     // Auto-populate mod filter with first detected modification
     if (bamPeekResult) {
@@ -393,13 +406,18 @@ elements.btnBrowseBed.addEventListener("click", async () => {
     updateStartButton();
 
     // Count lines for summary
+    const currentRequestId = ++bedCountRequestId;
+    let lineCount: number | null;
     try {
-        bedLineCount = await api.swipeCountBedLines(path);
+        lineCount = await api.swipeCountBedLines(path);
     } catch (error) {
         console.error("Failed to count BED lines:", error);
-        bedLineCount = null;
+        lineCount = null;
     }
+    if (currentRequestId !== bedCountRequestId) return;
     if (path !== elements.bedPath.value) return;
+
+    bedLineCount = lineCount;
     updateSummary();
 });
 
@@ -419,6 +437,11 @@ elements.btnStart.addEventListener("click", async () => {
     const outputPath = outputSource.value;
 
     if (!bamPath || !bedPath || !outputPath) return;
+    if (
+        !outputSource.isValid ||
+        (outputSource.requiresOverwrite && !outputSource.overwriteConfirmed)
+    )
+        return;
 
     const windowSize = windowSizeInput.value;
     if (!windowSizeInput.isValid) {
@@ -444,6 +467,7 @@ elements.btnStart.addEventListener("click", async () => {
             bamPath,
             bedPath,
             outputPath,
+            overwriteConfirmed: outputSource.overwriteConfirmed,
             windowSize,
             modTag,
             modStrand,

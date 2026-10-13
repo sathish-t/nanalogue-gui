@@ -123,6 +123,7 @@ const BASE_ARGS: SwipeArgs = {
     bamPath: "/data/sample.bam",
     bedPath: "/data/annotations.bed",
     outputPath: "/data/output.bed",
+    overwriteConfirmed: false,
     windowSize: 200,
 };
 
@@ -224,13 +225,30 @@ describe("swipe mode — initialize()", () => {
             annotations: [...FAKE_ANNOTATIONS],
         });
 
-        await initializeSwipeReview(BASE_ARGS, true);
+        await initializeSwipeReview(BASE_ARGS, false);
 
         expect(vi.mocked(writeFileSync)).toHaveBeenCalledWith(
             "/data/output.bed",
             "",
-            "utf-8",
+            { encoding: "utf-8", flag: "wx" },
         );
+    });
+
+    it("propagates an exclusive-create conflict without deleting output", async () => {
+        setMockReturnValue(parseBedFile, {
+            capped: false,
+            annotations: [...FAKE_ANNOTATIONS],
+        });
+        vi.mocked(writeFileSync).mockImplementationOnce(() => {
+            throw Object.assign(new Error("output appeared"), {
+                code: "EEXIST",
+            });
+        });
+
+        await expect(initializeSwipeReview(BASE_ARGS, false)).rejects.toThrow(
+            "output appeared",
+        );
+        expect(unlinkSync).not.toHaveBeenCalled();
     });
 
     it("throws when the BED file exceeds 10 000 annotations", async () => {
@@ -398,6 +416,45 @@ describe("swipe mode — IPC handlers", () => {
     // -----------------------------------------------------------------------
 
     describe("accept", () => {
+        it("writes the current annotation, advances, and returns the next plot", async () => {
+            const nextPlotData = {
+                rawPoints: [{ x: 310, y: 0.75 }],
+                windowedPoints: [],
+            } as unknown as PlotData;
+            setMockResolvedValue(loadPlotData, nextPlotData);
+
+            const response = (await ipcHandlers.get("accept")?.(
+                undefined,
+            )) as HandlerResult;
+
+            expect(vi.mocked(appendFileSync)).toHaveBeenCalledWith(
+                "/data/output.bed",
+                `${FAKE_ANNOTATIONS[0].rawLine}\n`,
+                "utf-8",
+            );
+            expect(vi.mocked(loadPlotData)).toHaveBeenCalledWith(
+                BASE_ARGS.bamPath,
+                FAKE_ANNOTATIONS[1],
+                { chr1: 5000 },
+                BASE_ARGS.windowSize,
+                {
+                    modTag: undefined,
+                    modStrand: undefined,
+                    regionExpansion: undefined,
+                    treatAsUrl: undefined,
+                },
+            );
+            expect(response).toEqual({
+                done: false,
+                state: expect.objectContaining({
+                    acceptedCount: 1,
+                    rejectedCount: 0,
+                    currentIndex: 1,
+                }),
+                plotData: nextPlotData,
+            });
+        });
+
         it("increments acceptedCount and currentIndex", async () => {
             setMockResolvedValue(loadPlotData, {
                 rawPoints: [],
@@ -448,6 +505,41 @@ describe("swipe mode — IPC handlers", () => {
     // -----------------------------------------------------------------------
 
     describe("reject", () => {
+        it("advances without writing and returns the next plot", async () => {
+            const nextPlotData = {
+                rawPoints: [{ x: 310, y: 0.75 }],
+                windowedPoints: [],
+            } as unknown as PlotData;
+            setMockResolvedValue(loadPlotData, nextPlotData);
+
+            const response = (await ipcHandlers.get("reject")?.(
+                undefined,
+            )) as HandlerResult;
+
+            expect(vi.mocked(appendFileSync)).not.toHaveBeenCalled();
+            expect(vi.mocked(loadPlotData)).toHaveBeenCalledWith(
+                BASE_ARGS.bamPath,
+                FAKE_ANNOTATIONS[1],
+                { chr1: 5000 },
+                BASE_ARGS.windowSize,
+                {
+                    modTag: undefined,
+                    modStrand: undefined,
+                    regionExpansion: undefined,
+                    treatAsUrl: undefined,
+                },
+            );
+            expect(response).toEqual({
+                done: false,
+                state: expect.objectContaining({
+                    acceptedCount: 0,
+                    rejectedCount: 1,
+                    currentIndex: 1,
+                }),
+                plotData: nextPlotData,
+            });
+        });
+
         it("increments rejectedCount and currentIndex", async () => {
             setMockResolvedValue(loadPlotData, {
                 rawPoints: [],
@@ -486,6 +578,37 @@ describe("swipe mode — IPC handlers", () => {
 
             expect(final.done).toBe(true);
         });
+    });
+
+    it("keeps accept and reject advance/load-next response shapes aligned", async () => {
+        const nextPlotData = {
+            rawPoints: [],
+            windowedPoints: [],
+        } as unknown as PlotData;
+        setMockResolvedValue(loadPlotData, nextPlotData);
+
+        const acceptResponse = (await ipcHandlers.get("accept")?.(
+            undefined,
+        )) as HandlerResult;
+        const acceptShape = {
+            keys: Object.keys(acceptResponse).sort(),
+            done: acceptResponse.done,
+            currentIndex: acceptResponse.state.currentIndex,
+            plotData: acceptResponse.plotData,
+        };
+
+        await initializeWithFakes();
+        const rejectResponse = (await ipcHandlers.get("reject")?.(
+            undefined,
+        )) as HandlerResult;
+        const rejectShape = {
+            keys: Object.keys(rejectResponse).sort(),
+            done: rejectResponse.done,
+            currentIndex: rejectResponse.state.currentIndex,
+            plotData: rejectResponse.plotData,
+        };
+
+        expect(rejectShape).toEqual(acceptShape);
     });
 });
 
@@ -541,6 +664,11 @@ describe("swipe mode — initialize() overwrite dialog", () => {
         await initializeSwipeReview(BASE_ARGS, true);
 
         expect(dialog.showMessageBox).not.toHaveBeenCalled();
+        expect(vi.mocked(writeFileSync)).toHaveBeenCalledWith(
+            BASE_ARGS.outputPath,
+            "",
+            { encoding: "utf-8", flag: "w" },
+        );
     });
 
     it("throws when user cancels the overwrite dialog", async () => {
@@ -602,28 +730,51 @@ describe("swipe mode — IPC handler edge cases", () => {
         expect(vi.mocked(loadPlotData)).not.toHaveBeenCalled();
     });
 
-    it("accept rejects when appendFileSync fails so the user can retry", async () => {
+    it("accept retries the same annotation after an output write failure", async () => {
         setMockResolvedValue(loadPlotData, {
             rawPoints: [],
             windowedPoints: [],
         } as unknown as PlotData);
-        setMockImplementation(
-            appendFileSync as ReturnType<typeof vi.fn>,
-            () => {
-                throw new Error("disk full");
-            },
-        );
+        vi.mocked(appendFileSync).mockImplementationOnce(() => {
+            throw new Error("disk full");
+        });
 
         await expect(ipcHandlers.get("accept")?.(undefined)).rejects.toThrow(
             "disk full",
         );
 
-        // Counters should not have incremented — the user can retry the accept
         const state = (await ipcHandlers.get("get-state")?.(
             undefined,
         )) as TestAppState;
         expect(state.acceptedCount).toBe(0);
         expect(state.currentIndex).toBe(0);
+        expect(vi.mocked(loadPlotData)).not.toHaveBeenCalled();
+
+        const retryResult = (await ipcHandlers.get("accept")?.(
+            undefined,
+        )) as HandlerResult;
+
+        expect(vi.mocked(appendFileSync)).toHaveBeenNthCalledWith(
+            1,
+            BASE_ARGS.outputPath,
+            `${FAKE_ANNOTATIONS[0].rawLine}\n`,
+            "utf-8",
+        );
+        expect(vi.mocked(appendFileSync)).toHaveBeenNthCalledWith(
+            2,
+            BASE_ARGS.outputPath,
+            `${FAKE_ANNOTATIONS[0].rawLine}\n`,
+            "utf-8",
+        );
+        expect(retryResult.state.acceptedCount).toBe(1);
+        expect(retryResult.state.currentIndex).toBe(1);
+        expect(vi.mocked(loadPlotData)).toHaveBeenCalledWith(
+            BASE_ARGS.bamPath,
+            FAKE_ANNOTATIONS[1],
+            { chr1: 5000 },
+            BASE_ARGS.windowSize,
+            expect.any(Object),
+        );
     });
 
     it("accept resolves with plotData null when next plot load fails", async () => {

@@ -16,6 +16,16 @@ describe("validateLocateGenerateBedRequest", () => {
                 bamPath: "/a.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
+                overwriteConfirmed: "yes",
+            },
+            "overwriteConfirmed must be a boolean",
+        ],
+        [
+            {
+                bamPath: "/a.bam",
+                readIdPath: "/ids",
+                outputPath: "/out",
+                overwriteConfirmed: false,
                 region: " ",
             },
             "region must be a non-empty string",
@@ -25,6 +35,7 @@ describe("validateLocateGenerateBedRequest", () => {
                 bamPath: "/a.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
+                overwriteConfirmed: false,
                 region: "chr1",
                 fullRegion: "yes",
             },
@@ -36,12 +47,23 @@ describe("validateLocateGenerateBedRequest", () => {
         );
     });
 
+    it("requires explicit overwrite authorization", () => {
+        expect(() =>
+            validateLocateGenerateBedRequest({
+                bamPath: "/a.bam",
+                readIdPath: "/ids",
+                outputPath: "/out",
+            }),
+        ).toThrow("overwriteConfirmed");
+    });
+
     it("retains valid region filtering fields", () => {
         expect(
             validateLocateGenerateBedRequest({
                 bamPath: "/a.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
+                overwriteConfirmed: true,
                 region: "chr1:10-20",
                 fullRegion: true,
             }),
@@ -49,6 +71,7 @@ describe("validateLocateGenerateBedRequest", () => {
             bamPath: "/a.bam",
             readIdPath: "/ids",
             outputPath: "/out",
+            overwriteConfirmed: true,
             region: "chr1:10-20",
             fullRegion: true,
         });

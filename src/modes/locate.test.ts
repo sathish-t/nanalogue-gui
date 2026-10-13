@@ -13,11 +13,21 @@ vi.mock("electron", () => ({
     },
     dialog: { showOpenDialog: vi.fn() },
 }));
-vi.mock("node:fs", () => ({ readFileSync: vi.fn(), writeFileSync: vi.fn() }));
+vi.mock("node:fs", () => ({
+    readFileSync: vi.fn(),
+    realpathSync: vi.fn((filePath: string) => filePath),
+    statSync: vi.fn((filePath: string) => ({
+        dev: 1,
+        ino: [...filePath].reduce(
+            (hash, character) => hash * 31 + character.charCodeAt(0),
+            7,
+        ),
+    })),
+    writeFileSync: vi.fn(),
+}));
 vi.mock("@nanalogue/node", () => ({ readInfo: vi.fn() }));
 vi.mock("../lib/ipc-path-validation", () => ({
     validateIpcFilePath: vi.fn(),
-    validateIpcRemoteBamUrl: vi.fn(),
 }));
 vi.mock("../lib/line-counter", () => ({ countNonEmptyLines: vi.fn() }));
 
@@ -66,6 +76,7 @@ describe("Locate IPC handlers", () => {
                     bamPath: "/a.bam",
                     readIdPath: "/ids",
                     outputPath: "/out",
+                    overwriteConfirmed: false,
                     fullRegion: true,
                 },
             ),
@@ -82,6 +93,7 @@ describe("Locate IPC handlers", () => {
                 bamPath: "/a.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
+                overwriteConfirmed: false,
             },
         );
         expect(validateIpcFilePath).toHaveBeenNthCalledWith(
@@ -106,6 +118,7 @@ describe("Locate IPC handlers", () => {
                     bamPath: "/a.bam",
                     readIdPath: "/ids",
                     outputPath: "/out",
+                    overwriteConfirmed: false,
                 },
             ),
         ).rejects.toThrow("200,000");
@@ -129,12 +142,13 @@ describe("Locate IPC handlers", () => {
                 bamPath: "/a.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
+                overwriteConfirmed: false,
             },
         );
         expect(writeFileSync).toHaveBeenCalledWith(
             "/out",
             "chr1\t10\t20\tread-1\t1000\t+\n",
-            "utf-8",
+            { encoding: "utf-8", flag: "wx" },
         );
         expect(result).toMatchObject({
             totalIds: 2,
@@ -142,6 +156,49 @@ describe("Locate IPC handlers", () => {
             bedEntries: 1,
             notFound: 1,
         });
+    });
+
+    it("allows replacement only with explicit overwrite authorization", async () => {
+        vi.mocked(readFileSync).mockReturnValue("read-1\n");
+        vi.mocked(readInfo).mockResolvedValue([]);
+
+        await generate(
+            {},
+            {
+                bamPath: "/a.bam",
+                readIdPath: "/ids",
+                outputPath: "/out",
+                overwriteConfirmed: true,
+            },
+        );
+
+        expect(writeFileSync).toHaveBeenCalledWith("/out", "", {
+            encoding: "utf-8",
+            flag: "w",
+        });
+    });
+
+    it("propagates an exclusive-create conflict without retrying a write", async () => {
+        vi.mocked(readFileSync).mockReturnValue("read-1\n");
+        vi.mocked(readInfo).mockResolvedValue([]);
+        vi.mocked(writeFileSync).mockImplementationOnce(() => {
+            throw Object.assign(new Error("output appeared"), {
+                code: "EEXIST",
+            });
+        });
+
+        await expect(
+            generate(
+                {},
+                {
+                    bamPath: "/a.bam",
+                    readIdPath: "/ids",
+                    outputPath: "/out",
+                    overwriteConfirmed: false,
+                },
+            ),
+        ).rejects.toThrow("output appeared");
+        expect(writeFileSync).toHaveBeenCalledOnce();
     });
 
     it("returns null without a window or when the picker is cancelled", async () => {
@@ -188,6 +245,7 @@ describe("Locate IPC handlers", () => {
                 bamPath: "/data/sample.bam",
                 readIdPath: "/ids",
                 outputPath: "/out",
+                overwriteConfirmed: false,
                 region: "chr1:10-20",
                 fullRegion: true,
             },
