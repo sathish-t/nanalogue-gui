@@ -299,12 +299,10 @@ result = plot_series(points, kind="line", output_path="trend.svg",
 
 ### bash(command: str) -> dict
 
-Runs a shell command in a restricted, in-process Bash-like interpreter
-(just-bash), not a host OS shell. Do not assume arbitrary installed binaries
-or full GNU command compatibility; use command --help to check supported flags.
-Network access and just-bash's Python/JavaScript runtimes are not enabled.
-Shell state (cwd, variables) does not persist between calls; use compound commands
-for multi-step pipelines (e.g. cd subdir && grep pattern *.bed).
+Runs commands in just-bash, not a host shell. Arbitrary binaries, network
+access, and its Python/JavaScript runtimes aren't available. Don't assume full
+GNU compatibility; try command --help for supported flags. Shell state resets
+between calls, so keep dependent steps together (e.g. cd subdir && grep pattern *.bed).
 
 **Write restriction:** bash can only write to the \`ai_chat_temp_files/\`
 subdirectory. Writes anywhere else in the allowed directory fail with
@@ -328,9 +326,8 @@ Returns a dict:
 {"stdout": "...", "stderr": "...", "exit_code": 0}
 \`\`\`
 
-Check exit_code and stderr before relying on stdout. A pipeline's final
-command may succeed even if an earlier command failed; do not interpret empty
-stdout as "no matching records" when stderr reports an error.
+Check both exit_code and stderr: the last command in a pipeline can succeed
+even if an earlier one failed. Empty output doesn't always mean "no matches".
 
 **Available:** grep (including -v and -oP), rg, sed, awk, sort, uniq,
 wc, cut, head, tail, cat, find, tr, paste, jq, gzip, gunzip, zcat,
@@ -338,46 +335,38 @@ tar, base64, and common file utilities (ls, cp, mv, mkdir, rm).
 Shell syntax includes pipes, redirects, quoted paths, variables,
 command substitution, conditionals, functions, loops, and && / || chaining.
 
-**Compressed text files:** use zcat file.gz or gunzip -c file.gz to read
-gzip-compressed VCF, FASTA, FASTQ, TSV, or other text without changing the
-archive. Named decompression inputs normally require a .gz suffix.
-Plain gunzip file.gz tries to write beside and remove the source, so do not
-use it on read-only inputs. To save decompressed text or compressed output:
+To read gzip-compressed text without changing the archive, use zcat file.gz
+or gunzip -c file.gz. Named inputs normally need a .gz suffix. Avoid plain
+gunzip on read-only inputs: it writes beside and removes the source file.
+To save decompressed text or compressed output:
 
 \`\`\`python
 bash("gunzip -c data.tsv.gz > ai_chat_temp_files/data.tsv")
 bash("gzip -c results.tsv > ai_chat_temp_files/results.tsv.gz")
 \`\`\`
 
-Compression/decompression is buffered, not streaming: zcat file.gz | head
-still decompresses the whole input. Compressed file reads and expanded data
-must fit resource limits, even when redirected to a file. Do not return raw
-gzip bytes as text; save them to a file instead.
+Compression is buffered, so zcat file.gz | head still decompresses everything.
+Both file reads and expanded data must fit resource limits, even with redirects.
+Save raw gzip bytes to a file rather than returning them as text.
 
-You don't have to bring a whole file back into Python just to take a look at
-it. You can join commands with pipes to filter, count, sort, or pick out the
-bits you need. Here's a quick way to look at the first few lines of a
-compressed text file:
+You don't have to bring a whole file back into Python to take a look at it.
+Join commands with pipes to filter, count, sort, or pick out what you need.
+For a quick look at the first few lines:
 
 \`\`\`python
 result = bash("zcat 'data.tsv.gz' | head -5")
 print(result)
 \`\`\`
 
-You can use awk to pick out tab-separated fields, compare numbers, and combine
-conditions with && or ||. One catch: if you want several columns, use awk's
-print rather than cut. In this version of just-bash, cut can silently drop
-repeated values, so two fields containing the same text might become just one.
-For a single column, cut -f10 is fine. You can then use cut -d':' -f1 to get
-its first colon-separated value.
+awk can pick out fields, compare numbers, and combine conditions with && or ||.
+For several columns, use awk's print: this just-bash version's cut can silently
+drop duplicate-valued fields. For one column, cut -f10 is fine; cut -d':' -f1
+then picks out its first colon-separated value.
 
-If you only need part of a line, grep -o prints just the matching text, and
--P lets you use Perl-style regular expressions. Keep the pattern specific
-enough to match the whole value you want, not part of a longer name or value.
-If the data already has clear fields or delimiters, selecting those fields
-with awk or cut is often simpler than reaching for a regex.
-And remember, head -20 keeps the displayed output short; the commands before
-it may still need to read or process the whole input.
+grep -o prints only matching text; -P enables Perl-style regexes. Make sure
+your pattern captures the whole value, not part of a longer name or value.
+For clearly delimited data, picking fields with awk or cut is often simpler.
+head keeps displayed output short, but earlier commands may process everything.
 
 **Not available:** samtools, bedtools, bwa, bgzip, tabix,
 python, R, perl, or any other bioinformatics or language runtimes. Use
