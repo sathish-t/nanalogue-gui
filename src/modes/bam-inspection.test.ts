@@ -6,20 +6,18 @@ import { setMockResolvedValue } from "../test-helpers";
 /** Registered IPC handlers keyed by channel name. */
 const ipcHandlers = new Map<string, (...args: unknown[]) => Promise<unknown>>();
 
-vi.mock("electron", () => ({
-    ipcMain: {
-        /**
-         * Captures an IPC handler for direct test invocation.
-         *
-         * @param channel - The IPC channel name.
-         * @param handler - The handler registered for the channel.
-         */
-        handle: (
-            channel: string,
-            handler: (...args: unknown[]) => Promise<unknown>,
-        ) => {
-            ipcHandlers.set(channel, handler);
-        },
+vi.mock("../electron-security", () => ({
+    /**
+     * Captures a trusted IPC handler for mode-level tests.
+     *
+     * @param channel - The IPC channel name.
+     * @param handler - The mode handler to register.
+     */
+    registerTrustedIpcHandler: (
+        channel: string,
+        handler: (...args: unknown[]) => Promise<unknown>,
+    ) => {
+        ipcHandlers.set(channel, handler);
     },
 }));
 

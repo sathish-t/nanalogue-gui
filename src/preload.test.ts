@@ -74,9 +74,12 @@ describe("preload bridge", () => {
         it.each([
             "setFontSize",
             "getVersion",
-            "openExternalUrl",
         ])("exposes %s as a function", (name) => {
             expect(typeof exposedApi[name]).toBe("function");
+        });
+
+        it("does not expose a mechanism for opening external URLs", () => {
+            expect(exposedApi).not.toHaveProperty("openExternalUrl");
         });
     });
 
@@ -223,16 +226,6 @@ describe("invoke routing", () => {
     it("getVersion forwards to get-app-version", () => {
         (exposedApi.getVersion as () => void)();
         expect(ipcRenderer.invoke).toHaveBeenCalledWith("get-app-version");
-    });
-
-    it("openExternalUrl forwards to open-external-url with the url", () => {
-        (exposedApi.openExternalUrl as (url: string) => void)(
-            "https://example.com",
-        );
-        expect(ipcRenderer.invoke).toHaveBeenCalledWith(
-            "open-external-url",
-            "https://example.com",
-        );
     });
 
     // -----------------------------------------------------------------------

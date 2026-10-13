@@ -1,6 +1,6 @@
 // Shared font-size state for the main process.
 // Both main.ts and mode modules read this to pass the correct query param
-// to every loadFile call so child pages pick up the user's preference.
+// to every renderer URL so child pages pick up the user's preference.
 
 /** The three font-size presets available in the application. */
 export type FontSize = "small" | "medium" | "large";

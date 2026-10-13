@@ -1,7 +1,8 @@
 // AI Chat mode logic for nanalogue-gui.
 // Manages IPC handlers for the LLM-powered BAM analysis chat interface.
 
-import { type BrowserWindow, dialog, ipcMain } from "electron";
+import { type BrowserWindow, dialog } from "electron";
+import { registerTrustedIpcHandler } from "../electron-security";
 import {
     validateGetSystemPrompt,
     validateListModels,
@@ -379,7 +380,7 @@ async function sendAiChatMessage(
  * Registers all IPC handlers for the AI Chat mode.
  */
 export function registerAiChatIpcHandlers(): void {
-    ipcMain.handle(
+    registerTrustedIpcHandler(
         "ai-chat-list-models",
         /**
          * Queries the endpoint for available models using the provider-appropriate API.
@@ -391,7 +392,7 @@ export function registerAiChatIpcHandlers(): void {
         async (_event, payload: unknown) => listAiChatModels(payload),
     );
 
-    ipcMain.handle(
+    registerTrustedIpcHandler(
         "ai-chat-send-message",
         /**
          * Sends a user message through the orchestrator and returns the response.
@@ -403,7 +404,7 @@ export function registerAiChatIpcHandlers(): void {
         async (_event, payload: unknown) => sendAiChatMessage(payload),
     );
 
-    ipcMain.handle(
+    registerTrustedIpcHandler(
         "ai-chat-cancel",
         /**
          * Cancels the current in-flight LLM/sandbox request.
@@ -415,7 +416,7 @@ export function registerAiChatIpcHandlers(): void {
         },
     );
 
-    ipcMain.handle(
+    registerTrustedIpcHandler(
         "ai-chat-new-chat",
         /**
          * Resets conversation state without losing connection settings.
@@ -430,7 +431,7 @@ export function registerAiChatIpcHandlers(): void {
         },
     );
 
-    ipcMain.handle(
+    registerTrustedIpcHandler(
         "ai-chat-pick-directory",
         /**
          * Opens a native directory picker for selecting the BAM analysis directory.
@@ -448,7 +449,7 @@ export function registerAiChatIpcHandlers(): void {
         },
     );
 
-    ipcMain.handle(
+    registerTrustedIpcHandler(
         "ai-chat-go-back",
         /**
          * Navigates back to the landing page from the AI Chat screen.
@@ -463,7 +464,7 @@ export function registerAiChatIpcHandlers(): void {
         },
     );
 
-    ipcMain.handle(
+    registerTrustedIpcHandler(
         "ai-chat-consent",
         /**
          * Records user consent for a non-localhost endpoint origin.
@@ -476,7 +477,7 @@ export function registerAiChatIpcHandlers(): void {
         },
     );
 
-    ipcMain.handle(
+    registerTrustedIpcHandler(
         "ai-chat-get-system-prompt",
         /**
          * Builds and returns the effective system prompt for the given config.

@@ -18,4 +18,4 @@ permissions:
 jobs:
   # The reusable CI workflow includes committed-secret and character checks.
   ci:
-    uses: ./.github/workflows/ci.yml
+    uses: $/.github/workflows/ci.yml

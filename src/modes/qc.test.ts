@@ -54,6 +54,30 @@ vi.mock("electron", () => ({
     BrowserWindow: class {},
 }));
 
+// Mock the sender-validating registrar; its security behavior has a dedicated test suite.
+vi.mock("../electron-security", () => ({
+    /**
+     * Captures a trusted IPC handler for mode-level tests.
+     *
+     * @param channel - The IPC channel name.
+     * @param handler - The mode handler to register.
+     */
+    registerTrustedIpcHandler: (
+        channel: string,
+        handler: (...args: unknown[]) => Promise<unknown>,
+    ) => {
+        ipcHandlers.set(channel, handler);
+    },
+    /**
+     * Returns a stable custom-protocol URL for navigation assertions.
+     *
+     * @param relativePath - Renderer-relative asset path.
+     * @returns The corresponding test renderer URL.
+     */
+    getRendererAssetUrl: (relativePath: string) =>
+        `nanalogue://renderer/${relativePath}?fontSize=medium`,
+}));
+
 // Mock qc-data-loader – actual BAM I/O is covered by its own test suite.
 vi.mock("../lib/qc-data-loader", () => ({
     generateQCData: vi.fn(),
@@ -100,10 +124,10 @@ registerQcIpcHandlers();
 /** Mock webContents with a spy for the send method. */
 const mockWebContents = { send: vi.fn() };
 
-/** Mock BrowserWindow exposing webContents and loadFile spies. */
+/** Mock BrowserWindow exposing webContents and loadURL spies. */
 const mockWindow = {
     webContents: mockWebContents,
-    loadFile: vi.fn(),
+    loadURL: vi.fn(),
 } as unknown as BrowserWindow;
 
 // ---------------------------------------------------------------------------
@@ -247,7 +271,7 @@ describe("qc IPC handlers", () => {
         beforeEach(() => {
             setQcMainWindow(mockWindow);
             setMockResolvedValue(
-                mockWindow.loadFile as ReturnType<typeof vi.fn>,
+                mockWindow.loadURL as ReturnType<typeof vi.fn>,
                 undefined,
             );
             setMockResolvedValue(generateQCData, stubQCData);
@@ -266,14 +290,16 @@ describe("qc IPC handlers", () => {
             });
         });
 
-        it("calls mainWindow.loadFile after generateQCData completes", async () => {
+        it("loads the trusted results URL after generateQCData completes", async () => {
             await ipcHandlers.get("generate-qc")?.(undefined, {
                 ...baseConfig,
             });
 
             expect(
-                vi.mocked(mockWindow.loadFile as ReturnType<typeof vi.fn>),
-            ).toHaveBeenCalledOnce();
+                vi.mocked(mockWindow.loadURL as ReturnType<typeof vi.fn>),
+            ).toHaveBeenCalledWith(
+                "nanalogue://renderer/qc/qc-results.html?fontSize=medium",
+            );
         });
 
         it("sends qc-progress events via webContents during generation", async () => {
@@ -395,7 +421,7 @@ describe("qc IPC handlers", () => {
         beforeEach(() => {
             setQcMainWindow(mockWindow);
             setMockResolvedValue(
-                mockWindow.loadFile as ReturnType<typeof vi.fn>,
+                mockWindow.loadURL as ReturnType<typeof vi.fn>,
                 undefined,
             );
             setMockResolvedValue(generateQCData, {} as QCData);

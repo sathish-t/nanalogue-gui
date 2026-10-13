@@ -147,7 +147,7 @@ jobs:
   package:
     name: Package binaries
     needs: [version-check, build]
-    uses: ./.github/workflows/package.yml
+    uses: $/.github/workflows/package.yml
     with:
       version: ${{ needs.version-check.outputs.version }}
     # Permissions needed so the reusable packaging workflow can upload release assets.

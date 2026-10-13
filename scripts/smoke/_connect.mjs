@@ -22,8 +22,9 @@ export const projectRoot = resolve(
     "../..",
 );
 
-/** Absolute path to the landing page in dist/. */
-export const landingUrl = `file://${projectRoot}/dist/renderer/landing/landing.html?fontSize=medium`;
+/** Trusted custom-protocol URL used for the landing page. */
+export const landingUrl =
+    "nanalogue://renderer/landing/landing.html?fontSize=medium";
 
 /**
  * Parses ELECTRON_EXTRA_LAUNCH_ARGS env var into an array of CLI flags.
@@ -53,13 +54,13 @@ export async function launch() {
 }
 
 /**
- * Navigates to the landing page regardless of where the app currently is.
- * Waits for the DOM to be ready before returning.
+ * Confirms that a freshly launched app loaded the landing page through the
+ * trusted custom protocol.
  *
  * @param {import('playwright').Page} page
  */
 export async function goToLanding(page) {
-    await page.goto(landingUrl, { waitUntil: "domcontentloaded" });
+    await page.waitForURL(landingUrl);
 }
 
 /**

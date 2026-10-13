@@ -4,13 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const handlers = new Map<string, (...args: unknown[]) => Promise<unknown>>();
 
-vi.mock("electron", () => ({
-    ipcMain: {
-        handle: (
-            name: string,
-            handler: (...args: unknown[]) => Promise<unknown>,
-        ) => handlers.set(name, handler),
-    },
+vi.mock("../electron-security", () => ({
+    registerTrustedIpcHandler: (
+        name: string,
+        handler: (...args: unknown[]) => Promise<unknown>,
+    ) => handlers.set(name, handler),
 }));
 vi.mock("node:fs/promises", () => ({
     readFile: vi.fn(),

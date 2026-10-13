@@ -1,7 +1,10 @@
 // QC mode logic for nanalogue-gui
 
-import { resolve } from "node:path";
-import { type BrowserWindow, dialog, ipcMain } from "electron";
+import { type BrowserWindow, dialog } from "electron";
+import {
+    getRendererAssetUrl,
+    registerTrustedIpcHandler,
+} from "../electron-security";
 import { getFontSize } from "../font-size";
 import { validateIpcFilePath } from "../lib/ipc-path-validation";
 import { validateQCRequest } from "../lib/qc-contract";
@@ -24,7 +27,7 @@ export function setQcMainWindow(window: BrowserWindow | null) {
  * Registers QC-owned IPC handlers for file selection and QC generation.
  */
 export function registerQcIpcHandlers() {
-    ipcMain.handle("select-file", async () => {
+    registerTrustedIpcHandler("select-file", async () => {
         if (!mainWindow) return null;
 
         const result = await dialog.showOpenDialog(mainWindow, {
@@ -45,55 +48,61 @@ export function registerQcIpcHandlers() {
         return result.filePaths[0];
     });
 
-    ipcMain.handle("generate-qc", async (_event, payload: unknown) => {
-        const config = validateQCRequest(payload);
+    registerTrustedIpcHandler(
+        "generate-qc",
+        async (_event, payload: unknown) => {
+            const config = validateQCRequest(payload);
 
-        console.log("Generating QC with config:", {
-            ...config,
-            sampleFraction: config.sampleFraction / 100,
-        });
+            console.log("Generating QC with config:", {
+                ...config,
+                sampleFraction: config.sampleFraction / 100,
+            });
 
-        await validateIpcFilePath(config.bamPath, "read");
+            await validateIpcFilePath(config.bamPath, "read");
 
-        // Resolve read ID file path to an array of IDs
-        if (config.readIdFilePath) {
-            const { readFile } = await import("node:fs/promises");
-            const { parseReadIds } = await import("../lib/locate-data-loader");
-            await validateIpcFilePath(config.readIdFilePath, "read");
-            const content = await readFile(config.readIdFilePath, "utf-8");
-            const parseResult = parseReadIds(content);
-            if (parseResult.capped) {
-                throw new Error(
-                    `Read ID file contains ${parseResult.count.toLocaleString()} unique IDs, exceeding the limit of 200,000.`,
+            // Resolve read ID file path to an array of IDs
+            if (config.readIdFilePath) {
+                const { readFile } = await import("node:fs/promises");
+                const { parseReadIds } = await import(
+                    "../lib/locate-data-loader"
                 );
+                await validateIpcFilePath(config.readIdFilePath, "read");
+                const content = await readFile(config.readIdFilePath, "utf-8");
+                const parseResult = parseReadIds(content);
+                if (parseResult.capped) {
+                    throw new Error(
+                        `Read ID file contains ${parseResult.count.toLocaleString()} unique IDs, exceeding the limit of 200,000.`,
+                    );
+                }
+                config.readIdSet = parseResult.ids;
             }
-            config.readIdSet = parseResult.ids;
-        }
 
-        /**
-         * Forwards pagination progress from the worker to the renderer.
-         *
-         * @param source - The data source that produced this progress event.
-         * @param count - The running total of records processed so far.
-         */
-        const onProgress = (
-            source: "modifications" | "windows" | "sequences",
-            count: number,
-        ) => {
-            mainWindow?.webContents.send("qc-progress", source, count);
-        };
+            /**
+             * Forwards pagination progress from the worker to the renderer.
+             *
+             * @param source - The data source that produced this progress event.
+             * @param count - The running total of records processed so far.
+             */
+            const onProgress = (
+                source: "modifications" | "windows" | "sequences",
+                count: number,
+            ) => {
+                mainWindow?.webContents.send("qc-progress", source, count);
+            };
 
-        qcData = await generateQCData(config, onProgress);
-        console.log("QC data generated");
+            qcData = await generateQCData(config, onProgress);
+            console.log("QC data generated");
 
-        // Navigate to results page
-        mainWindow?.loadFile(
-            resolve(__dirname, "..", "renderer", "qc", "qc-results.html"),
-            { query: { fontSize: getFontSize() } },
-        );
-    });
+            // Navigate to results page
+            void mainWindow?.loadURL(
+                getRendererAssetUrl("qc/qc-results.html", {
+                    fontSize: getFontSize(),
+                }),
+            );
+        },
+    );
 
-    ipcMain.handle("get-qc-data", () => {
+    registerTrustedIpcHandler("get-qc-data", () => {
         return qcData;
     });
 }

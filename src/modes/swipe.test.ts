@@ -36,24 +36,25 @@ const ipcHandlers = new Map<string, (...args: unknown[]) => Promise<unknown>>();
 // vi.mock declarations (hoisted before any import).
 // ---------------------------------------------------------------------------
 
-// Mock electron so ipcMain.handle captures handlers and dialog can be spied.
+// Mock Electron dialogs; sender validation has its own security test suite.
 vi.mock("electron", () => ({
-    ipcMain: {
-        /**
-         * Captures the handler into ipcHandlers for test invocation.
-         *
-         * @param channel - The IPC channel name.
-         * @param handler - The handler to register.
-         */
-        handle: (
-            channel: string,
-            handler: (...args: unknown[]) => Promise<unknown>,
-        ) => {
-            ipcHandlers.set(channel, handler);
-        },
-    },
     dialog: {
         showMessageBox: vi.fn().mockResolvedValue({ response: 0 }),
+    },
+}));
+
+vi.mock("../electron-security", () => ({
+    /**
+     * Captures a trusted IPC handler for mode-level tests.
+     *
+     * @param channel - The IPC channel name.
+     * @param handler - The mode handler to register.
+     */
+    registerTrustedIpcHandler: (
+        channel: string,
+        handler: (...args: unknown[]) => Promise<unknown>,
+    ) => {
+        ipcHandlers.set(channel, handler);
     },
 }));
 

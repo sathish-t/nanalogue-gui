@@ -8,8 +8,9 @@ src/
   cli-terminal-formatting.ts  # Shared ANSI formatting constants for the standalone nanalogue-chat CLI.
   cli-terminal-output.ts      # Terminal output helpers for the standalone nanalogue-chat CLI.
   cli.ts                      # Standalone CLI for the nanalogue AI Chat feature.
+  electron-security.ts        # Shared Electron security boundaries for renderer loading and privileged IPC.
   execute-cli.ts              # Standalone CLI for running a Python file directly in the Monty sandbox.
-  exit-watchdog.ts            # Watchdog child process that force-kills the parent on demand.
+  exit-watchdog.ts            # Watchdog utility process that force-kills the parent after an arm/ack handshake.
   font-size.ts                # Shared font-size state for the main process.
   main.ts                     # Electron main process for nanalogue-gui with multi-mode support
   preload.ts                  # Preload script for nanalogue-gui

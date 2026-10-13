@@ -103,6 +103,33 @@ describe("parseBedFile", () => {
         );
     });
 
+    it("skips an empty read ID even with extra columns, without using the entry cap", async () => {
+        suppressConsoleWarn();
+        const path = await writeTempBed(
+            "chr1\t100\t200\t\t0\nchr2\t300\t450\tread2\t0",
+        );
+        expect(await parseBedFile(path, 1)).toEqual({
+            annotations: [
+                {
+                    contig: "chr2",
+                    start: 300,
+                    end: 450,
+                    readId: "read2",
+                    rawLine: "chr2\t300\t450\tread2\t0",
+                },
+            ],
+            capped: false,
+        });
+    });
+
+    it("rejects a stream open failure rather than returning empty annotations", async () => {
+        const path = await writeTempBed("");
+        await unlink(path);
+        await expect(parseBedFile(path)).rejects.toMatchObject({
+            code: "ENOENT",
+        });
+    });
+
     it.each([
         ["an empty start", "", "200"],
         ["an empty end", "100", " "],
@@ -187,11 +214,13 @@ describe("parseBedFile", () => {
 });
 
 describe("parseBedFile with maxEntries", () => {
-    it("returns capped: false when entries are within limit", async () => {
+    it.each([
+        2, 10,
+    ])("returns capped: false for two entries with limit %i", async (limit) => {
         const path = await writeTempBed(
             "chr1\t100\t200\tread1\nchr2\t300\t400\tread2",
         );
-        const result = await parseBedFile(path, 10);
+        const result = await parseBedFile(path, limit);
         expect(result.capped).toBe(false);
         expect(result.annotations).toHaveLength(2);
     });

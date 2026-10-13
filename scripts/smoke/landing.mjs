@@ -14,6 +14,7 @@ import { resolve } from "node:path";
 import {
     assert,
     goToLanding,
+    landingUrl,
     launch,
     makeOutDir,
     pass,
@@ -86,7 +87,7 @@ await run("Landing page", async () => {
         // Invoke from a separate renderer so navigation cannot destroy the
         // promises before both IPC handlers finish, including the stale one.
         const finalUrl = await app.evaluate(
-            async ({ BrowserWindow }, preload) => {
+            async ({ BrowserWindow }, { preload, callerUrl }) => {
                 const mainWindow = BrowserWindow.getAllWindows()[0];
                 const caller = new BrowserWindow({
                     show: false,
@@ -94,14 +95,15 @@ await run("Landing page", async () => {
                         preload,
                         contextIsolation: true,
                         nodeIntegration: false,
+                        sandbox: true,
                     },
                 });
                 try {
-                    await caller.loadURL("about:blank");
+                    await caller.loadURL(callerUrl);
                     await caller.webContents.executeJavaScript(
                         "Promise.all([window.api.launchAiChat(), window.api.launchQC()])",
                     );
-                    // Launch replies can precede loadFile completion. Observe the
+                    // Launch replies can precede loadURL completion. Observe the
                     // last navigation finishing instead of sleeping for a deadline.
                     if (mainWindow.webContents.isLoading()) {
                         await new Promise((resolve) =>
@@ -116,7 +118,10 @@ await run("Landing page", async () => {
                     caller.destroy();
                 }
             },
-            resolve(projectRoot, "dist/preload.js"),
+            {
+                preload: resolve(projectRoot, "dist/preload.js"),
+                callerUrl: landingUrl,
+            },
         );
         assert(
             /qc-config\.html/.test(finalUrl),
