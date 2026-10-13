@@ -1,6 +1,6 @@
 // Unit tests for monty-sandbox helper functions (no BAM files needed).
-// Tests resolvePath, toReadOptions, toWindowOptions, gateOutputSize, rejectTreatAsUrl,
-// hasControlChars, enforceRecordLimit, enforceDataSizeLimit, listFilesRecursive, convertMaps.
+// Tests resolvePath, toReadOptions, toWindowOptions, gateOutputSize,
+// rejectTreatAsUrl, record/data limits, directory listing, and map conversion.
 
 import { mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -13,7 +13,6 @@ import {
     enforceDataSizeLimit,
     enforceRecordLimit,
     gateOutputSize,
-    hasControlChars,
     listFilesRecursive,
     rejectTreatAsUrl,
     resolvePath,
@@ -170,10 +169,12 @@ describe("toWindowOptions", () => {
 });
 
 describe("gateOutputSize", () => {
-    it("passes through small output", () => {
+    it("preserves small objects and indivisible scalar output", () => {
         const { gated, truncated } = gateOutputSize({ a: 1 }, 1024);
         expect(gated).toEqual({ a: 1 });
         expect(truncated).toBe(false);
+        // A numeric result must not turn into a different number to fit the budget.
+        expect(gateOutputSize(42, 1)).toEqual({ gated: 42, truncated: false });
     });
 
     it("truncates large array output", () => {
@@ -226,24 +227,6 @@ describe("deriveMaxOutputBytes", () => {
     it("clamps to maximum for large context", () => {
         const result = deriveMaxOutputBytes(1_000_000);
         expect(result).toBe(80 * 1024);
-    });
-});
-
-describe("hasControlChars", () => {
-    it("returns false for a normal filename", () => {
-        expect(hasControlChars("report.bam")).toBe(false);
-    });
-
-    it("returns true for a null byte", () => {
-        expect(hasControlChars("bad\x00name")).toBe(true);
-    });
-
-    it("returns true for a DEL character (0x7F)", () => {
-        expect(hasControlChars("bad\x7fname")).toBe(true);
-    });
-
-    it("returns true for a control character in the middle", () => {
-        expect(hasControlChars("a\x1fb")).toBe(true);
     });
 });
 

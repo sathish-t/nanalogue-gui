@@ -21,7 +21,6 @@ import {
     setMockImplementation,
     setMockRejectedValue,
     setMockResolvedValue,
-    setMockReturnValue,
     suppressConsoleError,
 } from "../test-helpers";
 import type { SwipeArgs } from "./swipe";
@@ -37,28 +36,13 @@ const ipcHandlers = new Map<string, (...args: unknown[]) => Promise<unknown>>();
 // vi.mock declarations (hoisted before any import).
 // ---------------------------------------------------------------------------
 
-// Mock electron so ipcMain.handle captures handlers and dialog can be spied.
+// Mock Electron dialogs; sender validation has its own security test suite.
 vi.mock("electron", () => ({
-    ipcMain: {
-        /**
-         * Captures the handler into ipcHandlers for test invocation.
-         *
-         * @param channel - The IPC channel name.
-         * @param handler - The handler to register.
-         */
-        handle: (
-            channel: string,
-            handler: (...args: unknown[]) => Promise<unknown>,
-        ) => {
-            ipcHandlers.set(channel, handler);
-        },
-    },
     dialog: {
         showMessageBox: vi.fn().mockResolvedValue({ response: 0 }),
     },
 }));
 
-// Mock the sender-validating registrar; its security behavior has a dedicated test suite.
 vi.mock("../electron-security", () => ({
     /**
      * Captures a trusted IPC handler for mode-level tests.
@@ -74,13 +58,13 @@ vi.mock("../electron-security", () => ({
     },
 }));
 
-// Mock node:fs — controls realpathSync, existsSync, and file I/O helpers.
-vi.mock("node:fs", () => ({
-    appendFileSync: vi.fn(),
-    existsSync: vi.fn().mockReturnValue(false),
-    realpathSync: vi.fn((p: string) => p),
-    unlinkSync: vi.fn(),
-    writeFileSync: vi.fn(),
+// Mock async filesystem operations used by Swipe mode.
+vi.mock("node:fs/promises", () => ({
+    access: vi.fn().mockRejectedValue(new Error("ENOENT")),
+    appendFile: vi.fn(),
+    realpath: vi.fn(async (path: string) => path),
+    unlink: vi.fn(),
+    writeFile: vi.fn(),
 }));
 
 // Mock swipe-data-loader — BAM I/O is covered by swipe-data-loader.test.ts.
@@ -98,8 +82,9 @@ vi.mock("../lib/bed-parser", () => ({
 // Top-level imports (after mocks are hoisted).
 // ---------------------------------------------------------------------------
 
-const { appendFileSync, existsSync, realpathSync, unlinkSync, writeFileSync } =
-    await import("node:fs");
+const { access, appendFile, realpath, unlink, writeFile } = await import(
+    "node:fs/promises"
+);
 const { dialog } = await import("electron");
 const { loadContigSizes, loadPlotData } = await import(
     "../lib/swipe-data-loader"
@@ -149,12 +134,12 @@ const BASE_ARGS: SwipeArgs = {
  * @returns A promise that resolves when initialization completes.
  */
 async function initializeWithFakes(): Promise<void> {
-    setMockReturnValue(parseBedFile, {
+    setMockResolvedValue(parseBedFile, {
         capped: false,
         annotations: [...FAKE_ANNOTATIONS],
     });
     setMockResolvedValue(loadContigSizes, { chr1: 5000 });
-    setMockReturnValue(existsSync as ReturnType<typeof vi.fn>, false);
+    setMockRejectedValue(access, new Error("ENOENT"));
     await initializeSwipeReview(BASE_ARGS, true);
 }
 
@@ -202,15 +187,15 @@ describe("swipe mode — initialize()", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         setMockImplementation(
-            realpathSync as ReturnType<typeof vi.fn>,
-            (p: string) => p,
+            realpath as ReturnType<typeof vi.fn>,
+            async (path: string) => path,
         );
-        setMockReturnValue(existsSync as ReturnType<typeof vi.fn>, false);
+        setMockRejectedValue(access, new Error("ENOENT"));
         setMockResolvedValue(loadContigSizes, { chr1: 5000 });
     });
 
     it("calls loadContigSizes with the local BAM path", async () => {
-        setMockReturnValue(parseBedFile, {
+        setMockResolvedValue(parseBedFile, {
             capped: false,
             annotations: [...FAKE_ANNOTATIONS],
         });
@@ -223,7 +208,7 @@ describe("swipe mode — initialize()", () => {
     });
 
     it("calls parseBedFile with the BED path", async () => {
-        setMockReturnValue(parseBedFile, {
+        setMockResolvedValue(parseBedFile, {
             capped: false,
             annotations: [...FAKE_ANNOTATIONS],
         });
@@ -236,14 +221,14 @@ describe("swipe mode — initialize()", () => {
     });
 
     it("writes an empty output file after successful initialization", async () => {
-        setMockReturnValue(parseBedFile, {
+        setMockResolvedValue(parseBedFile, {
             capped: false,
             annotations: [...FAKE_ANNOTATIONS],
         });
 
         await initializeSwipeReview(BASE_ARGS, false);
 
-        expect(vi.mocked(writeFileSync)).toHaveBeenCalledWith(
+        expect(vi.mocked(writeFile)).toHaveBeenCalledWith(
             "/data/output.bed",
             "",
             { encoding: "utf-8", flag: "wx" },
@@ -251,24 +236,41 @@ describe("swipe mode — initialize()", () => {
     });
 
     it("propagates an exclusive-create conflict without deleting output", async () => {
-        setMockReturnValue(parseBedFile, {
+        setMockResolvedValue(parseBedFile, {
             capped: false,
             annotations: [...FAKE_ANNOTATIONS],
         });
-        vi.mocked(writeFileSync).mockImplementationOnce(() => {
-            throw Object.assign(new Error("output appeared"), {
+        vi.mocked(writeFile).mockRejectedValueOnce(
+            Object.assign(new Error("output appeared"), {
                 code: "EEXIST",
-            });
-        });
+            }),
+        );
 
         await expect(initializeSwipeReview(BASE_ARGS, false)).rejects.toThrow(
             "output appeared",
         );
-        expect(unlinkSync).not.toHaveBeenCalled();
+        expect(unlink).not.toHaveBeenCalled();
+    });
+
+    it("rechecks for an output file before writing", async () => {
+        setMockResolvedValue(parseBedFile, {
+            capped: false,
+            annotations: [...FAKE_ANNOTATIONS],
+        });
+        vi.mocked(access)
+            .mockRejectedValueOnce(new Error("ENOENT"))
+            .mockResolvedValueOnce(undefined);
+        setMockResolvedValue(dialog.showMessageBox, { response: 1 });
+
+        await expect(initializeSwipeReview(BASE_ARGS, false)).rejects.toThrow(
+            "User cancelled: output file exists",
+        );
+        expect(dialog.showMessageBox).toHaveBeenCalledOnce();
+        expect(writeFile).not.toHaveBeenCalled();
     });
 
     it("throws when the BED file exceeds 10 000 annotations", async () => {
-        setMockReturnValue(parseBedFile, {
+        setMockResolvedValue(parseBedFile, {
             capped: true,
             annotations: [],
         });
@@ -279,16 +281,13 @@ describe("swipe mode — initialize()", () => {
     });
 
     it("throws when outputPath resolves to the same file as bedPath", async () => {
-        setMockReturnValue(parseBedFile, {
+        setMockResolvedValue(parseBedFile, {
             capped: false,
             annotations: [...FAKE_ANNOTATIONS],
         });
-        // Make realpathSync return the same value for both paths to trigger the guard.
-        setMockReturnValue(
-            realpathSync as ReturnType<typeof vi.fn>,
-            "/data/same.bed",
-        );
-        setMockReturnValue(existsSync as ReturnType<typeof vi.fn>, true);
+        // Make realpath return the same value for both paths to trigger the guard.
+        setMockResolvedValue(realpath, "/data/same.bed");
+        setMockResolvedValue(access, undefined);
 
         const collidingArgs: SwipeArgs = {
             ...BASE_ARGS,
@@ -302,13 +301,13 @@ describe("swipe mode — initialize()", () => {
     });
 
     it("throws when resolved outputPath matches bedPath and output file does not yet exist", async () => {
-        setMockReturnValue(parseBedFile, {
+        setMockResolvedValue(parseBedFile, {
             capped: false,
             annotations: [...FAKE_ANNOTATIONS],
         });
-        // existsSync returns false so the first guard is skipped; the second
-        // guard catches the collision via path.resolve vs realpathSync.
-        setMockReturnValue(existsSync as ReturnType<typeof vi.fn>, false);
+        // access rejects so the first guard is skipped; the second guard
+        // catches the collision via path.resolve vs realpath.
+        setMockRejectedValue(access, new Error("ENOENT"));
 
         const collidingArgs: SwipeArgs = {
             ...BASE_ARGS,
@@ -373,8 +372,8 @@ describe("swipe mode — IPC handlers", () => {
     beforeEach(async () => {
         vi.clearAllMocks();
         setMockImplementation(
-            realpathSync as ReturnType<typeof vi.fn>,
-            (p: string) => p,
+            realpath as ReturnType<typeof vi.fn>,
+            async (path: string) => path,
         );
         await initializeWithFakes();
     });
@@ -443,7 +442,7 @@ describe("swipe mode — IPC handlers", () => {
                 undefined,
             )) as HandlerResult;
 
-            expect(vi.mocked(appendFileSync)).toHaveBeenCalledWith(
+            expect(vi.mocked(appendFile)).toHaveBeenCalledWith(
                 "/data/output.bed",
                 `${FAKE_ANNOTATIONS[0].rawLine}\n`,
                 "utf-8",
@@ -493,7 +492,7 @@ describe("swipe mode — IPC handlers", () => {
 
             await ipcHandlers.get("accept")?.(undefined);
 
-            expect(vi.mocked(appendFileSync)).toHaveBeenCalledWith(
+            expect(vi.mocked(appendFile)).toHaveBeenCalledWith(
                 "/data/output.bed",
                 `${FAKE_ANNOTATIONS[0].rawLine}\n`,
                 "utf-8",
@@ -532,7 +531,7 @@ describe("swipe mode — IPC handlers", () => {
                 undefined,
             )) as HandlerResult;
 
-            expect(vi.mocked(appendFileSync)).not.toHaveBeenCalled();
+            expect(vi.mocked(appendFile)).not.toHaveBeenCalled();
             expect(vi.mocked(loadPlotData)).toHaveBeenCalledWith(
                 BASE_ARGS.bamPath,
                 FAKE_ANNOTATIONS[1],
@@ -578,7 +577,7 @@ describe("swipe mode — IPC handlers", () => {
 
             await ipcHandlers.get("reject")?.(undefined);
 
-            expect(vi.mocked(appendFileSync)).not.toHaveBeenCalled();
+            expect(vi.mocked(appendFile)).not.toHaveBeenCalled();
         });
 
         it("returns done: true when the last annotation is rejected", async () => {
@@ -636,11 +635,11 @@ describe("swipe mode — initialize() overwrite dialog", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         setMockImplementation(
-            realpathSync as ReturnType<typeof vi.fn>,
-            (p: string) => p,
+            realpath as ReturnType<typeof vi.fn>,
+            async (path: string) => path,
         );
         setMockResolvedValue(loadContigSizes, { chr1: 5000 });
-        setMockReturnValue(parseBedFile, {
+        setMockResolvedValue(parseBedFile, {
             capped: false,
             annotations: [
                 {
@@ -653,7 +652,7 @@ describe("swipe mode — initialize() overwrite dialog", () => {
             ],
         });
         // Output file exists by default in these tests
-        setMockReturnValue(existsSync as ReturnType<typeof vi.fn>, true);
+        setMockResolvedValue(access, undefined);
         // Default dialog response: user confirms (response 0 = Overwrite)
         setMockResolvedValue(dialog.showMessageBox, { response: 0 });
     });
@@ -671,16 +670,14 @@ describe("swipe mode — initialize() overwrite dialog", () => {
     it("deletes the existing output file when user confirms overwrite", async () => {
         await initializeSwipeReview(BASE_ARGS, false);
 
-        expect(vi.mocked(unlinkSync)).toHaveBeenCalledWith(
-            BASE_ARGS.outputPath,
-        );
+        expect(vi.mocked(unlink)).toHaveBeenCalledWith(BASE_ARGS.outputPath);
     });
 
     it("does not show the dialog when skipOverwriteConfirm is true", async () => {
         await initializeSwipeReview(BASE_ARGS, true);
 
         expect(dialog.showMessageBox).not.toHaveBeenCalled();
-        expect(vi.mocked(writeFileSync)).toHaveBeenCalledWith(
+        expect(vi.mocked(writeFile)).toHaveBeenCalledWith(
             BASE_ARGS.outputPath,
             "",
             { encoding: "utf-8", flag: "w" },
@@ -700,7 +697,7 @@ describe("swipe mode — initialize() overwrite dialog", () => {
         setMockResolvedValue(dialog.showMessageBox, { response: 1 });
 
         await expect(initializeSwipeReview(BASE_ARGS, false)).rejects.toThrow();
-        expect(vi.mocked(unlinkSync)).not.toHaveBeenCalled();
+        expect(vi.mocked(unlink)).not.toHaveBeenCalled();
     });
 });
 
@@ -712,15 +709,12 @@ describe("swipe mode — IPC handler edge cases", () => {
     beforeEach(async () => {
         vi.clearAllMocks();
         setMockImplementation(
-            realpathSync as ReturnType<typeof vi.fn>,
-            (p: string) => p,
+            realpath as ReturnType<typeof vi.fn>,
+            async (path: string) => path,
         );
-        // Reset appendFileSync to a no-op since vi.clearAllMocks() does not
+        // Reset appendFile to a no-op since vi.clearAllMocks() does not
         // restore mock implementations set by individual tests.
-        setMockImplementation(
-            appendFileSync as ReturnType<typeof vi.fn>,
-            () => undefined,
-        );
+        setMockResolvedValue(appendFile, undefined);
         await initializeWithFakes();
     });
 
@@ -746,14 +740,103 @@ describe("swipe mode — IPC handler edge cases", () => {
         expect(vi.mocked(loadPlotData)).not.toHaveBeenCalled();
     });
 
+    it.each([
+        "accept",
+        "reject",
+        "initialize",
+    ])("blocks %s during an append without corrupting either session", async (operation) => {
+        let releaseWrite!: () => void;
+        vi.mocked(appendFile).mockImplementationOnce(
+            () =>
+                new Promise<void>((resolve) => {
+                    releaseWrite = resolve;
+                }),
+        );
+        setMockResolvedValue(loadPlotData, null);
+        const accepting = ipcHandlers.get("accept")?.();
+        const nextArgs = { ...BASE_ARGS, outputPath: "/data/next.bed" };
+        try {
+            await vi.waitFor(() => expect(releaseWrite).toBeDefined());
+            const competing =
+                operation === "initialize"
+                    ? initializeSwipeReview(nextArgs, true)
+                    : ipcHandlers.get(operation)?.();
+            await expect(competing).rejects.toThrow("Swipe review is busy");
+        } finally {
+            releaseWrite();
+            await accepting;
+        }
+        expect(await ipcHandlers.get("get-state")?.()).toMatchObject({
+            currentIndex: 1,
+            acceptedCount: 1,
+            rejectedCount: 0,
+            outputPath: BASE_ARGS.outputPath,
+        });
+        expect(vi.mocked(appendFile).mock.calls).toEqual([
+            [BASE_ARGS.outputPath, `${FAKE_ANNOTATIONS[0].rawLine}\n`, "utf-8"],
+        ]);
+        await initializeSwipeReview(nextArgs, true);
+        expect(await ipcHandlers.get("reject")?.()).toMatchObject({
+            state: {
+                currentIndex: 1,
+                acceptedCount: 0,
+                rejectedCount: 1,
+                outputPath: nextArgs.outputPath,
+            },
+        });
+    });
+
+    it.each([
+        "initialize",
+        "accept",
+        "reject",
+    ])("blocks review mutations until %s finishes loading", async (operation) => {
+        let releaseLoad!: () => void;
+        const loading = new Promise<void>((resolve) => {
+            releaseLoad = resolve;
+        });
+        let started = false;
+        if (operation === "initialize") {
+            vi.mocked(loadContigSizes).mockImplementationOnce(async () => {
+                started = true;
+                await loading;
+                return { chr1: 5000 };
+            });
+        } else {
+            vi.mocked(loadPlotData).mockImplementationOnce(async () => {
+                started = true;
+                await loading;
+                return null;
+            });
+        }
+        const pending =
+            operation === "initialize"
+                ? initializeSwipeReview(BASE_ARGS, true)
+                : ipcHandlers.get(operation)?.();
+        try {
+            await vi.waitFor(() => expect(started).toBe(true));
+            await expect(
+                initializeSwipeReview(BASE_ARGS, true),
+            ).rejects.toThrow("Swipe review is busy");
+            await expect(ipcHandlers.get("accept")?.()).rejects.toThrow(
+                "Swipe review is busy",
+            );
+            await expect(ipcHandlers.get("reject")?.()).rejects.toThrow(
+                "Swipe review is busy",
+            );
+        } finally {
+            releaseLoad();
+            await pending;
+        }
+        await expect(initializeWithFakes()).resolves.toBeUndefined();
+    });
+
     it("accept retries the same annotation after an output write failure", async () => {
         setMockResolvedValue(loadPlotData, {
             rawPoints: [],
             windowedPoints: [],
         } as unknown as PlotData);
-        vi.mocked(appendFileSync).mockImplementationOnce(() => {
-            throw new Error("disk full");
-        });
+        vi.mocked(appendFile).mockRejectedValueOnce(new Error("disk full"));
 
         await expect(ipcHandlers.get("accept")?.(undefined)).rejects.toThrow(
             "disk full",
@@ -770,13 +853,13 @@ describe("swipe mode — IPC handler edge cases", () => {
             undefined,
         )) as HandlerResult;
 
-        expect(vi.mocked(appendFileSync)).toHaveBeenNthCalledWith(
+        expect(vi.mocked(appendFile)).toHaveBeenNthCalledWith(
             1,
             BASE_ARGS.outputPath,
             `${FAKE_ANNOTATIONS[0].rawLine}\n`,
             "utf-8",
         );
-        expect(vi.mocked(appendFileSync)).toHaveBeenNthCalledWith(
+        expect(vi.mocked(appendFile)).toHaveBeenNthCalledWith(
             2,
             BASE_ARGS.outputPath,
             `${FAKE_ANNOTATIONS[0].rawLine}\n`,

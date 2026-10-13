@@ -38,7 +38,7 @@ describe("parseBedFile", () => {
         const path = await writeTempBed(
             "chr1\t100\t200\tread1\nchr2\t300\t400\tread2",
         );
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
         expect(result.annotations).toHaveLength(2);
         expect(result.annotations[0]).toEqual({
             contig: "chr1",
@@ -51,7 +51,7 @@ describe("parseBedFile", () => {
 
     it("skips comment lines", async () => {
         const path = await writeTempBed("# header\nchr1\t100\t200\tread1");
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
         expect(result.annotations).toHaveLength(1);
     });
 
@@ -59,7 +59,7 @@ describe("parseBedFile", () => {
         const path = await writeTempBed(
             "track name=example\nchr1\t100\t200\tread1",
         );
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
         expect(result.annotations).toHaveLength(1);
     });
 
@@ -67,7 +67,7 @@ describe("parseBedFile", () => {
         const path = await writeTempBed(
             "browser position chr1:100-200\nchr1\t100\t200\tread1",
         );
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
         expect(result.annotations).toHaveLength(1);
     });
 
@@ -75,7 +75,7 @@ describe("parseBedFile", () => {
         const path = await writeTempBed(
             "track1\t100\t200\tread1\nbrowserX\t300\t400\tread2",
         );
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
         expect(result.annotations).toHaveLength(2);
         expect(result.annotations[0].contig).toBe("track1");
         expect(result.annotations[1].contig).toBe("browserX");
@@ -86,7 +86,7 @@ describe("parseBedFile", () => {
         const path = await writeTempBed(
             "chr1\t100\t200\nchr1\t100\t200\tread1",
         );
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
         expect(result.annotations).toHaveLength(1);
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("insufficient columns"),
@@ -96,11 +96,38 @@ describe("parseBedFile", () => {
     it("skips lines with NaN coordinates", async () => {
         const warnSpy = suppressConsoleWarn();
         const path = await writeTempBed("chr1\tabc\t200\tread1");
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
         expect(result.annotations).toHaveLength(0);
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("invalid start/end"),
         );
+    });
+
+    it("skips an empty read ID even with extra columns, without using the entry cap", async () => {
+        suppressConsoleWarn();
+        const path = await writeTempBed(
+            "chr1\t100\t200\t\t0\nchr2\t300\t450\tread2\t0",
+        );
+        expect(await parseBedFile(path, 1)).toEqual({
+            annotations: [
+                {
+                    contig: "chr2",
+                    start: 300,
+                    end: 450,
+                    readId: "read2",
+                    rawLine: "chr2\t300\t450\tread2\t0",
+                },
+            ],
+            capped: false,
+        });
+    });
+
+    it("rejects a stream open failure rather than returning empty annotations", async () => {
+        const path = await writeTempBed("");
+        await unlink(path);
+        await expect(parseBedFile(path)).rejects.toMatchObject({
+            code: "ENOENT",
+        });
     });
 
     it.each([
@@ -113,7 +140,7 @@ describe("parseBedFile", () => {
     ])("skips %s", async (_description, start, end) => {
         const warnSpy = suppressConsoleWarn();
         const path = await writeTempBed(`chr1\t${start}\t${end}\tread1`);
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
 
         expect(result.annotations).toHaveLength(0);
         expect(warnSpy).toHaveBeenCalledWith(
@@ -123,14 +150,14 @@ describe("parseBedFile", () => {
 
     it("accepts coordinates with surrounding whitespace", async () => {
         const path = await writeTempBed("chr1\t 100 \t 200 \tread1");
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
 
         expect(result.annotations[0]).toMatchObject({ start: 100, end: 200 });
     });
 
     it("accepts safe-integer coordinate boundaries", async () => {
         const path = await writeTempBed("chr1\t0\t9007199254740991\tread1");
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
 
         expect(result.annotations[0]).toMatchObject({
             start: 0,
@@ -141,7 +168,7 @@ describe("parseBedFile", () => {
     it("skips lines with negative start coordinate", async () => {
         const warnSpy = suppressConsoleWarn();
         const path = await writeTempBed("chr1\t-10\t200\tread1");
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
         expect(result.annotations).toHaveLength(0);
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("0 <= start < end"),
@@ -151,7 +178,7 @@ describe("parseBedFile", () => {
     it("skips lines with negative end coordinate", async () => {
         const warnSpy = suppressConsoleWarn();
         const path = await writeTempBed("chr1\t10\t-5\tread1");
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
         expect(result.annotations).toHaveLength(0);
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("0 <= start < end"),
@@ -161,7 +188,7 @@ describe("parseBedFile", () => {
     it("skips lines where start equals end", async () => {
         const warnSpy = suppressConsoleWarn();
         const path = await writeTempBed("chr1\t100\t100\tread1");
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
         expect(result.annotations).toHaveLength(0);
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("0 <= start < end"),
@@ -171,7 +198,7 @@ describe("parseBedFile", () => {
     it("skips lines where start is greater than end", async () => {
         const warnSpy = suppressConsoleWarn();
         const path = await writeTempBed("chr1\t300\t100\tread1");
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
         expect(result.annotations).toHaveLength(0);
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("0 <= start < end"),
@@ -180,18 +207,20 @@ describe("parseBedFile", () => {
 
     it("accepts start=0 as valid", async () => {
         const path = await writeTempBed("chr1\t0\t100\tread1");
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
         expect(result.annotations).toHaveLength(1);
         expect(result.annotations[0].start).toBe(0);
     });
 });
 
 describe("parseBedFile with maxEntries", () => {
-    it("returns capped: false when entries are within limit", async () => {
+    it.each([
+        2, 10,
+    ])("returns capped: false for two entries with limit %i", async (limit) => {
         const path = await writeTempBed(
             "chr1\t100\t200\tread1\nchr2\t300\t400\tread2",
         );
-        const result = parseBedFile(path, 10);
+        const result = await parseBedFile(path, limit);
         expect(result.capped).toBe(false);
         expect(result.annotations).toHaveLength(2);
     });
@@ -202,14 +231,14 @@ describe("parseBedFile with maxEntries", () => {
             (_, i) => `chr1\t${i * 100}\t${(i + 1) * 100}\tread${i}`,
         ).join("\n");
         const path = await writeTempBed(lines);
-        const result = parseBedFile(path, 10);
+        const result = await parseBedFile(path, 10);
         expect(result.capped).toBe(true);
         expect(result.annotations).toHaveLength(10);
     });
 
     it("uses default maxEntries of 10000", async () => {
         const path = await writeTempBed("chr1\t100\t200\tread1");
-        const result = parseBedFile(path);
+        const result = await parseBedFile(path);
         expect(result.capped).toBe(false);
     });
 });

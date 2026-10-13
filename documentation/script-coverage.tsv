@@ -21,7 +21,7 @@ src/lib/ai-external-tools/read-info.ts	100
 src/lib/ai-external-tools/seq-table.ts	100
 src/lib/ai-external-tools/window-reads.ts	100
 src/lib/ai-external-tools/write-file.ts	100
-src/lib/bed-parser.ts	93.54
+src/lib/bed-parser.ts	100
 src/lib/chat-filesystem-input-checks.ts	100
 src/lib/chat-orchestrator-execution.ts	100
 src/lib/chat-orchestrator-handle-message-test-utils.ts	100
@@ -36,6 +36,7 @@ src/lib/chat-session.ts	100
 src/lib/chat-transcript-dump.ts	100
 src/lib/chat-user-input-parsing.ts	100
 src/lib/cli-user-input-parsing.ts	100
+src/lib/control-characters.ts	100
 src/lib/format-utils.ts	100
 src/lib/histogram-renderer.ts	100
 src/lib/histogram.ts	100
@@ -46,7 +47,7 @@ src/lib/log-to-html-assets.ts	100
 src/lib/log-to-html.ts	100
 src/lib/mod-filter.ts	100
 src/lib/model-listing.ts	92.42
-src/lib/monty-sandbox-helpers.ts	99.34
+src/lib/monty-sandbox-helpers.ts	100
 src/lib/monty-sandbox.ts	100
 src/lib/qc-config-builder.ts	100
 src/lib/qc-contract.ts	100
@@ -62,6 +63,7 @@ src/lib/swipe-data-loader.ts	100
 src/lib/system-append.ts	100
 src/lib/xy-renderer.ts	100
 src/modes/ai-chat.ts	100
+src/modes/bam-inspection.ts	100
 src/modes/locate.ts	100
 src/modes/qc.ts	100
 src/modes/swipe.ts	100
@@ -73,11 +75,11 @@ src/renderer/ai-chat/ai-chat-ui.ts	100
 src/renderer/ai-chat/ai-chat.ts	89.9
 src/renderer/locate/locate-config.ts	68.49
 src/renderer/qc/qc-config.ts	55.15
-src/renderer/qc/qc-results-charts.ts	0
-src/renderer/qc/qc-results-filters.ts	0
-src/renderer/qc/qc-results-page.ts	0
-src/renderer/qc/qc-results-seq-table.ts	0
-src/renderer/qc/qc-results-stats.ts	0
+src/renderer/qc/qc-results-charts.ts	21.05
+src/renderer/qc/qc-results-filters.ts	10.2
+src/renderer/qc/qc-results-page.ts	62.72
+src/renderer/qc/qc-results-seq-table.ts	85.81
+src/renderer/qc/qc-results-stats.ts	90.19
 src/renderer/qc/qc-results.ts	0
 src/renderer/qc/seq-mini-charts.ts	100
 src/renderer/shared/apply-font-size.ts	100

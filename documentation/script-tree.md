@@ -35,6 +35,7 @@ src/
     chat-types.ts                                   # Shared types for the AI Chat feature.
     chat-user-input-parsing.ts                      # Browser-safe parsing and measurement for chat user inputs.
     cli-user-input-parsing.ts                       # Parsing checks for command-line option structure and comma-separated tool names.
+    control-characters.ts
     format-utils.ts                                 # Pure formatting and trimming utilities shared across renderer pages.
     histogram-renderer.ts                           # Dependency-free histogram SVG renderer.
     histogram.ts                                    # Streaming histogram accumulator for binning data without storing raw arrays
@@ -83,6 +84,7 @@ src/
         minimap2.wasm
   modes/
     ai-chat.ts            # AI Chat mode logic for nanalogue-gui.
+    bam-inspection.ts     # Shared BAM metadata inspection for feature configuration pages.
     locate.ts
     qc.ts                 # QC mode logic for nanalogue-gui
     swipe.ts              # Swipe mode module - handles annotation review workflow

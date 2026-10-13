@@ -7,7 +7,7 @@
 
 import { realpathSync } from "node:fs";
 import { readFile, realpath, stat } from "node:fs/promises";
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
     MINIMAP2_MAX_INPUT_BYTES,
@@ -65,7 +65,8 @@ type Minimap2Factory = (config: {
  * Resolves the directory containing the biowasm minimap2 assets at runtime.
  *
  * Two esbuild output formats are in use:
- * - CJS (dist/main.js): __dirname is provided natively by Node.js CJS.
+ * - CJS GUI mode (dist/modes/ai-chat.js): __dirname is provided natively by
+ *   Node.js CJS, and the shared assets are one directory above the mode bundle.
  * - ESM (dist/cli.mjs, dist/execute-cli.mjs): __dirname is not defined.
  *   Falls back to dirname(realpathSync(process.argv[1])), resolving any
  *   symlinks first so that global npm bin shims (which set argv[1] to the
@@ -78,11 +79,13 @@ type Minimap2Factory = (config: {
  * @returns The absolute path to the minimap2-wasm asset directory.
  */
 function getAssetDir(): string {
-    const base =
+    const bundleDir =
         typeof __dirname !== "undefined"
             ? __dirname
             : /* c8 ignore next -- ESM bundle path; __dirname is always defined in the CJS test environment */
               dirname(realpathSync(process.argv[1] ?? ""));
+    const base =
+        basename(bundleDir) === "modes" ? dirname(bundleDir) : bundleDir;
     return join(base, "minimap2-wasm");
 }
 

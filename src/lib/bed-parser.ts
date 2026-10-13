@@ -1,6 +1,7 @@
 // BED file parser for nanalogue-swipe
 
-import { readFileSync } from "node:fs";
+import { createReadStream } from "node:fs";
+import { createInterface } from "node:readline";
 import type { BedAnnotation } from "./types";
 
 /** Result of parsing a BED file, including whether the entry cap was hit. */
@@ -40,75 +41,87 @@ export function isBedHeaderLine(line: string): boolean {
  * @param maxEntries - Maximum number of annotations to return (default 10,000).
  * @returns The parsed annotations and whether the cap was reached.
  */
-export function parseBedFile(
+export async function parseBedFile(
     bedPath: string,
     maxEntries = 10_000,
-): ParseBedResult {
-    const content = readFileSync(bedPath, "utf-8");
-    const lines = content.trim().split("\n");
+): Promise<ParseBedResult> {
+    const input = createReadStream(bedPath, "utf-8");
+    const lines = createInterface({
+        input,
+        crlfDelay: Number.POSITIVE_INFINITY,
+    });
     const annotations: BedAnnotation[] = [];
 
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+    try {
+        let lineNumber = 0;
+        for await (const rawLine of lines) {
+            lineNumber++;
+            const line = rawLine.trim();
 
-        if (!line || isBedHeaderLine(line)) {
-            continue;
+            if (!line || isBedHeaderLine(line)) {
+                continue;
+            }
+
+            const fields = line.split("\t");
+
+            if (fields.length < 4) {
+                console.warn(
+                    `Skipping line ${lineNumber}: insufficient columns (need at least 4, got ${fields.length})`,
+                );
+                continue;
+            }
+
+            const contig = fields[0];
+            const startField = fields[1].trim();
+            const endField = fields[2].trim();
+            const start = Number(startField);
+            const end = Number(endField);
+            const readId = fields[3];
+
+            if (
+                !startField ||
+                !endField ||
+                !Number.isSafeInteger(start) ||
+                !Number.isSafeInteger(end)
+            ) {
+                console.warn(
+                    `Skipping line ${lineNumber}: invalid start/end coordinates`,
+                );
+                continue;
+            }
+
+            if (start < 0 || end < 0 || start >= end) {
+                console.warn(
+                    `Skipping line ${lineNumber}: coordinates must satisfy 0 <= start < end (got start=${start}, end=${end})`,
+                );
+                continue;
+            }
+
+            if (!readId) {
+                console.warn(
+                    `Skipping line ${lineNumber}: missing read_id in column 4`,
+                );
+                continue;
+            }
+
+            annotations.push({
+                contig,
+                start,
+                end,
+                readId,
+                rawLine: line,
+            });
+
+            if (annotations.length > maxEntries) {
+                return {
+                    annotations: annotations.slice(0, maxEntries),
+                    capped: true,
+                };
+            }
         }
-
-        const fields = line.split("\t");
-
-        if (fields.length < 4) {
-            console.warn(
-                `Skipping line ${i + 1}: insufficient columns (need at least 4, got ${fields.length})`,
-            );
-            continue;
-        }
-
-        const contig = fields[0];
-        const startField = fields[1].trim();
-        const endField = fields[2].trim();
-        const start = Number(startField);
-        const end = Number(endField);
-        const readId = fields[3];
-
-        if (
-            !startField ||
-            !endField ||
-            !Number.isSafeInteger(start) ||
-            !Number.isSafeInteger(end)
-        ) {
-            console.warn(
-                `Skipping line ${i + 1}: invalid start/end coordinates`,
-            );
-            continue;
-        }
-
-        if (start < 0 || end < 0 || start >= end) {
-            console.warn(
-                `Skipping line ${i + 1}: coordinates must satisfy 0 <= start < end (got start=${start}, end=${end})`,
-            );
-            continue;
-        }
-
-        if (!readId) {
-            console.warn(`Skipping line ${i + 1}: missing read_id in column 4`);
-            continue;
-        }
-
-        annotations.push({
-            contig,
-            start,
-            end,
-            readId,
-            rawLine: line,
-        });
-
-        if (annotations.length > maxEntries) {
-            return {
-                annotations: annotations.slice(0, maxEntries),
-                capped: true,
-            };
-        }
+    } finally {
+        lines.close();
+        input.destroy();
     }
 
     return { annotations, capped: false };

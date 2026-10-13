@@ -3,8 +3,16 @@ import type { SeqTableRow } from "../../lib/types";
 /** Maximum number of sequence characters to display before truncation. */
 const SEQ_DISPLAY_LIMIT = 500;
 
+/** Number of sequence rows rendered per animation frame. */
+const SEQ_ROWS_PER_FRAME = 10;
+
 /** Tracks the last-clicked row index for shift-click range selection. */
 let lastClickedSeqRow = -1;
+
+/** Lets Chromium paint and process input before rendering the next row batch. */
+function waitForNextRendererFrame(): Promise<void> {
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
 
 /**
  * Renders the sequence table or a skip-reason message into the container.
@@ -13,13 +21,14 @@ let lastClickedSeqRow = -1;
  * @param rows - The sequence table rows, or undefined if skipped.
  * @param skipReason - The reason sequences were skipped, if applicable.
  * @param ambiguousReadIds - Read IDs excluded due to same-length alignments.
+ * @returns A promise that resolves after all row batches have rendered.
  */
-export function renderSeqTable(
+export async function renderSeqTable(
     containerId: string,
     rows: SeqTableRow[] | undefined,
     skipReason: string | undefined,
     ambiguousReadIds: string[] | undefined,
-): void {
+): Promise<void> {
     lastClickedSeqRow = -1;
 
     const container = document.getElementById(containerId);
@@ -113,6 +122,9 @@ export function renderSeqTable(
     // Body
     const tbody = document.createElement("tbody");
     const selectedSet = new Set<number>();
+    table.appendChild(tbody);
+    wrapper.appendChild(table);
+    container.appendChild(wrapper);
 
     /** Updates the copy and clear button states based on current selection. */
     function updateCopyBtn(): void {
@@ -127,6 +139,30 @@ export function renderSeqTable(
             ? `Copy ${uniqueCount} selected read ID${uniqueCount !== 1 ? "s" : ""}`
             : "Copy selected read IDs";
     }
+
+    // Copy button handler
+    copyBtn.addEventListener("click", () => {
+        const ids = [
+            ...new Set(
+                Array.from(selectedSet)
+                    .sort((a, b) => a - b)
+                    .map((idx) => rows[idx].readId),
+            ),
+        ].join("\n");
+        navigator.clipboard.writeText(ids).catch((err) => {
+            console.error("Failed to copy read IDs:", err);
+        });
+    });
+
+    // Clear selection handler
+    clearBtn.addEventListener("click", () => {
+        for (const idx of selectedSet) {
+            tbody.children[idx]?.classList.remove("seq-selected");
+        }
+        selectedSet.clear();
+        lastClickedSeqRow = -1;
+        updateCopyBtn();
+    });
 
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
@@ -222,33 +258,8 @@ export function renderSeqTable(
         });
 
         tbody.appendChild(tr);
-    }
-
-    table.appendChild(tbody);
-    wrapper.appendChild(table);
-    container.appendChild(wrapper);
-
-    // Copy button handler
-    copyBtn.addEventListener("click", () => {
-        const ids = [
-            ...new Set(
-                Array.from(selectedSet)
-                    .sort((a, b) => a - b)
-                    .map((idx) => rows[idx].readId),
-            ),
-        ].join("\n");
-        navigator.clipboard.writeText(ids).catch((err) => {
-            console.error("Failed to copy read IDs:", err);
-        });
-    });
-
-    // Clear selection handler
-    clearBtn.addEventListener("click", () => {
-        for (const idx of selectedSet) {
-            tbody.children[idx]?.classList.remove("seq-selected");
+        if ((i + 1) % SEQ_ROWS_PER_FRAME === 0 && i + 1 < rows.length) {
+            await waitForNextRendererFrame();
         }
-        selectedSet.clear();
-        lastClickedSeqRow = -1;
-        updateCopyBtn();
-    });
+    }
 }

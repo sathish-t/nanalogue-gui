@@ -49,22 +49,6 @@ export class SandboxError extends Error {
 }
 
 /**
- * Checks whether a string contains ASCII control characters (0x00-0x1F or 0x7F).
- *
- * @param str - The string to check.
- * @returns True if the string contains control characters.
- */
-export function hasControlChars(str: string): boolean {
-    for (let i = 0; i < str.length; i++) {
-        const code = str.charCodeAt(i);
-        if ((code >= 0 && code <= 0x1f) || code === 0x7f) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/**
  * Derives maxOutputBytes from the user's context window budget.
  * Uses 15% of the budget (at ~4 bytes/token), clamped to [4 KB, 80 KB].
  *

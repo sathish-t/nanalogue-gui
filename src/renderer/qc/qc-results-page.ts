@@ -12,7 +12,7 @@ import {
 import { setupHistogramFilter } from "./qc-results-filters";
 import { renderSeqTable } from "./qc-results-seq-table";
 import { renderStatsPanel, renderYieldSummary } from "./qc-results-stats";
-import type { ChartInstance, QCResultsApi } from "./qc-results-types";
+import type { ChartInstance, QCData, QCResultsApi } from "./qc-results-types";
 import { renderSeqMiniCharts } from "./seq-mini-charts";
 
 /**
@@ -68,6 +68,45 @@ function setupTabs(): void {
             });
         });
     });
+}
+
+/**
+ * Renders the potentially large sequence view after the user first opens it.
+ *
+ * @param data - The completed quality control data to render on demand.
+ */
+function setupDeferredSequenceRendering(data: QCData): void {
+    const sequencesTabButton = document.querySelector('[data-tab="sequences"]');
+    sequencesTabButton?.addEventListener(
+        "click",
+        () => {
+            void (async () => {
+                await renderSeqTable(
+                    "seq-table-container",
+                    data.seqTableRows,
+                    data.seqTableSkipReason,
+                    data.seqTableAmbiguousReadIds,
+                );
+
+                if (data.seqTableRows && data.seqTableRows.length > 0) {
+                    renderSeqMiniCharts(
+                        "seq-table-container",
+                        data.seqTableRows,
+                        charts,
+                    );
+                }
+            })().catch((error: unknown) => {
+                console.error("Failed to render QC sequence results:", error);
+                const container = document.getElementById(
+                    "seq-table-container",
+                );
+                if (container) {
+                    container.textContent = `Failed to render sequence results: ${String(error)}`;
+                }
+            });
+        },
+        { once: true },
+    );
 }
 
 /**
@@ -241,23 +280,7 @@ async function initialize(): Promise<void> {
             "stats-windowed-density",
         );
 
-        // Sequences tab
-        renderSeqTable(
-            "seq-table-container",
-            data.seqTableRows,
-            data.seqTableSkipReason,
-            data.seqTableAmbiguousReadIds,
-        );
-
-        // Mini sparkline histograms for insertion rate, deletion rate, and quality
-        if (data.seqTableRows && data.seqTableRows.length > 0) {
-            renderSeqMiniCharts(
-                "seq-table-container",
-                data.seqTableRows,
-                charts,
-            );
-        }
-
+        setupDeferredSequenceRendering(data);
         setupTabs();
     } catch (error) {
         console.error("Failed to initialize QC results:", error);

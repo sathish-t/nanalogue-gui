@@ -1,12 +1,12 @@
 // Swipe mode module - handles annotation review workflow
 
 import {
-    appendFileSync,
-    existsSync,
-    realpathSync,
-    unlinkSync,
-    writeFileSync,
-} from "node:fs";
+    access,
+    appendFile,
+    realpath,
+    unlink,
+    writeFile,
+} from "node:fs/promises";
 import { resolve } from "node:path";
 import { dialog } from "electron";
 import { registerTrustedIpcHandler } from "../electron-security";
@@ -35,6 +35,8 @@ let cliArgs: SwipeArgs | null = null;
 let modTag: string | undefined;
 let modStrand: "bc" | "bc_comp" | undefined;
 let regionExpansion: number | undefined;
+/** Excludes session initialization and review actions while either is pending. */
+let swipeReviewBusy = false;
 const appState: SwipeReviewState = {
     currentIndex: 0,
     totalCount: 0,
@@ -53,78 +55,98 @@ export async function initializeSwipeReview(
     args: SwipeArgs,
     overwriteConfirmed = false,
 ): Promise<void> {
-    cliArgs = args;
-    modTag = args.modTag;
-    modStrand = args.modStrand;
-    regionExpansion = args.regionExpansion;
-    appState.showAnnotationHighlight = args.showAnnotationHighlight;
-
-    // Guard against output path being the same as input BED path
-    const resolvedBed = realpathSync(cliArgs.bedPath);
-    const resolvedOutput = resolve(cliArgs.outputPath);
-    if (
-        existsSync(cliArgs.outputPath) &&
-        realpathSync(cliArgs.outputPath) === resolvedBed
-    ) {
+    if (swipeReviewBusy) {
         throw new Error(
-            "Output path resolves to the same file as the input BED path. Choose a different output file to avoid data loss.",
+            "Swipe review is busy. Wait for the current operation to finish and try again.",
         );
     }
-    if (resolvedOutput === resolvedBed) {
-        throw new Error(
-            "Output path resolves to the same file as the input BED path. Choose a different output file to avoid data loss.",
+    swipeReviewBusy = true;
+    try {
+        cliArgs = args;
+        modTag = args.modTag;
+        modStrand = args.modStrand;
+        regionExpansion = args.regionExpansion;
+        appState.showAnnotationHighlight = args.showAnnotationHighlight;
+
+        // Guard against output path being the same as input BED path
+        const outputExistsDuringCollisionCheck = await access(
+            cliArgs.outputPath,
+        ).then(
+            () => true,
+            () => false,
         );
-    }
-
-    console.log("Loading data...");
-    console.log(`  BAM: ${cliArgs.bamPath}`);
-    console.log(`  BED: ${cliArgs.bedPath}`);
-    console.log(`  Output: ${cliArgs.outputPath}`);
-    console.log(`  Window size: ${cliArgs.windowSize}`);
-
-    console.log("Reading contig sizes...");
-    contigSizes = await loadContigSizes(cliArgs.bamPath);
-    console.log(`  Found ${Object.keys(contigSizes).length} contigs`);
-
-    console.log("Parsing BED file...");
-    const parseResult = parseBedFile(cliArgs.bedPath);
-    if (parseResult.capped) {
-        throw new Error(
-            "BED file contains more than 10,000 annotations. Please reduce the file to 10,000 or fewer entries.",
-        );
-    }
-    annotations = parseResult.annotations;
-    console.log(`  Found ${annotations.length} annotations`);
-
-    appState.totalCount = annotations.length;
-    appState.currentIndex = 0;
-    appState.acceptedCount = 0;
-    appState.rejectedCount = 0;
-    appState.outputPath = cliArgs.outputPath;
-
-    if (existsSync(cliArgs.outputPath)) {
-        if (!overwriteConfirmed) {
-            const { response } = await dialog.showMessageBox({
-                type: "warning",
-                buttons: ["Overwrite", "Cancel"],
-                defaultId: 1,
-                title: "File exists",
-                message: `Output file already exists:\n${cliArgs.outputPath}`,
-                detail: "Do you want to overwrite it?",
-            });
-            if (response === 1) {
-                throw new Error("User cancelled: output file exists");
-            }
-            overwriteConfirmed = true;
+        const resolvedBed = await realpath(cliArgs.bedPath);
+        const resolvedOutput = resolve(cliArgs.outputPath);
+        if (
+            outputExistsDuringCollisionCheck &&
+            (await realpath(cliArgs.outputPath)) === resolvedBed
+        ) {
+            throw new Error(
+                "Output path resolves to the same file as the input BED path. Choose a different output file to avoid data loss.",
+            );
         }
-        unlinkSync(cliArgs.outputPath);
-    }
-    writeFileSync(cliArgs.outputPath, "", {
-        encoding: "utf-8",
-        flag: overwriteConfirmed ? "w" : "wx",
-    });
+        if (resolvedOutput === resolvedBed) {
+            throw new Error(
+                "Output path resolves to the same file as the input BED path. Choose a different output file to avoid data loss.",
+            );
+        }
 
-    console.log("Ready! Opening window...");
+        console.log("Loading data...");
+        console.log(`  BAM: ${cliArgs.bamPath}`);
+        console.log(`  BED: ${cliArgs.bedPath}`);
+        console.log(`  Output: ${cliArgs.outputPath}`);
+        console.log(`  Window size: ${cliArgs.windowSize}`);
+
+        console.log("Reading contig sizes...");
+        contigSizes = await loadContigSizes(cliArgs.bamPath);
+        console.log(`  Found ${Object.keys(contigSizes).length} contigs`);
+
+        console.log("Parsing BED file...");
+        const parseResult = await parseBedFile(cliArgs.bedPath);
+        if (parseResult.capped) {
+            throw new Error(
+                "BED file contains more than 10,000 annotations. Please reduce the file to 10,000 or fewer entries.",
+            );
+        }
+        annotations = parseResult.annotations;
+        console.log(`  Found ${annotations.length} annotations`);
+
+        appState.totalCount = annotations.length;
+        appState.currentIndex = 0;
+        appState.acceptedCount = 0;
+        appState.rejectedCount = 0;
+        appState.outputPath = cliArgs.outputPath;
+
+        const outputExistsBeforeWrite = await access(cliArgs.outputPath).then(
+            () => true,
+            () => false,
+        );
+        if (outputExistsBeforeWrite) {
+            if (!overwriteConfirmed) {
+                const { response } = await dialog.showMessageBox({
+                    type: "warning",
+                    buttons: ["Overwrite", "Cancel"],
+                    defaultId: 1,
+                    title: "File exists",
+                    message: `Output file already exists:\n${cliArgs.outputPath}`,
+                    detail: "Do you want to overwrite it?",
+                });
+                if (response === 1) {
+                    throw new Error("User cancelled: output file exists");
+                }
+                overwriteConfirmed = true;
+            }
+            await unlink(cliArgs.outputPath);
+        }
+        await writeFile(cliArgs.outputPath, "", {
+            encoding: "utf-8",
+            flag: overwriteConfirmed ? "w" : "wx",
+        });
+
+        console.log("Ready! Opening window...");
+    } finally {
+        swipeReviewBusy = false;
+    }
 }
 
 /**
@@ -163,8 +185,11 @@ async function loadCurrentPlotData(): Promise<SwipePlotData | null> {
  * @param outputPath - Path to the output BED file.
  * @param rawLine - The raw BED line to append.
  */
-function writeAcceptedAnnotation(outputPath: string, rawLine: string): void {
-    appendFileSync(outputPath, `${rawLine}\n`, "utf-8");
+async function writeAcceptedAnnotation(
+    outputPath: string,
+    rawLine: string,
+): Promise<void> {
+    await appendFile(outputPath, `${rawLine}\n`, "utf-8");
 }
 
 /**
@@ -204,40 +229,67 @@ export function registerSwipeIpcHandlers(): void {
     });
 
     registerTrustedIpcHandler("accept", async () => {
-        if (!cliArgs) {
-            console.error("Unknown state: accept called without cliArgs set");
-            return { done: true, state: appState };
-        }
-
-        if (appState.currentIndex < annotations.length) {
-            const annotation = annotations[appState.currentIndex];
-            writeAcceptedAnnotation(cliArgs.outputPath, annotation.rawLine);
-            appState.acceptedCount++;
-            return await advanceAndLoadNextAnnotation();
-        } else {
-            console.error(
-                "Unknown state: accept called even though we've run out of annotations",
+        if (swipeReviewBusy) {
+            throw new Error(
+                "Swipe review is busy. Wait for the current operation to finish and try again.",
             );
         }
+        swipeReviewBusy = true;
+        try {
+            if (!cliArgs) {
+                console.error(
+                    "Unknown state: accept called without cliArgs set",
+                );
+                return { done: true, state: appState };
+            }
 
-        return { done: true, state: appState };
+            if (appState.currentIndex < annotations.length) {
+                const annotation = annotations[appState.currentIndex];
+                await writeAcceptedAnnotation(
+                    cliArgs.outputPath,
+                    annotation.rawLine,
+                );
+                appState.acceptedCount++;
+                return await advanceAndLoadNextAnnotation();
+            } else {
+                console.error(
+                    "Unknown state: accept called even though we've run out of annotations",
+                );
+            }
+
+            return { done: true, state: appState };
+        } finally {
+            swipeReviewBusy = false;
+        }
     });
 
     registerTrustedIpcHandler("reject", async () => {
-        if (!cliArgs) {
-            console.error("Unknown state: reject called without cliArgs set");
-            return { done: true, state: appState };
-        }
-
-        if (appState.currentIndex < annotations.length) {
-            appState.rejectedCount++;
-            return await advanceAndLoadNextAnnotation();
-        } else {
-            console.error(
-                "Unknown state: reject called even though we've run out of annotations",
+        if (swipeReviewBusy) {
+            throw new Error(
+                "Swipe review is busy. Wait for the current operation to finish and try again.",
             );
         }
+        swipeReviewBusy = true;
+        try {
+            if (!cliArgs) {
+                console.error(
+                    "Unknown state: reject called without cliArgs set",
+                );
+                return { done: true, state: appState };
+            }
 
-        return { done: true, state: appState };
+            if (appState.currentIndex < annotations.length) {
+                appState.rejectedCount++;
+                return await advanceAndLoadNextAnnotation();
+            } else {
+                console.error(
+                    "Unknown state: reject called even though we've run out of annotations",
+                );
+            }
+
+            return { done: true, state: appState };
+        } finally {
+            swipeReviewBusy = false;
+        }
     });
 }
