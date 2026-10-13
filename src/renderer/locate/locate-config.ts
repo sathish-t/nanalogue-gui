@@ -344,6 +344,8 @@ bamSource.addEventListener("bam-selected", async (e) => {
     if (!value.trim()) return;
 
     const currentRequestId = ++peekRequestId;
+    bamPeekResult = null;
+    updateSummary();
     updateGenerateButton();
 
     let peekResult: PeekResult | null;

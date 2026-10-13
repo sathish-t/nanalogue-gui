@@ -98,6 +98,85 @@ describe("Locate config form handlers", () => {
         );
     });
 
+    it("does not validate a new BAM against old metadata while its peek is pending", async () => {
+        let resolvePeek: ((value: PeekResult) => void) | undefined;
+        const api = {
+            locatePickBam: vi.fn(),
+            locatePickReadIds: vi.fn().mockResolvedValue("/ids.txt"),
+            locatePickOutput: vi.fn(),
+            locateCheckFileExists: vi.fn(),
+            locateCountReadIds: vi.fn().mockResolvedValue(4),
+            locateGenerateBed: vi.fn().mockResolvedValue({
+                totalIds: 4,
+                found: 4,
+                bedEntries: 4,
+                notFound: 0,
+                unmapped: 0,
+            }),
+            peekBam: vi
+                .fn()
+                .mockResolvedValueOnce(peekResult)
+                .mockImplementationOnce(
+                    () =>
+                        new Promise<PeekResult>((resolve) => {
+                            resolvePeek = resolve;
+                        }),
+                ),
+            locateGoBack: vi.fn(),
+        };
+        const { bam } = await loadLocateHandlers(api);
+        bam.dispatchEvent(
+            new CustomEvent("bam-selected", { detail: { value: bam.value } }),
+        );
+        await vi.waitFor(() =>
+            expect(
+                document.getElementById("file-summary")?.textContent,
+            ).toContain("chr1"),
+        );
+        (
+            document.getElementById("btn-browse-read-ids") as HTMLButtonElement
+        ).click();
+        await vi.waitFor(() =>
+            expect(
+                document.getElementById("file-summary")?.textContent,
+            ).toContain("4 read IDs"),
+        );
+
+        bam.value = "/newer.bam";
+        bam.dispatchEvent(
+            new CustomEvent("bam-selected", { detail: { value: bam.value } }),
+        );
+        (document.getElementById("region") as HTMLInputElement).value =
+            "chr2:100-900";
+        (document.getElementById("btn-generate") as HTMLButtonElement).click();
+        expect(api.locateGenerateBed).toHaveBeenCalledWith({
+            bamPath: "/newer.bam",
+            readIdPath: "/ids.txt",
+            outputPath: "/output.bed",
+            overwriteConfirmed: false,
+            region: "chr2:100-900",
+            fullRegion: false,
+        });
+        expect(alert).not.toHaveBeenCalled();
+        expect(
+            document.getElementById("file-summary")?.textContent,
+        ).not.toContain("chr1");
+        expect(document.getElementById("file-summary")?.textContent).toContain(
+            "4 read IDs",
+        );
+
+        resolvePeek?.({
+            ...peekResult,
+            contigs: ["chr2"],
+            allContigs: { chr2: 20_000 },
+        });
+        await vi.waitFor(() =>
+            expect(
+                document.getElementById("file-summary")?.textContent,
+            ).toContain("chr2"),
+        );
+    });
+
     it("submits current form values, renders results, and restores controls", async () => {
         const result = {
             totalIds: 4,

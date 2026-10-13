@@ -70,7 +70,7 @@ src/renderer/ai-chat/ai-chat-consent.ts	100
 src/renderer/ai-chat/ai-chat-elements.ts	100
 src/renderer/ai-chat/ai-chat-ui.ts	100
 src/renderer/ai-chat/ai-chat.ts	89.9
-src/renderer/locate/locate-config.ts	66.35
+src/renderer/locate/locate-config.ts	68.49
 src/renderer/qc/qc-config.ts	55.15
 src/renderer/qc/qc-results-charts.ts	0
 src/renderer/qc/qc-results-filters.ts	0
