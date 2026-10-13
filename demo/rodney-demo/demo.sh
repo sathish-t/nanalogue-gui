@@ -11,9 +11,6 @@ set -euo pipefail
 # Wrap uvx rodney so it reads like a normal command throughout the script.
 rodney() { uvx rodney "$@"; }
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-LANDING_URL="file://${PROJECT_ROOT}/dist/renderer/landing/landing.html?fontSize=medium"
-
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 OUT_DIR="/tmp/rodney-demo-${TS}"
 mkdir -p "${OUT_DIR}"
@@ -34,8 +31,7 @@ echo ""
 # --- connect to running Electron instance ---
 rodney connect localhost:9222
 
-# --- navigate ---
-rodney open "${LANDING_URL}"
+# --- confirm the freshly launched landing page is stable ---
 rodney waitstable
 
 # --- mode buttons: present and enabled ---

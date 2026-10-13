@@ -33,15 +33,6 @@ contextBridge.exposeInMainWorld("api", {
     getVersion: () => ipcRenderer.invoke("get-app-version"),
 
     /**
-     * Opens a URL in the user's default OS browser.
-     *
-     * @param url - The URL to open.
-     * @returns A promise that resolves when the URL has been handed off to the OS.
-     */
-    openExternalUrl: (url: string) =>
-        ipcRenderer.invoke("open-external-url", url),
-
-    /**
      * Launch the swipe review mode.
      *
      * @returns A promise that resolves when the swipe window is opened.

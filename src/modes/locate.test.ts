@@ -13,6 +13,12 @@ vi.mock("electron", () => ({
     },
     dialog: { showOpenDialog: vi.fn() },
 }));
+vi.mock("../electron-security", () => ({
+    registerTrustedIpcHandler: (
+        name: string,
+        handler: (...args: unknown[]) => Promise<unknown>,
+    ) => handlers.set(name, handler),
+}));
 vi.mock("node:fs", () => ({
     readFileSync: vi.fn(),
     realpathSync: vi.fn((filePath: string) => filePath),

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Runs all CDP smoke scripts against the running Electron app and prints a
-# summary.  The app must already be open (launched via scripts/start-debug.sh).
+# Runs smoke scripts that launch their own Electron processes and prints a summary.
 #
 # Usage:
-#   ./scripts/smoke/smoke-all.sh              # run all three suites
+#   ./scripts/smoke/smoke-all.sh              # run all suites
 #   ./scripts/smoke/smoke-all.sh landing      # run only landing.mjs
 #   ./scripts/smoke/smoke-all.sh swipe qc     # run specific suites
 set -euo pipefail
@@ -11,11 +10,10 @@ set -euo pipefail
 SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Default to all suites; allow overriding via args
-SUITES=("${@:-landing swipe qc}")
 if [ $# -gt 0 ]; then
     SUITES=("$@")
 else
-    SUITES=(landing swipe qc)
+    SUITES=(landing swipe qc exit-watchdog)
 fi
 
 PASS=0

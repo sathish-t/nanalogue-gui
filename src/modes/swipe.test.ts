@@ -58,6 +58,22 @@ vi.mock("electron", () => ({
     },
 }));
 
+// Mock the sender-validating registrar; its security behavior has a dedicated test suite.
+vi.mock("../electron-security", () => ({
+    /**
+     * Captures a trusted IPC handler for mode-level tests.
+     *
+     * @param channel - The IPC channel name.
+     * @param handler - The mode handler to register.
+     */
+    registerTrustedIpcHandler: (
+        channel: string,
+        handler: (...args: unknown[]) => Promise<unknown>,
+    ) => {
+        ipcHandlers.set(channel, handler);
+    },
+}));
+
 // Mock node:fs — controls realpathSync, existsSync, and file I/O helpers.
 vi.mock("node:fs", () => ({
     appendFileSync: vi.fn(),

@@ -26,7 +26,6 @@ set -euo pipefail
 rodney() { uvx rodney "$@"; }
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-LANDING_URL="file://${PROJECT_ROOT}/dist/renderer/landing/landing.html?fontSize=medium"
 
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 OUT_DIR="/tmp/rodney-locate-bed-${TS}"
@@ -57,9 +56,8 @@ echo ""
 echo "── rodney test: locate-bed roundtrip ──"
 echo ""
 
-# ── connect and navigate to landing ─────────────────────────────────────────
+# ── connect to the freshly launched landing page ────────────────────────────
 rodney connect localhost:9222
-rodney open "${LANDING_URL}"
 rodney waitstable
 
 # ── open Locate Reads mode ───────────────────────────────────────────────────

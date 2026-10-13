@@ -60,7 +60,12 @@ async function generateLocateBed(
     if (!generate)
         throw new Error("Locate generate handler was not registered");
     return generate(
-        {},
+        {
+            senderFrame: {
+                parent: null,
+                url: "nanalogue://renderer/locate/locate-config.html",
+            },
+        },
         {
             bamPath,
             readIdPath,

@@ -109,12 +109,6 @@ body {
     margin: 0 0 12px;
 }
 
-/* Link to nanalogue.com styled with the standard link color. */
-#nanalogue-link {
-    color: #1a73e8;
-    text-decoration: underline;
-}
-
 /* Close button centered below the dialog content. */
 .version-close-button {
     background: #f8f8f8;
