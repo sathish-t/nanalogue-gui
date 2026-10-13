@@ -299,8 +299,11 @@ result = plot_series(points, kind="line", output_path="trend.svg",
 
 ### bash(command: str) -> dict
 
-Runs a shell command in an in-process bash interpreter. Shell state
-(cwd, variables) does not persist between calls; use compound commands
+Runs a shell command in a restricted, in-process Bash-like interpreter
+(just-bash), not a host OS shell. Do not assume arbitrary installed binaries
+or full GNU command compatibility; use command --help to check supported flags.
+Network access and just-bash's Python/JavaScript runtimes are not enabled.
+Shell state (cwd, variables) does not persist between calls; use compound commands
 for multi-step pipelines (e.g. cd subdir && grep pattern *.bed).
 
 **Write restriction:** bash can only write to the \`ai_chat_temp_files/\`
@@ -325,9 +328,56 @@ Returns a dict:
 {"stdout": "...", "stderr": "...", "exit_code": 0}
 \`\`\`
 
-**Available:** grep, sed, awk, sort, uniq, wc, cut, head, tail, cat,
-find, tr, paste, jq, and standard bash builtins (echo, printf, pipes,
-redirects, variables, loops, etc.).
+Check exit_code and stderr before relying on stdout. A pipeline's final
+command may succeed even if an earlier command failed; do not interpret empty
+stdout as "no matching records" when stderr reports an error.
+
+**Available:** grep (including -v and -oP), rg, sed, awk, sort, uniq,
+wc, cut, head, tail, cat, find, tr, paste, jq, gzip, gunzip, zcat,
+tar, base64, and common file utilities (ls, cp, mv, mkdir, rm).
+Shell syntax includes pipes, redirects, quoted paths, variables,
+command substitution, conditionals, functions, loops, and && / || chaining.
+
+**Compressed text files:** use zcat file.gz or gunzip -c file.gz to read
+gzip-compressed VCF, FASTA, FASTQ, TSV, or other text without changing the
+archive. Named decompression inputs normally require a .gz suffix.
+Plain gunzip file.gz tries to write beside and remove the source, so do not
+use it on read-only inputs. To save decompressed text or compressed output:
+
+\`\`\`python
+bash("gunzip -c data.tsv.gz > ai_chat_temp_files/data.tsv")
+bash("gzip -c results.tsv > ai_chat_temp_files/results.tsv.gz")
+\`\`\`
+
+Compression/decompression is buffered, not streaming: zcat file.gz | head
+still decompresses the whole input. Compressed file reads and expanded data
+must fit resource limits, even when redirected to a file. Do not return raw
+gzip bytes as text; save them to a file instead.
+
+You don't have to bring a whole file back into Python just to take a look at
+it. You can join commands with pipes to filter, count, sort, or pick out the
+bits you need. Here's a quick way to look at the first few lines of a
+compressed text file:
+
+\`\`\`python
+result = bash("zcat 'data.tsv.gz' | head -5")
+print(result)
+\`\`\`
+
+You can use awk to pick out tab-separated fields, compare numbers, and combine
+conditions with && or ||. One catch: if you want several columns, use awk's
+print rather than cut. In this version of just-bash, cut can silently drop
+repeated values, so two fields containing the same text might become just one.
+For a single column, cut -f10 is fine. You can then use cut -d':' -f1 to get
+its first colon-separated value.
+
+If you only need part of a line, grep -o prints just the matching text, and
+-P lets you use Perl-style regular expressions. Keep the pattern specific
+enough to match the whole value you want, not part of a longer name or value.
+If the data already has clear fields or delimiters, selecting those fields
+with awk or cut is often simpler than reaching for a regex.
+And remember, head -20 keeps the displayed output short; the commands before
+it may still need to read or process the whole input.
 
 **Not available:** samtools, bedtools, bwa, bgzip, tabix,
 python, R, perl, or any other bioinformatics or language runtimes. Use
@@ -401,10 +451,10 @@ AAATTTGCCT
 If the user supplies a raw sequence string rather than a file for use with minimap2(), use
 write_file() to save it as FASTA first, then pass that path to minimap2().
 
-The fasta file extension may be .fa, .fna etc. It may also be .gz in which case
-you will have to use \`bash("zcat ...")\` to read it or use \`bash("gunzip ... ")\` first
-to convert to a plain text format. These are not relevant for usage with minimap2();
-they are only relevant if you want to read the file yourself.
+FASTA files may use .fa, .fna, or similar extensions, optionally ending in .gz.
+To inspect gzip-compressed sequence text yourself, use zcat or gunzip -c as
+described in the bash section above. This decompression step is not needed
+when passing the file to minimap2().
 
 #### Sample code to align and process the resulting PAF information
 
