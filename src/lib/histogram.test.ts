@@ -181,6 +181,61 @@ describe("RunningHistogram", () => {
             expect(typeof stats.n50).toBe("number");
         });
 
+        it("approximates N50 from longest to shortest at an exact half-yield boundary", () => {
+            const h = new RunningHistogram(1, 10);
+            h.add(1);
+            h.add(1);
+            h.add(2);
+            const stats = h.toStats(true);
+            expect(stats.n50).toBe(2.5);
+        });
+
+        it("accumulates multiple bins to reach half the yield for N50", () => {
+            const h = new RunningHistogram(1, 10);
+            for (const value of [4, 1, 3, 2]) {
+                h.add(value);
+            }
+            expect(h.toStats(true).n50).toBe(3.5);
+        });
+
+        it("returns the zero-containing bin midpoint for all-zero yield", () => {
+            const h = new RunningHistogram(1, 10);
+            h.add(0);
+            h.add(0);
+            expect(h.toStats(true).n50).toBe(0.5);
+        });
+
+        it("includes above-range yield before walking represented bins", () => {
+            const h = new RunningHistogram(1, 10);
+            for (const value of [1, 2, 3, 4, 5, 10]) {
+                h.add(value);
+            }
+            expect(h.toStats(true).n50).toBe(5.5);
+        });
+
+        it("omits N50 when half the yield lies above the represented range", () => {
+            const h = new RunningHistogram(1, 10);
+            h.add(1);
+            h.add(10);
+            expect(h.toStats(true).n50).toBeUndefined();
+        });
+
+        it("omits N50 when above-range yield is exactly half the total", () => {
+            const h = new RunningHistogram(1, 10);
+            for (const value of [5, 5, 10]) {
+                h.add(value);
+            }
+            expect(h.toStats(true).n50).toBeUndefined();
+        });
+
+        it("accumulates all above-range values when locating N50", () => {
+            const h = new RunningHistogram(1, 10);
+            for (const value of [6, 6, 10, 10]) {
+                h.add(value);
+            }
+            expect(h.toStats(true).n50).toBeUndefined();
+        });
+
         it("omits N50 when not requested", () => {
             const h = new RunningHistogram(1, 1000);
             h.add(100);

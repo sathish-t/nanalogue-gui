@@ -29,6 +29,16 @@ describe("calculateStats", () => {
         expect(typeof result.n50).toBe("number");
     });
 
+    it("computes N50 from longest to shortest at an exact half-yield boundary", () => {
+        const result = calculateStats([1, 1, 2], true);
+        expect(result.n50).toBe(2);
+    });
+
+    it("accumulates multiple lengths to reach half the yield for N50", () => {
+        const result = calculateStats([4, 1, 3, 2], true);
+        expect(result.n50).toBe(3);
+    });
+
     it("omits N50 when not requested", () => {
         const result = calculateStats([100, 200, 300], false);
         expect(result.n50).toBeUndefined();

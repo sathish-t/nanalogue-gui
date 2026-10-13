@@ -109,16 +109,15 @@ function percentile(sorted: number[], p: number): number {
  * Compute the N50 value from a pre-sorted array of lengths.
  *
  * @param sorted - The array of numbers sorted in ascending order.
- * @returns The value at which the cumulative sum reaches 50 percent of the total.
+ * @returns The length where descending cumulative yield reaches 50 percent of the total.
  */
 function computeN50(sorted: number[]): number {
-    // N50: sort ascending, cumulative sum from smallest,
-    // return length where cumsum reaches 50% of total
     const total = sorted.reduce((acc, v) => acc + v, 0);
     const half = total / 2;
 
     let cumsum = 0;
-    for (const value of sorted) {
+    for (let i = sorted.length - 1; i >= 0; i--) {
+        const value = sorted[i];
         cumsum += value;
         if (cumsum >= half) {
             return value;
