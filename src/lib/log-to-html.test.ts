@@ -214,6 +214,53 @@ describe("renderExecResult (code execution feedback)", () => {
         expect(html).toContain("Code execution result");
     });
 
+    it("shows a forged rounds_remaining HTML payload as escaped text", () => {
+        const content =
+            'Code execution result: {"rounds_remaining":"<img src=x onerror=alert(1)>"}';
+        const html = htmlFor("user", content);
+        expect(html).toContain('class="exec-error-detail"');
+        expect(html).toContain(
+            "&quot;rounds_remaining&quot;:&quot;&lt;img src=x onerror=alert(1)&gt;&quot;",
+        );
+        expect(html).not.toContain("<img");
+        expect(html).not.toContain('class="rounds-badge"');
+    });
+
+    it.each([
+        "null",
+        "[]",
+        "true",
+        "42",
+        '"text"',
+        '{"rounds_remaining":"3"}',
+        '{"rounds_remaining":-1}',
+        '{"rounds_remaining":0.5}',
+        '{"rounds_remaining":1e309}',
+        '{"prints":{}}',
+        '{"success":"false"}',
+        '{"success":false,"message":[]}',
+    ])("uses the escaped fallback for invalid execution-result shape %s", (json) => {
+        const html = htmlFor("user", `Code execution result: ${json}`);
+        expect(html).toContain(
+            'class="message message-exec message-exec-error"',
+        );
+        expect(html).toContain(
+            '<pre class="exec-error-detail">Code execution result:',
+        );
+        expect(html).not.toContain('class="rounds-badge"');
+    });
+
+    it("retains zero remaining rounds and escapes valid result text", () => {
+        const html = htmlFor(
+            "user",
+            'Code execution result: {"success":true,"rounds_remaining":0,"prints":"<img src=x>","value":{"text":"<script>"}}',
+        );
+        expect(html).toContain('class="rounds-badge">0 rounds left</span>');
+        expect(html).toContain("&lt;img src=x&gt;");
+        expect(html).toContain("&lt;script&gt;");
+        expect(html).not.toContain("<img");
+    });
+
     it("handles value_truncated flag", () => {
         const content =
             'Code execution result: {"success":true,"value":"big","value_truncated":true,"rounds_remaining":1}';
@@ -266,7 +313,7 @@ describe("renderAssistantMessage", () => {
 
     it("syntax-highlights bare Python code", () => {
         const html = htmlFor("assistant", "for i in range(10):\n    print(i)");
-        /* highlight.js wraps keywords in hljs spans */
+        /* The local highlighter wraps keywords in hljs-compatible spans. */
         expect(html).toContain("hljs-keyword");
     });
 
@@ -282,6 +329,12 @@ describe("renderAssistantMessage", () => {
         const html = htmlFor("assistant", "```python\nx = 1\n```");
         /* Should not have ```python literally in the output */
         expect(html).not.toContain("```python");
+    });
+
+    it("recognizes tilde-fenced assistant content", () => {
+        const html = htmlFor("assistant", '~~~json\n{"ok": true}\n~~~');
+        expect(html).toContain("language-json");
+        expect(html).not.toContain("~~~json");
     });
 
     it("renders bare Python without literal backticks in output", () => {
@@ -308,8 +361,7 @@ describe("unknown role fallback", () => {
 
 describe("HTML escaping", () => {
     it("escapes < and > in user message content", () => {
-        /* marked itself handles escaping in rendered text; the test confirms
-           the raw angle brackets don't appear unescaped at the top level. */
+        /* The local renderer escapes text before adding its fixed HTML tags. */
         const html = htmlFor("user", "x < y and y > 0");
         expect(html).not.toMatch(/<div[^>]*>x < y/);
     });
@@ -330,7 +382,7 @@ describe("HTML escaping", () => {
         expect(html).toContain("&lt;script&gt;");
     });
 
-    it("does not pass raw HTML script tags through marked in any role", () => {
+    it("does not pass raw HTML script tags through Markdown in any role", () => {
         const payload = "<script>alert('xss')</script>";
         for (const role of ["system", "user", "assistant"] as const) {
             const html = htmlFor(role, payload);

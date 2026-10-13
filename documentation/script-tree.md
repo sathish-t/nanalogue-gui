@@ -21,6 +21,7 @@ src/
     ai-chat-shared-constants.ts                     # Config field specs and shared constants for the AI Chat feature.
     bed-parser.ts                                   # BED file parser for nanalogue-swipe
     chat-filesystem-input-checks.ts                 # Node-only checks for chat analysis directories and Python source files.
+    chat-markdown.ts                                # Safe, dependency-free Markdown and code rendering for exported chat transcripts.
     chat-orchestrator-execution.ts                  # Sandbox execution and feedback helpers for AI chat orchestration.
     chat-orchestrator-handle-message-test-utils.ts  # Shared helpers for handleUserMessage integration tests.
     chat-orchestrator-helpers.ts                    # Helper utilities for chat-orchestrator.
@@ -52,6 +53,7 @@ src/
     qc-data-loader.ts                               # QC data loader: paginated BAM data retrieval with streaming histograms
     region-parser.ts                                # Parses and validates genomic region strings (e.g. "chr3", "chrI:1000-50000")
     sandbox-cli-args.ts                             # Shared sandbox CLI argument definitions, numeric arg parser, and sandbox
+    sandbox-glob.ts                                 # Restricted glob matching for sandbox file discovery; no expansion or backtracking.
     sandbox-prompt-text.ts                          # Contains the large built-in sandbox prompt template used for AI chat.
     sandbox-prompt.ts                               # Builds the LLM system prompt and assembles the full system message sent on every turn.
     stats.ts                                        # Statistics utilities for QC calculations

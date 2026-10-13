@@ -23,6 +23,7 @@ src/lib/ai-external-tools/window-reads.ts	100
 src/lib/ai-external-tools/write-file.ts	100
 src/lib/bed-parser.ts	93.54
 src/lib/chat-filesystem-input-checks.ts	100
+src/lib/chat-markdown.ts	99.64
 src/lib/chat-orchestrator-execution.ts	100
 src/lib/chat-orchestrator-handle-message-test-utils.ts	100
 src/lib/chat-orchestrator-helpers.ts	100
@@ -46,13 +47,14 @@ src/lib/log-to-html-assets.ts	100
 src/lib/log-to-html.ts	100
 src/lib/mod-filter.ts	100
 src/lib/model-listing.ts	92.42
-src/lib/monty-sandbox-helpers.ts	99.34
+src/lib/monty-sandbox-helpers.ts	99.37
 src/lib/monty-sandbox.ts	100
 src/lib/qc-config-builder.ts	100
 src/lib/qc-contract.ts	100
 src/lib/qc-data-loader.ts	93.56
 src/lib/region-parser.ts	95.65
 src/lib/sandbox-cli-args.ts	100
+src/lib/sandbox-glob.ts	100
 src/lib/sandbox-prompt-text.ts	100
 src/lib/sandbox-prompt.ts	100
 src/lib/stats.ts	98.36
