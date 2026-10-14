@@ -2,10 +2,15 @@
 // Tests context limits, runSandboxGuarded, and adversarial edge cases.
 // handleUserMessage end-to-end tests live in chat-orchestrator-handle-message.test.ts.
 
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+    DEFAULT_MAX_COMPLETION_TOKENS,
+    DEFAULT_MAX_WRITE_BYTES,
+    MAX_INPUT_CONTEXT_FRACTION,
+} from "./ai-chat-constants";
 import {
     applySlidingWindow,
     deriveHistoryBudgetTokens,
@@ -22,6 +27,7 @@ import {
     startMockServer,
 } from "./chat-orchestrator-test-utils";
 import type { AiChatConfig, AiChatEvent, HistoryEntry } from "./chat-types";
+import { buildCompleteSystemPrompt } from "./sandbox-prompt";
 
 describe("applySlidingWindow", () => {
     it("keeps all messages when within budget", () => {
@@ -427,6 +433,101 @@ describe("adversarial/edge-case tests", () => {
 
         // Even though continue_thinking was called, forced-final treats output as terminal
         expect(result.text).toContain("forced");
+    });
+
+    it("shows the print delivery error when the forced-final round exceeds 50 MiB", async () => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: "continue_thinking()",
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: `print("x" * ${DEFAULT_MAX_WRITE_BYTES})`,
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+        const { result } = await callOrchestrator(mockServer.url, {
+            config: { maxCodeRounds: 1 },
+        });
+        expect(result.text).toContain("OutputError");
+        expect(result.text).toContain("50 MiB");
+        expect(result.text).toContain("not saved or returned");
+    });
+
+    it("keeps complete mixed-output feedback in the forced-final request", async () => {
+        const responses: MockCompletion[] = [
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: 'print("p" * 10000)\n"v" * 10000',
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: 'print("done")',
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ];
+        mockServer = await startMockServer(responses);
+        // Leave 4,000 history tokens: combined 20 KiB output cannot fit,
+        // but a complete value plus a print-file notice and final nudge can.
+        const systemPrompt = buildCompleteSystemPrompt({
+            config: minimalConfig,
+            maxOutputKB: 10,
+        });
+        const contextWindowTokens = Math.ceil(
+            (Math.ceil(Buffer.byteLength(systemPrompt) / 4) +
+                DEFAULT_MAX_COMPLETION_TOKENS +
+                4000) /
+                MAX_INPUT_CONTEXT_FRACTION,
+        );
+        await callOrchestrator(mockServer.url, {
+            config: { maxCodeRounds: 1, contextWindowTokens },
+        });
+        const messages = mockServer.requestBodies()[1].messages as Array<{
+            /** Message text. */ content: string;
+        }>;
+        const feedback = messages.find((message) =>
+            message.content.startsWith("Code execution result: "),
+        );
+        expect(feedback).toBeDefined();
+        const payload = JSON.parse(
+            feedback?.content.replace("Code execution result: ", "") ?? "",
+        );
+        expect(payload.value).toBe("v".repeat(10000));
+        const path = payload.prints.match(
+            /ai_chat_output\/python-prints-[\w-]+\.txt/,
+        )?.[0];
+        expect(path).toBeDefined();
+        expect(await readFile(join(tmpDir, path ?? ""), "utf-8")).toBe(
+            `${"p".repeat(10000)}\n`,
+        );
+        expect(payload).not.toHaveProperty("truncated");
     });
 
     it("stops executing code after the cumulative sandbox budget is exhausted", async () => {
@@ -870,9 +971,10 @@ describe("adversarial/edge-case tests", () => {
         expect(mockServer.requestCount()).toBeGreaterThanOrEqual(2);
     });
 
-    it("feedback prints exceeding FEEDBACK_OUTPUT_MAX_BYTES are truncated", async () => {
-        // First round: huge print + continue_thinking
-        // Second round: final answer
+    it.each([
+        true,
+        false,
+    ])("delivers complete print files in thinking (%s) and terminal rounds", async (thinking) => {
         const bigPrint = "x".repeat(12000);
         const responses: MockCompletion[] = [
             {
@@ -880,7 +982,9 @@ describe("adversarial/edge-case tests", () => {
                     {
                         message: {
                             role: "assistant",
-                            content: `print("${bigPrint}")\ncontinue_thinking()`,
+                            content:
+                                `print("${bigPrint}")` +
+                                (thinking ? "\ncontinue_thinking()" : ""),
                         },
                         finish_reason: "stop",
                     },
@@ -900,20 +1004,40 @@ describe("adversarial/edge-case tests", () => {
         ];
         mockServer = await startMockServer(responses);
 
-        const { history } = await callOrchestrator(mockServer.url);
+        const { history, result, events } = await callOrchestrator(
+            mockServer.url,
+        );
 
         const feedbackMsg = history.find(
             (m) =>
                 m.role === "user" &&
                 "isExecutionResult" in m &&
                 m.isExecutionResult &&
-                m.content.includes("truncated"),
+                m.content.includes("python-prints-"),
         );
         expect(feedbackMsg).toBeDefined();
         const parsed = JSON.parse(
             feedbackMsg?.content.replace("Code execution result: ", "") ?? "",
         ) as Record<string, unknown>;
-        expect(parsed.truncated).toBe(true);
+        const notice = String(parsed.prints);
+        const path = notice.match(
+            /ai_chat_output\/python-prints-[\w-]+\.txt/,
+        )?.[0];
+        expect(path).toBeDefined();
+        expect(await readFile(join(tmpDir, path ?? ""), "utf-8")).toBe(
+            `${bigPrint}\n`,
+        );
+        expect(parsed).not.toHaveProperty("truncated");
+        expect(result.text).toBe(thinking ? "done\n" : notice);
+        const execution = events.find(
+            (event) => event.type === "code_execution_end",
+        );
+        expect(
+            execution &&
+                "result" in execution &&
+                execution.result.prints?.join(""),
+        ).toBe(notice);
+        expect(notice).not.toContain("x".repeat(100));
     });
 
     it("error feedback includes print output when code fails after printing", async () => {

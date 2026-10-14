@@ -1,20 +1,15 @@
 // Unit tests for split chat-orchestrator helper modules.
 // Covers helper-module branches directly.
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-    DEFAULT_MAX_COMPLETION_TOKENS,
-    FEEDBACK_OUTPUT_MAX_BYTES,
-    TERMINAL_OUTPUT_OVERFLOW_BYTES,
-} from "./ai-chat-constants";
+import { DEFAULT_MAX_COMPLETION_TOKENS } from "./ai-chat-constants";
 import {
     buildExecutionFeedback,
     buildMalformedAssistantProtocolFeedback,
     detectMalformedAssistantProtocol,
-    handleTerminalOverflow,
     runSandboxGuarded,
 } from "./chat-orchestrator-execution";
 import {
@@ -31,36 +26,6 @@ describe("chat-orchestrator-execution helpers", () => {
                 .splice(0)
                 .map((path) => rm(path, { recursive: true, force: true })),
         );
-    });
-
-    it("returns small terminal output unchanged", async () => {
-        const tmpPath = await mkdtemp(join(tmpdir(), "chat-overflow-"));
-        tmpPaths.push(tmpPath);
-        await expect(handleTerminalOverflow("ok", tmpPath)).resolves.toBe("ok");
-    });
-
-    it("writes oversized terminal output to ai_chat_output", async () => {
-        const tmpPath = await mkdtemp(join(tmpdir(), "chat-overflow-"));
-        tmpPaths.push(tmpPath);
-        const text = "x".repeat(TERMINAL_OUTPUT_OVERFLOW_BYTES + 1);
-
-        const result = await handleTerminalOverflow(text, tmpPath);
-
-        expect(result).toMatch(
-            /^Output too large \(\d+ bytes\)\. Full output saved to ai_chat_output\/.+\.txt in the allowed directory\.$/,
-        );
-    });
-
-    it("returns a fallback message when overflow output cannot be written", async () => {
-        const dir = await mkdtemp(join(tmpdir(), "chat-overflow-file-"));
-        const filePath = join(dir, "not-a-directory");
-        await writeFile(filePath, "x", "utf-8");
-        tmpPaths.push(dir);
-
-        const text = "x".repeat(TERMINAL_OUTPUT_OVERFLOW_BYTES + 1);
-        const result = await handleTerminalOverflow(text, filePath);
-
-        expect(result).toContain("could not write to file");
     });
 
     it("detects native tool, reasoning, and simulated execution markup", () => {
@@ -129,12 +94,15 @@ describe("chat-orchestrator-execution helpers", () => {
         expect(payload.message).toContain("</think>");
     });
 
-    it("marks oversized expression values as truncated", () => {
+    it("preserves a saved-result notice and filename in feedback", () => {
+        const outputFile = "ai_chat_output/python-result-test.json";
+        const message = `Python execution completed. Full output saved to ${outputFile}.`;
         const feedback = buildExecutionFeedback(
             {
                 success: true,
                 endedWithExpression: true,
-                value: "x".repeat(FEEDBACK_OUTPUT_MAX_BYTES),
+                value: message,
+                outputFile,
             },
             2,
         );
@@ -142,8 +110,9 @@ describe("chat-orchestrator-execution helpers", () => {
         const payload = JSON.parse(
             feedback.replace("Code execution result: ", ""),
         ) as Record<string, unknown>;
-        expect(payload.value_truncated).toBe(true);
-        expect(String(payload.value)).toContain("...(truncated)");
+        expect(payload.value).toBe(message);
+        expect(payload.output_file).toBe(outputFile);
+        expect(payload).not.toHaveProperty("value_truncated");
     });
 
     it("rejects while waiting for the sandbox lock when already aborted", async () => {

@@ -47,16 +47,11 @@ export const /** Maximum output bytes ceiling. */ MAX_OUTPUT_BYTES = 80 * 1024;
 
 // --- Orchestrator output limits ---
 
-export const /** Maximum terminal output before writing to a file instead of showing inline. */ TERMINAL_OUTPUT_OVERFLOW_BYTES = 10_240;
-export const /** Maximum bytes for execution feedback sent back to the LLM. */ FEEDBACK_OUTPUT_MAX_BYTES = 10_240;
+export const /** Maximum inline output allowance for AI execution feedback; larger outputs are saved to files. */ FEEDBACK_OUTPUT_MAX_BYTES = 10_240;
 
 // --- LLM request parameters ---
 
 export const /** Maximum completion tokens sent to the LLM per request. */ DEFAULT_MAX_COMPLETION_TOKENS = 16_384;
-
-// --- Print capture limits ---
-
-export const /** Maximum bytes of print output to capture per sandbox execution (1 MB). */ MAX_PRINT_CAPTURE_BYTES = 1_048_576;
 
 // --- File operation limits ---
 

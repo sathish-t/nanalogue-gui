@@ -3,6 +3,7 @@
 
 import {
     AI_CHAT_OUTPUT_DIR,
+    DEFAULT_MAX_WRITE_BYTES,
     MAX_FILENAME_LENGTH,
     MAX_LS_ENTRIES,
 } from "./ai-chat-constants";
@@ -85,12 +86,6 @@ During the final round (no continue_thinking() call):
   or HTML tags). Use simple indentation and line breaks for structure.
 - Do NOT end with a bare expression that duplicates a printed value.
 
-If you want to chat with the user i.e. if you want to send plain text
-to them, use the print() function. You can use this to print long
-strings if you wish.
-
-Keep output under ${maxOutputKB} KB. Output exceeding ${maxOutputKB} KB is written to a file instead of being shown inline.
-
 If your code fails, you will receive the error and can try again.
 Execution results appear as user messages prefixed with "Code execution result:"
 and include a "rounds_remaining" field showing how many execution rounds you
@@ -113,8 +108,13 @@ You do not have network access, and have read/write file access only to a specif
 and its subfolders.
 
 IMPORTANT: Keep output concise.
-The maximum output size is ${maxOutputKB} KB. If your result exceeds
-this, it will be truncated. Prefer computing summary statistics
+The inline allowance is ${maxOutputKB} KB, shared by returned values and prints.
+Larger returned strings, lists, and dictionaries are saved whole as JSON under
+${AI_CHAT_OUTPUT_DIR}/; larger prints are saved whole as UTF-8 text in both thinking
+and final rounds. You receive a filename and read_file() instructions, not partial output.
+Returned output or total printed text above ${DEFAULT_MAX_WRITE_BYTES / 1024 / 1024} MiB
+causes an output-delivery error. Execution may already have completed;
+files written during execution remain. Prefer computing summary statistics
 (counts, means, distributions) over returning raw record lists,
 unless the prompt message you receive shows the user is specifically
 interested in per-record information such as read ids, sequences etc.

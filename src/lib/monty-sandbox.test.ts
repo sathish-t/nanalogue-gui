@@ -1,8 +1,10 @@
 // Integration tests for monty-sandbox with real BAM fixtures.
 // Uses simulateModBam from @nanalogue/node to generate test BAM files.
 
+import * as crypto from "node:crypto";
 import {
     mkdir,
+    readdir,
     readFile,
     realpath,
     rm,
@@ -13,14 +15,17 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { simulateModBam } from "@nanalogue/node";
 import { runMontyAsync } from "@pydantic/monty";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { MAX_PRINT_CAPTURE_BYTES } from "./ai-chat-constants";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { DEFAULT_MAX_WRITE_BYTES } from "./ai-chat-constants";
+import { buildExecutionFeedback } from "./chat-orchestrator-execution";
 import {
     collectTerminalOutput,
     runSandboxCode,
     wrapForMonty,
 } from "./monty-sandbox";
 import { resolvePath, SandboxError } from "./monty-sandbox-helpers";
+
+vi.mock("node:crypto", { spy: true });
 
 let allowedDir: string;
 let bamName: string;
@@ -129,16 +134,27 @@ it("URL access is blocked", async () => {
     expect(result.message).toMatch(/not permitted/);
 });
 
-it("timeout raises error with isTimeout flag", async () => {
-    const code = `
-while True:
-    pass
-`;
+it.each([
+    6, 21000,
+])("timeout preserves %s printed characters and isTimeout", async (length) => {
+    const code = `print("x" * ${length})\nwhile True:\n    pass`;
     const result = await runSandboxCode(code, allowedDir, {
         maxDurationSecs: 0.1,
     });
     expect(result.success).toBe(false);
     expect(result.isTimeout).toBe(true);
+    const output = result.prints?.join("") ?? "";
+    if (length === 6) {
+        expect(output).toBe("xxxxxx\n");
+    } else {
+        const path = output.match(
+            /ai_chat_output\/python-prints-[\w-]+\.txt/,
+        )?.[0];
+        expect(path).toBeDefined();
+        expect(await readFile(join(allowedDir, path ?? ""), "utf-8")).toBe(
+            `${"x".repeat(length)}\n`,
+        );
+    }
 });
 
 it("bash abort via wall-clock timer sets isTimeout", async () => {
@@ -214,17 +230,243 @@ it("directory path is rejected", async () => {
     expect(result.success).toBe(false);
 });
 
-it("output exceeding maxOutputBytes is truncated", async () => {
-    const code = `
-reads = read_info("${bamName}")
-reads
-`;
+it.each([
+    ["string", '"🧬" * 100', "🧬".repeat(100), "string"],
+    ["list", '["x" * 300, "kept"]', ["x".repeat(300), "kept"], "array (list)"],
+    [
+        "dictionary",
+        '{"summary": "x" * 300, "count": 42}',
+        { summary: "x".repeat(300), count: 42 },
+        "object (dictionary)",
+    ],
+])("saves an overflowing %s in full instead of truncating it", async (_name, code, expected, outputType) => {
     const result = await runSandboxCode(code, allowedDir, {
-        maxOutputBytes: 1024,
+        maxOutputBytes: 100,
     });
     expect(result.success).toBe(true);
-    expect(result.truncated).toBe(true);
+    if (!result.success) throw new Error(result.message);
+    expect(result.value).toMatch(/Python execution completed.*inline limit/);
+    expect(result.value).toContain(`Top-level JSON type: ${outputType}.`);
+    expect(result.value).toContain(
+        "complete returned value, with no wrapper or execution metadata",
+    );
+    const readExpression = String(result.value).match(
+        /json\.loads\(read_file\("[^"]+"\)\["content"\]\)/,
+    )?.[0];
+    expect(readExpression).toBeDefined();
+    const reread = await runSandboxCode(
+        `import json\n${readExpression}`,
+        allowedDir,
+        { maxOutputBytes: 1000 },
+    );
+    expect(reread).toMatchObject({ success: true, value: expected });
+    const path = String(result.value).match(
+        /ai_chat_output\/python-result-[\w-]+\.json/,
+    )?.[0];
+    expect(path).toBeDefined();
+    const content = await readFile(join(allowedDir, path ?? ""), "utf-8");
+    expect(JSON.parse(content)).toEqual(expected);
+    expect(result.truncated).toBe(false);
+    expect(result.outputFile).toBe(path);
+    const feedback = JSON.parse(
+        buildExecutionFeedback(result, 2).replace(
+            "Code execution result: ",
+            "",
+        ),
+    );
+    expect(feedback.output_file).toBe(path);
+    expect(feedback.value).toBe(result.value);
+    expect(collectTerminalOutput(result)).toContain(path);
 });
+
+it("warns when an overflow file exceeds the configured read_file limit", async () => {
+    const result = await runSandboxCode('"x" * 300', allowedDir, {
+        maxOutputBytes: 100,
+        maxReadBytes: 128,
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error(result.message);
+    expect(result.value).toContain("read_file's 128-byte per-call limit");
+    expect(result.value).toContain(
+        "Do not json.loads a partial read_file result",
+    );
+    expect(result.value).toContain("increase the configured read limit");
+    expect(result.value).not.toContain('json.loads(read_file("');
+    const chunk = await runSandboxCode(
+        `read_file("${result.outputFile}")`,
+        allowedDir,
+        { maxReadBytes: 128, maxOutputBytes: 1000 },
+    );
+    expect(chunk).toMatchObject({
+        success: true,
+        value: {
+            bytes_read: 128,
+            total_size: 302,
+            content: `"${"x".repeat(127)}`,
+        },
+    });
+});
+
+it.each([
+    ["number", "42", 42, 2],
+    ["boolean", "True", true, 4],
+])("keeps an inline %s but rejects saving an overflowing one", async (_name, code, expected, inlineBytes) => {
+    const inline = await runSandboxCode(code, allowedDir, {
+        maxOutputBytes: inlineBytes,
+    });
+    expect(inline).toMatchObject({ success: true, value: expected });
+    const dir = join(allowedDir, `scalar-overflow-${_name}`);
+    await mkdir(dir);
+    const overflow = await runSandboxCode(
+        `write_file("side-effect.txt", "completed")\n${code}`,
+        dir,
+        { maxOutputBytes: 1 },
+    );
+    expect(overflow).toMatchObject({
+        success: false,
+        errorType: "OutputError",
+        message: expect.stringContaining(
+            "Only strings, lists, and dictionaries can be saved as overflow files",
+        ),
+    });
+    expect(overflow).not.toHaveProperty("outputFile");
+    expect(await readdir(dir)).not.toContain("ai_chat_output");
+    expect(await readFile(join(dir, "side-effect.txt"), "utf-8")).toBe(
+        "completed",
+    );
+});
+
+it("keeps a result at the inline byte boundary and saves one byte over it", async () => {
+    const inline = await runSandboxCode('"🧬" * 10', allowedDir, {
+        maxOutputBytes: 42,
+    });
+    expect(inline.success).toBe(true);
+    expect(inline.value).toBe("🧬".repeat(10));
+    expect(inline).not.toHaveProperty("outputFile");
+    const overflow = await runSandboxCode('"🧬" * 10', allowedDir, {
+        maxOutputBytes: 41,
+    });
+    expect(overflow.success).toBe(true);
+    expect(overflow).toHaveProperty("outputFile");
+});
+
+it.each([
+    "value",
+    "prints",
+])("does not overwrite an existing %s overflow filename", async (kind) => {
+    const id = "00000000-0000-4000-8000-000000000008";
+    const path =
+        kind === "value"
+            ? `ai_chat_output/python-result-${id}.json`
+            : `ai_chat_output/python-prints-${id}.txt`;
+    await mkdir(join(allowedDir, "ai_chat_output"), { recursive: true });
+    await writeFile(join(allowedDir, path), "existing data");
+    const uuid = vi.mocked(crypto.randomUUID).mockReturnValue(id);
+    try {
+        const result = await runSandboxCode(
+            kind === "value" ? '"x" * 300' : 'print("x" * 300)',
+            allowedDir,
+            {
+                maxOutputBytes: 100,
+            },
+        );
+        expect(result.success).toBe(false);
+        expect(result).toMatchObject({
+            errorType: "OutputError",
+            message: expect.stringContaining("saving"),
+        });
+        expect(await readFile(join(allowedDir, path), "utf-8")).toBe(
+            "existing data",
+        );
+    } finally {
+        uuid.mockRestore();
+    }
+});
+
+it.each([
+    "value",
+    "prints",
+])("blocks %s overflow saving outside the allowed directory without undoing execution", async (kind) => {
+    const dir = join(allowedDir, `save-failure-${kind}`);
+    const outside = await import("node:fs/promises").then((fs) =>
+        fs.mkdtemp(join(tmpdir(), "outside-output-")),
+    );
+    await mkdir(dir);
+    await symlink(outside, join(dir, "ai_chat_output"));
+    try {
+        const result = await runSandboxCode(
+            'write_file("side-effect.txt", "completed")\nprint("finished")\n' +
+                (kind === "value" ? '"x" * 300' : 'print("x" * 300)'),
+            dir,
+            { maxOutputBytes: 100 },
+        );
+        expect(result).toMatchObject({
+            success: false,
+            errorType: "OutputError",
+            message: expect.stringContaining("saving"),
+        });
+        expect(result.prints?.join("")).toBe(
+            kind === "value" ? "finished\n" : "",
+        );
+        expect(await readdir(outside)).toEqual([]);
+        expect(await readFile(join(dir, "side-effect.txt"), "utf-8")).toBe(
+            "completed",
+        );
+    } finally {
+        await rm(outside, { recursive: true, force: true });
+    }
+});
+
+it("reports completed execution when the returned value cannot be serialized", async () => {
+    const result = await runSandboxCode("2 ** 100", allowedDir);
+    expect(result).toMatchObject({
+        success: false,
+        errorType: "OutputError",
+        message: expect.stringContaining(
+            "Python execution completed, but its returned output could not be serialized",
+        ),
+    });
+});
+
+it("saves a result exactly at the 50 MiB file limit", async () => {
+    const result = await runSandboxCode(
+        `"x" * ${DEFAULT_MAX_WRITE_BYTES - 2}`,
+        allowedDir,
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error(result.message);
+    const content = await readFile(
+        join(allowedDir, result.outputFile ?? ""),
+        "utf-8",
+    );
+    expect(Buffer.byteLength(content)).toBe(DEFAULT_MAX_WRITE_BYTES);
+    expect(JSON.parse(content)).toBe("x".repeat(DEFAULT_MAX_WRITE_BYTES - 2));
+}, 30_000);
+
+it("fails above 50 MiB without saving the result or undoing Python file writes", async () => {
+    const dir = join(allowedDir, "over-file-limit");
+    await mkdir(dir);
+    const result = await runSandboxCode(
+        `write_file("side-effect.txt", "completed")\n"x" * ${DEFAULT_MAX_WRITE_BYTES - 1}`,
+        dir,
+        { maxOutputBytes: DEFAULT_MAX_WRITE_BYTES + 100 },
+    );
+    expect(result).toMatchObject({
+        success: false,
+        errorType: "OutputError",
+        message: expect.stringContaining("Python execution completed"),
+    });
+    if (result.success) throw new Error("Expected output delivery failure");
+    expect(result.message).toContain("exceeded the 50 MiB limit");
+    expect(result.message).toContain("not saved or returned");
+    expect(result.message).toContain(
+        "Any files written during execution remain",
+    );
+    expect(await readFile(join(dir, "side-effect.txt"), "utf-8")).toBe(
+        "completed",
+    );
+    expect(await readdir(dir)).not.toContain("ai_chat_output");
+}, 30_000);
 
 it("code ending with assignment sets endedWithExpression false", async () => {
     const code = `
@@ -674,38 +916,74 @@ files = ls()
     expect(files).not.toContain("link_file.txt");
 });
 
-// --- Print capture cap ---
+// --- Complete printed output delivery ---
 
-it("caps print capture at MAX_PRINT_CAPTURE_BYTES", async () => {
-    // Each iteration prints 10000 chars + newline; 200 iterations = ~2 MB
-    const code = `
-for i in range(200):
-    print("x" * 10000)
-`;
-    const result = await runSandboxCode(code, allowedDir, {
-        maxDurationSecs: 30,
-    });
-    expect(result.success).toBe(true);
-    const totalBytes = Buffer.byteLength(
-        result.prints?.join("") ?? "",
-        "utf-8",
+it.each([
+    false,
+    true,
+])("saves complete multi-call prints above 1 MiB, including before an error (%s)", async (fail) => {
+    const result = await runSandboxCode(
+        'for i in range(200):\n    print("x" * 10000)\nprint("END")\n' +
+            (fail ? "undefined_var" : ""),
+        allowedDir,
     );
-    expect(totalBytes).toBeLessThanOrEqual(MAX_PRINT_CAPTURE_BYTES);
+    expect(result.success).toBe(!fail);
+    const notice = result.prints?.join("") ?? "";
+    const path = notice.match(/ai_chat_output\/python-prints-[\w-]+\.txt/)?.[0];
+    expect(path).toBeDefined();
+    expect(await readFile(join(allowedDir, path ?? ""), "utf-8")).toBe(
+        `${`${"x".repeat(10000)}\n`.repeat(200)}END\n`,
+    );
+    const feedback = JSON.parse(
+        buildExecutionFeedback(result, 2).replace(
+            "Code execution result: ",
+            "",
+        ),
+    );
+    expect(feedback.prints).toBe(notice);
+    expect(feedback).not.toHaveProperty("truncated");
+    expect(notice).not.toContain("x".repeat(100));
 });
 
-it("truncates the final print chunk when it partially overflows the budget", async () => {
-    // "hello" is 5 bytes; maxPrintBytes=8 leaves 3 bytes remaining for the
-    // second print, so the partial-fit else-branch in printCallback fires.
-    const code = 'print("hello")\nprint("world!")';
-    const result = await runSandboxCode(code, allowedDir, {
-        maxPrintBytes: 8,
-    });
-    expect(result.success).toBe(true);
-    expect(result.printsTruncated).toBe(true);
-    // "hello\n" = 6 bytes, leaving 2 bytes → "wo" from "world!\n"
-    const joined = result.prints?.join("") ?? "";
-    expect(joined.startsWith("hello")).toBe(true);
-    expect(joined.length).toBeLessThanOrEqual(8);
+it.each([
+    0, 1,
+])("delivers printed output at the inclusive 50 MiB ceiling plus %s bytes", async (extra) => {
+    const before = await readdir(join(allowedDir, "ai_chat_output"));
+    const result = await runSandboxCode(
+        `print("x" * ${DEFAULT_MAX_WRITE_BYTES - 1}, end="")\nprint("Z", end="")\n` +
+            (extra
+                ? 'print("!", end="")\nwrite_file("overflow-side-effect.txt", "completed")'
+                : ""),
+        allowedDir,
+        { maxDurationSecs: 30 },
+    );
+    expect(result.success).toBe(extra === 0);
+    if (result.success) {
+        const path = result.prints
+            ?.join("")
+            .match(/ai_chat_output\/python-prints-[\w-]+\.txt/)?.[0];
+        expect(path).toBeDefined();
+        const saved = await readFile(join(allowedDir, path ?? ""));
+        expect(saved.byteLength).toBe(DEFAULT_MAX_WRITE_BYTES);
+        expect(
+            saved.equals(
+                Buffer.from(`${"x".repeat(DEFAULT_MAX_WRITE_BYTES - 1)}Z`),
+            ),
+        ).toBe(true);
+    } else {
+        expect(result.errorType).toBe("OutputError");
+        expect(result.message).toContain("50 MiB");
+        expect(result.prints).toEqual([]);
+        expect(await readdir(join(allowedDir, "ai_chat_output"))).toEqual(
+            before,
+        );
+        expect(
+            await readFile(
+                join(allowedDir, "overflow-side-effect.txt"),
+                "utf-8",
+            ),
+        ).toBe("completed");
+    }
 });
 
 // --- Parity tests: runMontyAsyncWithPrint vs runMontyAsync ---
@@ -797,7 +1075,6 @@ it("collectTerminalOutput uses safeStringify fallback for non-serializable value
         continueThinkingCalled: false,
         sandboxToolCalled: false,
         prints: [],
-        printsTruncated: false,
         truncated: false,
     });
     expect(result).toContain("cyclic or non-serializable");
@@ -811,7 +1088,6 @@ it("collectTerminalOutput joins prints with serialized expression value", () => 
         continueThinkingCalled: false,
         sandboxToolCalled: false,
         prints: ["hello\n"],
-        printsTruncated: false,
         truncated: false,
     });
     expect(result).toBe("hello\n99\n");
@@ -840,21 +1116,49 @@ it("removedTools with empty set leaves all tools available", async () => {
     expect(result.success).toBe(true);
 });
 
-// --- printCallback UTF-8 boundary ---
+// --- Printed UTF-8 byte boundary ---
 
-it("printCallback backs off to a UTF-8 boundary when cap splits a multi-byte character", async () => {
-    // '🎉' is 4 bytes in UTF-8 (F0 9F 8E 89).  With maxPrintBytes=3 the cap
-    // falls inside the codepoint; the while loop in printCallback must step
-    // back to position 0 to avoid emitting a broken sequence.
-    const result = await runSandboxCode('print("🎉")', allowedDir, {
-        maxPrintBytes: 3,
+it.each([
+    6, 5, 4,
+])("shares an inline allowance of %s bytes without prematurely spilling small mixed output", async (maxOutputBytes) => {
+    const result = await runSandboxCode('print("ok")\n42', allowedDir, {
+        maxOutputBytes,
     });
     expect(result.success).toBe(true);
-    expect(result.printsTruncated).toBe(true);
-    // Nothing valid fits before the boundary, so prints may be empty or
-    // contain only the safe leading bytes (zero in this case).
-    const total = Buffer.byteLength(result.prints?.join("") ?? "", "utf-8");
-    expect(total).toBeLessThanOrEqual(3);
+    expect(result.value).toBe(42);
+    const output = result.prints?.join("") ?? "";
+    if (maxOutputBytes >= 5) {
+        expect(output).toBe("ok\n");
+    } else {
+        const path = output.match(
+            /ai_chat_output\/python-prints-[\w-]+\.txt/,
+        )?.[0];
+        expect(path).toBeDefined();
+        expect(await readFile(join(allowedDir, path ?? ""), "utf-8")).toBe(
+            "ok\n",
+        );
+    }
+});
+
+it.each([
+    5, 4,
+])("delivers complete emoji prints with an inline allowance of %s bytes", async (maxOutputBytes) => {
+    const result = await runSandboxCode('print("🎉")', allowedDir, {
+        maxOutputBytes,
+    });
+    expect(result.success).toBe(true);
+    const output = result.prints?.join("") ?? "";
+    if (maxOutputBytes === 5) {
+        expect(output).toBe("🎉\n");
+    } else {
+        const path = output.match(
+            /ai_chat_output\/python-prints-[\w-]+\.txt/,
+        )?.[0];
+        expect(path).toBeDefined();
+        expect(await readFile(join(allowedDir, path ?? ""), "utf-8")).toBe(
+            "🎉\n",
+        );
+    }
 });
 
 // RuntimeError message includes a full Python-style traceback so the LLM can

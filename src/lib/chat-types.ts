@@ -3,9 +3,7 @@
 
 /** Print metadata shared by successful and failed sandbox executions. */
 interface SandboxPrintMetadata {
-    /** Whether print() output was clipped by the maxPrintBytes limit. */
-    printsTruncated?: boolean;
-    /** Captured print() output segments from sandbox code. */
+    /** Complete inline print() output, or a notice pointing to its complete text file. */
     prints?: string[];
 }
 
@@ -16,8 +14,10 @@ export type SandboxResult =
           success: true;
           /** The sandbox return value; undefined is a valid successful value. */
           value: unknown;
-          /** Whether the return value was truncated by the output gate. */
+          /** Whether the return value is incomplete; file-backed results are complete. */
           truncated: boolean;
+          /** Relative path of the complete JSON result when it exceeded the inline limit. */
+          outputFile?: string;
           /** Whether the code ended with a bare expression (heuristic). */
           endedWithExpression: boolean;
           /** Whether continue_thinking() was called in the sandbox code. */
@@ -26,7 +26,7 @@ export type SandboxResult =
           sandboxToolCalled: boolean;
       })
     | (SandboxPrintMetadata & {
-          /** The code failed to execute. */
+          /** Execution failed, or its completed result could not be delivered. */
           success: false;
           /** Producer-defined error class; intentionally not a closed enum. */
           errorType: string;
@@ -52,7 +52,7 @@ export interface SandboxOptions {
     maxRecordsSeqTable?: number;
     /** Maximum number of Monty VM heap allocations. */
     maxAllocations?: number;
-    /** Maximum output size in bytes (derived from context budget). */
+    /** Inline byte allowance shared by returned values and prints; larger outputs are saved to files. */
     maxOutputBytes?: number;
     /** Maximum bytes per read_file call. */
     maxReadBytes?: number;
@@ -60,8 +60,6 @@ export interface SandboxOptions {
     maxWriteBytes?: number;
     /** Maximum entries returned by ls(). */
     maxLsEntries?: number;
-    /** Maximum bytes of print() output to capture. Defaults to MAX_PRINT_CAPTURE_BYTES (1 MB). */
-    maxPrintBytes?: number;
     /** Tool names to omit from the sandbox. When absent, all tools are registered. */
     removedTools?: ReadonlySet<string>;
 }

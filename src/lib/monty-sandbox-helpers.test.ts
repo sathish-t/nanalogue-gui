@@ -1,5 +1,5 @@
 // Unit tests for monty-sandbox helper functions (no BAM files needed).
-// Tests resolvePath, toReadOptions, toWindowOptions, gateOutputSize,
+// Tests resolvePath, toReadOptions, toWindowOptions, safeStringify,
 // rejectTreatAsUrl, record/data limits, directory listing, and map conversion.
 
 import { mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
@@ -11,12 +11,12 @@ import {
     deriveMaxOutputBytes,
     enforceDataSizeLimit,
     enforceRecordLimit,
-    gateOutputSize,
     isDeniedPath,
     listFilesRecursive,
     rejectTreatAsUrl,
     resolvePath,
     SandboxError,
+    safeStringify,
     toReadOptions,
     toWindowOptions,
 } from "./monty-sandbox-helpers";
@@ -199,35 +199,16 @@ describe("toWindowOptions", () => {
     });
 });
 
-describe("gateOutputSize", () => {
-    it("preserves small objects and indivisible scalar output", () => {
-        const { gated, truncated } = gateOutputSize({ a: 1 }, 1024);
-        expect(gated).toEqual({ a: 1 });
-        expect(truncated).toBe(false);
-        // A numeric result must not turn into a different number to fit the budget.
-        expect(gateOutputSize(42, 1)).toEqual({ gated: 42, truncated: false });
-    });
-
-    it("truncates large array output", () => {
-        const large = Array.from({ length: 1000 }, (_, i) => i);
-        const { truncated } = gateOutputSize(large, 100);
-        expect(truncated).toBe(true);
-    });
-
-    it("returns bounded fallback for cyclic values", () => {
-        const obj: Record<string, unknown> = { a: 1 };
-        obj.self = obj;
-        const { gated, truncated } = gateOutputSize(obj, 1024);
-        expect(truncated).toBe(true);
-        expect(typeof gated).toBe("string");
-        expect(gated).toMatch(/cyclic or non-serializable/);
-        expect(() => JSON.parse(gated as string)).not.toThrow();
-    });
-
-    it("uses Buffer.byteLength for multibyte UTF-8", () => {
-        const emoji = "🧬".repeat(10);
-        const { truncated } = gateOutputSize(emoji, 20);
-        expect(truncated).toBe(true);
+describe("safeStringify", () => {
+    it("serializes JSON data and reports non-serializable values", () => {
+        expect(safeStringify({ count: 42 })).toEqual({
+            ok: true,
+            json: '{"count":42}',
+        });
+        const cyclic: Record<string, unknown> = {};
+        cyclic.self = cyclic;
+        expect(safeStringify(cyclic).ok).toBe(false);
+        expect(safeStringify(undefined).ok).toBe(false);
     });
 });
 
@@ -364,51 +345,6 @@ describe("listFilesRecursive", () => {
         for (const f of files) {
             expect(f).toMatch(/\.bam$/);
         }
-    });
-});
-
-describe("gateOutputSize — object branch", () => {
-    it("truncates a large array field inside an object", () => {
-        // data field is a large array that exceeds maxBytes / 4.
-        const bigArr = Array.from({ length: 500 }, (_, i) => ({
-            index: i,
-            value: "x".repeat(10),
-        }));
-        const obj = { data: bigArr, label: "test" };
-        const { gated, truncated } = gateOutputSize(obj, 200);
-        expect(truncated).toBe(true);
-        expect(gated).toBeDefined();
-    });
-
-    it("truncates a large string field inside an object", () => {
-        // content field is a long string that exceeds maxBytes / 4.
-        const obj = { content: "x".repeat(5000), count: 1 };
-        const { gated, truncated } = gateOutputSize(obj, 200);
-        expect(truncated).toBe(true);
-        expect(gated).toBeDefined();
-    });
-
-    it("hard-truncates when the object is still too large after field truncation", () => {
-        // A single key 300 chars long — the key itself makes the serialised
-        // object exceed maxBytes even after structural truncation.
-        const obj: Record<string, unknown> = {};
-        obj["k".repeat(300)] = 42;
-        const { gated, truncated } = gateOutputSize(obj, 100);
-        expect(truncated).toBe(true);
-        expect(typeof gated).toBe("string");
-        expect(gated as string).toContain("[TRUNCATED");
-    });
-});
-
-describe("gateOutputSize — string branch with newline", () => {
-    it("truncates at a newline boundary for long strings", () => {
-        // String contains newlines within the first maxBytes chars;
-        // cutPoint should land at the last newline position.
-        const data = "line1\nline2\nline3\n".repeat(50);
-        const { gated, truncated } = gateOutputSize(data, 20);
-        expect(truncated).toBe(true);
-        expect(typeof gated).toBe("string");
-        expect(gated as string).toContain("[TRUNCATED");
     });
 });
 
