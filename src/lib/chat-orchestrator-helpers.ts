@@ -4,6 +4,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { FEEDBACK_OUTPUT_MAX_BYTES } from "./ai-chat-constants";
 import type {
     AiChatConfig,
     AiChatEvent,
@@ -139,7 +140,10 @@ export async function handleDumpCommand(
         const filename = `nanalogue-chat-${date}-${uuid}.log`;
         const outputFile = join(safeDir, filename);
 
-        const maxOutputBytes = deriveMaxOutputBytes(config.contextWindowTokens);
+        const maxOutputBytes = Math.min(
+            deriveMaxOutputBytes(config.contextWindowTokens),
+            FEEDBACK_OUTPUT_MAX_BYTES,
+        );
         const maxOutputKB = Math.round(maxOutputBytes / 1024);
         // Include SYSTEM_APPEND.md content in the dump so it accurately
         // reflects the system prompt sent on every turn.

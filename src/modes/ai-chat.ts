@@ -3,6 +3,7 @@
 
 import { type BrowserWindow, dialog } from "electron";
 import { registerTrustedIpcHandler } from "../electron-security";
+import { FEEDBACK_OUTPUT_MAX_BYTES } from "../lib/ai-chat-constants";
 import {
     validateGetSystemPrompt,
     validateListModels,
@@ -314,8 +315,9 @@ async function sendAiChatMessage(
             ? appendSystemPrompt
             : undefined;
         try {
-            const maxOutputBytes = deriveMaxOutputBytes(
-                config.contextWindowTokens,
+            const maxOutputBytes = Math.min(
+                deriveMaxOutputBytes(config.contextWindowTokens),
+                FEEDBACK_OUTPUT_MAX_BYTES,
             );
             buildCompleteSystemPrompt({
                 config,
@@ -531,8 +533,9 @@ export function registerAiChatIpcHandlers(): void {
                     error: "System prompt mode cannot change during an active chat session",
                 };
             }
-            const maxOutputBytes = deriveMaxOutputBytes(
-                config.contextWindowTokens,
+            const maxOutputBytes = Math.min(
+                deriveMaxOutputBytes(config.contextWindowTokens),
+                FEEDBACK_OUTPUT_MAX_BYTES,
             );
             const maxOutputKB = Math.round(maxOutputBytes / 1024);
             const sandboxPrompt = buildSandboxPrompt({

@@ -7,6 +7,7 @@ import {
     DEFAULT_MAX_CODE_ROUNDS,
     DEFAULT_MAX_COMPLETION_TOKENS,
     DEFAULT_MAX_CUMULATIVE_SANDBOX_MS,
+    FEEDBACK_OUTPUT_MAX_BYTES,
     MAX_INPUT_CONTEXT_FRACTION,
     NOMINAL_BYTES_PER_TOKEN,
 } from "./ai-chat-constants";
@@ -19,7 +20,6 @@ import {
     buildMalformedAssistantProtocolFeedback,
     detectMalformedAssistantProtocol,
     extractCodeFromFences,
-    handleTerminalOverflow,
     runSandboxGuarded,
 } from "./chat-orchestrator-execution";
 import { handleDumpCommand } from "./chat-orchestrator-helpers";
@@ -249,7 +249,10 @@ export async function handleUserMessage(
     };
 
     // Build system prompt
-    const maxOutputBytes = deriveMaxOutputBytes(config.contextWindowTokens);
+    const maxOutputBytes = Math.min(
+        deriveMaxOutputBytes(config.contextWindowTokens),
+        FEEDBACK_OUTPUT_MAX_BYTES,
+    );
     const maxOutputKB = Math.round(maxOutputBytes / 1024);
     // Reuse the same derived output ceiling for both sandbox limits and the
     // default sandbox prompt so those two views of the runtime stay in sync.
@@ -272,11 +275,6 @@ export async function handleUserMessage(
         maxAllocations: config.maxAllocations,
         maxReadBytes: config.maxReadMB * 1024 * 1024,
         maxWriteBytes: config.maxWriteMB * 1024 * 1024,
-        // maxPrintBytes is intentionally left at its default (MAX_PRINT_CAPTURE_BYTES,
-        // 1 MB) so that large print()-based final answers are fully captured and
-        // can be redirected to an overflow file by handleTerminalOverflow.
-        // The LLM-facing truncation at the context budget is already enforced
-        // downstream by truncatePrints() in buildExecutionFeedback.
         removedTools,
     };
 
@@ -527,10 +525,6 @@ export async function handleUserMessage(
                     });
                 } else {
                     finalText = collectTerminalOutput(sandboxResult);
-                    finalText = await handleTerminalOverflow(
-                        finalText,
-                        allowedDir,
-                    );
                     // Persist execution feedback so follow-up turns have structured context
                     const terminalFeedback = buildExecutionFeedback(
                         sandboxResult,
@@ -679,7 +673,8 @@ export async function handleUserMessage(
             // Forced round: ignore continueThinkingCalled — always treat as terminal
             if (result.success) {
                 finalText = collectTerminalOutput(result);
-                finalText = await handleTerminalOverflow(finalText, allowedDir);
+            } else if (result.errorType === "OutputError") {
+                finalText = collectDirectExecutionOutput(result);
             }
             // Record execution feedback for follow-up turn context
             history.push({

@@ -1,5 +1,5 @@
 // Utility helpers for monty-sandbox: path security, option translation,
-// output gating, and directory listing.
+// output serialization, and directory listing.
 
 import { lstat, readdir, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
@@ -420,25 +420,6 @@ export async function listFilesRecursive(
 }
 
 /**
- * Slices a UTF-8 string to at most maxBytes bytes, backing off to a codepoint
- * boundary so the result is always valid UTF-8. Returns the original string
- * unchanged when it is already within the limit.
- *
- * @param s - The string to slice.
- * @param maxBytes - Maximum byte length of the returned string.
- * @returns The (possibly shorter) string.
- */
-export function safeUtf8Slice(s: string, maxBytes: number): string {
-    const buf = Buffer.from(s, "utf-8");
-    if (buf.length <= maxBytes) return s;
-    let end = maxBytes;
-    // Back off past UTF-8 continuation bytes (10xxxxxx) to land on a
-    // codepoint boundary and never emit a partial multi-byte character.
-    while (end > 0 && (buf[end] & 0xc0) === 0x80) end--;
-    return buf.subarray(0, end).toString("utf-8");
-}
-
-/**
  * Safe JSON.stringify that handles cyclic references.
  *
  * @param value - The value to serialize.
@@ -458,124 +439,15 @@ export function safeStringify(value: unknown):
           fallback: string;
       } {
     try {
-        return { ok: true, json: JSON.stringify(value) };
+        const json = JSON.stringify(value);
+        if (json !== undefined) return { ok: true, json };
     } catch {
-        return {
-            ok: false,
-            fallback: '{"_error":"cyclic or non-serializable value"}',
-        };
+        // Fall through to the bounded non-serializable representation.
     }
-}
-
-/**
- * Gates output size by truncating at semantic boundaries if it exceeds maxBytes.
- * Returns valid, parseable data with truncation metadata.
- *
- * @param value - The value to gate.
- * @param maxBytes - The maximum output size in bytes.
- * @returns An object with the gated value and whether truncation occurred.
- */
-export function gateOutputSize(
-    value: unknown,
-    maxBytes: number,
-): {
-    /** The gated output value, possibly truncated. */
-    gated: unknown;
-    /** Whether the output was truncated. */
-    truncated: boolean;
-} {
-    const result = safeStringify(value);
-
-    if (!result.ok) {
-        return { gated: result.fallback, truncated: true };
-    }
-
-    const serialized = result.json;
-    if (Buffer.byteLength(serialized, "utf-8") <= maxBytes) {
-        return { gated: value, truncated: false };
-    }
-
-    const serializedBytes = Buffer.byteLength(serialized, "utf-8");
-
-    if (Array.isArray(value)) {
-        const items: unknown[] = [];
-        let currentSize = 2;
-        for (const item of value) {
-            const itemResult = safeStringify(item);
-            const itemBytes = itemResult.ok
-                ? Buffer.byteLength(itemResult.json, "utf-8") + 1
-                : 64;
-            if (currentSize + itemBytes > maxBytes) break;
-            items.push(item);
-            currentSize += itemBytes;
-        }
-        return {
-            gated: {
-                items,
-                _truncated: {
-                    kept: items.length,
-                    total: value.length,
-                    dropped: value.length - items.length,
-                    total_bytes: serializedBytes,
-                },
-            },
-            truncated: true,
-        };
-    }
-
-    if (typeof value === "string") {
-        const lastNewline = value.lastIndexOf("\n", maxBytes);
-        const cutPoint = lastNewline > 0 ? lastNewline : maxBytes;
-        const lines = value.slice(0, cutPoint);
-        const totalLines = value.split("\n").length;
-        const keptLines = lines.split("\n").length;
-        return {
-            gated:
-                `${lines}\n[TRUNCATED: showing ${keptLines} of ${totalLines} lines, ` +
-                `${serializedBytes} bytes total]`,
-            truncated: true,
-        };
-    }
-
-    if (typeof value === "object" && value !== null) {
-        const obj = value as Record<string, unknown>;
-        const truncatedObj: Record<string, unknown> = {};
-        for (const [key, val] of Object.entries(obj)) {
-            const valResult = safeStringify(val);
-            const valBytes = valResult.ok
-                ? Buffer.byteLength(valResult.json, "utf-8")
-                : 64;
-            if (Array.isArray(val) && valBytes > maxBytes / 4) {
-                truncatedObj[key] = gateOutputSize(
-                    val,
-                    Math.floor(maxBytes / 4),
-                ).gated;
-            } else if (typeof val === "string" && valBytes > maxBytes / 4) {
-                truncatedObj[key] = gateOutputSize(
-                    val,
-                    Math.floor(maxBytes / 4),
-                ).gated;
-            } else {
-                truncatedObj[key] = val;
-            }
-        }
-        const objResult = safeStringify(truncatedObj);
-        const objSerialized = objResult.ok
-            ? objResult.json
-            : objResult.fallback;
-        if (Buffer.byteLength(objSerialized, "utf-8") > maxBytes) {
-            const truncStr = objSerialized.slice(0, maxBytes);
-            return {
-                gated:
-                    truncStr +
-                    `\n[TRUNCATED: object exceeded ${maxBytes} bytes after structural truncation]`,
-                truncated: true,
-            };
-        }
-        return { gated: truncatedObj, truncated: true };
-    }
-
-    return { gated: value, truncated: false };
+    return {
+        ok: false,
+        fallback: '{"_error":"cyclic or non-serializable value"}',
+    };
 }
 
 /**

@@ -595,7 +595,7 @@ describe("cross-endpoint compatibility", () => {
         expect("max_tokens" in bodies[0]).toBe(false);
     });
 
-    it("truncates feedback prints exceeding 10240 bytes", async () => {
+    it("saves complete feedback prints exceeding 10240 bytes", async () => {
         // First round: print a huge string + continue_thinking
         // Second round: print the answer
         const bigPrint = "x".repeat(12000);
@@ -645,13 +645,20 @@ describe("cross-endpoint compatibility", () => {
                 m.role === "user" &&
                 "isExecutionResult" in m &&
                 m.isExecutionResult &&
-                m.content.includes("truncated"),
+                m.content.includes("python-prints-"),
         );
         expect(feedbackMsg).toBeDefined();
         const parsed = JSON.parse(
             feedbackMsg?.content.replace("Code execution result: ", "") ?? "",
         ) as Record<string, unknown>;
-        expect(parsed.truncated).toBe(true);
+        expect(parsed).not.toHaveProperty("truncated");
+        const path = String(parsed.prints).match(
+            /ai_chat_output\/python-prints-[\w-]+\.txt/,
+        )?.[0];
+        expect(path).toBeDefined();
+        expect(await readFile(join(tmpDir, path ?? ""), "utf-8")).toBe(
+            `${bigPrint}\n`,
+        );
     });
 
     it("does not execute code when finish_reason is length", async () => {
@@ -776,9 +783,8 @@ describe("cross-endpoint compatibility", () => {
         expect(parsed.error_type).toBe("SyntaxError");
     });
 
-    it("truncates large expression value in feedback", async () => {
-        // First round: builds a large dict and ends with it as expression + continue_thinking
-        // The expression value should be truncated in the feedback message
+    it("saves a large expression value and sends its filename in feedback", async () => {
+        // The complete returned value must be saved, not cut into a feedback string.
         const bigValue = "x".repeat(12000);
         const responses: MockCompletion[] = [
             {
@@ -832,7 +838,16 @@ describe("cross-endpoint compatibility", () => {
         const parsed = JSON.parse(
             feedbackMsg?.content.replace("Code execution result: ", "") ?? "",
         ) as Record<string, unknown>;
-        expect(parsed.value_truncated).toBe(true);
+        expect(parsed).not.toHaveProperty("value_truncated");
+        expect(parsed.output_file).toMatch(
+            /^ai_chat_output\/python-result-[\w-]+\.json$/,
+        );
+        expect(parsed.value).toContain(parsed.output_file);
+        const saved = await readFile(
+            join(tmpDir, String(parsed.output_file)),
+            "utf-8",
+        );
+        expect(JSON.parse(saved)).toBe(bigValue);
         // Total feedback size should be bounded
         const feedbackBytes = Buffer.byteLength(
             feedbackMsg?.content ?? "",
@@ -862,7 +877,7 @@ describe("cross-endpoint compatibility", () => {
         const { result } = await callOrchestrator(mockServer.url);
 
         // Should return overflow pointer message
-        expect(result.text).toContain("Output too large");
+        expect(result.text).toContain("Full printed output saved");
         expect(result.text).toContain("bytes");
         expect(result.text).toContain("ai_chat_output/");
 
@@ -872,7 +887,7 @@ describe("cross-endpoint compatibility", () => {
         expect(files).toHaveLength(1);
         expect(files[0]).toMatch(/\.txt$/);
         const fileContent = await readFile(join(outputDir, files[0]), "utf-8");
-        expect(fileContent).toContain(bigOutput);
+        expect(fileContent).toBe(`${bigOutput}\n`);
     });
 
     it("rejects overflow write when ai_chat_output is a symlink outside allowed dir", async () => {
@@ -908,9 +923,8 @@ describe("cross-endpoint compatibility", () => {
         await rm(outsideDir, { recursive: true });
     });
 
-    it("truncates feedback prints without splitting multi-byte UTF-8 characters", async () => {
-        // Euro sign '€' is 3 bytes in UTF-8; 4000 chars = 12000 bytes, exceeds 10240 limit.
-        // 10240 / 3 = 3413.33 — the cut falls mid-character, producing \uFFFD without the fix.
+    it("saves complete multi-byte UTF-8 feedback prints", async () => {
+        // Euro sign '€' is 3 bytes in UTF-8; all 4000 characters must survive.
         const bigPrint = "\u20AC".repeat(4000);
         const responses: MockCompletion[] = [
             {
@@ -952,22 +966,26 @@ describe("cross-endpoint compatibility", () => {
             signal: new AbortController().signal,
         });
 
-        // Find the truncated feedback message
+        // Find the complete print-file notice in feedback.
         const feedbackMsg = history.find(
             (m) =>
                 m.role === "user" &&
                 "isExecutionResult" in m &&
                 m.isExecutionResult &&
-                m.content.includes("truncated"),
+                m.content.includes("python-prints-"),
         );
         expect(feedbackMsg).toBeDefined();
         const parsed = JSON.parse(
             feedbackMsg?.content.replace("Code execution result: ", "") ?? "",
         ) as Record<string, unknown>;
-        expect(parsed.truncated).toBe(true);
-        // The prints field should not contain the Unicode replacement character
-        // which appears when a multi-byte sequence is split
-        expect(String(parsed.prints)).not.toContain("\uFFFD");
+        expect(parsed).not.toHaveProperty("truncated");
+        const path = String(parsed.prints).match(
+            /ai_chat_output\/python-prints-[\w-]+\.txt/,
+        )?.[0];
+        expect(path).toBeDefined();
+        expect(await readFile(join(tmpDir, path ?? ""), "utf-8")).toBe(
+            `${bigPrint}\n`,
+        );
     });
 
     it("skips execution for truncated forced-final response", async () => {

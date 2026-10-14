@@ -4,6 +4,7 @@
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { version } from "../package.json";
+import { DEFAULT_MAX_WRITE_BYTES } from "./lib/ai-chat-constants";
 import {
     readValidatedPythonSource,
     validateAnalysisDirectory,
@@ -12,7 +13,6 @@ import {
 import { parseCanonicalInteger } from "./lib/chat-user-input-parsing";
 import { findDuplicateCliOption } from "./lib/cli-user-input-parsing";
 import { collectTerminalOutput, runSandboxCode } from "./lib/monty-sandbox";
-import { safeUtf8Slice } from "./lib/monty-sandbox-helpers";
 import {
     buildSandboxRunOptions,
     SANDBOX_ARG_DEFS,
@@ -22,12 +22,6 @@ import {
 
 /** Default max output bytes: 10 MB (no LLM context to worry about). */
 const DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
-
-/**
- * Hard ceiling for the in-memory print buffer to prevent accidental OOM when
- * a user passes a very large --max-output-bytes value. Set to 100 MB.
- */
-const MAX_PRINT_BUFFER_BYTES = 100 * 1024 * 1024;
 
 /** CLI argument definitions for node:util parseArgs. */
 const argConfig = {
@@ -74,8 +68,9 @@ Required:
   <script.py>              Path to the Python script to run (resolved from cwd)
 
 Output:
-  --max-output-bytes <n>   Max output size in decimal integer bytes (default: ${DEFAULT_MAX_OUTPUT_BYTES}); print() output
-                           is buffered in memory up to ${MAX_PRINT_BUFFER_BYTES} bytes regardless of this value
+  --max-output-bytes <n>   Max inline output in decimal integer bytes (default: ${DEFAULT_MAX_OUTPUT_BYTES}).
+                           Larger returned values and prints are saved in full; file notices are not clipped.
+                           Outputs exceeding ${DEFAULT_MAX_WRITE_BYTES / 1024 / 1024} MiB fail instead of being partially delivered.
 
 Sandbox limits:
   --max-records-read-info <n>    Max read_info records (default: ${200_000})
@@ -202,58 +197,29 @@ async function main(): Promise<void> {
 
     // Build sandbox options from CLI values. Uses runSandboxCode directly —
     // no orphan-execution guard needed (no concurrent LLM loop to cancel).
-    // maxPrintBytes mirrors maxOutputBytes but is capped at MAX_PRINT_BUFFER_BYTES
-    // to prevent accidental OOM when --max-output-bytes is set very large.
-    const sandboxOptions = {
-        ...buildSandboxRunOptions(values, maxOutputBytes),
-        maxPrintBytes: Math.min(maxOutputBytes, MAX_PRINT_BUFFER_BYTES),
-    };
+    const sandboxOptions = buildSandboxRunOptions(values, maxOutputBytes);
     const result = await runSandboxCode(code, allowedDir, sandboxOptions);
 
     if (result.success) {
-        // Apply --max-output-bytes to the total collected output (prints +
-        // expression value). runSandboxCode only gates the expression value
-        // internally; print() output must be capped here.
-        // printsTruncated is true when the printCallback clipped output inside
-        // runSandboxCode (single chunk exceeds the limit), so we always emit a
-        // truncation marker when output was cut short for any reason.
-        // Collect output directly — skip the "(No output produced.)" placeholder
-        // that collectTerminalOutput adds for the chat UI; silent scripts should
-        // produce empty stdout so callers can rely on exit code alone.
-        const raw =
-            result.prints?.length || result.endedWithExpression
-                ? collectTerminalOutput(result)
-                : "";
-        const rawBytes = Buffer.byteLength(raw, "utf-8");
-        const isTruncated =
-            rawBytes > maxOutputBytes ||
-            result.printsTruncated === true ||
-            result.truncated === true;
-        // Build the body, reserving space for the truncation note AND a
-        // trailing newline, then apply a final hard clamp so stdout never
-        // exceeds maxOutputBytes regardless of edge cases (e.g. when
-        // maxOutputBytes is smaller than the note itself).
-        let output: string;
-        if (isTruncated) {
-            // Include the trailing newline inside the note so the entire
-            // output fits within maxOutputBytes.
-            const truncNote = `\n[output truncated at ${maxOutputBytes} bytes]\n`;
-            const truncNoteBytes = Buffer.byteLength(truncNote, "utf-8");
-            const contentBytes = Math.max(0, maxOutputBytes - truncNoteBytes);
-            output = safeUtf8Slice(
-                `${safeUtf8Slice(raw, contentBytes)}${truncNote}`,
-                maxOutputBytes,
-            );
-        } else {
-            // Silent scripts (no prints, no expression) produce truly empty
-            // stdout — do not add a newline so callers see zero bytes.
-            // For non-empty output, add a trailing newline for terminal
-            // readability only if the budget still has room.
-            output =
-                raw === "" || raw.endsWith("\n") || rawBytes >= maxOutputBytes
-                    ? raw
-                    : `${raw}\n`;
+        const hasOutput = result.prints?.length || result.endedWithExpression;
+        let output = hasOutput ? collectTerminalOutput(result) : "";
+        // The collector adds a newline after an inline value; preserve exact
+        // byte-boundary behavior when that newline does not fit.
+        if (
+            !result.outputFile &&
+            result.endedWithExpression &&
+            Buffer.byteLength(output, "utf-8") > maxOutputBytes &&
+            output.endsWith("\n")
+        ) {
+            output = output.slice(0, -1);
         }
+        // Silent scripts stay silent; a readability newline must also fit.
+        if (
+            output &&
+            !output.endsWith("\n") &&
+            Buffer.byteLength(output, "utf-8") < maxOutputBytes
+        )
+            output += "\n";
 
         // Drain stdout before exiting so the full output reaches the next
         // process in a pipeline (drainStdout handles EPIPE gracefully).

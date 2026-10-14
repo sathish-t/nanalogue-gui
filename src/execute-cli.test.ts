@@ -3,7 +3,7 @@
 // basic script execution. Requires `npm run build` to have run first.
 
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -288,7 +288,7 @@ describe("nanalogue-sandbox-exec CLI", () => {
             expect(stdout).toContain("hello from sandbox");
         });
 
-        it("truncates output when --max-output-bytes is exceeded", async () => {
+        it("saves complete prints when --max-output-bytes is exceeded", async () => {
             const scriptPath = join(tmpDir, "big.py");
             // Print enough output that it exceeds a tiny byte limit.
             await writeFile(scriptPath, 'print("A" * 200)\n');
@@ -302,7 +302,87 @@ describe("nanalogue-sandbox-exec CLI", () => {
                 scriptPath,
             ]);
 
-            expect(stdout).toContain("[output truncated");
+            const path = stdout.match(
+                /ai_chat_output\/python-prints-[\w-]+\.txt/,
+            )?.[0];
+            expect(path).toBeDefined();
+            expect(await readFile(join(tmpDir, path ?? ""), "utf-8")).toBe(
+                `${"A".repeat(200)}\n`,
+            );
+            expect(stdout).not.toContain("A".repeat(100));
+        });
+
+        it.each([
+            ["42", "42", "2"],
+            ['"🧬"', '"🧬"', "6"],
+        ])("preserves the inline value %s at its exact byte boundary", async (code, expected, budget) => {
+            const scriptPath = join(tmpDir, "boundary.py");
+            await writeFile(scriptPath, code);
+            const { stdout } = await execFileAsync("node", [
+                CLI_PATH,
+                "--dir",
+                tmpDir,
+                "--max-output-bytes",
+                budget,
+                scriptPath,
+            ]);
+            expect(stdout).toBe(expected);
+        });
+
+        it("saves complete prints alongside a complete inline dictionary", async () => {
+            const scriptPath = join(tmpDir, "mixed.py");
+            await writeFile(scriptPath, 'print("x" * 200)\n{"count": 42}');
+            const { stdout, stderr } = await execFileAsync("node", [
+                CLI_PATH,
+                "--dir",
+                tmpDir,
+                "--max-output-bytes",
+                "12",
+                scriptPath,
+            ]);
+            expect(stdout).toContain('{"count":42}');
+            expect(stderr).toBe("");
+            const path = stdout.match(
+                /ai_chat_output\/python-prints-[\w-]+\.txt/,
+            )?.[0];
+            expect(path).toBeDefined();
+            expect(await readFile(join(tmpDir, path ?? ""), "utf-8")).toBe(
+                `${"x".repeat(200)}\n`,
+            );
+        });
+
+        it("reports the complete saved result even with a tiny inline budget", async () => {
+            const scriptPath = join(tmpDir, "returned.py");
+            await writeFile(
+                scriptPath,
+                'print("p" * 200)\n{"summary": "x" * 300, "count": 42}\n',
+            );
+            const { stdout, stderr } = await execFileAsync("node", [
+                CLI_PATH,
+                "--dir",
+                tmpDir,
+                "--max-output-bytes",
+                "1",
+                scriptPath,
+            ]);
+            expect(stdout).toContain("Python execution completed");
+            expect(stderr).toBe("");
+            const printPath = stdout.match(
+                /ai_chat_output\/python-prints-[\w-]+\.txt/,
+            )?.[0];
+            expect(printPath).toBeDefined();
+            expect(await readFile(join(tmpDir, printPath ?? ""), "utf-8")).toBe(
+                `${"p".repeat(200)}\n`,
+            );
+            const path = stdout.match(
+                /ai_chat_output\/python-result-[\w-]+\.json/,
+            )?.[0];
+            expect(path).toBeDefined();
+            const saved = await readFile(join(tmpDir, path ?? ""), "utf-8");
+            expect(JSON.parse(saved)).toEqual({
+                summary: "x".repeat(300),
+                count: 42,
+            });
         });
     });
 

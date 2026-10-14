@@ -1,6 +1,7 @@
 // Monty sandbox wrapper for AI Chat mode.
 // Encapsulates @pydantic/monty with @nanalogue/node external functions and security guards.
 
+import { randomUUID } from "node:crypto";
 import {
     Monty,
     MontyRuntimeError,
@@ -8,6 +9,7 @@ import {
     runMontyAsync,
 } from "@pydantic/monty";
 import {
+    AI_CHAT_OUTPUT_DIR,
     DEFAULT_MAX_ALLOCATIONS,
     DEFAULT_MAX_DURATION_SECS,
     DEFAULT_MAX_MEMORY,
@@ -19,7 +21,6 @@ import {
     DEFAULT_MAX_RECORDS_WINDOW_READS,
     DEFAULT_MAX_WRITE_BYTES,
     MAX_LS_ENTRIES,
-    MAX_PRINT_CAPTURE_BYTES,
 } from "./ai-chat-constants";
 import {
     makeBamMods,
@@ -39,15 +40,12 @@ import {
 import type { SandboxOptions, SandboxResult } from "./chat-types";
 import {
     convertMaps,
-    gateOutputSize,
     SandboxError,
     safeStringify,
-    safeUtf8Slice,
 } from "./monty-sandbox-helpers";
 
 export {
     deriveMaxOutputBytes,
-    gateOutputSize,
     rejectTreatAsUrl,
     resolvePath,
     safeStringify,
@@ -66,8 +64,12 @@ export {
 export function collectTerminalOutput(result: SandboxResult): string {
     const parts: string[] = [...(result.prints ?? [])];
     if (result.success && result.endedWithExpression && result.value != null) {
-        const valStr = safeStringify(result.value);
-        parts.push(`${valStr.ok ? valStr.json : valStr.fallback}\n`);
+        if (result.outputFile) {
+            parts.push(`${result.value}\n`);
+        } else {
+            const valStr = safeStringify(result.value);
+            parts.push(`${valStr.ok ? valStr.json : valStr.fallback}\n`);
+        }
     }
     return parts.join("") || "(No output produced.)";
 }
@@ -152,7 +154,6 @@ export async function runSandboxCode(
         maxReadBytes = DEFAULT_MAX_READ_BYTES,
         maxWriteBytes = DEFAULT_MAX_WRITE_BYTES,
         maxLsEntries = MAX_LS_ENTRIES,
-        maxPrintBytes = MAX_PRINT_CAPTURE_BYTES,
         removedTools,
     } = options;
 
@@ -160,7 +161,8 @@ export async function runSandboxCode(
     let sandboxToolCalled = false;
     const prints: string[] = [];
     let printBytes = 0;
-    let printsTruncated = false;
+    let printsExceededLimit = false;
+    let result: SandboxResult;
 
     // Wall-clock abort for bash: fires after maxDurationSecs and cancels any
     // in-flight bash command via AbortSignal. Other external functions (native
@@ -182,28 +184,22 @@ export async function runSandboxCode(
                 maxAllocations,
             },
             /**
-             * Captures print output from the sandbox into the prints array.
-             * Silently drops prints beyond MAX_PRINT_CAPTURE_BYTES — the Monty
-             * runtime continues executing but we stop accumulating output.
+             * Captures complete prints up to the shared output-file ceiling.
+             * Above it, discards the partial capture and reports OutputError
+             * after execution finishes; no partial output is delivered.
              *
              * @param _stream - The output stream name (unused).
              * @param text - The printed text content.
              */
             printCallback: (_stream, text) => {
+                if (printsExceededLimit || !text) return;
                 const textBytes = Buffer.byteLength(text, "utf-8");
-                if (printBytes >= maxPrintBytes) {
-                    // Subsequent chunks after the limit is reached are also truncated.
-                    printsTruncated = true;
-                    return;
-                }
-                const remaining = maxPrintBytes - printBytes;
-                if (textBytes <= remaining) {
+                printBytes += textBytes;
+                if (printBytes <= DEFAULT_MAX_WRITE_BYTES) {
                     prints.push(text);
-                    printBytes += textBytes;
                 } else {
-                    prints.push(safeUtf8Slice(text, remaining));
-                    printBytes = maxPrintBytes;
-                    printsTruncated = true;
+                    prints.length = 0;
+                    printsExceededLimit = true;
                 }
             },
             externalFunctions: wrapForMonty(
@@ -246,67 +242,187 @@ export async function runSandboxCode(
             ),
         });
 
-        const converted = convertMaps(value);
-        const { gated, truncated } = gateOutputSize(converted, maxOutputBytes);
-
         // If the bash abort timer fired while Python was catching the abort
         // error (try/except), runMontyAsync may still complete successfully.
         // Treat this as a timeout rather than letting a partial result through.
         if (bashTimedOut) {
-            return {
-                success: false,
-                errorType: "RuntimeError",
-                message: "execution aborted",
-                isTimeout: true,
-                prints,
-                printsTruncated,
-            };
+            throw new SandboxError("RuntimeError", "execution aborted");
+        }
+        if (printsExceededLimit) {
+            throw new SandboxError(
+                "OutputError",
+                "Printed output exceeded the file limit.",
+            );
         }
 
-        return {
+        const converted = convertMaps(value);
+        let deliveredValue = converted;
+        let outputFile: string | undefined;
+        if (converted != null) {
+            const serialized = safeStringify(converted);
+            if (!serialized.ok) {
+                throw new SandboxError(
+                    "OutputError",
+                    "Python execution completed, but its returned output could not be serialized. " +
+                        "The result was not saved or returned. Any files written during execution remain.",
+                );
+            }
+            const outputBytes = Buffer.byteLength(serialized.json, "utf-8");
+            if (outputBytes > DEFAULT_MAX_WRITE_BYTES) {
+                throw new SandboxError(
+                    "OutputError",
+                    `Python execution completed, but its returned output (${outputBytes} bytes) exceeded the ` +
+                        `${DEFAULT_MAX_WRITE_BYTES / 1024 / 1024} MiB limit. The result was not saved or returned. ` +
+                        "Any files written during execution remain. Rerun with code that returns a smaller summary.",
+                );
+            }
+            if (outputBytes > maxOutputBytes) {
+                if (
+                    typeof converted !== "string" &&
+                    typeof converted !== "object"
+                ) {
+                    throw new SandboxError(
+                        "OutputError",
+                        "Python execution completed, but its returned output exceeded the inline limit. " +
+                            "Only strings, lists, and dictionaries can be saved as overflow files. " +
+                            "The result was not saved or returned. Any files written during execution remain.",
+                    );
+                }
+                const outputType = Array.isArray(converted)
+                    ? "array (list)"
+                    : typeof converted === "string"
+                      ? "string"
+                      : "object (dictionary)";
+                outputFile = `${AI_CHAT_OUTPUT_DIR}/python-result-${randomUUID()}.json`;
+                try {
+                    await makeWriteFile(allowedDir, DEFAULT_MAX_WRITE_BYTES)(
+                        outputFile,
+                        serialized.json,
+                    );
+                } catch (error) {
+                    throw new SandboxError(
+                        "OutputError",
+                        "Python execution completed, but saving its returned output failed: " +
+                            `${String(error)}. Any files written during execution remain.`,
+                    );
+                }
+                const readHint =
+                    outputBytes <= maxReadBytes
+                        ? `Import json, then read it with json.loads(read_file("${outputFile}")["content"]).`
+                        : `The file exceeds read_file's ${maxReadBytes}-byte per-call limit. ` +
+                          "Do not json.loads a partial read_file result. Return a smaller summary, " +
+                          "or ask the user to increase the configured read limit before loading the full JSON file.";
+                deliveredValue =
+                    "Python execution completed. The result exceeded the inline limit. " +
+                    `Full output saved to ${outputFile} (${outputBytes} bytes). ` +
+                    "The file contains the complete returned value, with no wrapper or execution metadata. " +
+                    `Top-level JSON type: ${outputType}. ` +
+                    readHint;
+            }
+        }
+
+        result = {
             success: true,
-            value: gated,
-            truncated,
+            value: deliveredValue,
+            truncated: false,
+            ...(outputFile && { outputFile }),
             endedWithExpression: converted != null,
             continueThinkingCalled,
             sandboxToolCalled,
             prints,
-            printsTruncated,
         };
     } catch (error) {
         // On error, continueThinkingCalled is discarded (not included) but
         // prints are preserved — they show how far execution got before the error.
         if (error instanceof MontyRuntimeError) {
-            return {
+            result = {
                 success: false,
                 errorType: "RuntimeError",
                 message: error.display("traceback"),
                 isTimeout: bashTimedOut || error.message.includes("time limit"),
                 prints,
-                printsTruncated,
             };
-        }
-        if (error instanceof MontySyntaxError) {
-            return {
+        } else if (error instanceof MontySyntaxError) {
+            result = {
                 success: false,
                 errorType: "SyntaxError",
                 message: error.message,
                 isTimeout: false,
                 prints,
-                printsTruncated,
+            };
+        } else {
+            result = {
+                success: false,
+                errorType:
+                    error instanceof SandboxError ? error.name : "GenericError",
+                message:
+                    error instanceof SandboxError
+                        ? error.message
+                        : String(error),
+                isTimeout: bashTimedOut,
+                prints,
             };
         }
-        return {
-            success: false,
-            errorType: "GenericError",
-            message: String(error),
-            isTimeout: false,
-            prints,
-            printsTruncated,
-        };
     } finally {
         // Always clear the bash abort timer so it does not fire after
         // runMontyAsync has already completed (success or error).
         clearTimeout(bashTimer);
     }
+
+    if (printsExceededLimit) {
+        return {
+            success: false,
+            errorType: "OutputError",
+            message:
+                "Python execution finished, but its printed output exceeded the " +
+                `${DEFAULT_MAX_WRITE_BYTES / 1024 / 1024} MiB limit. Printed output was not saved or returned. ` +
+                "Any files written during execution remain. Rerun with code that prints a smaller summary.",
+            isTimeout: result.success ? false : result.isTimeout,
+            prints: [],
+        };
+    }
+
+    // Keep a complete inline value or file notice; move the whole printed text
+    // to a file when it cannot share the inline allowance with that value.
+    const printBudget =
+        result.success && result.endedWithExpression
+            ? Math.max(
+                  0,
+                  maxOutputBytes -
+                      Buffer.byteLength(JSON.stringify(result.value), "utf-8"),
+              )
+            : maxOutputBytes;
+    if (printBytes > printBudget) {
+        const text = prints.join("");
+        prints.length = 0;
+        const path = `${AI_CHAT_OUTPUT_DIR}/python-prints-${randomUUID()}.txt`;
+        try {
+            await makeWriteFile(allowedDir, DEFAULT_MAX_WRITE_BYTES)(
+                path,
+                text,
+            );
+            const readHint =
+                printBytes <= maxReadBytes
+                    ? `Read the text with read_file("${path}")["content"].`
+                    : `The file exceeds read_file's ${maxReadBytes}-byte per-call limit. ` +
+                      "Return a smaller summary, or ask the user to increase the configured read limit before loading the full text file.";
+            prints.push(
+                `Full printed output saved to ${path} (${printBytes} bytes). ` +
+                    "The file contains the complete printed text as UTF-8, not JSON. " +
+                    readHint +
+                    "\n",
+            );
+        } catch (error) {
+            return {
+                success: false,
+                errorType: "OutputError",
+                message:
+                    `Python execution finished, but saving its printed output failed: ${String(error)}. ` +
+                    "Printed output was not saved or returned. Any files written during execution remain.",
+                isTimeout: result.success ? false : result.isTimeout,
+                prints: [],
+            };
+        }
+    }
+    return result;
 }
