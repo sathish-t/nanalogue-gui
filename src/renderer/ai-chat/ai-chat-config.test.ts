@@ -45,7 +45,7 @@ describe("ai-chat-config", () => {
     });
 
     it("resets advanced options to their configured defaults", async () => {
-        const { resetDefaults } = await import("./ai-chat-config");
+        const { getConfig, resetDefaults } = await import("./ai-chat-config");
         const timeout = document.getElementById(
             "opt-timeout",
         ) as HTMLInputElement;
@@ -72,6 +72,13 @@ describe("ai-chat-config", () => {
             (document.getElementById("opt-max-allocations") as HTMLInputElement)
                 .value,
         ).toBe("100000000");
+        expect(getConfig()).toMatchObject({
+            contextWindowTokens: 200_000,
+            maxRetries: 20,
+            timeoutSeconds: 300,
+            maxCodeRounds: 30,
+            maxDurationSecs: 1_800,
+        });
         expect(temperature.value).toBe("");
     });
 
@@ -207,13 +214,25 @@ describe("ai-chat-config", () => {
 
     it.each([
         ["opt-timeout", "1.5", "decimal digits only"],
-        ["opt-max-retries", "0", "between 1 and 20"],
+        ["opt-timeout", "3601", "between 1 and 3600"],
+        ["opt-max-retries", "0", "between 1 and 50"],
+        ["opt-max-retries", "51", "between 1 and 50"],
         ["opt-temperature", "1e0", "shorter than 10 bytes"],
     ])("rejects malformed advanced option %s", async (inputId, value, expectedError) => {
         const { validateAdvancedConfig } = await import("./ai-chat-config");
         (document.getElementById(inputId) as HTMLInputElement).value = value;
 
         expect(validateAdvancedConfig()).toContain(expectedError);
+    });
+
+    it.each([
+        ["opt-max-retries", "50"],
+        ["opt-timeout", "3600"],
+    ])("accepts the expanded maximum for %s", async (inputId, value) => {
+        const { validateAdvancedConfig } = await import("./ai-chat-config");
+        (document.getElementById(inputId) as HTMLInputElement).value = value;
+
+        expect(validateAdvancedConfig()).toBeNull();
     });
 
     it("rejects a directory with surrounding whitespace", async () => {

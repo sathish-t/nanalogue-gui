@@ -70,6 +70,8 @@ describe("nanalogue-sandbox-exec CLI", () => {
             ]);
             expect(stdout).toContain("nanalogue-sandbox-exec");
             expect(stdout).toContain("--dir");
+            expect(stdout).toMatch(/--max-duration-secs[^\n]*default: 1800/);
+            expect(stdout).toMatch(/--max-allocations[^\n]*default: 100000000/);
         });
 
         it("-h prints usage information", async () => {

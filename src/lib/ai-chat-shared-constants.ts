@@ -25,16 +25,16 @@ export const /** Validation specs for each integer AiChatConfig field (temperatu
         contextWindowTokens: {
             min: 8_000,
             max: 2_000_000,
-            fallback: 32_000,
+            fallback: 200_000,
             label: "context window tokens",
         },
         /** At least one attempt; cap to avoid runaway retry loops. */
-        maxRetries: { min: 1, max: 20, fallback: 5, label: "max retries" },
-        /** Per-request HTTP timeout; 1 s floor, 20-minute ceiling. */
+        maxRetries: { min: 1, max: 50, fallback: 20, label: "max retries" },
+        /** Per-request HTTP timeout; 1 s floor, 1-hour ceiling. */
         timeoutSeconds: {
             min: 1,
-            max: 1_200,
-            fallback: 60,
+            max: 3_600,
+            fallback: 300,
             label: "timeout seconds",
         },
         /** Floor of 1 record; ceiling of 1 M to prevent memory blowup. */
@@ -69,14 +69,14 @@ export const /** Validation specs for each integer AiChatConfig field (temperatu
         maxCodeRounds: {
             min: 1,
             max: MAX_CODE_ROUNDS_LIMIT,
-            fallback: 10,
+            fallback: 30,
             label: "max code rounds",
         },
         /** Best-effort sandbox execution time limit; bash is cancelled at this limit, native reads in progress may complete in the background. */
         maxDurationSecs: {
             min: 1,
             max: 604_800,
-            fallback: 600,
+            fallback: 1_800,
             label: "max execution time (seconds)",
         },
         /** Sandbox heap limit; 1 MB floor, 64 GB ceiling. */
