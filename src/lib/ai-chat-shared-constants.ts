@@ -90,7 +90,7 @@ export const /** Validation specs for each integer AiChatConfig field (temperatu
         maxAllocations: {
             min: 1,
             max: 100_000_000_000,
-            fallback: 100_000,
+            fallback: 100_000_000,
             label: "max sandbox allocations",
         },
         /** Per read_file call limit; 1 MB floor, 100 MB ceiling (Buffer.alloc constraint). */

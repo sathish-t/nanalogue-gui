@@ -101,6 +101,7 @@ describe("buildSandboxRunOptions", () => {
         expect(opts.maxRecordsReadInfo).toBe(200_000);
         expect(opts.maxRecordsBamMods).toBe(5_000);
         expect(opts.maxDurationSecs).toBe(600);
+        expect(opts.maxAllocations).toBe(100_000_000);
         expect(opts.maxOutputBytes).toBe(1024);
     });
 

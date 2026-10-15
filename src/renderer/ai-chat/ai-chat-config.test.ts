@@ -68,6 +68,10 @@ describe("ai-chat-config", () => {
         expect(maxReadMb.value).toBe(
             String(CONFIG_FIELD_SPECS.maxReadMB.fallback),
         );
+        expect(
+            (document.getElementById("opt-max-allocations") as HTMLInputElement)
+                .value,
+        ).toBe("100000000");
         expect(temperature.value).toBe("");
     });
 

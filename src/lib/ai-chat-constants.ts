@@ -29,7 +29,7 @@ export const /** Default best-effort sandbox execution time limit in seconds (10
 
 export const /** Default heap memory cap in bytes (512 MB). */ DEFAULT_MAX_MEMORY =
         512 * 1024 * 1024;
-export const /** Default Monty VM allocation cap. */ DEFAULT_MAX_ALLOCATIONS = 100_000;
+export const /** Default Monty VM allocation cap. */ DEFAULT_MAX_ALLOCATIONS = 100_000_000;
 
 // --- Record limit defaults ---
 

@@ -294,7 +294,8 @@ describe("basic functionality", () => {
     it("infinite loop terminates due to maxLoopIterations limit", async () => {
         // just-bash enforces maxLoopIterations, once hit the command is killed
         // and returns exit code 126.
-        const r = (await bash("while true; do :; done")) as BashResult;
+        const limitedBash = makeBash(allowedDir, { maxAllocations: 1_000 });
+        const r = (await limitedBash("while true; do :; done")) as BashResult;
         expect(r.exit_code).toBe(126);
     });
 });
