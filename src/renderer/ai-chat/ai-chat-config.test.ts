@@ -18,9 +18,14 @@ function loadHtml(): void {
 }
 
 describe("ai-chat-config", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.resetModules();
         loadHtml();
+        const { applyConfigBounds, resetDefaults } = await import(
+            "./ai-chat-config"
+        );
+        applyConfigBounds();
+        resetDefaults();
     });
 
     it("applies min/max bounds from CONFIG_FIELD_SPECS", async () => {
@@ -30,6 +35,9 @@ describe("ai-chat-config", () => {
         ) as HTMLInputElement;
         const maxRetries = document.getElementById(
             "opt-max-retries",
+        ) as HTMLInputElement;
+        const temperature = document.getElementById(
+            "opt-temperature",
         ) as HTMLInputElement;
 
         applyConfigBounds();
@@ -42,6 +50,8 @@ describe("ai-chat-config", () => {
         );
         expect(maxRetries.min).toBe(String(CONFIG_FIELD_SPECS.maxRetries.min));
         expect(maxRetries.max).toBe(String(CONFIG_FIELD_SPECS.maxRetries.max));
+        expect(temperature.min).toBe("0");
+        expect(temperature.max).toBe("2");
     });
 
     it("resets advanced options to their configured defaults", async () => {

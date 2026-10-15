@@ -3,6 +3,7 @@
 import {
     CONFIG_FIELD_SPECS,
     MAX_INPUT_PATH_LENGTH,
+    TEMPERATURE_SPEC,
 } from "../../lib/ai-chat-shared-constants";
 import {
     isValidApiKey,
@@ -157,7 +158,7 @@ export function unlockSessionConfig(): void {
 }
 
 /**
- * Applies min/max bounds to all numeric config inputs from CONFIG_FIELD_SPECS.
+ * Applies min/max bounds to all numeric config inputs from the shared field specs.
  */
 export function applyConfigBounds(): void {
     for (const [input, key] of ADVANCED_OPTION_FIELDS) {
@@ -165,6 +166,8 @@ export function applyConfigBounds(): void {
         input.min = String(spec.min);
         input.max = String(spec.max);
     }
+    optTemperature.min = String(TEMPERATURE_SPEC.min);
+    optTemperature.max = String(TEMPERATURE_SPEC.max);
 }
 
 /**
