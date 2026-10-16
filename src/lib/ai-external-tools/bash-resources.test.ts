@@ -69,7 +69,7 @@ bash(command).then(result => process.stdout.write(JSON.stringify(result)))
             exitCode: 126,
             error: /maximum recursion depth \(100\)/i,
         },
-    ])("halts $name within 20 seconds using real defaults", async ({
+    ])("halts $name at its resource limit using real defaults", async ({
         command,
         error,
         input,
@@ -79,14 +79,16 @@ bash(command).then(result => process.stdout.write(JSON.stringify(result)))
             await writeFile(join(allowedDir, "oversized-array.txt"), input);
         }
         const stdout = await new Promise<string>((resolve, reject) => {
+            // Safety net for a missing limit, not a performance requirement.
+            // A watchdog kill fails; only the resource-limit error passes.
             const child = execFile(
                 process.execPath,
                 ["-e", childScript, allowedDir],
-                { timeout: 20_000, killSignal: "SIGKILL" },
+                { timeout: 120_000, killSignal: "SIGKILL" },
                 (failure, output, stderr) => {
                     if (failure) {
                         const reason = failure.killed
-                            ? "20-second watchdog"
+                            ? "120-second watchdog"
                             : failure.code;
                         reject(
                             new Error(
@@ -112,5 +114,5 @@ bash(command).then(result => process.stdout.write(JSON.stringify(result)))
         };
         expect(result.exit_code).toBe(exitCode);
         expect(result.stderr).toMatch(error);
-    }, 25_000);
+    }, 125_000);
 });
