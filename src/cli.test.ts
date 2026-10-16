@@ -1012,7 +1012,7 @@ describe("nanalogue-chat CLI", () => {
         it("prints a descriptive error when a numeric flag is below its minimum", async () => {
             const stderr = await stderrOf([...baseArgs, "--timeout", "0"]);
             expect(stderr).toContain("--timeout");
-            expect(stderr).toContain("between 1 and 1200");
+            expect(stderr).toContain("between 1 and 3600");
         });
 
         it("exits 1 when a numeric flag is above its maximum", async () => {

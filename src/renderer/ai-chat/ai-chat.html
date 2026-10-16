@@ -127,28 +127,29 @@
   <dialog id="advanced-dialog">
     <h2>Advanced Options</h2>
 
-    <!-- Context window size in tokens. Min/max values from CONFIG_FIELD_SPECS in src/lib/ai-chat-shared-constants.ts. -->
+    <!-- Numeric defaults and bounds are initialized from shared specs by ai-chat-config.ts. -->
+    <!-- Context window size in tokens. -->
     <div class="dialog-row">
       <label for="opt-context-window">Context window (tokens):</label>
-      <input type="number" id="opt-context-window" value="32000" min="8000" max="2000000">
+      <input type="number" id="opt-context-window">
     </div>
 
     <!-- Maximum retries per turn. -->
     <div class="dialog-row">
       <label for="opt-max-retries">Max retries:</label>
-      <input type="number" id="opt-max-retries" value="5" min="1" max="20">
+      <input type="number" id="opt-max-retries">
     </div>
 
     <!-- Maximum code execution rounds per user message. -->
     <div class="dialog-row">
       <label for="opt-max-code-rounds">Max code rounds:</label>
-      <input type="number" id="opt-max-code-rounds" value="10" min="1" max="50">
+      <input type="number" id="opt-max-code-rounds">
     </div>
 
     <!-- LLM sampling temperature. Empty means provider default. -->
     <div class="dialog-row">
       <label for="opt-temperature">Temperature:</label>
-      <input type="number" id="opt-temperature" value="" min="0" max="2" step="0.1" placeholder="(provider default)">
+      <input type="number" id="opt-temperature" step="0.1" placeholder="(provider default)">
     </div>
 
     <!-- Checkbox that makes SYSTEM_APPEND.md replace the built-in sandbox prompt. -->
@@ -163,61 +164,61 @@
     <!-- LLM response timeout in seconds. -->
     <div class="dialog-row">
       <label for="opt-timeout">LLM response timeout (s):</label>
-      <input type="number" id="opt-timeout" value="60" min="1" max="1200">
+      <input type="number" id="opt-timeout">
     </div>
 
     <!-- Maximum records from read_info. -->
     <div class="dialog-row">
       <label for="opt-max-read-info">Max read_info records:</label>
-      <input type="number" id="opt-max-read-info" value="200000" min="1" max="1000000">
+      <input type="number" id="opt-max-read-info">
     </div>
 
     <!-- Maximum records from bam_mods. -->
     <div class="dialog-row">
       <label for="opt-max-bam-mods">Max bam_mods records:</label>
-      <input type="number" id="opt-max-bam-mods" value="5000" min="1" max="1000000">
+      <input type="number" id="opt-max-bam-mods">
     </div>
 
     <!-- Maximum records from window_reads. -->
     <div class="dialog-row">
       <label for="opt-max-window-reads">Max window_reads records:</label>
-      <input type="number" id="opt-max-window-reads" value="5000" min="1" max="1000000">
+      <input type="number" id="opt-max-window-reads">
     </div>
 
     <!-- Maximum records from seq_table. -->
     <div class="dialog-row">
       <label for="opt-max-seq-table">Max seq_table records:</label>
-      <input type="number" id="opt-max-seq-table" value="5000" min="1" max="100000">
+      <input type="number" id="opt-max-seq-table">
     </div>
 
     <!-- Best-effort sandbox execution time limit in seconds. -->
     <div class="dialog-row">
       <label for="opt-max-duration" title="Best-effort limit. Bash commands are cancelled; native data reads in progress may complete in the background.">Max execution time (s):</label>
-      <input type="number" id="opt-max-duration" value="600" min="1" max="604800">
+      <input type="number" id="opt-max-duration">
     </div>
 
     <!-- Maximum sandbox heap memory in megabytes. -->
     <div class="dialog-row">
       <label for="opt-max-memory">Max sandbox memory (MB):</label>
-      <input type="number" id="opt-max-memory" value="512" min="1" max="65536">
+      <input type="number" id="opt-max-memory">
     </div>
 
     <!-- Maximum Monty VM heap allocations. -->
     <div class="dialog-row">
       <label for="opt-max-allocations">Max sandbox allocations:</label>
-      <input type="number" id="opt-max-allocations" value="100000" min="1" max="100000000">
+      <input type="number" id="opt-max-allocations">
     </div>
 
     <!-- Maximum read_file text size in megabytes. -->
     <div class="dialog-row">
       <label for="opt-max-read-mb">Max read_file text size (MB):</label>
-      <input type="number" id="opt-max-read-mb" value="1" min="1" max="100">
+      <input type="number" id="opt-max-read-mb">
     </div>
 
     <!-- Maximum write_file text size in megabytes. -->
     <div class="dialog-row">
       <label for="opt-max-write-mb">Max write_file text size (MB):</label>
-      <input type="number" id="opt-max-write-mb" value="50" min="1" max="100">
+      <input type="number" id="opt-max-write-mb">
     </div>
 
     <!-- Dialog action buttons. -->

@@ -2,7 +2,6 @@
 // Manages conversation history, context transformation, and the code-only LLM loop.
 
 import {
-    CONFIG_FIELD_SPECS,
     DEFAULT_MAX_BLANK_RETRIES,
     DEFAULT_MAX_CODE_ROUNDS,
     DEFAULT_MAX_COMPLETION_TOKENS,
@@ -287,13 +286,6 @@ export async function handleUserMessage(
     let cumulativeSandboxMs = 0;
     const maxRounds = config.maxCodeRounds ?? DEFAULT_MAX_CODE_ROUNDS;
 
-    // Combine abort signals
-    const timeoutMs =
-        (config.timeoutSeconds ?? CONFIG_FIELD_SPECS.timeoutSeconds.fallback) *
-        1000;
-    const timeoutSignal = AbortSignal.timeout(timeoutMs);
-    const combinedSignal = AbortSignal.any([signal, timeoutSignal]);
-
     // Effective cumulative sandbox budget: at least as large as one full
     // single-execution timeout so the invariant cumulativeBudgetMs >=
     // maxDurationSecs * 1000 always holds regardless of user config.
@@ -346,8 +338,9 @@ export async function handleUserMessage(
             systemPrompt,
             llmMessages,
             config.maxRetries,
-            combinedSignal,
+            signal,
             config.temperature,
+            config.timeoutSeconds,
         );
         emitEvent({ type: "llm_request_end" });
 
@@ -460,7 +453,7 @@ export async function handleUserMessage(
             code,
             allowedDir,
             sandboxOptions,
-            combinedSignal,
+            signal,
         );
         if (
             !sandboxResult.success &&
@@ -473,7 +466,7 @@ export async function handleUserMessage(
                     code,
                     allowedDir,
                     sandboxOptions,
-                    combinedSignal,
+                    signal,
                 );
             }
         }
@@ -607,8 +600,9 @@ export async function handleUserMessage(
             systemPrompt,
             llmMessages,
             config.maxRetries,
-            combinedSignal,
+            signal,
             config.temperature,
+            config.timeoutSeconds,
         );
         emitEvent({ type: "llm_request_end" });
 
@@ -653,7 +647,7 @@ export async function handleUserMessage(
                 codeToRun,
                 allowedDir,
                 sandboxOptions,
-                combinedSignal,
+                signal,
             );
             if (!result.success && result.errorType === "SyntaxError") {
                 const extracted = extractCodeFromFences(rawFinal);
@@ -663,7 +657,7 @@ export async function handleUserMessage(
                         codeToRun,
                         allowedDir,
                         sandboxOptions,
-                        combinedSignal,
+                        signal,
                     );
                 }
             }

@@ -291,10 +291,69 @@ describe("basic functionality", () => {
         });
     });
 
-    it("infinite loop terminates due to maxLoopIterations limit", async () => {
-        // just-bash enforces maxLoopIterations, once hit the command is killed
-        // and returns exit code 126.
-        const r = (await bash("while true; do :; done")) as BashResult;
+    it.each([
+        { maxAllocations: 1, limit: 1, commands: 0 },
+        { maxAllocations: 1_050, limit: 10, commands: 9 },
+    ])("scales command limits at 1:100 with a floor of 1 ($maxAllocations allocations)", async ({
+        maxAllocations,
+        limit,
+        commands,
+    }) => {
+        const limitedBash = makeBash(allowedDir, { maxAllocations });
+        const withinLimit = (await limitedBash(
+            ":;".repeat(commands),
+        )) as BashResult;
+        const overLimit = (await limitedBash(
+            ":;".repeat(commands + 1),
+        )) as BashResult;
+
+        expect(withinLimit.exit_code).toBe(0);
+        expect(overLimit.exit_code).toBe(126);
+        expect(overLimit.stderr).toContain("too many commands");
+        expect(overLimit.stderr).toContain(`(>${limit})`);
+    });
+
+    it.each([
+        { maxAllocations: 1_050, limit: 10 },
+        { maxAllocations: 2_100, limit: 21 },
+    ])("scales supported array limits at 1:100 ($maxAllocations allocations)", async ({
+        maxAllocations,
+        limit,
+    }) => {
+        const limitedBash = makeBash(allowedDir, { maxAllocations });
+        const withinLimit = (await limitedBash(
+            `read -a values <<< "${Array(limit).fill("x").join(" ")}"`,
+        )) as BashResult;
+        const overLimit = (await limitedBash(
+            `read -a values <<< "${Array(limit + 1)
+                .fill("x")
+                .join(" ")}"`,
+        )) as BashResult;
+
+        expect(withinLimit.exit_code).toBe(0);
+        expect(overLimit.exit_code).not.toBe(0);
+        expect(overLimit.stderr).toMatch(/array/i);
+    });
+
+    it("scales AWK loop limits at 1:100", async () => {
+        const limitedBash = makeBash(allowedDir, { maxAllocations: 1_050 });
+        const withinLimit = (await limitedBash(
+            "awk 'BEGIN { for(i=0;i<10;i++) n++; print n }'",
+        )) as BashResult;
+        const overLimit = (await limitedBash(
+            "awk 'BEGIN { for(i=0;i<11;i++) n++; print n }'",
+        )) as BashResult;
+
+        expect(withinLimit.exit_code).toBe(0);
+        expect(withinLimit.stdout).toBe("10\n");
+        expect(overLimit.exit_code).not.toBe(0);
+        expect(overLimit.stderr).toMatch(/iteration/i);
+    });
+
+    it("infinite loop terminates due to execution limits", async () => {
+        // Command accounting stops this loop before the loop-iteration cap.
+        const limitedBash = makeBash(allowedDir, { maxAllocations: 1_000 });
+        const r = (await limitedBash("while true; do :; done")) as BashResult;
         expect(r.exit_code).toBe(126);
     });
 });

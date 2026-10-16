@@ -75,6 +75,48 @@ len(reads)
     expect(result.value as number).toBeGreaterThan(0);
 });
 
+it("read_info handles 10,000 methylated 10 kb reads with default sandbox limits", async () => {
+    await simulateModBam({
+        jsonConfig: JSON.stringify({
+            contigs: { number: 1, len_range: [10_000, 10_000] },
+            reads: [
+                {
+                    number: 10_000,
+                    mapq_range: [10, 20],
+                    base_qual_range: [10, 20],
+                    len_range: [1, 1],
+                    mods: [
+                        {
+                            base: "C",
+                            is_strand_plus: true,
+                            mod_code: "m",
+                            win: [40, 40],
+                            mod_range: [
+                                [0.1, 0.2],
+                                [0.7, 0.8],
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }),
+        bamPath: join(allowedDir, "ten-thousand.bam"),
+        fastaPath: join(allowedDir, "ten-thousand.fasta"),
+    });
+
+    const result = await runSandboxCode(
+        `reads = read_info("ten-thousand.bam")
+lengths = [r["sequence_length"] for r in reads]
+mod_codes = [m[2] for m in peek("ten-thousand.bam")["modifications"]]
+[len(reads), min(lengths), max(lengths), mod_codes]`,
+        allowedDir,
+    );
+    expect(result, JSON.stringify(result)).toMatchObject({
+        success: true,
+        value: [10_000, 10_000, 10_000, ["m"]],
+    });
+}, 60_000);
+
 it("bam_mods returns modification data via sandbox", async () => {
     const code = `
 mods = bam_mods("${bamName}", sample_fraction=0.01)

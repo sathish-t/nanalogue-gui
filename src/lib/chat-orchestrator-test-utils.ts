@@ -24,6 +24,8 @@ export interface MockCompletion {
     _statusCode?: number;
     /** Delay in ms before responding. */
     _delayMs?: number;
+    /** Delay in ms between flushed response headers and the body. */
+    _bodyDelayMs?: number;
     /** Custom response headers (e.g. Retry-After). */
     _headers?: Record<string, string>;
     /** Return raw body instead of JSON (for malformed response tests). */
@@ -91,6 +93,20 @@ export async function startMockServer(
                         "Content-Type": "application/json",
                         ...(completion._headers ?? {}),
                     });
+                    if ((completion._bodyDelayMs ?? 0) > 0) {
+                        res.flushHeaders();
+                        const timer = setTimeout(
+                            sendBody,
+                            completion._bodyDelayMs,
+                        );
+                        res.once("close", () => clearTimeout(timer));
+                    } else {
+                        sendBody();
+                    }
+                };
+
+                /** Sends the body independently of the response headers. */
+                const sendBody = (): void => {
                     if (completion._rawBody !== undefined) {
                         res.end(completion._rawBody);
                     } else {

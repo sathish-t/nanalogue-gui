@@ -89,10 +89,10 @@ describe("ai-chat-constants scalar exports", () => {
         expect(DEFAULT_MAX_BLANK_RETRIES).toBe(3);
     });
 
-    it("allows an optional 1,200-second LLM response timeout", () => {
+    it("allows an optional 3,600-second LLM response timeout", () => {
         expect(CONFIG_FIELD_SPECS.timeoutSeconds).toMatchObject({
-            max: 1_200,
-            fallback: 60,
+            max: 3_600,
+            fallback: 300,
         });
     });
 });

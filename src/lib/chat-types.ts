@@ -244,7 +244,7 @@ export interface AiChatConfig {
     contextWindowTokens: number;
     /** Maximum retries per turn. */
     maxRetries: number;
-    /** LLM request timeout in seconds. */
+    /** Timeout per logical LLM call in seconds, including retries and backoff. */
     timeoutSeconds: number;
     /** Maximum code execution rounds per user message. */
     maxCodeRounds: number;

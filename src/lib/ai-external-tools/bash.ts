@@ -216,6 +216,8 @@ export function makeBash(
     const mountable = new MountableFs({ base: overlayFs });
     mountable.mount(outputDir, readWriteFs);
 
+    // Share a 1:100 allocation ratio across Bash counters and supported array caps.
+    const bashAllocationLimit = Math.max(1, Math.floor(maxAllocations / 100));
     const shell = new Bash({
         fs: withDenyList(mountable, allowedDir),
         cwd: allowedDir,
@@ -227,13 +229,13 @@ export function makeBash(
             // Fixed: stack depth guard against infinite recursion, not a
             // throughput limit.
             maxCallDepth: 100,
-            // Allocation-derived: scale iteration limits at 1:10 relative to maxAllocations
-            maxCommandCount: Math.max(1, Math.floor(maxAllocations / 10)),
-            maxLoopIterations: Math.max(1, Math.floor(maxAllocations / 10)),
-            maxAwkIterations: Math.max(1, Math.floor(maxAllocations / 10)),
-            maxSedIterations: Math.max(1, Math.floor(maxAllocations / 10)),
-            maxJqIterations: Math.max(1, Math.floor(maxAllocations / 10)),
-            maxArrayElements: maxAllocations,
+            // Allocation-derived: 100 million Monty allocations permits 1 million here.
+            maxCommandCount: bashAllocationLimit,
+            maxLoopIterations: bashAllocationLimit,
+            maxAwkIterations: bashAllocationLimit,
+            maxSedIterations: bashAllocationLimit,
+            maxJqIterations: bashAllocationLimit,
+            maxArrayElements: bashAllocationLimit,
             // Memory-derived: allow bash output and strings up to 50% of the
             // sandbox memory cap so large intermediate data (e.g. a column
             // extracted from a 1 GB CSV) can be passed back to Python.

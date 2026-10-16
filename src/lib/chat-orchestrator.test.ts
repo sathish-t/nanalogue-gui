@@ -279,6 +279,7 @@ describe("adversarial/edge-case tests", () => {
      * @param options.config - Config overrides.
      * @param options.appendSystemPrompt - Optional text to append to the system prompt.
      * @param options.history - Optional pre-seeded conversation history.
+     * @param options.onEvent - Optional observer for synchronizing concurrent turns.
      * @returns The orchestrator result, history, and events.
      */
     async function callOrchestrator(
@@ -294,6 +295,8 @@ describe("adversarial/edge-case tests", () => {
             appendSystemPrompt?: string;
             /** Optional pre-seeded conversation history. */
             history?: HistoryEntry[];
+            /** Optional observer for emitted events. */
+            onEvent?: (event: AiChatEvent) => void;
         } = {},
     ): Promise<{
         /** Orchestrator return value. */
@@ -320,6 +323,7 @@ describe("adversarial/edge-case tests", () => {
              */
             emitEvent: (e: AiChatEvent) => {
                 events.push(e);
+                options.onEvent?.(e);
             },
             history,
             signal: options.signal ?? new AbortController().signal,
@@ -396,6 +400,200 @@ describe("adversarial/edge-case tests", () => {
         await expect(
             callOrchestrator(mockServer.url, { signal: controller.signal }),
         ).rejects.toThrow();
+    });
+
+    it.each([
+        1, 4,
+    ])("gives the final LLM call a fresh budget after long sandbox work (max rounds %i)", async (maxCodeRounds) => {
+        mockServer = await startMockServer([
+            {
+                _delayMs: 600,
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content:
+                                'delay = bash("sleep 1.2; echo analysis-done")\n' +
+                                'print(delay["stdout"])\ncontinue_thinking()',
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                _delayMs: 600,
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: 'print("finished after analysis")',
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        // Each response fits within 1 s, but their sum and the sandbox
+        // execution each exceed it. Cover normal and forced-final calls.
+        const { result } = await callOrchestrator(mockServer.url, {
+            config: { timeoutSeconds: 1, maxCodeRounds },
+        });
+
+        expect(result.steps[0].result.success).toBe(true);
+        expect(result.steps[0].result.prints?.join("")).toContain(
+            "analysis-done",
+        );
+        expect(result.text).toBe("finished after analysis\n");
+    });
+
+    it.each([
+        { firstDelay: 0, retryAfter: "2", secondDelay: 0, requests: 1 },
+        { firstDelay: 350, retryAfter: "0.4", secondDelay: 500, requests: 2 },
+    ])("bounds the whole LLM call including backoff and retries ($retryAfter s backoff)", async ({
+        firstDelay,
+        retryAfter,
+        secondDelay,
+        requests,
+    }) => {
+        mockServer = await startMockServer([
+            {
+                choices: [],
+                _statusCode: 429,
+                _delayMs: firstDelay,
+                _headers: { "Retry-After": retryAfter },
+            },
+            {
+                _delayMs: secondDelay,
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: 'print("late")',
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+
+        await expect(
+            callOrchestrator(mockServer.url, {
+                config: { timeoutSeconds: 1 },
+            }),
+        ).rejects.toMatchObject({ name: "TimeoutError" });
+        expect(mockServer.requestCount()).toBe(requests);
+    });
+
+    it.each([
+        200, 400,
+    ])("times out a stalled response body after HTTP %i headers without retrying", async (statusCode) => {
+        mockServer = await startMockServer([
+            {
+                choices: [],
+                _statusCode: statusCode,
+                _bodyDelayMs: 1500,
+            },
+        ]);
+
+        await expect(
+            callOrchestrator(mockServer.url, {
+                config: { timeoutSeconds: 1 },
+            }),
+        ).rejects.toMatchObject({ name: "TimeoutError" });
+        expect(mockServer.requestCount()).toBe(1);
+    });
+
+    it.each([
+        false,
+        true,
+    ])("waits for the sandbox independently of the LLM timer, with queued cancellation=%s", async (cancelWhileQueued) => {
+        mockServer = await startMockServer([
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content:
+                                'write_file("queued-marker.txt", "executed")',
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: 'print("queued execution ran")',
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+        let holderFinished = false;
+        const holder = runSandboxGuarded('bash("sleep 2")', tmpDir, {}).then(
+            (result) => {
+                holderFinished = true;
+                return result;
+            },
+        );
+        const controller = new AbortController();
+        let notifyQueued!: () => void;
+        const queued = new Promise<void>((resolve) => {
+            notifyQueued = resolve;
+        });
+        const pending = callOrchestrator(mockServer.url, {
+            config: { timeoutSeconds: 1 },
+            signal: controller.signal,
+            /**
+             * Observes sandbox admission after the LLM response completes.
+             *
+             * @param event - The event emitted by the queued turn.
+             */
+            onEvent: (event) => {
+                if (event.type === "code_execution_start") notifyQueued();
+            },
+        }).then(
+            (value) => value,
+            // Observe early rejection without an unhandled-rejection race.
+            (error: unknown) => ({ error }),
+        );
+        try {
+            await Promise.race([
+                queued,
+                pending.then((outcome) => {
+                    if ("error" in outcome) throw outcome.error;
+                    throw new Error("Turn finished before sandbox admission");
+                }),
+            ]);
+            await new Promise((resolve) => setTimeout(resolve, 1100));
+            expect(holderFinished).toBe(false);
+            if (cancelWhileQueued) {
+                controller.abort(new Error("cancel queued"));
+                await expect(pending).resolves.toMatchObject({
+                    error: { message: "cancel queued" },
+                });
+                expect(holderFinished).toBe(false);
+            } else {
+                await expect(pending).resolves.toMatchObject({
+                    result: { text: "queued execution ran\n" },
+                });
+            }
+        } finally {
+            expect((await holder).success).toBe(true);
+        }
+        if (cancelWhileQueued) {
+            await expect(
+                readFile(join(tmpDir, "queued-marker.txt")),
+            ).rejects.toMatchObject({ code: "ENOENT" });
+        } else {
+            expect(
+                await readFile(join(tmpDir, "queued-marker.txt"), "utf-8"),
+            ).toBe("executed");
+        }
     });
 
     it("forced-final with continue_thinking still produces terminal output", async () => {

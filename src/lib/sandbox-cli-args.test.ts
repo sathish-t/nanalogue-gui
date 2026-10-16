@@ -100,7 +100,8 @@ describe("buildSandboxRunOptions", () => {
         const opts = buildSandboxRunOptions({}, 1024);
         expect(opts.maxRecordsReadInfo).toBe(200_000);
         expect(opts.maxRecordsBamMods).toBe(5_000);
-        expect(opts.maxDurationSecs).toBe(600);
+        expect(opts.maxDurationSecs).toBe(1_800);
+        expect(opts.maxAllocations).toBe(100_000_000);
         expect(opts.maxOutputBytes).toBe(1024);
     });
 
