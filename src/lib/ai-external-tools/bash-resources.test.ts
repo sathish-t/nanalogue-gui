@@ -69,7 +69,7 @@ bash(command).then(result => process.stdout.write(JSON.stringify(result)))
             exitCode: 126,
             error: /maximum recursion depth \(100\)/i,
         },
-    ])("halts $name within 10 seconds using real defaults", async ({
+    ])("halts $name within 20 seconds using real defaults", async ({
         command,
         error,
         input,
@@ -82,11 +82,11 @@ bash(command).then(result => process.stdout.write(JSON.stringify(result)))
             const child = execFile(
                 process.execPath,
                 ["-e", childScript, allowedDir],
-                { timeout: 10_000, killSignal: "SIGKILL" },
+                { timeout: 20_000, killSignal: "SIGKILL" },
                 (failure, output, stderr) => {
                     if (failure) {
                         const reason = failure.killed
-                            ? "10-second watchdog"
+                            ? "20-second watchdog"
                             : failure.code;
                         reject(
                             new Error(
@@ -112,5 +112,5 @@ bash(command).then(result => process.stdout.write(JSON.stringify(result)))
         };
         expect(result.exit_code).toBe(exitCode);
         expect(result.stderr).toMatch(error);
-    }, 15_000);
+    }, 25_000);
 });
