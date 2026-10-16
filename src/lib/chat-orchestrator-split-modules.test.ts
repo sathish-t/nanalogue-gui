@@ -2,6 +2,7 @@
 // Covers helper-module branches directly.
 
 import { mkdtemp, rm } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,6 +17,7 @@ import {
     deriveEstimatedBytesPerToken,
     fetchChatCompletion,
 } from "./chat-orchestrator-llm";
+import { startMockServer } from "./chat-orchestrator-test-utils";
 
 describe("chat-orchestrator-execution helpers", () => {
     const tmpPaths: string[] = [];
@@ -159,6 +161,96 @@ describe("chat-orchestrator-execution helpers", () => {
 describe("chat-orchestrator-llm helpers", () => {
     afterEach(() => {
         vi.restoreAllMocks();
+    });
+
+    it.each([
+        429, 503,
+    ])("abandons the stalled HTTP %i body before retrying successfully", async (statusCode) => {
+        let requests = 0;
+        let firstBodyCancelled = false;
+        let cancelledBeforeRetry = false;
+        const completion = {
+            choices: [
+                {
+                    message: { role: "assistant", content: "retry succeeded" },
+                    finish_reason: "stop",
+                },
+            ],
+        };
+        const server = createServer((req, res) => {
+            req.resume();
+            requests += 1;
+            if (requests === 1) {
+                res.on("close", () => {
+                    firstBodyCancelled = !res.writableFinished;
+                });
+                res.writeHead(statusCode, {
+                    "Content-Type": "application/json",
+                    "Retry-After": "0.1",
+                });
+                res.flushHeaders();
+                // Never send or finish this body: reading it would stall.
+            } else {
+                cancelledBeforeRetry = firstBodyCancelled;
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify(completion));
+            }
+        });
+        await new Promise<void>((resolve) =>
+            server.listen(0, "127.0.0.1", resolve),
+        );
+        try {
+            const address = server.address();
+            if (address === null || typeof address === "string") {
+                throw new Error("Mock server did not bind to a port");
+            }
+            const result = await fetchChatCompletion(
+                `http://127.0.0.1:${address.port}/v1`,
+                "",
+                "test-model",
+                "system",
+                [{ role: "user", content: "hello" }],
+                1,
+                new AbortController().signal,
+                undefined,
+                3,
+            );
+
+            expect(result).toEqual(completion);
+            expect(requests).toBe(2);
+            expect(cancelledBeforeRetry).toBe(true);
+        } finally {
+            server.closeAllConnections();
+            await new Promise<void>((resolve) => server.close(() => resolve()));
+        }
+    });
+
+    it.each([
+        400, 503,
+    ])("preserves the HTTP %i error body when no retry will be made", async (statusCode) => {
+        const server = await startMockServer([
+            {
+                choices: [],
+                _statusCode: statusCode,
+                _rawBody: "provider error details",
+            },
+        ]);
+        try {
+            await expect(
+                fetchChatCompletion(
+                    server.url,
+                    "",
+                    "test-model",
+                    "system",
+                    [{ role: "user", content: "hello" }],
+                    statusCode === 400 ? 2 : 0,
+                    new AbortController().signal,
+                ),
+            ).rejects.toThrow(`HTTP ${statusCode}: provider error details`);
+            expect(server.requestCount()).toBe(1);
+        } finally {
+            await server.close();
+        }
     });
 
     it("applies provider payload adjustments before transport", async () => {

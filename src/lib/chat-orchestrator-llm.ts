@@ -146,6 +146,8 @@ export async function fetchChatCompletion(
                             delay = Number(retryAfter) * 1000;
                         }
                     }
+                    // Release the unused response without waiting for its body to finish.
+                    await response.body?.cancel();
                     await abortableSleep(delay, signal);
                     continue;
                 }
