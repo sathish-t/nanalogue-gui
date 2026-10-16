@@ -242,10 +242,8 @@ describe("chat-orchestrator-llm helpers", () => {
             headers: new Headers(),
         } as Response);
 
-        const signal = {
-            aborted: true,
-            reason: new Error("aborted before sleep"),
-        } as AbortSignal;
+        const controller = new AbortController();
+        controller.abort(new Error("aborted before sleep"));
 
         await expect(
             fetchChatCompletion(
@@ -255,7 +253,7 @@ describe("chat-orchestrator-llm helpers", () => {
                 "system",
                 [{ role: "user", content: "hello" }],
                 1,
-                signal,
+                controller.signal,
             ),
         ).rejects.toThrow("aborted before sleep");
     });

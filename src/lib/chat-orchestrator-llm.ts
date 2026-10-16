@@ -2,6 +2,7 @@
 // Keeps API retries and prompt-token calibration separate from the main turn loop.
 
 import { DEFAULT_MAX_COMPLETION_TOKENS } from "./ai-chat-constants";
+import { CONFIG_FIELD_SPECS } from "./ai-chat-shared-constants";
 import {
     adjustChatCompletionPayloadForProvider,
     type ChatCompletionPayload,
@@ -68,7 +69,8 @@ function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /**
- * Calls the /chat/completions endpoint with retry logic.
+ * Calls /chat/completions with a fresh timeout budget per logical LLM call,
+ * shared by all HTTP attempts, retry backoffs, and response body reads within that call.
  * Temperature is only included when explicitly set (not undefined).
  *
  * @param endpointUrl - The LLM endpoint URL.
@@ -77,8 +79,9 @@ function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
  * @param systemPrompt - The system prompt.
  * @param messages - The conversation messages.
  * @param maxRetries - Maximum number of retry attempts.
- * @param signal - Abort signal for cancellation.
+ * @param cancellationSignal - Abort signal for user cancellation.
  * @param temperature - Optional sampling temperature.
+ * @param timeoutSeconds - Budget for this logical LLM call, including response body reads.
  * @returns The parsed completion response.
  */
 export async function fetchChatCompletion(
@@ -93,9 +96,14 @@ export async function fetchChatCompletion(
         content: string;
     }>,
     maxRetries: number,
-    signal: AbortSignal,
+    cancellationSignal: AbortSignal,
     temperature?: number,
+    timeoutSeconds = CONFIG_FIELD_SPECS.timeoutSeconds.fallback,
 ): Promise<ChatCompletionResponse> {
+    const signal = AbortSignal.any([
+        cancellationSignal,
+        AbortSignal.timeout(timeoutSeconds * 1000),
+    ]);
     const base = endpointUrl.endsWith("/") ? endpointUrl : `${endpointUrl}/`;
     const url = new URL("chat/completions", base).href;
     const providerNeutralPayload: ChatCompletionPayload = {
