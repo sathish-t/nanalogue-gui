@@ -4,7 +4,29 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
     test: {
-        include: ["src/**/*.test.ts"],
+        projects: [
+            {
+                test: {
+                    name: "unit",
+                    include: ["src/**/*.test.ts"],
+                    exclude: [
+                        "src/lib/ai-external-tools/bash-resources.test.ts",
+                    ],
+                    sequence: { groupOrder: 1 },
+                },
+            },
+            {
+                test: {
+                    name: "bash-resources",
+                    include: [
+                        "src/lib/ai-external-tools/bash-resources.test.ts",
+                    ],
+                    // Keep the strict wall-clock checks out of contention with
+                    // unit tests, particularly during coverage collection.
+                    sequence: { groupOrder: 2 },
+                },
+            },
+        ],
         coverage: {
             include: ["src/**/*.ts"],
             exclude: [
