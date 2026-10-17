@@ -79,6 +79,35 @@ describe("buildSandboxPrompt — external function docs", () => {
             prompt.match(/255 means mapping quality is unavailable/g),
         ).toHaveLength(2);
     });
+
+    it("documents positional-only arguments while preserving keyword options", () => {
+        const prompt = buildSandboxPrompt(BASE_OPTIONS);
+        const signatures = [
+            "ls(pattern: str = None, /)",
+            "read_file(file_path: str, /, **kwargs)",
+            "write_file(file_path: str, content: str, /)",
+            "plot_histogram(bins, /, **kwargs)",
+            "plot_series(points, /, **kwargs)",
+            "bash(command: str, /)",
+            "minimap2(reference_path: str, query_path: str, /, preset: str = None)",
+            "peek(bam_path: str, /)",
+            "read_info(bam_path: str, /, **kwargs)",
+            "bam_mods(bam_path: str, /, **kwargs)",
+            "window_reads(bam_path: str, /, **kwargs)",
+            "seq_table(bam_path: str, /, **kwargs)",
+        ];
+        for (const signature of signatures) {
+            expect(prompt).toContain(`### ${signature} ->`);
+        }
+        expect(prompt).toContain("### continue_thinking() -> None");
+        expect(prompt).toContain(
+            "Arguments before / are positional-only: never pass them by keyword.",
+        );
+        expect(prompt).toContain('Use read_info("sample.bam", limit=5)');
+        expect(prompt).toContain(
+            "Options in **kwargs must be passed by keyword.",
+        );
+    });
 });
 
 // ---------------------------------------------------------------------------

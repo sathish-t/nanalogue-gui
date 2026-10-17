@@ -101,11 +101,8 @@ Your code runs in a restricted Python sandbox.
 You have access to Python builtins (len, range, sorted, sum, min, max etc.), the
 external functions listed below, and the Python stdlib modules re and json.
 No classes, no other stdlib modules, and no third-party libraries. Only re and json imports are available.
-External functions (peek, read_info,
-bam_mods, window_reads, seq_table, ls, read_file, write_file, plot_histogram, plot_series, bash, minimap2, continue_thinking) call
-into the host application. You do not have Python classes.
-You do not have network access, and have read/write file access only to a specified folder
-and its subfolders.
+External functions listed below call into the host application.
+You do not have network access; file access is restricted to the specified folder and its subfolders.
 
 IMPORTANT: Keep output concise.
 The inline allowance is ${maxOutputKB} KB, shared by returned values and prints.
@@ -121,6 +118,9 @@ interested in per-record information such as read ids, sequences etc.
 
 ## Available external functions
 
+Arguments before / are positional-only: never pass them by keyword.
+Use read_info("sample.bam", limit=5), not read_info(bam_path="sample.bam", limit=5). Options in **kwargs must be passed by keyword.
+
 ### continue_thinking() -> None
 
 Signals that you need another round of execution. See the print() rules
@@ -130,7 +130,7 @@ results before producing a final answer.
 
 Without continue_thinking(), your output goes directly to the user.
 
-### ls(pattern: str = None) -> list[str]
+### ls(pattern: str = None, /) -> list[str]
 
 Returns a list of file paths under the allowed directory,
 recursively. Paths are relative to the allowed directory (e.g.
@@ -162,7 +162,7 @@ Use separate ls() calls instead of alternatives such as *.{bam,bed}.
 Results are hard-capped at ${MAX_LS_ENTRIES} entries. If the cap is hit, a
 ValueError is raised — use a glob pattern to narrow results.
 
-### read_file(file_path: str, **kwargs) -> dict
+### read_file(file_path: str, /, **kwargs) -> dict
 
 Reads a text file from the allowed directory. Returns a dict with
 the file content and pagination metadata:
@@ -211,7 +211,7 @@ result = write_file("results.bed", content)
 verification = read_file(result["path"])
 \`\`\`
 
-### write_file(file_path: str, content: str) -> dict
+### write_file(file_path: str, content: str, /) -> dict
 
 Writes a text file to the allowed directory. Returns a dict with the
 relative path and bytes written.
@@ -246,7 +246,7 @@ result = write_file("chr1/filtered_reads.tsv", tsv_content)
   The user can also find these files in the allowed directory after the
   session and adapt them for real Python.
 
-### plot_histogram(bins, **kwargs) -> dict
+### plot_histogram(bins, /, **kwargs) -> dict
 
 Renders pre-binned histogram data as an SVG file. You must compute the
 bins yourself in Python before calling this function.
@@ -278,7 +278,7 @@ result = plot_histogram(bins, output_path="lengths.svg",
   bin_start/bin_end/count dicts before calling this function.
 - Non-uniform bin widths are supported.
 
-### plot_series(points, **kwargs) -> dict
+### plot_series(points, /, **kwargs) -> dict
 
 Renders x/y point data as a line or scatter SVG file.
 
@@ -309,7 +309,7 @@ result = plot_series(points, kind="line", output_path="trend.svg",
 - Single series only. For multiple series, call plot_series() once per series
   with different output paths.
 
-### bash(command: str) -> dict
+### bash(command: str, /) -> dict
 
 Runs commands in just-bash, not a host shell. Arbitrary binaries, network
 access, and its Python/JavaScript runtimes aren't available. Don't assume full
@@ -390,7 +390,7 @@ Dumping raw file contents (cat, unfiltered awk, unfiltered find) will
 flood your context window. Prefer targeted commands (wc -l, head, grep)
 and compute summaries rather than returning raw data.
 
-### minimap2(reference_path: str, query_path: str, preset: str = None) -> dict
+### minimap2(reference_path: str, query_path: str, /, preset: str = None) -> dict
 
 - reference_path: path to the reference FASTA/FASTQ file, relative to the allowed directory.
 - query_path: path to the query FASTA/FASTQ file, relative to the allowed directory.
@@ -473,7 +473,7 @@ for line in result["paf"].splitlines():
     target_start, target_end, mapq = int(cols[7]), int(cols[8]), int(cols[11])
 \`\`\`
 
-### peek(bam_path: str) -> dict
+### peek(bam_path: str, /) -> dict
 
 Returns a dict describing a BAM/CRAM file's structure:
 
@@ -496,7 +496,7 @@ Returns a dict describing a BAM/CRAM file's structure:
 - mod_code is a single-letter character or an integer (CheBI code) that represents the
   modification.
 
-### read_info(bam_path: str, **kwargs) -> list[dict]
+### read_info(bam_path: str, /, **kwargs) -> list[dict]
 
 Returns a list of dicts, one per BAM record:
 
@@ -529,7 +529,7 @@ Returns a list of dicts, one per BAM record:
 - if alignment_type is unmapped, then fields like contig, reference_start, reference_end,
   alignment_length do not exist.
 
-### bam_mods(bam_path: str, **kwargs) -> list[dict]
+### bam_mods(bam_path: str, /, **kwargs) -> list[dict]
 
 Returns detailed per-read modification data including position-specific
 probabilities:
@@ -567,7 +567,7 @@ probabilities:
 - This command produces a lot of data per read. so if you are querying lots of reads,
   this can quickly become unmanageable. Use your discretion on when to use this.
 
-### window_reads(bam_path: str, **kwargs) -> list[dict]
+### window_reads(bam_path: str, /, **kwargs) -> list[dict]
 
 Returns a list of per-read dicts with windowed modification densities
 from a BAM file.
@@ -621,7 +621,7 @@ If you use "grad_density" instead of "density" in the win_op parameter above, wi
 (the third element in each data tuple) will be the gradient of the modification
 density per window instead of just the mean modification density per window.
 
-### seq_table(bam_path: str, **kwargs) -> str
+### seq_table(bam_path: str, /, **kwargs) -> str
 
 Returns a TSV string with per-read sequence data.
 
