@@ -2,6 +2,7 @@
 // Wraps conversation history and abort handling so both the GUI and CLI share the same logic.
 
 import { handleUserMessage, resetLastSentMessages } from "./chat-orchestrator";
+import { LlmRequestTimeoutError } from "./chat-orchestrator-llm";
 import type {
     AiChatConfig,
     AiChatConsentRequiredResult,
@@ -141,6 +142,18 @@ export class ChatSession {
                     error.message.includes("timed out"));
             const errorMsg =
                 error instanceof Error ? error.message : String(error);
+            // Only an actual LLM deadline can add a notice, not local errors
+            // with timeout-like text or cancelled/reset/superseded requests.
+            if (
+                error instanceof LlmRequestTimeoutError &&
+                !localSignal.aborted
+            ) {
+                this.history.push({
+                    role: "user",
+                    content:
+                        "Application notice: The previous turn ended without a final answer because an LLM request timed out. Any earlier code executions and their results were not rolled back.",
+                });
+            }
             emitEvent({
                 type: "turn_error",
                 error: errorMsg,

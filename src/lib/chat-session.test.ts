@@ -3,6 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setMockImplementation, setMockResolvedValue } from "../test-helpers";
+import { LlmRequestTimeoutError } from "./chat-orchestrator-llm";
 import type { AiChatConfig } from "./chat-types";
 
 // Mock the orchestrator so tests don't need a real LLM or sandbox
@@ -268,6 +269,48 @@ describe("ChatSession", () => {
     });
 
     describe("stale response detection", () => {
+        it.each([
+            "cancel",
+            "reset",
+            "supersede",
+        ] as const)("does not add a late timeout notice after %s", async (action) => {
+            let rejectRequest!: (error: Error) => void;
+            vi.mocked(handleUserMessage).mockImplementationOnce(
+                () =>
+                    new Promise((_, reject) => {
+                        rejectRequest = reject;
+                    }),
+            );
+            const options = {
+                endpointUrl: "http://localhost:11434/v1",
+                apiKey: "",
+                model: "llama3",
+                message: "test",
+                allowedDir: "/tmp",
+                config: defaultConfig,
+                emitEvent: vi.fn(),
+            };
+            const pending = session.sendMessage(options);
+            if (action === "supersede") {
+                setMockResolvedValue(handleUserMessage, {
+                    text: "new response",
+                    steps: [],
+                });
+                await session.sendMessage(options);
+            } else {
+                session[action]();
+            }
+            session.history.push({ role: "user", content: "newer turn" });
+
+            const timeout = new LlmRequestTimeoutError("request timed out");
+            rejectRequest(timeout);
+            await pending;
+
+            expect(session.history).toEqual([
+                { role: "user", content: "newer turn" },
+            ]);
+        });
+
         it("returns cancelled when a completed request was aborted while pending", async () => {
             let finishRequest!: () => void;
             setMockImplementation(handleUserMessage, async () => {
@@ -456,10 +499,11 @@ describe("ChatSession", () => {
                 error: "network failure",
                 isTimeout: false,
             });
+            expect(session.history).toEqual([]);
         });
 
         it("marks the result as a timeout when the error name is TimeoutError", async () => {
-            const timeoutErr = new Error("timed out waiting for response");
+            const timeoutErr = new Error("response deadline exceeded");
             timeoutErr.name = "TimeoutError";
             vi.mocked(handleUserMessage).mockRejectedValue(timeoutErr);
 
@@ -477,14 +521,15 @@ describe("ChatSession", () => {
             expect(result).toEqual({
                 success: false,
                 reason: "error",
-                error: "timed out waiting for response",
+                error: "response deadline exceeded",
                 isTimeout: true,
             });
             expect(emitEvent).toHaveBeenCalledWith({
                 type: "turn_error",
-                error: "timed out waiting for response",
+                error: "response deadline exceeded",
                 isTimeout: true,
             });
+            expect(session.history).toEqual([]);
         });
 
         it("marks the result as a timeout when the error message contains 'timed out'", async () => {
@@ -503,6 +548,7 @@ describe("ChatSession", () => {
             });
 
             expect(result).toMatchObject({ success: false, isTimeout: true });
+            expect(session.history).toEqual([]);
         });
 
         it("converts non-Error rejections to a string error message", async () => {

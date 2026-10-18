@@ -21,6 +21,7 @@ import {
     runSandboxGuarded,
     transformContext,
 } from "./chat-orchestrator";
+import { LlmRequestTimeoutError } from "./chat-orchestrator-llm";
 import {
     type MockCompletion,
     type MockServer,
@@ -394,12 +395,13 @@ describe("adversarial/edge-case tests", () => {
         mockServer = await startMockServer(responses);
 
         const controller = new AbortController();
+        const cancellationReason = new Error("Cancelled by user");
         // Abort after 200ms — during the retry backoff sleep
-        setTimeout(() => controller.abort(), 200);
+        setTimeout(() => controller.abort(cancellationReason), 200);
 
         await expect(
             callOrchestrator(mockServer.url, { signal: controller.signal }),
-        ).rejects.toThrow();
+        ).rejects.toBe(cancellationReason);
     });
 
     it.each([
@@ -481,8 +483,23 @@ describe("adversarial/edge-case tests", () => {
             callOrchestrator(mockServer.url, {
                 config: { timeoutSeconds: 1 },
             }),
-        ).rejects.toMatchObject({ name: "TimeoutError" });
+        ).rejects.toBeInstanceOf(LlmRequestTimeoutError);
         expect(mockServer.requestCount()).toBe(requests);
+    });
+
+    it("identifies an LLM deadline reached during network-error retry backoff", async () => {
+        const fetchMock = vi
+            .spyOn(globalThis, "fetch")
+            .mockRejectedValue(new TypeError("fetch failed"));
+        try {
+            await expect(
+                callOrchestrator("http://127.0.0.1:1/v1", {
+                    config: { timeoutSeconds: 1 },
+                }),
+            ).rejects.toBeInstanceOf(LlmRequestTimeoutError);
+        } finally {
+            fetchMock.mockRestore();
+        }
     });
 
     it.each([
@@ -500,7 +517,7 @@ describe("adversarial/edge-case tests", () => {
             callOrchestrator(mockServer.url, {
                 config: { timeoutSeconds: 1 },
             }),
-        ).rejects.toMatchObject({ name: "TimeoutError" });
+        ).rejects.toBeInstanceOf(LlmRequestTimeoutError);
         expect(mockServer.requestCount()).toBe(1);
     });
 
