@@ -17,6 +17,7 @@ import {
     extractCodeFromFences,
     getLastSentMessages,
     handleUserMessage,
+    type LlmMessage,
     resetLastSentMessages,
     runSandboxGuarded,
     transformContext,
@@ -1047,6 +1048,59 @@ describe("adversarial/edge-case tests", () => {
         expect(historyContents[secondHistoryCodeIndex + 1]).toContain(
             "SyntaxError",
         );
+    });
+
+    it("retains timeout code and feedback through recovery and a later user turn", async () => {
+        const timeoutCode = "ls()\nwhile True:\n    pass";
+        const responses: MockCompletion[] = [
+            timeoutCode,
+            "print('recovered')",
+            "print('follow-up answered')",
+        ].map((content) => ({
+            choices: [
+                {
+                    message: { role: "assistant", content },
+                    finish_reason: "stop",
+                },
+            ],
+        }));
+        mockServer = await startMockServer(responses);
+        const config = { maxDurationSecs: 1, contextWindowTokens: 100_000 };
+        const { result, history } = await callOrchestrator(mockServer.url, {
+            config,
+        });
+        expect(result.text).toBe("recovered\n");
+        const followUp = "Explain the earlier timeout.";
+        await callOrchestrator(mockServer.url, {
+            message: followUp,
+            history,
+            config,
+        });
+        const requests = mockServer.requestBodies();
+        expect(requests).toHaveLength(3);
+        for (const request of requests.slice(1)) {
+            const messages = request.messages as LlmMessage[];
+            const codeIndex = messages.findIndex(
+                (message) => message.content === timeoutCode,
+            );
+            expect(codeIndex).toBeGreaterThanOrEqual(0);
+            expect(messages[codeIndex].role).toBe("assistant");
+            const feedback = messages[codeIndex + 1];
+            expect(feedback.role).toBe("user");
+            expect(feedback.content).toMatch(/^Code execution result: /);
+            const payload = JSON.parse(
+                feedback.content.slice("Code execution result: ".length),
+            );
+            expect(payload.success).toBe(false);
+            expect(payload.is_timeout).toBe(true);
+            expect(payload.message).toContain(
+                "TimeoutError: time limit exceeded",
+            );
+        }
+        expect(requests[2].messages).toContainEqual({
+            role: "user",
+            content: followUp,
+        });
     });
 
     it("windows old failed rounds out of the LLM request but not raw history", async () => {
