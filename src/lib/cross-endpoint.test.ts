@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { handleUserMessage } from "./chat-orchestrator";
+import { ChatSession } from "./chat-session";
 import type { AiChatConfig, AiChatEvent, HistoryEntry } from "./chat-types";
 
 /** Directory containing cross-endpoint test fixture JSON files. */
@@ -554,6 +555,151 @@ describe("cross-endpoint compatibility", () => {
         const bodies = mockServer.requestBodies();
         expect(bodies.length).toBeGreaterThan(0);
         expect("temperature" in bodies[0]).toBe(false);
+    });
+
+    it("does not record an LLM timeout for a local path error containing 'timed out'", async () => {
+        const { responses } = loadFixture("simple-code");
+        mockServer = await startMockServer(responses);
+        const session = new ChatSession();
+        const options = {
+            endpointUrl: mockServer.url,
+            apiKey: "",
+            model: "test-model",
+            allowedDir: tmpDir,
+            config: minimalConfig,
+            /** Discards progress events. */
+            emitEvent: () => {},
+        };
+        await expect(
+            session.sendMessage({ ...options, message: "compute 1+1" }),
+        ).resolves.toMatchObject({ success: true, text: "2\n" });
+        const priorHistory = [...session.history];
+        const requestCount = mockServer.requestCount();
+
+        await expect(
+            session.sendMessage({
+                ...options,
+                message: "/exec ../timed out.py",
+            }),
+        ).resolves.toMatchObject({
+            success: false,
+            reason: "error",
+            error: 'Path "../timed out.py" is outside the allowed directory',
+        });
+
+        expect(mockServer.requestCount()).toBe(requestCount);
+        expect(session.history).toEqual(priorHistory);
+    });
+
+    it.each([
+        { phase: "initial request", priorExecution: false, maxCodeRounds: 10 },
+        {
+            phase: "continuation request",
+            priorExecution: true,
+            maxCodeRounds: 10,
+        },
+        {
+            phase: "forced-final request",
+            priorExecution: true,
+            maxCodeRounds: 1,
+        },
+    ])("tells the next turn about a timed-out $phase without losing completed work", async ({
+        priorExecution,
+        maxCodeRounds,
+    }) => {
+        const code = 'print("analysis checkpoint: 37")\ncontinue_thinking()';
+        const checkpoint: MockCompletion = {
+            choices: [
+                {
+                    message: { role: "assistant", content: code },
+                    finish_reason: "stop",
+                },
+            ],
+        };
+        mockServer = await startMockServer([
+            ...(priorExecution ? [checkpoint] : []),
+            { choices: [], _delayMs: 1500 },
+            {
+                choices: [
+                    {
+                        message: {
+                            role: "assistant",
+                            content: 'print("Recovered")',
+                        },
+                        finish_reason: "stop",
+                    },
+                ],
+            },
+        ]);
+        const session = new ChatSession();
+        const events: AiChatEvent[] = [];
+        const options = {
+            endpointUrl: mockServer.url,
+            apiKey: "",
+            model: "test-model",
+            allowedDir: tmpDir,
+            config: {
+                ...minimalConfig,
+                maxRetries: 0,
+                timeoutSeconds: 1,
+                maxCodeRounds,
+            },
+            /**
+             * Collects events from both turns.
+             *
+             * @param event - The progress or failure event to record.
+             */
+            emitEvent: (event: AiChatEvent) => {
+                events.push(event);
+            },
+        };
+
+        await expect(
+            session.sendMessage({ ...options, message: "Analyse my data" }),
+        ).resolves.toMatchObject({
+            success: false,
+            reason: "error",
+            isTimeout: true,
+        });
+        expect(events).toContainEqual({
+            type: "turn_error",
+            error: expect.any(String),
+            isTimeout: true,
+        });
+
+        const timeoutIndex = priorExecution ? 1 : 0;
+        const priorMessages = (
+            mockServer.requestBodies()[timeoutIndex].messages as HistoryEntry[]
+        ).slice(1);
+        if (priorExecution) {
+            expect(priorMessages).toContainEqual({
+                role: "assistant",
+                content: code,
+            });
+            expect(priorMessages).toContainEqual({
+                role: "user",
+                content: expect.stringContaining("analysis checkpoint: 37"),
+            });
+        }
+
+        await expect(
+            session.sendMessage({ ...options, message: "What happened?" }),
+        ).resolves.toMatchObject({ success: true, text: "Recovered\n" });
+
+        const nextMessages = (
+            mockServer.requestBodies()[timeoutIndex + 1]
+                .messages as HistoryEntry[]
+        ).slice(1);
+        expect(nextMessages).toEqual([
+            ...priorMessages,
+            {
+                role: "user",
+                content: expect.stringMatching(
+                    /Application notice:.*without a final answer.*LLM request timed out.*not rolled back/s,
+                ),
+            },
+            { role: "user", content: "What happened?" },
+        ]);
     });
 
     it("stores terminal assistant answer in history for follow-up context", async () => {

@@ -153,6 +153,13 @@ keep the assembled context within ~80% of the model's context budget. Failed
 assistant-code + user-error pairs remain in history and are sent in later
 requests until this normal context-window limit evicts them.
 
+An LLM request timeout adds an application notice to conversation history
+that the previous turn ended without a final answer and earlier code
+executions were not rolled back. The notice follows the same sliding-window
+policy as other messages: it is not pinned and can be dropped when the
+context budget is exceeded, even on the next request. Later turns receive
+the notice only while it fits in the retained context.
+
 ---
 
 ## Security model

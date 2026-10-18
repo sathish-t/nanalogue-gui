@@ -39,6 +39,12 @@ const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 /** Marks an HTTP response failure so retry control flow does not inspect display text. */
 class HttpResponseError extends Error {}
 
+/** Identifies an LLM request timeout without relying on exception message text. */
+export class LlmRequestTimeoutError extends Error {
+    /** Preserves the standard timeout name used by existing error reporting. */
+    override name = "TimeoutError";
+}
+
 /**
  * Sleeps for the given duration, rejecting immediately if the signal is aborted.
  * Cleans up the abort listener when the timer fires normally.
@@ -122,58 +128,75 @@ export async function fetchChatCompletion(
     );
     const body = JSON.stringify(payload);
 
-    let lastError: Error | undefined;
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-            const response = await fetch(url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-                },
-                body,
-                signal,
-            });
-            if (!response.ok) {
-                if (
-                    RETRYABLE_STATUS_CODES.has(response.status) &&
-                    attempt < maxRetries
-                ) {
-                    let delay = Math.min(1000 * 2 ** attempt, 30000);
-                    if (response.status === 429) {
-                        const retryAfter = response.headers.get("Retry-After");
-                        if (retryAfter && Number.isFinite(Number(retryAfter))) {
-                            delay = Number(retryAfter) * 1000;
+    try {
+        let lastError: Error | undefined;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(apiKey
+                            ? { Authorization: `Bearer ${apiKey}` }
+                            : {}),
+                    },
+                    body,
+                    signal,
+                });
+                if (!response.ok) {
+                    if (
+                        RETRYABLE_STATUS_CODES.has(response.status) &&
+                        attempt < maxRetries
+                    ) {
+                        let delay = Math.min(1000 * 2 ** attempt, 30000);
+                        if (response.status === 429) {
+                            const retryAfter =
+                                response.headers.get("Retry-After");
+                            if (
+                                retryAfter &&
+                                Number.isFinite(Number(retryAfter))
+                            ) {
+                                delay = Number(retryAfter) * 1000;
+                            }
                         }
+                        // Release the unused response without waiting for its body to finish.
+                        await response.body?.cancel();
+                        await abortableSleep(delay, signal);
+                        continue;
                     }
-                    // Release the unused response without waiting for its body to finish.
-                    await response.body?.cancel();
+                    let errorMsg = `HTTP ${response.status}: ${await response.text()}`;
+                    if (response.status === 404) {
+                        errorMsg +=
+                            "\nIf you're using Ollama, make sure your endpoint URL ends with /v1 (e.g., http://localhost:11434/v1).";
+                    }
+                    throw new HttpResponseError(errorMsg);
+                }
+                return (await response.json()) as ChatCompletionResponse;
+            } catch (e) {
+                if (signal.aborted) throw e;
+                // A received non-retryable HTTP response is never a transport retry.
+                if (e instanceof HttpResponseError) throw e;
+                // Malformed JSON from a 200 response — not retryable
+                if (e instanceof SyntaxError) throw e;
+                // Network errors (no response received) are retryable
+                lastError = e instanceof Error ? e : new Error(String(e));
+                if (attempt < maxRetries) {
+                    const delay = Math.min(1000 * 2 ** attempt, 30000);
                     await abortableSleep(delay, signal);
-                    continue;
                 }
-                let errorMsg = `HTTP ${response.status}: ${await response.text()}`;
-                if (response.status === 404) {
-                    errorMsg +=
-                        "\nIf you're using Ollama, make sure your endpoint URL ends with /v1 (e.g., http://localhost:11434/v1).";
-                }
-                throw new HttpResponseError(errorMsg);
-            }
-            return (await response.json()) as ChatCompletionResponse;
-        } catch (e) {
-            if (signal.aborted) throw e;
-            // A received non-retryable HTTP response is never a transport retry.
-            if (e instanceof HttpResponseError) throw e;
-            // Malformed JSON from a 200 response — not retryable
-            if (e instanceof SyntaxError) throw e;
-            // Network errors (no response received) are retryable
-            lastError = e instanceof Error ? e : new Error(String(e));
-            if (attempt < maxRetries) {
-                const delay = Math.min(1000 * 2 ** attempt, 30000);
-                await abortableSleep(delay, signal);
             }
         }
+        throw lastError ?? new Error("All retries exhausted");
+    } catch (error) {
+        // Cover request/body reads and both HTTP and network retry backoffs.
+        if (signal.aborted && !cancellationSignal.aborted) {
+            throw new LlmRequestTimeoutError(
+                error instanceof Error ? error.message : String(error),
+                { cause: error },
+            );
+        }
+        throw error;
     }
-    throw lastError ?? new Error("All retries exhausted");
 }
 
 /**
