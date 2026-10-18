@@ -206,7 +206,10 @@ it("bash abort via wall-clock timer sets isTimeout", async () => {
         maxDurationSecs: 0.1,
     });
     expect(result.success).toBe(false);
+    expect(result.errorType).toBe("RuntimeError");
     expect(result.isTimeout).toBe(true);
+    expect(result.message).toMatch(/time limit exceeded|execution aborted/);
+    expect(result.message).not.toContain("Invalid exception type");
 }, 10_000);
 
 it("bash abort caught by try/except still surfaces as isTimeout", async () => {

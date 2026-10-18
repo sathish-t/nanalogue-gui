@@ -3,10 +3,13 @@
 
 import { randomUUID } from "node:crypto";
 import {
+    type ExceptionInput,
     Monty,
+    MontyComplete,
+    MontyNameLookup,
     MontyRuntimeError,
     MontySyntaxError,
-    runMontyAsync,
+    type ResourceLimits,
 } from "@pydantic/monty";
 import {
     AI_CHAT_OUTPUT_DIR,
@@ -129,6 +132,78 @@ export function wrapForMonty(
     return wrapped;
 }
 
+/** Options for {@link runMontyWithExternalFunctions}. */
+export interface MontyExternalRunOptions {
+    /** Monty resource limits. */
+    limits: ResourceLimits;
+    /** Receives each printed text chunk with its stream name. */
+    printCallback: (stream: string, text: string) => void;
+    /** Host functions callable from Python, keyed by Python name. */
+    externalFunctions: Record<string, (...args: unknown[]) => unknown>;
+}
+
+/**
+ * Drives a Monty program to completion, answering external-function calls.
+ *
+ * Replaces `runMontyAsync` from `@pydantic/monty` 0.0.18, whose loop resumes the
+ * snapshot inside the same `try` as the external call. Any Python exception
+ * raised after the first external call (including MemoryError and the
+ * TimeoutError from the time limit) therefore reached its `catch` as a
+ * MontyRuntimeError and was re-raised into Python with the invalid type name
+ * "MontyRuntimeError", replacing the real traceback with
+ * "Invalid exception type: 'MontyRuntimeError'". Here only the external call is
+ * guarded, so `resume()` errors propagate as the original MontyRuntimeError.
+ *
+ * @param monty - The parsed Monty program.
+ * @param options - Resource limits, print callback, and external functions.
+ * @returns The program's final value.
+ */
+export async function runMontyWithExternalFunctions(
+    monty: Monty,
+    options: MontyExternalRunOptions,
+): Promise<unknown> {
+    const { limits, printCallback, externalFunctions } = options;
+    let progress = monty.start({ limits, printCallback });
+    while (!(progress instanceof MontyComplete)) {
+        if (progress instanceof MontyNameLookup) {
+            const fn = Object.hasOwn(externalFunctions, progress.variableName)
+                ? externalFunctions[progress.variableName]
+                : undefined;
+            progress = fn ? progress.resume({ value: fn }) : progress.resume();
+            continue;
+        }
+        const snapshot = progress;
+        const fn = Object.hasOwn(externalFunctions, snapshot.functionName)
+            ? externalFunctions[snapshot.functionName]
+            : undefined;
+        if (!fn) {
+            progress = snapshot.resume({
+                exception: {
+                    type: "NameError",
+                    message: `name '${snapshot.functionName}' is not defined`,
+                },
+            });
+            continue;
+        }
+        let returnValue: unknown;
+        let exception: ExceptionInput | undefined;
+        try {
+            returnValue = await fn(...snapshot.args, snapshot.kwargs);
+        } catch (error) {
+            exception =
+                error instanceof SandboxError
+                    ? { type: error.name, message: error.message }
+                    : { type: "RuntimeError", message: String(error) };
+        }
+        // Outside the try: a Python error raised while resuming must reach
+        // runSandboxCode as the MontyRuntimeError Monty threw.
+        progress = exception
+            ? snapshot.resume({ exception })
+            : snapshot.resume({ returnValue });
+    }
+    return progress.output;
+}
+
 /**
  * Runs Python code in the Monty sandbox with all external functions bound.
  *
@@ -177,7 +252,7 @@ export async function runSandboxCode(
     try {
         const m = new Monty(code);
 
-        const value = await runMontyAsync(m, {
+        const value = await runMontyWithExternalFunctions(m, {
             limits: {
                 maxDurationSecs,
                 maxMemory,
@@ -243,7 +318,7 @@ export async function runSandboxCode(
         });
 
         // If the bash abort timer fired while Python was catching the abort
-        // error (try/except), runMontyAsync may still complete successfully.
+        // error (try/except), execution may still complete successfully.
         // Treat this as a timeout rather than letting a partial result through.
         if (bashTimedOut) {
             throw new SandboxError("RuntimeError", "execution aborted");
@@ -365,7 +440,7 @@ export async function runSandboxCode(
         }
     } finally {
         // Always clear the bash abort timer so it does not fire after
-        // runMontyAsync has already completed (success or error).
+        // execution has already completed (success or error).
         clearTimeout(bashTimer);
     }
 
