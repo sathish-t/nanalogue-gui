@@ -45,12 +45,22 @@ it.** Always use `runMontyAsync`.
 
 Three limits matter in practice:
 
-- **`timeout`** — wall-clock timeout in seconds. Default in this
-  codebase is 10 minutes.
-- **`maxHeapBytes`** — heap memory cap in bytes.
+- **`maxDurationSecs`** — best-effort execution time limit in seconds.
+  Default in this codebase is 1,800 seconds (30 minutes). The wrapper also
+  cancels bash commands at this wall-clock limit; native data-access
+  operations already in progress may complete in the background.
+- **`maxMemory`** — heap memory cap in bytes. Default is 536,870,912 bytes
+  (512 MiB).
 - **`maxAllocations`** — counts object *creations*, not bytes. A tight loop
   that creates many small objects can hit this cap even if memory usage is
-  low. Set it with that in mind.
+  low. Default is 100,000,000 allocations.
+
+These are passed in the `limits` option to `runMontyAsync`. Their defaults
+match `CONFIG_FIELD_SPECS` in `src/lib/ai-chat-shared-constants.ts`; users
+can override them through the [advanced options](../advanced-options.md).
+They are separate from `--timeout`, the total logical LLM-call budget
+across HTTP attempts, retry backoff, and response body reads (default
+300 seconds, range 1–3,600 seconds).
 
 ---
 
