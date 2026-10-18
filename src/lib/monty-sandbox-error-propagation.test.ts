@@ -11,8 +11,9 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Monty } from "@pydantic/monty";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { runSandboxCode } from "./monty-sandbox";
+import { runMontyWithExternalFunctions, runSandboxCode } from "./monty-sandbox";
 
 let allowedDir: string;
 
@@ -149,4 +150,56 @@ it("preserves MemoryError while importing an external tool return value", async 
     expect(result.message).toContain("MemoryError: memory limit exceeded");
     expect(result.message).not.toContain("Invalid exception type");
     expect(result.isTimeout).toBe(false);
+});
+
+it("resolves a registered external function during Python name lookup", async () => {
+    const result = await runMontyWithExternalFunctions(
+        new Monty("small is not None"),
+        {
+            limits: { maxDurationSecs: 1 },
+            /**
+             * Discards print output; this program only returns a value.
+             *
+             * @returns Nothing.
+             */
+            printCallback: () => undefined,
+            externalFunctions: {
+                /**
+                 * Fails if name lookup invokes the host function.
+                 */
+                small: () => {
+                    throw new Error("Name lookup must not invoke small");
+                },
+            },
+        },
+    );
+    expect(result).toBe(true);
+});
+
+it("lets Python catch an ordinary async host error as RuntimeError and continue", async () => {
+    const code =
+        'message = "not caught"\n' +
+        "try:\n" +
+        "    fail()\n" +
+        "except RuntimeError as error:\n" +
+        "    message = str(error)\n" +
+        "message";
+    const result = await runMontyWithExternalFunctions(new Monty(code), {
+        limits: { maxDurationSecs: 1 },
+        /**
+         * Discards print output; the caught error is returned instead.
+         *
+         * @returns Nothing.
+         */
+        printCallback: () => undefined,
+        externalFunctions: {
+            /**
+             * Rejects with an ordinary JavaScript error, not SandboxError.
+             */
+            fail: async () => {
+                throw new Error("host failure marker");
+            },
+        },
+    });
+    expect(result).toBe("Error: host failure marker");
 });
