@@ -71,6 +71,13 @@ All execution feedback messages are marked `isExecutionResult: true` on
 the `UserMessage` so they can be distinguished from real user input by the
 renderer.
 
+Each logical LLM call has a total wall-clock budget of 300 seconds by
+default (`--timeout`, range 1–3,600 seconds). All HTTP attempts, retry
+backoff, and response body reads share that budget; retries do not restart
+it. Each later call, including the forced-final call, gets a fresh budget.
+Sandbox execution and waiting for sandbox admission are separate from the
+LLM timeout, so this is not a timeout for the whole user message.
+
 ---
 
 ## The Monty sandbox
@@ -111,19 +118,31 @@ that point outside it.
 
 ### Resource limits
 
-> All limits listed here are defaults and are user-configurable via the
-> Advanced Options dialog (GUI) or CLI flags. See
+> Sandbox runtime, record, and read/write limits are user-configurable via
+> the Advanced Options dialog (GUI) or CLI flags. Output limits are derived
+> or fixed, and the `ls` cap is fixed. See
 > [advanced-options.md](advanced-options.md).
 
 Two layers of limits protect the host process:
 
-- **Monty runtime** — wall-clock timeout (default 10 min), heap cap (512 MB),
-  allocation cap (100 000 objects).
+- **Monty runtime** — best-effort execution time limit (default 30 min,
+  or 1,800 seconds), heap cap (512 MB), allocation cap (100,000,000 objects).
+  Bash commands are cancelled at the time limit; native data-access
+  operations already in progress may complete in the background.
 - **Wrapper level** — record caps passed as `limit` directly to the
   `@nanalogue/node` Rust layer (so large BAMs stop reading early rather
-  than materialising in memory), output cap derived from the model's context
-  window (15% of context budget, clamped to 4 KB–80 KB), `ls` capped at
-  10,000 entries, `read_file` capped at 1 MB, `write_file` capped at 50 MB.
+  than materialising in memory), inline output allowance derived from the
+  model's context window and capped at 10 KiB for execution feedback, `ls`
+  capped at 10,000 entries, `read_file` capped at 1 MB, `write_file` capped
+  at 50 MB. Larger prints and returned strings, lists, or dictionaries are
+  saved in full under `ai_chat_output/` with file notices instead of
+  truncated data. Prints and serialized returned values each have a fixed
+  50 MiB ceiling, independent of the configurable write limit.
+
+The orchestrator also tracks cumulative sandbox runtime per user message:
+the budget is the larger of 30 minutes and the configured per-run limit.
+Once exhausted, it moves to the forced-final LLM call instead of starting
+another normal round.
 
 ---
 
