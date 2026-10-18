@@ -905,6 +905,37 @@ it("returns GenericError when sandbox setup throws a non-Monty error", async () 
     expect(result.errorType).toBe("GenericError");
 });
 
+// --- Python errors raised after an external call ---
+
+it.each([
+    ["ValueError", 'ls()\nraise ValueError("boom")', {}, "ValueError: boom"],
+    [
+        "MemoryError",
+        "ls()\nx = [0] * 10_000_000",
+        { maxMemory: 1024 * 1024 },
+        "MemoryError: memory limit exceeded",
+    ],
+])("keeps the %s traceback when it is raised after an external call", async (_name, code, options, expected) => {
+    const result = await runSandboxCode(code, allowedDir, options);
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.errorType).toBe("RuntimeError");
+    expect(result.message).toContain(expected);
+    expect(result.message).not.toContain("Invalid exception type");
+});
+
+it("reports a time limit reached after an external call as a timeout", async () => {
+    const result = await runSandboxCode(
+        "ls()\nwhile True:\n    pass",
+        allowedDir,
+        { maxDurationSecs: 1 },
+    );
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.isTimeout).toBe(true);
+    expect(result.message).toContain("TimeoutError: time limit exceeded");
+});
+
 // --- print() capture ---
 
 it("captures print output in SandboxResult", async () => {

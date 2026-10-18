@@ -70,7 +70,7 @@ export function toForwardSlashes(p: string): string {
 
 /**
  * Error class with a Python-compatible exception type name.
- * Monty's runMontyAsync uses err.name to map JS errors to Python exceptions.
+ * The Monty drive loop uses err.name to map JS errors to Python exceptions.
  */
 export class SandboxError extends Error {
     /**
