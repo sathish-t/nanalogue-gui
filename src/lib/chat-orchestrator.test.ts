@@ -487,6 +487,36 @@ describe("adversarial/edge-case tests", () => {
         expect(mockServer.requestCount()).toBe(requests);
     });
 
+    it("preserves the original transport error message and cause when an LLM request times out", async () => {
+        const transportError = new TypeError(
+            "Transport interrupted while waiting for response headers",
+        );
+        const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(
+            (_input, init) =>
+                new Promise((_resolve, reject) => {
+                    init?.signal?.addEventListener(
+                        "abort",
+                        () => reject(transportError),
+                        { once: true },
+                    );
+                }),
+        );
+        try {
+            await expect(
+                callOrchestrator("http://127.0.0.1:1/v1", {
+                    config: { timeoutSeconds: 1 },
+                }),
+            ).rejects.toSatisfy((error: unknown) => {
+                expect(error).toBeInstanceOf(LlmRequestTimeoutError);
+                expect((error as Error).message).toBe(transportError.message);
+                expect((error as Error).cause).toBe(transportError);
+                return true;
+            });
+        } finally {
+            fetchMock.mockRestore();
+        }
+    });
+
     it("identifies an LLM deadline reached during network-error retry backoff", async () => {
         const fetchMock = vi
             .spyOn(globalThis, "fetch")
