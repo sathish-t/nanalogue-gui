@@ -105,10 +105,10 @@ configurable ones are exposed in [advanced-options.md](advanced-options.md);
 | `seq_table(file, ...)` | Sequence table for a region |
 | `ls(glob?)` | Lists files under the allowed directory, up to 10,000 entries by default |
 | `read_file(path, ...)` | Reads a text file, up to 1 MB per call |
-| `write_file(path, content)` | Writes a new text file anywhere under `allowedDir` |
+| `write_file(path, content)` | Writes a new text file anywhere under `allowedDir` and fails if the path already exists |
 | `plot_histogram(data, ...)` | Renders a histogram as an SVG file in `ai_chat_output/` |
 | `plot_series(data, ...)` | Renders an XY series plot as an SVG file in `ai_chat_output/` |
-| `bash(command)` | Runs a shell command with restricted access: `allowedDir` is read-only except for `ai_chat_temp_files/` |
+| `bash(command)` | Runs a shell command with restricted access: `allowedDir` is read-only except for `ai_chat_temp_files/`, which bash can write to and overwrite |
 | `minimap2(query, target, ...)` | Runs minimap2 alignment via WebAssembly |
 | `continue_thinking()` | Signals the orchestrator to feed this round's output back to the LLM instead of showing it to the user |
 
