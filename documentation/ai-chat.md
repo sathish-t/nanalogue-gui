@@ -109,12 +109,25 @@ configurable ones are exposed in [advanced-options.md](advanced-options.md);
 | `plot_histogram(data, ...)` | Renders a histogram as an SVG file in `ai_chat_output/` |
 | `plot_series(data, ...)` | Renders an XY series plot as an SVG file in `ai_chat_output/` |
 | `bash(command)` | Runs a shell command with restricted access: `allowedDir` is read-only except for `ai_chat_temp_files/`, which bash can write to and overwrite |
-| `minimap2(query, target, ...)` | Runs minimap2 alignment via WebAssembly |
+| `minimap2(reference_path, query_path, ...)` | Runs minimap2 alignment via WebAssembly |
 | `continue_thinking()` | Signals the orchestrator to feed this round's output back to the LLM instead of showing it to the user |
 
 All path arguments go through `resolvePath()`, which calls `realpath` and
 rejects anything that resolves outside `allowedDir` — including symlinks
 that point outside it.
+
+### Bash commands and scratch files
+
+`bash()` runs an in-process interpreter, not the host shell. Supported
+commands include `grep`, `sed`, `awk`, `sort`, `jq`, and `gzip`; installed
+programs such as `samtools`, `bedtools`, Python, and R are not available.
+Do not assume full GNU command compatibility. Working-directory changes
+and shell variables do not persist between calls, so keep dependent steps
+in one command (for example, `cd subdir && grep pattern *.bed`).
+
+Despite its name, `ai_chat_temp_files/` persists on disk after the session.
+Bash can overwrite and delete files inside it, so do not store irreplaceable
+inputs there. The rest of `allowedDir` is read-only to bash.
 
 ### Resource limits
 
