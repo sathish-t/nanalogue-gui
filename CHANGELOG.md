@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `nanalogue-chat` and `nanalogue-sandbox-exec` report their status to the terminal with the [OSC 7501 Program Status Protocol](https://www.superlogical.com/rex/docs/build/program-status): `working` while thinking or running code, `done` when a response or script finishes, `error` on failure, `idle` at the chat prompt or when Ctrl+C cancels a chat request, and `clear` when the chat exits; reports go to stderr only when it is a terminal, and setting `NANALOGUE_NO_PROGRAM_STATUS` turns them off
 
+### Changed
+
+- Raises the minimum Node.js version to 22.22.0 on the Node 22 line and 24.8.0 on the Node 24 line, as required by html-validate 11
+- Upgrades the html-validate dev dependency from 10 to 11, which replaces its vulnerable `glob` dependency (GHSA-3g3m-2fjr-6pw4) with Node's built-in glob
+
 ### Removed
 
 - Conversation facts extraction, session storage, eviction, and system-prompt injection from AI Chat; conversation context now comes exclusively from retained message history.
