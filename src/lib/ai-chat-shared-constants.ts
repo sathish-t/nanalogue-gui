@@ -72,7 +72,7 @@ export const /** Validation specs for each integer AiChatConfig field (temperatu
             fallback: 30,
             label: "max code rounds",
         },
-        /** Best-effort sandbox execution time limit; bash is cancelled at this limit, native reads in progress may complete in the background. */
+        /** Best-effort sandbox execution time limit; native reads in progress may complete in the background. */
         maxDurationSecs: {
             min: 1,
             max: 604_800,

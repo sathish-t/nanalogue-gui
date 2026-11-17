@@ -91,7 +91,7 @@ ${TERMINAL_BOLD}Advanced options:${TERMINAL_RESET}
   --max-records-window-reads <n> Max window_reads records (default: ${CONFIG_FIELD_SPECS.maxRecordsWindowReads.fallback})
   --max-records-seq-table <n>    Max seq_table records (default: ${CONFIG_FIELD_SPECS.maxRecordsSeqTable.fallback})
   --max-code-rounds <n>    Max code execution rounds (default: ${CONFIG_FIELD_SPECS.maxCodeRounds.fallback})
-  --max-duration-secs <n>  Best-effort sandbox time limit in seconds (bash cancelled at limit; native reads in progress may finish) (default: ${CONFIG_FIELD_SPECS.maxDurationSecs.fallback})
+  --max-duration-secs <n>  Best-effort sandbox time limit in seconds (native reads in progress may finish) (default: ${CONFIG_FIELD_SPECS.maxDurationSecs.fallback})
   --max-memory-mb <n>      Max sandbox memory in MB (default: ${CONFIG_FIELD_SPECS.maxMemoryMB.fallback})
   --max-allocations <n>    Max sandbox VM allocations (default: ${CONFIG_FIELD_SPECS.maxAllocations.fallback})
   --max-read-mb <n>        Max read_file text size in MB (BAM access is not affected) (default: ${CONFIG_FIELD_SPECS.maxReadMB.fallback})

@@ -88,7 +88,6 @@ describe("buildSandboxPrompt — external function docs", () => {
             "write_file(file_path: str, content: str, /)",
             "plot_histogram(bins, /, **kwargs)",
             "plot_series(points, /, **kwargs)",
-            "bash(command: str, /)",
             "minimap2(reference_path: str, query_path: str, /, preset: str = None)",
             "peek(bam_path: str, /)",
             "read_info(bam_path: str, /, **kwargs)",

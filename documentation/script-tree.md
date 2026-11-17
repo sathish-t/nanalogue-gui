@@ -66,7 +66,6 @@ src/
     xy-renderer.ts                                  # Dependency-free x/y series SVG renderer.
     ai-external-tools/
       bam-mods.ts           # External tool: bam_mods
-      bash.ts               # External tool: bash
       continue-thinking.ts  # External tool: continue_thinking
       index.ts              # Index of all external tools registered with the Monty sandbox.
       ls.ts                 # External tool: ls

@@ -7,7 +7,6 @@ src/lib/ai-chat-constants.ts	100
 src/lib/ai-chat-ipc-validation.ts	100
 src/lib/ai-chat-shared-constants.ts	84.61
 src/lib/ai-external-tools/bam-mods.ts	100
-src/lib/ai-external-tools/bash.ts	100
 src/lib/ai-external-tools/continue-thinking.ts	100
 src/lib/ai-external-tools/index.ts	100
 src/lib/ai-external-tools/ls.ts	100

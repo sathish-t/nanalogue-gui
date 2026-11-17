@@ -13,6 +13,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { gzipSync } from "node:zlib";
 import { simulateModBam } from "@nanalogue/node";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { MAX_FILENAME_LENGTH } from "../ai-chat-constants";
@@ -244,7 +245,7 @@ it("makeReadFile rejects .svg files with ValueError", async () => {
     // any filesystem access, but we want to ensure it is not bypassed for
     // existing files either.
     await writeFile(join(allowedDir, "plot.svg"), "<svg/>");
-    const fn = makeReadFile(allowedDir, 1024 * 1024);
+    const fn = makeReadFile(allowedDir, 1024 * 1024, 1024 * 1024);
     await expect(fn("plot.svg")).rejects.toMatchObject({
         name: "ValueError",
         message: expect.stringMatching(/Cannot read SVG files/),
@@ -253,8 +254,27 @@ it("makeReadFile rejects .svg files with ValueError", async () => {
 
 it("makeReadFile rejects .SVG (uppercase) with ValueError", async () => {
     await writeFile(join(allowedDir, "CHART.SVG"), "<svg/>");
-    const fn = makeReadFile(allowedDir, 1024 * 1024);
+    const fn = makeReadFile(allowedDir, 1024 * 1024, 1024 * 1024);
     await expect(fn("CHART.SVG")).rejects.toMatchObject({
         name: "ValueError",
+    });
+});
+
+it("makeReadFile rejects .gz input that decompresses past the limit", async () => {
+    // 64 KiB of zeros compresses to well under the limit but expands past it.
+    await writeFile(
+        join(allowedDir, "expands.txt.gz"),
+        gzipSync(Buffer.alloc(65_536)),
+    );
+    const fn = makeReadFile(allowedDir, 1024, 65_535);
+    await expect(fn("expands.txt.gz")).rejects.toMatchObject({
+        name: "ValueError",
+        message: expect.stringMatching(/decompresses to more than 65535 bytes/),
+    });
+    // Exactly at the limit is allowed, and only one page is returned.
+    const atLimit = makeReadFile(allowedDir, 1024, 65_536);
+    await expect(atLimit("expands.txt.gz")).resolves.toMatchObject({
+        bytes_read: 1024,
+        total_size: 65_536,
     });
 });
