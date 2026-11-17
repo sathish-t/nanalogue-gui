@@ -124,8 +124,8 @@ of many concatenated gzip blocks. `content` is the decompressed text, and
 decompressed as a stream that stops once the requested page is full, so each
 call costs at most `offset + max_bytes` of decompression however large the
 file expands, and only the page is kept in memory. Because the rest of the
-file is never decompressed, `total_size` is `None` for `.gz` files; a page
-with fewer bytes than requested marks the end of the file. A `.gz` file that
+file is never decompressed, `total_size` is `None` for `.gz` files; otherwise
+they paginate exactly like uncompressed files. A `.gz` file that
 is not valid gzip data raises `ValueError`.
 Index files such as `.tbi` and `.csi` are binary and cannot be read.
 
