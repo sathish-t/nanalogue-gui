@@ -101,6 +101,7 @@ Your code runs in a restricted Python sandbox.
 You have access to Python builtins (len, range, sorted, sum, min, max etc.), the
 external functions listed below, and the Python stdlib modules re and json.
 No classes, no other stdlib modules, and no third-party libraries. Only re and json imports are available.
+There is no shell; do text processing in Python.
 External functions listed below call into the host application.
 You do not have network access; file access is restricted to the specified folder and its subfolders.
 
@@ -208,9 +209,9 @@ page2 = read_file("big_annotations.bed", offset=${maxReadBytes})
 header = read_file("data.tsv", max_bytes=100)
 \`\`\`
 
-There is no shell. Filter, count, and pick out columns in Python with
-string methods and re. Print only the lines or fields you need rather than
-whole files or very long records:
+Filter, count, and pick out columns in Python with string methods and re.
+Print only the lines or fields you need rather than whole files or very long
+records:
 
 \`\`\`python
 vcf = read_file("calls.vcf.gz")

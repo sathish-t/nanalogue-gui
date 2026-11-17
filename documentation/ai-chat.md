@@ -117,9 +117,6 @@ that point outside it.
 
 ### Gzip-compressed text files
 
-There is no shell in the sandbox. Generated code filters, counts, and
-extracts columns in Python with string methods and `re`.
-
 `read_file()` decompresses any file whose name ends in `.gz` (for example
 `.vcf.gz`, `.bed.gz`, `.tsv.gz`, `.fa.gz`), including bgzip/BGZF files made
 of many concatenated gzip blocks. `content` is the decompressed text, and
