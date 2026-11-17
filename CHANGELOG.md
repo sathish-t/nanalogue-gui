@@ -7,9 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `read_file()` in the AI Chat sandbox now decompresses files ending in `.gz`, including multi-member bgzip/BGZF files such as `.vcf.gz`; the file is streamed and only the requested page is kept in memory; `offset`, `max_bytes`, `bytes_read`, and `total_size` count decompressed bytes; decompressed size is capped at half the sandbox memory limit and invalid gzip data raises `ValueError`; the sandbox prompt and `documentation/ai-chat.md` document this in place of the `zcat` guidance ([`a0b2dbc`](https://github.com/sathish-t/nanalogue-gui/commit/a0b2dbc095cf44677709375755827362b9e2f4d6), [`5691798`](https://github.com/sathish-t/nanalogue-gui/commit/56917987f305973db41aaac9835fdf45db70c14c))
+
+### Fixed
+
+- AI Chat LLM requests now honour `--timeout` (and the GUI timeout setting) instead of failing after 300 s: Node's built-in `fetch` aborted any request whose response headers took longer than undici's default `headersTimeout`, so non-streamed replies from slow local models failed at 5m0s; each request now uses an undici `Agent` whose header and body timeouts equal the configured timeout ([`343f835`](https://github.com/sathish-t/nanalogue-gui/commit/343f83593a9fac6a8fa9732c59aaf713fbe47e52))
+
 ### Removed
 
 - Conversation facts extraction, session storage, eviction, and system-prompt injection from AI Chat; conversation context now comes exclusively from retained message history.
+- `bash()` external tool and the `just-bash` dependency from the AI Chat sandbox, together with its wall-clock abort timer, the `ai_chat_temp_files/` write mount, its tests and Showboat demo, and its documentation; generated code now filters text in Python, and gzip-compressed text is read through `read_file()` ([`a0b2dbc`](https://github.com/sathish-t/nanalogue-gui/commit/a0b2dbc095cf44677709375755827362b9e2f4d6), [`5691798`](https://github.com/sathish-t/nanalogue-gui/commit/56917987f305973db41aaac9835fdf45db70c14c), [`30d8980`](https://github.com/sathish-t/nanalogue-gui/commit/30d8980379c1518152f36caa4d5ba3aa061b79b2))
+
+### Dependencies
+
+- Adds `undici` ^7.30.2 as a runtime dependency; it is external to the `nanalogue-chat` ESM bundle ([`343f835`](https://github.com/sathish-t/nanalogue-gui/commit/343f83593a9fac6a8fa9732c59aaf713fbe47e52))
+- Removes `just-bash` and its transitive dependencies, including `node-liblzma` and `@mongodb-js/zstd`, whose esbuild externals and electron-builder exclusions are also removed ([`a0b2dbc`](https://github.com/sathish-t/nanalogue-gui/commit/a0b2dbc095cf44677709375755827362b9e2f4d6), [`30d8980`](https://github.com/sathish-t/nanalogue-gui/commit/30d8980379c1518152f36caa4d5ba3aa061b79b2))
+
+### Infrastructure
+
+- The production audit no longer carries the temporary GHSA-hp3w-g68c-fv3c exception for `just-bash` → `sprintf-js`; any finding in the production tree now fails `npm run audit:prod` ([`a0b2dbc`](https://github.com/sathish-t/nanalogue-gui/commit/a0b2dbc095cf44677709375755827362b9e2f4d6))
+- Removes live Google Gemini testing: the Gemini case in the live model-listing integration test, the Google provider in the demo screenshots and its committed PNGs, and `GOOGLE_API_KEY` plus the `generativelanguage.googleapis.com` egress allowance from the `ci` and `demo` workflows; live testing now covers OpenAI and Anthropic, and Gemini endpoint support and its offline tests are unchanged ([`2bd27d8`](https://github.com/sathish-t/nanalogue-gui/commit/2bd27d8742eb06f624b95ef683ee78c12eac32aa))
 
 ## [0.2.7] - 2026-03-18
 
