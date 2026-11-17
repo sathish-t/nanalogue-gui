@@ -5,6 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Agent, getGlobalDispatcher, setGlobalDispatcher } from "undici";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_MAX_COMPLETION_TOKENS } from "./ai-chat-constants";
 import {
@@ -220,6 +221,61 @@ describe("chat-orchestrator-llm helpers", () => {
             expect(requests).toBe(2);
             expect(cancelledBeforeRetry).toBe(true);
         } finally {
+            server.closeAllConnections();
+            await new Promise<void>((resolve) => server.close(() => resolve()));
+        }
+    });
+
+    it("waits up to timeoutSeconds for headers despite a shorter global fetch timeout", async () => {
+        // Stands in for Node's 300 s default headers timeout at test scale:
+        // the request succeeds only if fetchChatCompletion uses its own dispatcher.
+        // Undici timers have about 1 s resolution, so the 200 ms global timeout
+        // fires after roughly 1 s; the 2 s reply delay must exceed that.
+        const previousDispatcher = getGlobalDispatcher();
+        const shortTimeoutDispatcher = new Agent({
+            headersTimeout: 200,
+            bodyTimeout: 200,
+        });
+        setGlobalDispatcher(shortTimeoutDispatcher);
+        const completion = {
+            choices: [
+                {
+                    message: { role: "assistant", content: "slow reply" },
+                    finish_reason: "stop",
+                },
+            ],
+        };
+        const server = createServer((req, res) => {
+            req.resume();
+            setTimeout(() => {
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify(completion));
+            }, 2000);
+        });
+        await new Promise<void>((resolve) =>
+            server.listen(0, "127.0.0.1", resolve),
+        );
+        try {
+            const address = server.address();
+            if (address === null || typeof address === "string") {
+                throw new Error("Mock server did not bind to a port");
+            }
+            const result = await fetchChatCompletion(
+                `http://127.0.0.1:${address.port}/v1`,
+                "",
+                "test-model",
+                "system",
+                [{ role: "user", content: "hello" }],
+                0,
+                new AbortController().signal,
+                undefined,
+                5,
+            );
+
+            expect(result).toEqual(completion);
+        } finally {
+            setGlobalDispatcher(previousDispatcher);
+            await shortTimeoutDispatcher.close();
             server.closeAllConnections();
             await new Promise<void>((resolve) => server.close(() => resolve()));
         }
