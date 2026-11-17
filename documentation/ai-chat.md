@@ -25,7 +25,7 @@ handleUserMessage (src/lib/chat-orchestrator.ts)
      │         executes code, captures print() output and expression value
      │         external functions: peek, read_info, bam_mods, window_reads,
      │         seq_table, ls, read_file, write_file, plot_histogram,
-     │         plot_series, bash, minimap2, continue_thinking
+     │         plot_series, minimap2, continue_thinking
      └──► result fed back to LLM or shown to user
 ```
 
@@ -104,11 +104,10 @@ configurable ones are exposed in [advanced-options.md](advanced-options.md);
 | `window_reads(file, ...)` | Reads in a genomic window, up to 5 000 records |
 | `seq_table(file, ...)` | Sequence table for a region |
 | `ls(glob?)` | Lists files under the allowed directory, up to 10,000 entries by default |
-| `read_file(path, ...)` | Reads a text file, up to 1 MB per call |
+| `read_file(path, ...)` | Reads a text file, up to 1 MB per call; decompresses `.gz` files |
 | `write_file(path, content)` | Writes a new text file anywhere under `allowedDir` and fails if the path already exists |
 | `plot_histogram(data, ...)` | Renders a histogram as an SVG file in `ai_chat_output/` |
 | `plot_series(data, ...)` | Renders an XY series plot as an SVG file in `ai_chat_output/` |
-| `bash(command)` | Runs a shell command with restricted access: `allowedDir` is read-only except for `ai_chat_temp_files/`, which bash can write to and overwrite |
 | `minimap2(reference_path, query_path, ...)` | Runs minimap2 alignment via WebAssembly |
 | `continue_thinking()` | Signals the orchestrator to feed this round's output back to the LLM instead of showing it to the user |
 
@@ -116,18 +115,20 @@ All path arguments go through `resolvePath()`, which calls `realpath` and
 rejects anything that resolves outside `allowedDir` — including symlinks
 that point outside it.
 
-### Bash commands and scratch files
+### Gzip-compressed text files
 
-`bash()` runs an in-process interpreter, not the host shell. Supported
-commands include `grep`, `sed`, `awk`, `sort`, `jq`, and `gzip`; installed
-programs such as `samtools`, `bedtools`, Python, and R are not available.
-Do not assume full GNU command compatibility. Working-directory changes
-and shell variables do not persist between calls, so keep dependent steps
-in one command (for example, `cd subdir && grep pattern *.bed`).
+There is no shell in the sandbox. Generated code filters, counts, and
+extracts columns in Python with string methods and `re`.
 
-Despite its name, `ai_chat_temp_files/` persists on disk after the session.
-Bash can overwrite and delete files inside it, so do not store irreplaceable
-inputs there. The rest of `allowedDir` is read-only to bash.
+`read_file()` decompresses any file whose name ends in `.gz` (for example
+`.vcf.gz`, `.bed.gz`, `.tsv.gz`, `.fa.gz`), including bgzip/BGZF files made
+of many concatenated gzip blocks. `content` is the decompressed text, and
+`offset`, `max_bytes`, `bytes_read`, and `total_size` all count decompressed
+bytes, so a large `.gz` file is paginated exactly like an uncompressed one.
+The file is decompressed as a stream and only the requested page is kept in
+memory. A file that decompresses to more than half the sandbox memory cap
+raises `ValueError`, as does a `.gz` file that is not valid gzip data.
+Index files such as `.tbi` and `.csi` are binary and cannot be read.
 
 ### Resource limits
 
@@ -140,8 +141,8 @@ Two layers of limits protect the host process:
 
 - **Monty runtime** — best-effort execution time limit (default 30 min,
   or 1,800 seconds), heap cap (512 MB), allocation cap (100,000,000 objects).
-  Bash commands are cancelled at the time limit; native data-access
-  operations already in progress may complete in the background.
+  Native data-access operations already in progress at the time limit may
+  complete in the background.
 - **Wrapper level** — record caps passed as `limit` directly to the
   `@nanalogue/node` Rust layer (so large BAMs stop reading early rather
   than materialising in memory), inline output allowance derived from the

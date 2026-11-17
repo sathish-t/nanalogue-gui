@@ -44,10 +44,10 @@ Monty sandbox. They apply to both `nanalogue-chat` and
 
 | Option | CLI flag | Default | Range | Description |
 |---|---|---|---|---|
-| Max execution time (seconds) | `--max-duration-secs` | 1,800 | 1–604,800 | Best-effort execution time limit per sandbox run. Bash commands are actively cancelled when this fires; native data-access operations already in progress may complete in the background. The LLM is told the actual value you set, so it can plan accordingly. Increase for computationally heavy scripts. |
+| Max execution time (seconds) | `--max-duration-secs` | 1,800 | 1–604,800 | Best-effort execution time limit per sandbox run. Native data-access operations already in progress when this fires may complete in the background. The LLM is told the actual value you set, so it can plan accordingly. Increase for computationally heavy scripts. |
 | Max sandbox memory (MB) | `--max-memory-mb` | 512 | 1–65,536 | Heap memory cap for the sandbox process. Increase when working with large dataframes or high-coverage BAM regions. |
 | Max sandbox allocations | `--max-allocations` | 100,000,000 | 1–100,000,000,000 | Monty VM allocation cap. Acts as a secondary safety net independent of memory. Change as needed depending on the task at hand. |
-| Max read_file size (MB) | `--max-read-mb` | 1 | 1–100 | Maximum bytes the sandbox `read_file()` function may read in a single call. Also limits each file loaded by filesystem-backed bash reads. Increase if your analysis scripts need to read large text or CSV files through either tool. |
+| Max read_file size (MB) | `--max-read-mb` | 1 | 1–100 | Maximum bytes the sandbox `read_file()` function may return in a single call. For `.gz` files this counts decompressed bytes. Increase if your analysis scripts need to read large text or CSV files. |
 | Max write_file size (MB) | `--max-write-mb` | 50 | 1–100 | Maximum bytes the sandbox `write_file()` function may write in a single call. Increase if the model needs to produce large output files (e.g. BED files with millions of rows). |
 
 **When to change:**

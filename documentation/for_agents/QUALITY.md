@@ -64,7 +64,6 @@ are created.
 |---|---|---|---|
 | `index.ts` | via `ai-external-tools.test.ts` | A | 100% line coverage |
 | `bam-mods.ts` | via `monty-sandbox.test.ts` | A | 100% line coverage |
-| `bash.ts` | `bash.test.ts` | A | 100% line coverage |
 | `continue-thinking.ts` | via `monty-sandbox.test.ts` | A | 100% line coverage |
 | `ls.ts` | via `monty-sandbox.test.ts` | A | 100% line coverage |
 | `minimap2.ts` | `minimap2.test.ts` | A | 100% line coverage |
@@ -72,7 +71,7 @@ are created.
 | `plot-histogram.ts` | `plot-histogram.test.ts` | A | 100% line coverage |
 | `plot-series.ts` | `plot-series.test.ts` | A | 100% line coverage |
 | `plot-utils.ts` | via `plot-histogram.test.ts`, `plot-series.test.ts` | A | 100% line coverage |
-| `read-file.ts` | via `monty-sandbox.test.ts` | A | 100% line coverage |
+| `read-file.ts` | via `monty-sandbox.test.ts` and `ai-external-tools.test.ts` | A | 100% line coverage |
 | `read-info.ts` | via `monty-sandbox.test.ts` | A | 100% line coverage |
 | `seq-table.ts` | via `monty-sandbox.test.ts` | A | 100% line coverage |
 | `window-reads.ts` | via `monty-sandbox.test.ts` | A | 100% line coverage |
