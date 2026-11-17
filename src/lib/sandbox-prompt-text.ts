@@ -215,6 +215,7 @@ Print only the lines or fields you need rather than whole files or very long
 records:
 
 \`\`\`python
+# Reads only the first page; paginate with offset for larger files.
 vcf = read_file("calls.vcf.gz")
 for line in vcf["content"].splitlines():
     if line.startswith("#"):
