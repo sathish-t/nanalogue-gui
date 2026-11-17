@@ -286,6 +286,23 @@ it("makeReadFile stops decompressing .gz input once the page is full", async () 
     });
 });
 
+it("makeReadFile ignores zero padding after .gz data", async () => {
+    // Block-padded copies end in zero bytes; unlike other trailing data,
+    // gzip -d accepts them silently, and read_file must too.
+    const text = "chr1\t100\tA\tT\nchr2\t200\tG\tC\n";
+    await writeFile(
+        join(allowedDir, "padded.vcf.gz"),
+        Buffer.concat([gzipSync(text), Buffer.alloc(512)]),
+    );
+    const fn = makeReadFile(allowedDir, 1024);
+    await expect(fn("padded.vcf.gz")).resolves.toEqual({
+        content: text,
+        bytes_read: text.length,
+        total_size: null,
+        offset: 0,
+    });
+});
+
 it("makeReadFile passes file-system errors on .gz paths through unchanged", async () => {
     // Only zlib errors become "not valid gzip data"; an I/O error keeps its code.
     await mkdir(join(allowedDir, "folder.gz"));
