@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `nanalogue-chat` and `nanalogue-sandbox-exec` report their status to the terminal with the [OSC 7501 Program Status Protocol](https://www.superlogical.com/rex/docs/build/program-status): `working` while thinking or running code, `done` when a response or script finishes, `error` on failure, `idle` at the chat prompt or when Ctrl+C cancels a chat request, and `clear` when the chat exits; reports go to stderr only when it is a terminal, and setting `NANALOGUE_NO_PROGRAM_STATUS` turns them off
+
 ### Removed
 
 - Conversation facts extraction, session storage, eviction, and system-prompt injection from AI Chat; conversation context now comes exclusively from retained message history.

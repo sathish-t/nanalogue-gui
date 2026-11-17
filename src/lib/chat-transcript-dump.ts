@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type { HistoryEntry } from "./chat-types";
 import { generateChatHtml } from "./log-to-html.js";
 import { resolvePath } from "./monty-sandbox-helpers";
+import { CHAT_CLI_PROGRAM_NAME } from "./program-names";
 
 /** A role and content pair accepted by the transcript renderers. */
 export interface ChatTranscriptMessage {
@@ -78,7 +79,12 @@ export async function dumpLlmInstructions(
     messages: ChatTranscriptMessage[],
     model: string,
 ): Promise<ChatTranscriptDumpResult> {
-    return writeChatTranscript(allowedDir, messages, model, "nanalogue-chat");
+    return writeChatTranscript(
+        allowedDir,
+        messages,
+        model,
+        CHAT_CLI_PROGRAM_NAME,
+    );
 }
 
 /**

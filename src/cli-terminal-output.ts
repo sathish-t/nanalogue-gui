@@ -1,6 +1,7 @@
 // Terminal output helpers for the standalone nanalogue-chat CLI.
 
 import assert from "node:assert/strict";
+import { reportProgramStatus } from "./cli-program-status";
 import {
     TERMINAL_BOLD,
     TERMINAL_CLEAR_LINE,
@@ -13,6 +14,7 @@ import {
 import { EXTERNAL_FUNCTIONS } from "./lib/ai-chat-constants";
 import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
 import type { AiChatEvent, SandboxResult } from "./lib/chat-types";
+import { CHAT_CLI_PROGRAM_NAME } from "./lib/program-names";
 
 /**
  * Wraps text with an ANSI color code and reset suffix.
@@ -109,6 +111,9 @@ ${TERMINAL_BOLD}Other:${TERMINAL_RESET}
   Note: --list-models takes precedence over --non-interactive if both are passed.
   -v, --version            Print version and exit
 
+${TERMINAL_BOLD}Environment:${TERMINAL_RESET}
+  NANALOGUE_NO_PROGRAM_STATUS  Set to stop terminal program status reports (OSC 7501)
+
 ${TERMINAL_BOLD}Custom system prompt:${TERMINAL_RESET}
   --system-prompt <text>       Replace the default system prompt. Pass content
                                directly or via a shell variable:
@@ -186,13 +191,15 @@ function formatSandboxResult(result: SandboxResult): string {
 }
 
 /**
- * Handles a progress event from the orchestrator by printing to the terminal.
+ * Handles a progress event from the orchestrator by printing to the terminal
+ * and reporting the matching OSC 7501 program status.
  *
  * @param event - The AI Chat event to display.
  */
 export function emitEvent(event: AiChatEvent): void {
     switch (event.type) {
         case "turn_start":
+            reportProgramStatus(CHAT_CLI_PROGRAM_NAME, "working", "Thinking");
             process.stdout.write(color(TERMINAL_YELLOW, "[thinking...]"));
             break;
         case "code_execution_start":
@@ -203,14 +210,26 @@ export function emitEvent(event: AiChatEvent): void {
                     `\`\`\`python\n${event.code}\n\`\`\``,
                 ),
             );
+            reportProgramStatus(
+                CHAT_CLI_PROGRAM_NAME,
+                "working",
+                "Running Python code",
+            );
             process.stdout.write(color(TERMINAL_YELLOW, "[running code...]"));
             break;
         case "code_execution_end":
             process.stdout.write(TERMINAL_CLEAR_LINE);
             console.log(color(TERMINAL_DIM, formatSandboxResult(event.result)));
+            // The orchestrator returns to the LLM after each code run.
+            reportProgramStatus(CHAT_CLI_PROGRAM_NAME, "working", "Thinking");
             break;
         case "turn_end":
             process.stdout.write(TERMINAL_CLEAR_LINE);
+            reportProgramStatus(
+                CHAT_CLI_PROGRAM_NAME,
+                "done",
+                "Response ready",
+            );
             break;
         case "turn_error": {
             process.stdout.write(TERMINAL_CLEAR_LINE);
@@ -220,21 +239,18 @@ export function emitEvent(event: AiChatEvent): void {
                 errorMsg.length <= 3000,
                 "Error message is pathologically long (length > 3000)!",
             );
-            console.error(
-                color(
-                    TERMINAL_RED,
-                    `Error: ${
-                        event.isTimeout
-                            ? "LLM response timed out (i.e. a message from the LLM took too much time to arrive)"
-                            : errorMsg
-                    }`,
-                ),
-            );
+            const displayedError = event.isTimeout
+                ? "LLM response timed out (i.e. a message from the LLM took too much time to arrive)"
+                : errorMsg;
+            console.error(color(TERMINAL_RED, `Error: ${displayedError}`));
+            reportProgramStatus(CHAT_CLI_PROGRAM_NAME, "error", displayedError);
             break;
         }
         case "turn_cancelled":
             process.stdout.write(TERMINAL_CLEAR_LINE);
             console.log(color(TERMINAL_YELLOW, "[cancelled]"));
+            // The spec asks programs to report idle when the user cancels.
+            reportProgramStatus(CHAT_CLI_PROGRAM_NAME, "idle");
             break;
         default:
             break;
