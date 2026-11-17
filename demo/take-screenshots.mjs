@@ -170,12 +170,6 @@ const AI_PROVIDERS = [
         model: "gpt-5.4-mini",
     },
     {
-        name: "google",
-        endpoint: "https://generativelanguage.googleapis.com/v1beta",
-        keyEnv: "GOOGLE_API_KEY",
-        model: "gemini-2.5-pro",
-    },
-    {
         name: "anthropic",
         endpoint: "https://api.anthropic.com/v1/",
         keyEnv: "ANTHROPIC_API_KEY",
