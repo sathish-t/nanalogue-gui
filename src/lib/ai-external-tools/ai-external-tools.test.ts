@@ -303,6 +303,21 @@ it("makeReadFile ignores zero padding after .gz data", async () => {
     });
 });
 
+it("makeReadFile rejects non-zero padding after .gz data", async () => {
+    // Non-zero trailing bytes mean a damaged file, so a read that reaches
+    // them raises, where gzip -d warns and ignores them.
+    const text = "chr1\t100\tA\tT\nchr2\t200\tG\tC\n";
+    await writeFile(
+        join(allowedDir, "nonzero-padded.vcf.gz"),
+        Buffer.concat([gzipSync(text), Buffer.alloc(512, 1)]),
+    );
+    const fn = makeReadFile(allowedDir, 1024);
+    await expect(fn("nonzero-padded.vcf.gz")).rejects.toMatchObject({
+        name: "ValueError",
+        message: expect.stringMatching(/not valid gzip data/),
+    });
+});
+
 it("makeReadFile passes file-system errors on .gz paths through unchanged", async () => {
     // Only zlib errors become "not valid gzip data"; an I/O error keeps its code.
     await mkdir(join(allowedDir, "folder.gz"));
