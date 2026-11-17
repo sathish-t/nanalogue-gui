@@ -120,11 +120,13 @@ that point outside it.
 `read_file()` decompresses any file whose name ends in `.gz` (for example
 `.vcf.gz`, `.bed.gz`, `.tsv.gz`, `.fa.gz`), including bgzip/BGZF files made
 of many concatenated gzip blocks. `content` is the decompressed text, and
-`offset`, `max_bytes`, `bytes_read`, and `total_size` all count decompressed
-bytes, so a large `.gz` file is paginated exactly like an uncompressed one.
-The file is decompressed as a stream and only the requested page is kept in
-memory. A file that decompresses to more than half the sandbox memory cap
-raises `ValueError`, as does a `.gz` file that is not valid gzip data.
+`offset`, `max_bytes`, and `bytes_read` count decompressed bytes. The file is
+decompressed as a stream that stops once the requested page is full, so each
+call costs at most `offset + max_bytes` of decompression however large the
+file expands, and only the page is kept in memory. Because the rest of the
+file is never decompressed, `total_size` is `None` for `.gz` files; a page
+with fewer bytes than requested marks the end of the file. A `.gz` file that
+is not valid gzip data raises `ValueError`.
 Index files such as `.tbi` and `.csi` are binary and cannot be read.
 
 ### Resource limits

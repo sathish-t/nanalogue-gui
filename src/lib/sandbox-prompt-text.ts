@@ -183,10 +183,11 @@ the file content and pagination metadata:
   bam_mods, window_reads, or seq_table for BAM/CRAM files instead.
 - Gzip-compressed text files whose names end in .gz (for example .vcf.gz,
   .bed.gz, .tsv.gz, .fa.gz), including bgzip/BGZF files, are decompressed
-  automatically. content is the decompressed text, and offset, max_bytes,
-  bytes_read and total_size all count decompressed bytes, so paginate a
-  large .gz file exactly as you would an uncompressed one. Index files such
-  as .tbi and .csi are binary and cannot be read.
+  automatically. content is the decompressed text, and offset, max_bytes
+  and bytes_read count decompressed bytes. total_size is None for .gz files
+  because the decompressed size is unknown; paginate with offset until
+  bytes_read is less than the bytes requested, which marks the end of the
+  file. Index files such as .tbi and .csi are binary and cannot be read.
 - Max ${maxReadMB} MB per call. For files larger than ${maxReadMB} MB, use offset and
   max_bytes to paginate.
 

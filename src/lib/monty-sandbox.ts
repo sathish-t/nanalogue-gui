@@ -282,11 +282,7 @@ export async function runSandboxCode(
                         ),
                         seq_table: makeSeqTable(allowedDir, maxRecordsSeqTable),
                         ls: makeLs(allowedDir, maxLsEntries),
-                        read_file: makeReadFile(
-                            allowedDir,
-                            maxReadBytes,
-                            Math.max(1, Math.floor(maxMemory * 0.5)),
-                        ),
+                        read_file: makeReadFile(allowedDir, maxReadBytes),
                         write_file: makeWriteFile(allowedDir, maxWriteBytes),
                         plot_histogram: makePlotHistogram(
                             allowedDir,

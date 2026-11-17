@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `read_file()` in the AI Chat sandbox now decompresses files ending in `.gz`, including multi-member bgzip/BGZF files such as `.vcf.gz`; the file is streamed and only the requested page is kept in memory; `offset`, `max_bytes`, `bytes_read`, and `total_size` count decompressed bytes; decompressed size is capped at half the sandbox memory limit and invalid gzip data raises `ValueError`; the sandbox prompt and `documentation/ai-chat.md` document this in place of the `zcat` guidance ([`a0b2dbc`](https://github.com/sathish-t/nanalogue-gui/commit/a0b2dbc095cf44677709375755827362b9e2f4d6), [`5691798`](https://github.com/sathish-t/nanalogue-gui/commit/56917987f305973db41aaac9835fdf45db70c14c))
+- `read_file()` in the AI Chat sandbox now decompresses files ending in `.gz`, including multi-member bgzip/BGZF files such as `.vcf.gz`; decompression streams and stops once the requested page is full, so a call costs at most `offset + max_bytes` of decompression and keeps only that page in memory, even for a gzip bomb; `offset`, `max_bytes`, and `bytes_read` count decompressed bytes, `total_size` is `None` because the decompressed size is unknown, and invalid gzip data raises `ValueError`; the sandbox prompt and `documentation/ai-chat.md` document this in place of the `zcat` guidance ([`a0b2dbc`](https://github.com/sathish-t/nanalogue-gui/commit/a0b2dbc095cf44677709375755827362b9e2f4d6), [`5691798`](https://github.com/sathish-t/nanalogue-gui/commit/56917987f305973db41aaac9835fdf45db70c14c))
 
 ### Fixed
 

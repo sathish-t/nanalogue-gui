@@ -552,17 +552,22 @@ it("read_file decompresses every member of a multi-member .gz file", async () =>
     const code = `
 whole = read_file("calls.vcf.gz")
 page = read_file("calls.vcf.gz", offset=${header.length - 3}, max_bytes=9)
-[whole, page]
+[whole, page, whole["total_size"] is None and page["total_size"] is None]
 `;
     const result = await runSandboxCode(code, allowedDir);
     expect(result.success).toBe(true);
-    const [whole, page] = result.value as Record<string, unknown>[];
+    const [whole, page, totalSizesAreNone] = result.value as [
+        Record<string, unknown>,
+        Record<string, unknown>,
+        boolean,
+    ];
     expect(whole.content).toBe(header + record);
-    expect(whole.total_size).toBe(header.length + record.length);
+    expect(whole.bytes_read).toBe(header.length + record.length);
+    // The decompressed size is unknown without reading the whole file.
+    expect(totalSizesAreNone).toBe(true);
     // offset and max_bytes count decompressed bytes and may span members.
     expect(page.content).toBe(".2\nchr2\t4");
     expect(page.bytes_read).toBe(9);
-    expect(page.total_size).toBe(header.length + record.length);
     expect(page.offset).toBe(header.length - 3);
 });
 

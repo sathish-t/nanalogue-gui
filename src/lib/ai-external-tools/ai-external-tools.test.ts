@@ -245,7 +245,7 @@ it("makeReadFile rejects .svg files with ValueError", async () => {
     // any filesystem access, but we want to ensure it is not bypassed for
     // existing files either.
     await writeFile(join(allowedDir, "plot.svg"), "<svg/>");
-    const fn = makeReadFile(allowedDir, 1024 * 1024, 1024 * 1024);
+    const fn = makeReadFile(allowedDir, 1024 * 1024);
     await expect(fn("plot.svg")).rejects.toMatchObject({
         name: "ValueError",
         message: expect.stringMatching(/Cannot read SVG files/),
@@ -254,27 +254,41 @@ it("makeReadFile rejects .svg files with ValueError", async () => {
 
 it("makeReadFile rejects .SVG (uppercase) with ValueError", async () => {
     await writeFile(join(allowedDir, "CHART.SVG"), "<svg/>");
-    const fn = makeReadFile(allowedDir, 1024 * 1024, 1024 * 1024);
+    const fn = makeReadFile(allowedDir, 1024 * 1024);
     await expect(fn("CHART.SVG")).rejects.toMatchObject({
         name: "ValueError",
     });
 });
 
-it("makeReadFile rejects .gz input that decompresses past the limit", async () => {
-    // 64 KiB of zeros compresses to well under the limit but expands past it.
+it("makeReadFile stops decompressing .gz input once the page is full", async () => {
+    // 4 MiB of zeros compresses to a few KiB, like a small gzip bomb. The junk
+    // after it is only reached, and only raises, if decompression runs past
+    // the requested page.
     await writeFile(
         join(allowedDir, "expands.txt.gz"),
-        gzipSync(Buffer.alloc(65_536)),
+        Buffer.concat([
+            gzipSync(Buffer.alloc(4 * 1024 * 1024)),
+            Buffer.from("junk after the gzip data"),
+        ]),
     );
-    const fn = makeReadFile(allowedDir, 1024, 65_535);
-    await expect(fn("expands.txt.gz")).rejects.toMatchObject({
-        name: "ValueError",
-        message: expect.stringMatching(/decompresses to more than 65535 bytes/),
-    });
-    // Exactly at the limit is allowed, and only one page is returned.
-    const atLimit = makeReadFile(allowedDir, 1024, 65_536);
-    await expect(atLimit("expands.txt.gz")).resolves.toMatchObject({
+    const fn = makeReadFile(allowedDir, 1024);
+    await expect(fn("expands.txt.gz")).resolves.toEqual({
+        content: "\0".repeat(1024),
         bytes_read: 1024,
-        total_size: 65_536,
+        total_size: null,
+        offset: 0,
     });
+    await expect(
+        fn("expands.txt.gz", { offset: 4 * 1024 * 1024 }),
+    ).rejects.toMatchObject({
+        name: "ValueError",
+        message: expect.stringMatching(/not valid gzip data/),
+    });
+});
+
+it("makeReadFile passes file-system errors on .gz paths through unchanged", async () => {
+    // Only zlib errors become "not valid gzip data"; an I/O error keeps its code.
+    await mkdir(join(allowedDir, "folder.gz"));
+    const fn = makeReadFile(allowedDir, 1024);
+    await expect(fn("folder.gz")).rejects.toMatchObject({ code: "EISDIR" });
 });
