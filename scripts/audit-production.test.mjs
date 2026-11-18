@@ -1,4 +1,4 @@
-// Production audit policy: a single temporary exception must not hide other risks.
+// Production audit policy: any finding in the production tree fails the audit.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
@@ -15,178 +15,64 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { evaluateProductionAudit } from "./audit-production.mjs";
 
-const lock = {
-    packages: {
-        "node_modules/just-bash": {
-            version: "2.14.2",
-            dependencies: { "sprintf-js": "^1.1.3" },
-        },
-        "node_modules/sprintf-js": { version: "1.1.3" },
-    },
-};
-
-function approvedReport() {
+/** Builds a well-formed npm audit report containing the given findings. */
+function report(findings = {}) {
+    const counts = { info: 0, low: 0, moderate: 0, high: 0, critical: 0 };
+    for (const finding of Object.values(findings)) counts[finding.severity]++;
     return {
         auditReportVersion: 2,
-        vulnerabilities: {
-            "just-bash": {
-                name: "just-bash",
-                severity: "moderate",
-                isDirect: true,
-                range: "*",
-                via: ["sprintf-js"],
-                nodes: ["node_modules/just-bash"],
-                effects: [],
-                fixAvailable: false,
-            },
-            "sprintf-js": {
-                name: "sprintf-js",
-                severity: "moderate",
-                isDirect: false,
-                range: "*",
-                via: [
-                    {
-                        name: "sprintf-js",
-                        dependency: "sprintf-js",
-                        severity: "moderate",
-                        range: "<=1.1.3",
-                        url: "https://github.com/advisories/GHSA-hp3w-g68c-fv3c",
-                    },
-                ],
-                nodes: ["node_modules/sprintf-js"],
-                effects: ["just-bash"],
-                fixAvailable: false,
-            },
-        },
+        vulnerabilities: findings,
         metadata: {
             vulnerabilities: {
-                info: 0,
-                low: 0,
-                moderate: 2,
-                high: 0,
-                critical: 0,
-                total: 2,
+                ...counts,
+                total: Object.keys(findings).length,
             },
         },
     };
 }
 
-const beforeExpiry = new Date("2026-11-10T23:59:59.999Z");
-const expiry = new Date("2026-11-11T00:00:00.000Z");
-const check = (report, status = 1, date = beforeExpiry, locked = lock) =>
-    evaluateProductionAudit(JSON.stringify(report), status, locked, date);
+const finding = (name, severity = "moderate") => ({ name, severity });
+const check = (r, status) => evaluateProductionAudit(JSON.stringify(r), status);
 
-test("accepts only the approved chain before its UTC expiry and reports the risk", () => {
-    assert.match(check(approvedReport()), /GHSA-hp3w-g68c-fv3c.*2026-11-11/);
-    assert.throws(() => check(approvedReport(), 1, expiry), /expired/);
+test("a clean production audit passes", () => {
+    assert.match(check(report(), 0), /no vulnerabilities/);
 });
 
-test("a clean production audit passes even after the exception expires", () => {
-    const report = approvedReport();
-    report.vulnerabilities = {};
-    for (const key of Object.keys(report.metadata.vulnerabilities)) {
-        report.metadata.vulnerabilities[key] = 0;
-    }
-    assert.match(check(report, 0, expiry), /no vulnerabilities/);
-});
-
-test("rejects unrelated findings, extra advisories, paths, versions and available fixes", () => {
-    const mutations = [
-        (r) => {
-            r.vulnerabilities.other = r.vulnerabilities["just-bash"];
-            r.metadata.vulnerabilities.moderate = 3;
-            r.metadata.vulnerabilities.total = 3;
-        },
-        (r) => {
-            r.vulnerabilities["sprintf-js"].via[0].url += "-different";
-        },
-        (r) => {
-            r.vulnerabilities["sprintf-js"].via.push({
-                url: "another advisory",
-            });
-        },
-        (r) => {
-            r.vulnerabilities["just-bash"].via.push("another-package");
-        },
-        (r) => {
-            r.vulnerabilities["sprintf-js"].nodes.push(
-                "node_modules/other/node_modules/sprintf-js",
-            );
-        },
-        (r) => {
-            r.vulnerabilities["just-bash"].effects.push("another-package");
-        },
-        (r) => {
-            r.vulnerabilities["sprintf-js"].severity = "high";
-            r.metadata.vulnerabilities.moderate = 1;
-            r.metadata.vulnerabilities.high = 1;
-        },
-        (r) => {
-            r.vulnerabilities["sprintf-js"].fixAvailable = { version: "1.1.4" };
-        },
-    ];
-    for (const mutate of mutations) {
-        const report = approvedReport();
-        mutate(report);
-        assert.throws(() => check(report), /Production audit/);
-    }
-    for (const name of ["sprintf-js", "just-bash"]) {
-        const changedLock = structuredClone(lock);
-        changedLock.packages[`node_modules/${name}`].version = "9.9.9";
+test("any finding fails, whatever its severity", () => {
+    for (const severity of ["info", "low", "moderate", "high", "critical"]) {
         assert.throws(
-            () => check(approvedReport(), 1, beforeExpiry, changedLock),
-            /Production audit/,
+            () => check(report({ pkg: finding("pkg", severity) }), 1),
+            new RegExp(
+                `Production audit failed: 1 finding\\(s\\): pkg \\(${severity}\\)`,
+            ),
         );
     }
-    const changedChain = structuredClone(lock);
-    changedChain.packages["node_modules/just-bash"].dependencies["sprintf-js"] =
-        "*";
-    assert.throws(
-        () => check(approvedReport(), 1, beforeExpiry, changedChain),
-        /dependency chain changed/,
-    );
 });
 
 test("fails closed on audit errors, malformed reports and inconsistent exit codes/counts", () => {
+    const one = () => report({ pkg: finding("pkg") });
     for (const status of [null, 2, 0]) {
-        assert.throws(
-            () => check(approvedReport(), status),
-            /Production audit/,
-        );
+        assert.throws(() => check(one(), status), /Production audit/);
     }
-    for (const report of [null, {}, { error: { code: "ENETWORK" } }]) {
-        assert.throws(() => check(report), /Production audit/);
+    assert.throws(() => check(report(), 1), /inconsistent total or exit code/);
+    for (const r of [null, {}, { error: { code: "ENETWORK" } }]) {
+        assert.throws(() => check(r, 1), /Production audit/);
     }
     for (const raw of ["", "not JSON"]) {
         assert.throws(
-            () => evaluateProductionAudit(raw, 1, lock, beforeExpiry),
+            () => evaluateProductionAudit(raw, 1),
             /Production audit/,
         );
     }
-    const report = approvedReport();
-    report.metadata.vulnerabilities.total = 0;
-    assert.throws(() => check(report), /Production audit/);
-    report.metadata.vulnerabilities.total = 2;
-    delete report.vulnerabilities["sprintf-js"].via;
-    assert.throws(() => check(report), /Production audit/);
-});
-
-test("requires inherited-only exposure and the reviewed vulnerable release inventory", () => {
-    for (const name of ["just-bash", "sprintf-js"]) {
-        for (const range of ["<=1.1.3", "", undefined]) {
-            const report = approvedReport();
-            report.vulnerabilities[name].range = range;
-            assert.throws(() => check(report), /Production audit/);
-        }
-        for (const isDirect of [name !== "just-bash", undefined]) {
-            const report = approvedReport();
-            report.vulnerabilities[name].isDirect = isDirect;
-            assert.throws(() => check(report), /Production audit/);
-        }
-    }
-    const report = approvedReport();
-    report.vulnerabilities["sprintf-js"].via[0].range = "<=2.0.0";
-    assert.throws(() => check(report), /Production audit/);
+    const wrongTotal = one();
+    wrongTotal.metadata.vulnerabilities.total = 0;
+    assert.throws(() => check(wrongTotal, 1), /Production audit/);
+    const wrongSeverityCount = one();
+    wrongSeverityCount.metadata.vulnerabilities.moderate = 0;
+    assert.throws(
+        () => check(wrongSeverityCount, 1),
+        /inconsistent vulnerability counts/,
+    );
 });
 
 test("the CLI exits nonzero when npm cannot reach the audit registry", () => {

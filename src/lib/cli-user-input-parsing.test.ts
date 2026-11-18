@@ -28,22 +28,22 @@ describe("findDuplicateCliOption", () => {
 });
 
 describe("parseRemovedToolNames", () => {
-    const validTools = ["read_info", "bam_mods", "bash"];
+    const validTools = ["read_info", "bam_mods", "ls"];
 
     it("accepts unique known comma-separated tools", () => {
-        expect(parseRemovedToolNames("read_info,bash", validTools)).toEqual({
+        expect(parseRemovedToolNames("read_info,ls", validTools)).toEqual({
             valid: true,
-            names: ["read_info", "bash"],
+            names: ["read_info", "ls"],
         });
     });
 
     it.each([
         ["", "cannot be empty"],
-        ["read_info,,bash", "empty entry"],
-        ["read_info, bash", "surrounding whitespace"],
+        ["read_info,,ls", "empty entry"],
+        ["read_info, ls", "surrounding whitespace"],
         ["x".repeat(301), "exceeds 300 characters"],
         ["unknown", "unknown tool"],
-        ["bash,bash", "repeats tool"],
+        ["ls,ls", "repeats tool"],
     ])("rejects malformed list %j", (rawValue, expectedError) => {
         const result = parseRemovedToolNames(rawValue, validTools);
         expect(result.valid).toBe(false);

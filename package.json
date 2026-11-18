@@ -12,9 +12,9 @@
     ],
     "scripts": {
         "build": "npm run build:main && npm run build:renderer && npm run build:cli && npm run build:execute-cli && npm run copy-assets",
-        "build:cli": "esbuild src/cli.ts --bundle --outfile=dist/cli.mjs --format=esm --platform=node --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd --banner:js='#!/usr/bin/env node'",
-        "build:execute-cli": "esbuild src/execute-cli.ts --bundle --outfile=dist/execute-cli.mjs --format=esm --platform=node --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd --banner:js='#!/usr/bin/env node'",
-        "build:main": "esbuild src/main.ts src/preload.ts src/exit-watchdog.ts src/electron-security.ts src/font-size.ts src/modes/ai-chat.ts src/modes/bam-inspection.ts src/modes/locate.ts src/modes/qc.ts src/modes/swipe.ts --bundle --platform=node --format=cjs --outbase=src --outdir=dist '--external:./modes/*' --external:./electron-security --external:../electron-security --external:./font-size --external:../font-size --external:electron --external:@nanalogue/node --external:@pydantic/monty --external:node-liblzma --external:@mongodb-js/zstd",
+        "build:cli": "esbuild src/cli.ts --bundle --outfile=dist/cli.mjs --format=esm --platform=node --external:@nanalogue/node --external:@pydantic/monty --external:undici --banner:js='#!/usr/bin/env node'",
+        "build:execute-cli": "esbuild src/execute-cli.ts --bundle --outfile=dist/execute-cli.mjs --format=esm --platform=node --external:@nanalogue/node --external:@pydantic/monty --banner:js='#!/usr/bin/env node'",
+        "build:main": "esbuild src/main.ts src/preload.ts src/exit-watchdog.ts src/electron-security.ts src/font-size.ts src/modes/ai-chat.ts src/modes/bam-inspection.ts src/modes/locate.ts src/modes/qc.ts src/modes/swipe.ts --bundle --platform=node --format=cjs --outbase=src --outdir=dist '--external:./modes/*' --external:./electron-security --external:../electron-security --external:./font-size --external:../font-size --external:electron --external:@nanalogue/node --external:@pydantic/monty",
         "build:renderer": "npm run build:landing && npm run build:swipe && npm run build:qc && npm run build:locate && npm run build:ai-chat",
         "build:landing": "esbuild src/renderer/landing/landing.ts --bundle --outfile=dist/renderer/landing/landing.js --format=iife --platform=browser",
         "build:swipe": "esbuild src/renderer/swipe/swipe.ts src/renderer/swipe/swipe-config.ts --bundle --outdir=dist/renderer/swipe --format=iife --platform=browser",
@@ -48,7 +48,7 @@
         "@pydantic/monty": "^0.0.18",
         "chart.js": "^4.4.0",
         "chartjs-plugin-annotation": "^3.1.0",
-        "just-bash": "^2.14.0"
+        "undici": "^7.30.2"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.6",
@@ -104,8 +104,6 @@
         "files": [
             "dist/**/*",
             "node_modules/**/*",
-            "!node_modules/node-liblzma/**/*",
-            "!node_modules/@mongodb-js/zstd/**/*",
             "package.json"
         ],
         "mac": {

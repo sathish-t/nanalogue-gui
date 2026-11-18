@@ -268,7 +268,7 @@ Any other provider that supports the OpenAI v1 chat completions protocol
 Please note that unless you have a local LLM that you or your organization are running,
 it is likely that you will be charged per request to these URLs. Remote endpoints also receive the BAM-derived prompts and results from your session, so only use a provider you trust.
 
-We have tested for the following providers either manually or automatically in this repository.
+We have tested the following providers. OpenAI and Anthropic are tested automatically in CI; Google was tested manually and is not exercised in CI.
 
 | Provider | Endpoint URL | API key | How to get started |
 |---|---|---|---|

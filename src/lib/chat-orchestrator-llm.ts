@@ -1,6 +1,7 @@
 // LLM transport helpers for AI chat orchestration.
 // Keeps API retries and prompt-token calibration separate from the main turn loop.
 
+import { Agent } from "undici";
 import { DEFAULT_MAX_COMPLETION_TOKENS } from "./ai-chat-constants";
 import { CONFIG_FIELD_SPECS } from "./ai-chat-shared-constants";
 import {
@@ -127,12 +128,21 @@ export async function fetchChatCompletion(
         endpointUrl,
     );
     const body = JSON.stringify(payload);
+    // Node's fetch otherwise aborts after 300 s without response headers, which
+    // non-streamed responses from slow local models exceed regardless of timeoutSeconds.
+    const dispatcher = new Agent({
+        headersTimeout: timeoutSeconds * 1000,
+        bodyTimeout: timeoutSeconds * 1000,
+    });
 
     try {
         let lastError: Error | undefined;
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
             try {
-                const response = await fetch(url, {
+                const init: RequestInit & {
+                    /** Agent applying timeoutSeconds to headers and body. */
+                    dispatcher: Agent;
+                } = {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -142,7 +152,9 @@ export async function fetchChatCompletion(
                     },
                     body,
                     signal,
-                });
+                    dispatcher,
+                };
+                const response = await fetch(url, init);
                 if (!response.ok) {
                     if (
                         RETRYABLE_STATUS_CODES.has(response.status) &&
@@ -196,6 +208,8 @@ export async function fetchChatCompletion(
             );
         }
         throw error;
+    } finally {
+        void dispatcher.close();
     }
 }
 

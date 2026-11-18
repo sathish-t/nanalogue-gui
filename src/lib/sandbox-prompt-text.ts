@@ -101,6 +101,7 @@ Your code runs in a restricted Python sandbox.
 You have access to Python builtins (len, range, sorted, sum, min, max etc.), the
 external functions listed below, and the Python stdlib modules re and json.
 No classes, no other stdlib modules, and no third-party libraries. Only re and json imports are available.
+There is no shell; do text processing in Python.
 External functions listed below call into the host application.
 You do not have network access; file access is restricted to the specified folder and its subfolders.
 
@@ -180,7 +181,13 @@ the file content and pagination metadata:
 - This function reads files as text (UTF-8). Reading binary files
   (BAM, CRAM, etc.) will produce garbage — use peek, read_info,
   bam_mods, window_reads, or seq_table for BAM/CRAM files instead.
-  You cannot read other binary files such as gzip.
+- Gzip-compressed text files whose names end in .gz (for example .vcf.gz,
+  .bed.gz, .tsv.gz, .fa.gz), including bgzip/BGZF files, are decompressed
+  automatically. content is the decompressed text, and offset, max_bytes
+  and bytes_read count decompressed bytes, so paginate a .gz file exactly as
+  you would an uncompressed one. The only difference is that total_size is
+  None, because the decompressed size is not known. Index files such as .tbi
+  and .csi are binary and cannot be read.
 - Max ${maxReadMB} MB per call. For files larger than ${maxReadMB} MB, use offset and
   max_bytes to paginate.
 
@@ -201,6 +208,21 @@ page2 = read_file("big_annotations.bed", offset=${maxReadBytes})
 
 # Read just the first 100 bytes
 header = read_file("data.tsv", max_bytes=100)
+\`\`\`
+
+Filter, count, and pick out columns in Python with string methods and re.
+Print only the lines or fields you need rather than whole files or very long
+records:
+
+\`\`\`python
+# Reads only the first page; paginate with offset for larger files.
+vcf = read_file("calls.vcf.gz")
+for line in vcf["content"].splitlines():
+    if line.startswith("#"):
+        continue
+    cols = line.split("\\t")
+    if cols[0] == "chr1" and cols[1] == "1000000":
+        print(cols[0], cols[1], cols[7])
 \`\`\`
 
 You can also read back files written by write_file:
@@ -309,87 +331,6 @@ result = plot_series(points, kind="line", output_path="trend.svg",
 - Single series only. For multiple series, call plot_series() once per series
   with different output paths.
 
-### bash(command: str, /) -> dict
-
-Runs commands in just-bash, not a host shell. Arbitrary binaries, network
-access, and its Python/JavaScript runtimes aren't available. Don't assume full
-GNU compatibility; try command --help for supported flags. Shell state resets
-between calls, so keep dependent steps together (e.g. cd subdir && grep pattern *.bed).
-
-**Write restriction:** bash can only write to the \`ai_chat_temp_files/\`
-subdirectory. Writes anywhere else in the allowed directory fail with
-a permission error (EROFS: read-only file system). To save pipeline
-output, redirect into \`ai_chat_temp_files/\`:
-
-\`\`\`python
-bash("sort data.tsv > ai_chat_temp_files/sorted.tsv")
-\`\`\`
-
-Files written to \`ai_chat_temp_files/\` persist to disk and survive the
-session. Use \`ls("ai_chat_temp_files/**")\` or
-\`read_file("ai_chat_temp_files/sorted.tsv")\` to inspect them afterwards.
-\`write_file()\` can write to any new path in the allowed directory but
-refuses to overwrite; \`bash\` writes only to \`ai_chat_temp_files/\` but
-can overwrite files it previously created there.
-
-Returns a dict:
-
-\`\`\`json
-{"stdout": "...", "stderr": "...", "exit_code": 0}
-\`\`\`
-
-Check both exit_code and stderr: the last command in a pipeline can succeed
-even if an earlier one failed. Empty output doesn't always mean "no matches".
-
-**Available:** grep (including -v and -oP), rg, sed, awk, sort, uniq,
-wc, cut, head, tail, cat, find, tr, paste, jq, gzip, gunzip, zcat,
-tar, base64, and common file utilities (ls, cp, mv, mkdir, rm).
-Shell syntax includes pipes, redirects, quoted paths, variables,
-command substitution, conditionals, functions, loops, and && / || chaining.
-
-To read gzip-compressed text without changing the archive, use zcat file.gz
-or gunzip -c file.gz. Named inputs normally need a .gz suffix. Avoid plain
-gunzip on read-only inputs: it writes beside and removes the source file.
-To save decompressed text or compressed output:
-
-\`\`\`python
-bash("gunzip -c data.tsv.gz > ai_chat_temp_files/data.tsv")
-bash("gzip -c results.tsv > ai_chat_temp_files/results.tsv.gz")
-\`\`\`
-
-Compression is buffered, so zcat file.gz | head still decompresses everything.
-Both file reads and expanded data must fit resource limits, even with redirects.
-Save raw gzip bytes to a file rather than returning them as text.
-
-You don't have to bring a whole file back into Python to take a look at it.
-Join commands with pipes to filter, count, sort, or pick out what you need.
-For a quick look at the first few lines:
-
-\`\`\`python
-result = bash("zcat 'data.tsv.gz' | head -5")
-print(result)
-\`\`\`
-
-awk can pick out fields, compare numbers, and combine conditions with && or ||.
-For several columns, use awk's print: this just-bash version's cut can silently
-drop duplicate-valued fields. For one column, cut -f10 is fine; cut -d':' -f1
-then picks out its first colon-separated value.
-
-grep -o prints only matching text; -P enables Perl-style regexes. Make sure
-your pattern captures the whole value, not part of a longer name or value.
-For clearly delimited data, picking fields with awk or cut is often simpler.
-head keeps displayed output short, but earlier commands may process everything.
-
-**Not available:** samtools, bedtools, bwa, bgzip, tabix,
-python, R, perl, or any other bioinformatics or language runtimes. Use
-external functions provided in the prompt for BAM/CRAM data. Use
-minimap2() (listed below) for sequence alignment.
-
-**Output warning:** stdout and stderr are each capped at ${maxOutputKB} KB.
-Dumping raw file contents (cat, unfiltered awk, unfiltered find) will
-flood your context window. Prefer targeted commands (wc -l, head, grep)
-and compute summaries rather than returning raw data.
-
 ### minimap2(reference_path: str, query_path: str, /, preset: str = None) -> dict
 
 - reference_path: path to the reference FASTA/FASTQ file, relative to the allowed directory.
@@ -453,9 +394,9 @@ If the user supplies a raw sequence string rather than a file for use with minim
 write_file() to save it as FASTA first, then pass that path to minimap2().
 
 FASTA files may use .fa, .fna, or similar extensions, optionally ending in .gz.
-To inspect gzip-compressed sequence text yourself, use zcat or gunzip -c as
-described in the bash section above. This decompression step is not needed
-when passing the file to minimap2().
+To inspect gzip-compressed sequence text yourself, read it with read_file(),
+which decompresses .gz files. This is not needed when passing the file to
+minimap2().
 
 #### Sample code to align and process the resulting PAF information
 
@@ -784,7 +725,7 @@ lengths = [r["sequence_length"] for r in reads]
 
 ## Performance constraints
 
-- Your code runs with a best-effort time limit (default ${maxDurationMinutes} minutes). Bash commands are cancelled at this limit; data-access calls already in progress may complete slightly beyond it.
+- Your code runs with a best-effort time limit (default ${maxDurationMinutes} minutes). Data-access calls already in progress may complete slightly beyond it.
 - Avoid infinite loops and unbounded iteration.
 - Keep operations linear in the number of reads.
 
@@ -792,8 +733,8 @@ lengths = [r["sequence_length"] for r in reads]
 
 - You cannot use Python's open() or os module. Use ls() to discover
   files, peek/read_info/bam_mods/window_reads/seq_table for BAM/CRAM
-  data, read_file() for text files, write_file() to save results, and
-  bash() for shell text-processing pipelines.
+  data, read_file() for text files (including .gz), and write_file() to
+  save results.
 - write_file() writes anywhere within the allowed directory and never
   overwrites existing files.`;
 }

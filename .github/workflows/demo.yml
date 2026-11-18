@@ -85,7 +85,7 @@ jobs:
       - name: Lock down network egress
         run: |
           # Resolve whitelisted API domains while DNS is still open
-          HOSTS="api.anthropic.com generativelanguage.googleapis.com api.openai.com"
+          HOSTS="api.anthropic.com api.openai.com"
           RESOLVED=""
           for host in $HOSTS; do
             for ip in $(dig +short "$host" | grep -E '^[0-9]'); do
@@ -120,7 +120,6 @@ jobs:
         env:
           ELECTRON_EXTRA_LAUNCH_ARGS: "--no-sandbox --disable-gpu"
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Kill processes spawned during screenshots

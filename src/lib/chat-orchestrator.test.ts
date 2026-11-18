@@ -28,6 +28,35 @@ import {
 import type { AiChatConfig, AiChatEvent, HistoryEntry } from "./chat-types";
 import { buildCompleteSystemPrompt } from "./sandbox-prompt";
 
+// Monty runs Python synchronously, so a busy loop would block the event loop.
+// ls("__test_wait_ms__:<ms>") instead waits on a timer, standing in for a slow
+// asynchronous tool call; every other pattern uses the real ls implementation.
+vi.mock("./ai-external-tools/ls", async (importOriginal) => {
+    const actual =
+        await importOriginal<typeof import("./ai-external-tools/ls")>();
+    return {
+        /**
+         * Wraps the real ls with a test-only timed wait.
+         *
+         * @param args - The real makeLs arguments.
+         * @returns The wrapped ls implementation.
+         */
+        makeLs: (...args: Parameters<typeof actual.makeLs>) => {
+            const ls = actual.makeLs(...args);
+            return async (pattern?: string | Record<string, unknown>) => {
+                const wait =
+                    typeof pattern === "string" &&
+                    /^__test_wait_ms__:(\d+)$/.exec(pattern);
+                if (!wait) return ls(pattern);
+                await new Promise((resolve) =>
+                    setTimeout(resolve, Number(wait[1])),
+                );
+                return [];
+            };
+        },
+    };
+});
+
 describe("extractCodeFromFences", () => {
     it("extracts code from python fences", () => {
         const response = "Here's the code:\n\n```python\nprint('hello')\n```";
@@ -275,8 +304,8 @@ describe("adversarial/edge-case tests", () => {
                         message: {
                             role: "assistant",
                             content:
-                                'delay = bash("sleep 1.2; echo analysis-done")\n' +
-                                'print(delay["stdout"])\ncontinue_thinking()',
+                                'ls("__test_wait_ms__:1200")\n' +
+                                'print("analysis-done")\ncontinue_thinking()',
                         },
                         finish_reason: "stop",
                     },
@@ -441,12 +470,14 @@ describe("adversarial/edge-case tests", () => {
             },
         ]);
         let holderFinished = false;
-        const holder = runSandboxGuarded('bash("sleep 2")', tmpDir, {}).then(
-            (result) => {
-                holderFinished = true;
-                return result;
-            },
-        );
+        const holder = runSandboxGuarded(
+            'ls("__test_wait_ms__:2000")',
+            tmpDir,
+            {},
+        ).then((result) => {
+            holderFinished = true;
+            return result;
+        });
         const controller = new AbortController();
         let notifyQueued!: () => void;
         const queued = new Promise<void>((resolve) => {

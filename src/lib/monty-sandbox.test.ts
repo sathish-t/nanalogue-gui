@@ -13,6 +13,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { gzipSync } from "node:zlib";
 import { simulateModBam } from "@nanalogue/node";
 import { runMontyAsync } from "@pydantic/monty";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -198,36 +199,6 @@ it.each([
         );
     }
 });
-
-it("bash abort via wall-clock timer sets isTimeout", async () => {
-    // Timer fires at 100ms; bash sleeps for 2s — abort cancels bash mid-flight.
-    const code = `bash("sleep 2")`;
-    const result = await runSandboxCode(code, allowedDir, {
-        maxDurationSecs: 0.1,
-    });
-    expect(result.success).toBe(false);
-    expect(result.errorType).toBe("RuntimeError");
-    expect(result.isTimeout).toBe(true);
-    expect(result.message).toMatch(/time limit exceeded|execution aborted/);
-    expect(result.message).not.toContain("Invalid exception type");
-}, 10_000);
-
-it("bash abort caught by try/except still surfaces as isTimeout", async () => {
-    // Python catches the abort error — without the success-path bashTimedOut
-    // guard this would incorrectly return success: true.
-    const code = `
-try:
-    bash("sleep 2")
-except:
-    pass
-"completed"
-`;
-    const result = await runSandboxCode(code, allowedDir, {
-        maxDurationSecs: 0.1,
-    });
-    expect(result.success).toBe(false);
-    expect(result.isTimeout).toBe(true);
-}, 10_000);
 
 it("LLM-style processing produces summary dict", async () => {
     const code = `
@@ -569,20 +540,42 @@ result
     expect(value.offset).toBe(10);
 });
 
-it("runSandboxCode threads maxReadBytes through to bash", async () => {
-    await writeFile(join(allowedDir, "oversized.txt"), "hello world");
+it("read_file decompresses every member of a multi-member .gz file", async () => {
+    // BGZF files such as .vcf.gz are concatenated gzip members; a reader that
+    // stops after the first member would silently lose later records.
+    const header = "##fileformat=VCFv4.2\n";
+    const record = "chr2\t47400746\tDEL\n";
+    await writeFile(
+        join(allowedDir, "calls.vcf.gz"),
+        Buffer.concat([gzipSync(header), gzipSync(record)]),
+    );
     const code = `
-result = bash("cat oversized.txt")
-result
+whole = read_file("calls.vcf.gz")
+page = read_file("calls.vcf.gz", offset=${header.length - 3}, max_bytes=9)
+[whole, page, whole["total_size"] is None and page["total_size"] is None]
 `;
-    // runSandboxCode sets cwd to allowedDir, so the relative path here is
-    // the same shape an LLM-generated script would use inside the sandbox.
-    const result = await runSandboxCode(code, allowedDir, { maxReadBytes: 4 });
+    const result = await runSandboxCode(code, allowedDir);
     expect(result.success).toBe(true);
-    const value = result.value as Record<string, unknown>;
-    expect(value.exit_code).not.toBe(0);
-    expect(typeof value.stderr).toBe("string");
-    expect(value.stderr).toContain("No such file or directory");
+    const [whole, page, totalSizesAreNone] = result.value as [
+        Record<string, unknown>,
+        Record<string, unknown>,
+        boolean,
+    ];
+    expect(whole.content).toBe(header + record);
+    expect(whole.bytes_read).toBe(header.length + record.length);
+    // The decompressed size is unknown without reading the whole file.
+    expect(totalSizesAreNone).toBe(true);
+    // offset and max_bytes count decompressed bytes and may span members.
+    expect(page.content).toBe(".2\nchr2\t4");
+    expect(page.bytes_read).toBe(9);
+    expect(page.offset).toBe(header.length - 3);
+});
+
+it("read_file raises ValueError for a .gz file that is not gzip data", async () => {
+    await writeFile(join(allowedDir, "fake.tsv.gz"), "plain text\n");
+    const result = await runSandboxCode('read_file("fake.tsv.gz")', allowedDir);
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/not valid gzip data/);
 });
 
 it("read_file rejects path traversal", async () => {
@@ -897,15 +890,6 @@ it("wrapForMonty converts a non-Error throw to SandboxError", async () => {
     await expect(wrapped.f(0)).rejects.toThrow("sandbox");
     await expect(wrapped.f(1)).rejects.toThrow("native");
     await expect(wrapped.f(2)).rejects.toThrow("plain string");
-});
-
-it("returns GenericError when sandbox setup throws a non-Monty error", async () => {
-    // Use /dev/null/xyz so mkdirSync fails with ENOTDIR on both macOS and
-    // Linux — even when the process runs as root (as in Linux CI containers),
-    // /dev/null is a character device and cannot be entered as a directory.
-    const result = await runSandboxCode("1+1", "/dev/null/xyz");
-    expect(result.success).toBe(false);
-    expect(result.errorType).toBe("GenericError");
 });
 
 // --- print() capture ---

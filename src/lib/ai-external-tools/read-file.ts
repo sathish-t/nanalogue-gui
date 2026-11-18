@@ -1,14 +1,91 @@
 // External tool: read_file
 // Reads a text file from the sandboxed directory with optional offset and size limit.
+// Files ending in .gz (including multi-member BGZF such as .vcf.gz) are
+// decompressed as a stream up to the end of the requested page; offset and
+// max_bytes then refer to the decompressed text, and total_size is None.
 
+import { createReadStream } from "node:fs";
 import { open, realpath } from "node:fs/promises";
 import { relative } from "node:path";
+import { pipeline } from "node:stream";
+import { createGunzip } from "node:zlib";
 import {
     isDeniedPath,
     resolvePath,
     SandboxError,
     toForwardSlashes,
 } from "../monty-sandbox-helpers";
+
+/** One page of decompressed gzip text, as returned by readGzipPage. */
+interface GzipPage {
+    /** Buffer holding the page; only the first pageBytes bytes are valid. */
+    page: Buffer;
+    /** Number of decompressed bytes in the page. */
+    pageBytes: number;
+}
+
+/**
+ * Decompresses a gzip file as a stream and returns one page of its text.
+ *
+ * Node's gunzip continues across concatenated gzip members, so BGZF files
+ * are read in full. Decompression stops once the page is full, so each call
+ * costs at most offset + requestedBytes of decompression, however large the
+ * file decompresses (including gzip bombs). The total decompressed size is
+ * therefore never known.
+ *
+ * @param resolvedPath - Real path of the gzip file inside the allowed directory.
+ * @param filePath - Path as given by the caller, used in error messages.
+ * @param offset - Byte offset into the decompressed text.
+ * @param requestedBytes - Maximum decompressed bytes to return.
+ * @returns The page buffer and the number of bytes in the page.
+ */
+async function readGzipPage(
+    resolvedPath: string,
+    filePath: string,
+    offset: number,
+    requestedBytes: number,
+): Promise<GzipPage> {
+    const page = Buffer.alloc(requestedBytes);
+    const pageEnd = offset + requestedBytes;
+    let pageBytes = 0;
+    let decompressedBytes = 0;
+    const gunzip = pipeline(
+        createReadStream(resolvedPath),
+        createGunzip(),
+        () => {
+            // Errors surface through the async iteration below.
+        },
+    );
+    try {
+        for await (const chunk of gunzip as AsyncIterable<Buffer>) {
+            const chunkStart = decompressedBytes;
+            decompressedBytes += chunk.length;
+            const from = Math.max(offset, chunkStart);
+            const to = Math.min(pageEnd, decompressedBytes);
+            if (to > from) {
+                chunk.copy(
+                    page,
+                    from - offset,
+                    from - chunkStart,
+                    to - chunkStart,
+                );
+                pageBytes = to - offset;
+            }
+            // Leaving the loop destroys the stream and closes the file.
+            if (decompressedBytes >= pageEnd) break;
+        }
+    } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (typeof code === "string" && code.startsWith("Z_")) {
+            throw new SandboxError(
+                "ValueError",
+                `read_file: "${filePath}" is not valid gzip data (${String((error as Error).message)})`,
+            );
+        }
+        throw error;
+    }
+    return { page, pageBytes };
+}
 
 /**
  * Returns the read_file tool implementation bound to the given context.
@@ -23,6 +100,8 @@ export function makeReadFile(
 ): (filePath: string, opts?: Record<string, unknown>) => Promise<unknown> {
     /**
      * Reads a text file from the allowed directory with optional offset and size limit.
+     * A .gz file is decompressed up to the requested page; offset and sizes
+     * refer to its text, and total_size is null because it is unknown.
      *
      * Resolves allowedDir to its real path before the deny-list check so that
      * relative() always yields a clean subpath even when allowedDir itself
@@ -87,6 +166,20 @@ export function makeReadFile(
         }
         const offset = rawOffset;
         const requestedBytes = Math.min(rawMaxBytes, maxReadBytes);
+        if (filePath.toLowerCase().endsWith(".gz")) {
+            const { page, pageBytes } = await readGzipPage(
+                resolved,
+                filePath,
+                offset,
+                requestedBytes,
+            );
+            return {
+                content: page.toString("utf-8", 0, pageBytes),
+                bytes_read: pageBytes,
+                total_size: null,
+                offset,
+            };
+        }
         const fd = await open(resolved, "r");
         try {
             const stat = await fd.stat();

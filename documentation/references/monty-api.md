@@ -46,9 +46,9 @@ it.** Always use `runMontyAsync`.
 Three limits matter in practice:
 
 - **`maxDurationSecs`** — best-effort execution time limit in seconds.
-  Default in this codebase is 1,800 seconds (30 minutes). The wrapper also
-  cancels bash commands at this wall-clock limit; native data-access
-  operations already in progress may complete in the background.
+  Default in this codebase is 1,800 seconds (30 minutes). Native
+  data-access operations already in progress at this limit may complete in
+  the background.
 - **`maxMemory`** — heap memory cap in bytes. Default is 536,870,912 bytes
   (512 MiB).
 - **`maxAllocations`** — counts object *creations*, not bytes. A tight loop

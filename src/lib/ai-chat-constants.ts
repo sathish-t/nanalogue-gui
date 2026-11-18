@@ -25,7 +25,7 @@ export const /** Default maximum code execution rounds per user message. */ DEFA
 
 // --- Sandbox execution defaults ---
 
-export const /** Default best-effort sandbox execution time limit in seconds (30 minutes). Bash is cancelled at this limit; native reads in progress may complete in the background. */ DEFAULT_MAX_DURATION_SECS = 1_800;
+export const /** Default best-effort sandbox execution time limit in seconds (30 minutes). Native reads in progress may complete in the background. */ DEFAULT_MAX_DURATION_SECS = 1_800;
 
 export const /** Default heap memory cap in bytes (512 MB). */ DEFAULT_MAX_MEMORY =
         512 * 1024 * 1024;
@@ -102,7 +102,6 @@ export const /** All external function names registered with Monty. */ EXTERNAL_
             "write_file",
             "plot_histogram",
             "plot_series",
-            "bash",
             "minimap2",
             "continue_thinking",
         ] as const;

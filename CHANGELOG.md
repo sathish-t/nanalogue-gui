@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `read_file()` in the AI Chat sandbox now decompresses files ending in `.gz`, including multi-member bgzip/BGZF files such as `.vcf.gz`; decompression streams and stops once the requested page is full, so a call costs at most `offset + max_bytes` of decompression and keeps only that page in memory, even for a gzip bomb; `offset`, `max_bytes`, and `bytes_read` count decompressed bytes, `total_size` is `None` because the decompressed size is unknown, and invalid gzip data raises `ValueError`; trailing zero padding is ignored; the sandbox prompt and `documentation/ai-chat.md` document this in place of the `zcat` guidance ([`a0b2dbc`](https://github.com/sathish-t/nanalogue-gui/commit/a0b2dbc095cf44677709375755827362b9e2f4d6), [`5691798`](https://github.com/sathish-t/nanalogue-gui/commit/56917987f305973db41aaac9835fdf45db70c14c), [`b66a809`](https://github.com/sathish-t/nanalogue-gui/commit/b66a8092d780a3a3f93f643c7e5dd4a268cc38f9), [`b8f06b1`](https://github.com/sathish-t/nanalogue-gui/commit/b8f06b135ee33a37ea1c266bc2828c9569b5a19d), [`cd4c632`](https://github.com/sathish-t/nanalogue-gui/commit/cd4c632ec0d2faee72fd5997a97693526693c8c7), [`4f9f175`](https://github.com/sathish-t/nanalogue-gui/commit/4f9f17503f35e654faf4e889091691748208121f))
 - `nanalogue-chat` and `nanalogue-sandbox-exec` report their status to the terminal with the [OSC 7501 Program Status Protocol](https://www.superlogical.com/rex/docs/build/program-status): `working` while thinking or running code, `done` when a response or script finishes, `error` on failure, `idle` at the chat prompt or when Ctrl+C cancels a chat request, and `clear` when the chat exits; reports go to stderr only when it is a terminal, and setting `NANALOGUE_NO_PROGRAM_STATUS` turns them off
 
 ### Changed
@@ -16,9 +17,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Raises the minimum Node.js version to 22.22.0 on the Node 22 line and 24.8.0 on the Node 24 line, as required by html-validate 11
 - Upgrades the html-validate dev dependency from 10 to 11, which replaces its vulnerable `glob` dependency (GHSA-3g3m-2fjr-6pw4) with Node's built-in glob
 
+### Fixed
+
+- AI Chat LLM requests now honour `--timeout` (and the GUI timeout setting) instead of failing after 300 s: Node's built-in `fetch` aborted any request whose response headers took longer than undici's default `headersTimeout`, so non-streamed replies from slow local models failed at 5m0s; each request now uses an undici `Agent` whose header and body timeouts equal the configured timeout ([`343f835`](https://github.com/sathish-t/nanalogue-gui/commit/343f83593a9fac6a8fa9732c59aaf713fbe47e52), [`8d1a57d`](https://github.com/sathish-t/nanalogue-gui/commit/8d1a57d194f2ba75680eac747285edd04293d144))
+
 ### Removed
 
 - Conversation facts extraction, session storage, eviction, and system-prompt injection from AI Chat; conversation context now comes exclusively from retained message history.
+- `bash()` external tool and the `just-bash` dependency from the AI Chat sandbox, together with its wall-clock abort timer, the `ai_chat_temp_files/` write mount, its tests and Showboat demo, and its documentation; generated code now filters text in Python, and gzip-compressed text is read through `read_file()`; `nanalogue-chat --rm-tools bash` is now rejected as an unknown tool ([`a0b2dbc`](https://github.com/sathish-t/nanalogue-gui/commit/a0b2dbc095cf44677709375755827362b9e2f4d6), [`5691798`](https://github.com/sathish-t/nanalogue-gui/commit/56917987f305973db41aaac9835fdf45db70c14c), [`30d8980`](https://github.com/sathish-t/nanalogue-gui/commit/30d8980379c1518152f36caa4d5ba3aa061b79b2), [`df2db9a`](https://github.com/sathish-t/nanalogue-gui/commit/df2db9a3c0a87ac87c6df7683a357825536ee10e), [`8037731`](https://github.com/sathish-t/nanalogue-gui/commit/803773129189f2db5b1f0426267f3f28d8aabd4d))
+
+### Dependencies
+
+- Adds `undici` ^7.30.2 as a runtime dependency; it is external to the `nanalogue-chat` ESM bundle ([`343f835`](https://github.com/sathish-t/nanalogue-gui/commit/343f83593a9fac6a8fa9732c59aaf713fbe47e52))
+- Removes `just-bash` and its transitive dependencies, including `node-liblzma` and `@mongodb-js/zstd`, whose esbuild externals and electron-builder exclusions are also removed ([`a0b2dbc`](https://github.com/sathish-t/nanalogue-gui/commit/a0b2dbc095cf44677709375755827362b9e2f4d6), [`30d8980`](https://github.com/sathish-t/nanalogue-gui/commit/30d8980379c1518152f36caa4d5ba3aa061b79b2))
+
+### Infrastructure
+
+- The production audit no longer carries the temporary GHSA-hp3w-g68c-fv3c exception for `just-bash` → `sprintf-js`; any finding in the production tree now fails `npm run audit:prod` ([`a0b2dbc`](https://github.com/sathish-t/nanalogue-gui/commit/a0b2dbc095cf44677709375755827362b9e2f4d6))
+- Removes live Google Gemini testing: the Gemini case in the live model-listing integration test, the Google provider in the demo screenshots and its committed PNGs, and `GOOGLE_API_KEY` plus the `generativelanguage.googleapis.com` egress allowance from the `ci` and `demo` workflows; live testing now covers OpenAI and Anthropic, and Gemini endpoint support and its offline tests are unchanged ([`2bd27d8`](https://github.com/sathish-t/nanalogue-gui/commit/2bd27d8742eb06f624b95ef683ee78c12eac32aa))
 
 ## [0.2.7] - 2026-03-18
 

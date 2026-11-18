@@ -1091,7 +1091,7 @@ describe("nanalogue-chat CLI", () => {
                     "--system-prompt",
                     "prompt",
                     "--rm-tools",
-                    "bash,bash",
+                    "peek,peek",
                 ]),
             ).rejects.toMatchObject({
                 code: 1,

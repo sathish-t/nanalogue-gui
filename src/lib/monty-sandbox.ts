@@ -27,7 +27,6 @@ import {
 } from "./ai-chat-constants";
 import {
     makeBamMods,
-    makeBash,
     makeContinueThinking,
     makeLs,
     makePeek,
@@ -239,16 +238,6 @@ export async function runSandboxCode(
     let printsExceededLimit = false;
     let result: SandboxResult;
 
-    // Wall-clock abort for bash: fires after maxDurationSecs and cancels any
-    // in-flight bash command via AbortSignal. Other external functions (native
-    // Rust calls) cannot be interrupted mid-flight and are not affected.
-    const bashAbortController = new AbortController();
-    let bashTimedOut = false;
-    const bashTimer = setTimeout(() => {
-        bashTimedOut = true;
-        bashAbortController.abort();
-    }, maxDurationSecs * 1000);
-
     try {
         const m = new Monty(code);
 
@@ -284,12 +273,6 @@ export async function runSandboxCode(
                         continue_thinking: makeContinueThinking(() => {
                             continueThinkingCalled = true;
                         }),
-                        bash: makeBash(allowedDir, {
-                            signal: bashAbortController.signal,
-                            maxMemory,
-                            maxAllocations,
-                            maxReadBytes,
-                        }),
                         peek: makePeek(allowedDir),
                         read_info: makeReadInfo(allowedDir, maxRecordsReadInfo),
                         bam_mods: makeBamMods(allowedDir, maxRecordsBamMods),
@@ -317,12 +300,6 @@ export async function runSandboxCode(
             ),
         });
 
-        // If the bash abort timer fired while Python was catching the abort
-        // error (try/except), execution may still complete successfully.
-        // Treat this as a timeout rather than letting a partial result through.
-        if (bashTimedOut) {
-            throw new SandboxError("RuntimeError", "execution aborted");
-        }
         if (printsExceededLimit) {
             throw new SandboxError(
                 "OutputError",
@@ -414,7 +391,7 @@ export async function runSandboxCode(
                 success: false,
                 errorType: "RuntimeError",
                 message: error.display("traceback"),
-                isTimeout: bashTimedOut || error.message.includes("time limit"),
+                isTimeout: error.message.includes("time limit"),
                 prints,
             };
         } else if (error instanceof MontySyntaxError) {
@@ -434,14 +411,10 @@ export async function runSandboxCode(
                     error instanceof SandboxError
                         ? error.message
                         : String(error),
-                isTimeout: bashTimedOut,
+                isTimeout: false,
                 prints,
             };
         }
-    } finally {
-        // Always clear the bash abort timer so it does not fire after
-        // execution has already completed (success or error).
-        clearTimeout(bashTimer);
     }
 
     if (printsExceededLimit) {

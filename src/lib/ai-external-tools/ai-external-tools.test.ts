@@ -13,6 +13,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { gzipSync } from "node:zlib";
 import { simulateModBam } from "@nanalogue/node";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { MAX_FILENAME_LENGTH } from "../ai-chat-constants";
@@ -257,4 +258,69 @@ it("makeReadFile rejects .SVG (uppercase) with ValueError", async () => {
     await expect(fn("CHART.SVG")).rejects.toMatchObject({
         name: "ValueError",
     });
+});
+
+it("makeReadFile stops decompressing .gz input once the page is full", async () => {
+    // 4 MiB of zeros compresses to a few KiB, like a small gzip bomb. The junk
+    // after it is only reached, and only raises, if decompression runs past
+    // the requested page.
+    await writeFile(
+        join(allowedDir, "expands.txt.gz"),
+        Buffer.concat([
+            gzipSync(Buffer.alloc(4 * 1024 * 1024)),
+            Buffer.from("junk after the gzip data"),
+        ]),
+    );
+    const fn = makeReadFile(allowedDir, 1024);
+    await expect(fn("expands.txt.gz")).resolves.toEqual({
+        content: "\0".repeat(1024),
+        bytes_read: 1024,
+        total_size: null,
+        offset: 0,
+    });
+    await expect(
+        fn("expands.txt.gz", { offset: 4 * 1024 * 1024 }),
+    ).rejects.toMatchObject({
+        name: "ValueError",
+        message: expect.stringMatching(/not valid gzip data/),
+    });
+});
+
+it("makeReadFile ignores zero padding after .gz data", async () => {
+    // Block-padded copies end in zero bytes; unlike other trailing data,
+    // gzip -d accepts them silently, and read_file must too.
+    const text = "chr1\t100\tA\tT\nchr2\t200\tG\tC\n";
+    await writeFile(
+        join(allowedDir, "padded.vcf.gz"),
+        Buffer.concat([gzipSync(text), Buffer.alloc(512)]),
+    );
+    const fn = makeReadFile(allowedDir, 1024);
+    await expect(fn("padded.vcf.gz")).resolves.toEqual({
+        content: text,
+        bytes_read: text.length,
+        total_size: null,
+        offset: 0,
+    });
+});
+
+it("makeReadFile rejects non-zero padding after .gz data", async () => {
+    // Non-zero trailing bytes mean a damaged file, so a read that reaches
+    // them raises, where gzip -d warns and ignores them.
+    const text = "chr1\t100\tA\tT\nchr2\t200\tG\tC\n";
+    await writeFile(
+        join(allowedDir, "nonzero-padded.vcf.gz"),
+        Buffer.concat([gzipSync(text), Buffer.alloc(512, 1)]),
+    );
+    const fn = makeReadFile(allowedDir, 1024);
+    await expect(fn("nonzero-padded.vcf.gz")).rejects.toMatchObject({
+        name: "ValueError",
+        message: expect.stringMatching(/not valid gzip data/),
+    });
+});
+
+it("makeReadFile passes file-system errors on .gz paths through unchanged", async () => {
+    // Only zlib errors become "not valid gzip data"; an I/O error keeps its code.
+    await mkdir(join(allowedDir, "folder.gz"));
+    const fn = makeReadFile(allowedDir, 1024);
+    await expect(fn("folder.gz")).rejects.toMatchObject({ code: "EISDIR" });
 });
