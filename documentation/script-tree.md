@@ -5,6 +5,7 @@
 
 ```
 src/
+  cli-program-status.ts       # Program status reports (OSC 7501) for the standalone nanalogue CLIs.
   cli-terminal-formatting.ts  # Shared ANSI formatting constants for the standalone nanalogue-chat CLI.
   cli-terminal-output.ts      # Terminal output helpers for the standalone nanalogue-chat CLI.
   cli.ts                      # Standalone CLI for the nanalogue AI Chat feature.
@@ -49,6 +50,7 @@ src/
     model-listing.ts                                # Provider detection and model listing for multi-provider LLM endpoints.
     monty-sandbox-helpers.ts                        # Utility helpers for monty-sandbox: path security, option translation,
     monty-sandbox.ts                                # Monty sandbox wrapper for AI Chat mode.
+    program-names.ts                                # Program names of nanalogue-gui and its standalone CLIs.
     qc-config-builder.ts                            # Pure validation and construction of QC configuration form snapshots.
     qc-contract.ts
     qc-data-loader.ts                               # QC data loader: paginated BAM data retrieval with streaming histograms

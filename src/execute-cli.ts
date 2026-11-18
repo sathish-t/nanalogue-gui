@@ -1,9 +1,10 @@
 // Standalone CLI for running a Python file directly in the Monty sandbox.
 // No LLM is involved — this is a pure sandbox execution tool for BAM analysis scripts.
 
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { version } from "../package.json";
+import { reportProgramStatus } from "./cli-program-status";
 import { DEFAULT_MAX_WRITE_BYTES } from "./lib/ai-chat-constants";
 import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
 import {
@@ -14,6 +15,7 @@ import {
 import { parseCanonicalInteger } from "./lib/chat-user-input-parsing";
 import { findDuplicateCliOption } from "./lib/cli-user-input-parsing";
 import { collectTerminalOutput, runSandboxCode } from "./lib/monty-sandbox";
+import { SANDBOX_EXEC_CLI_PROGRAM_NAME } from "./lib/program-names";
 import {
     buildSandboxRunOptions,
     SANDBOX_ARG_DEFS,
@@ -87,6 +89,9 @@ Sandbox limits:
 Other:
   -v, --version            Print version and exit
   -h, --help               Show this help message
+
+Environment:
+  NANALOGUE_NO_PROGRAM_STATUS  Set to stop terminal program status reports (OSC 7501)
 
 Exit codes:
   0  Sandbox ran successfully (even if no output was produced)
@@ -199,6 +204,12 @@ async function main(): Promise<void> {
     // Build sandbox options from CLI values. Uses runSandboxCode directly —
     // no orphan-execution guard needed (no concurrent LLM loop to cancel).
     const sandboxOptions = buildSandboxRunOptions(values, maxOutputBytes);
+    const scriptName = basename(scriptPath);
+    reportProgramStatus(
+        SANDBOX_EXEC_CLI_PROGRAM_NAME,
+        "working",
+        `Running ${scriptName}`,
+    );
     const result = await runSandboxCode(code, allowedDir, sandboxOptions);
 
     if (result.success) {
@@ -225,6 +236,12 @@ async function main(): Promise<void> {
         // Drain stdout before exiting so the full output reaches the next
         // process in a pipeline (drainStdout handles EPIPE gracefully).
         await drainStdout(output);
+        // Leave a done record behind, since this process exits now.
+        reportProgramStatus(
+            SANDBOX_EXEC_CLI_PROGRAM_NAME,
+            "done",
+            `${scriptName} finished`,
+        );
         process.exitCode = 0;
     } else {
         // Emit any print() output captured before the failure to stdout so
@@ -234,11 +251,20 @@ async function main(): Promise<void> {
             await drainStdout(result.prints.join(""));
         }
         process.stderr.write(`${result.errorType}: ${result.message}\n`);
+        reportProgramStatus(
+            SANDBOX_EXEC_CLI_PROGRAM_NAME,
+            "error",
+            result.isTimeout
+                ? `${scriptName} timed out`
+                : `${scriptName} failed with ${result.errorType}`,
+        );
         process.exit(1);
     }
 }
 
 main().catch((e) => {
-    console.error(`Fatal: ${e instanceof Error ? e.message : String(e)}`);
+    const errorMsg = `Fatal: ${e instanceof Error ? e.message : String(e)}`;
+    console.error(errorMsg);
+    reportProgramStatus(SANDBOX_EXEC_CLI_PROGRAM_NAME, "error", errorMsg);
     process.exit(1);
 });

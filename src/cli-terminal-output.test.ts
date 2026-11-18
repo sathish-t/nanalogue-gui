@@ -2,6 +2,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+    buildProgramStatusSequence,
+    NO_PROGRAM_STATUS_ENV_VAR,
+} from "./cli-program-status";
+import {
     TERMINAL_BOLD,
     TERMINAL_CLEAR_LINE,
     TERMINAL_DIM,
@@ -14,6 +18,7 @@ import { color, emitEvent, printUsage } from "./cli-terminal-output";
 import { EXTERNAL_FUNCTIONS } from "./lib/ai-chat-constants";
 import { CONFIG_FIELD_SPECS } from "./lib/ai-chat-shared-constants";
 import type { SandboxResult } from "./lib/chat-types";
+import { CHAT_CLI_PROGRAM_NAME } from "./lib/program-names";
 
 /** Whether NO_COLOR existed before the current test. */
 const HAD_NO_COLOR = "NO_COLOR" in process.env;
@@ -343,5 +348,72 @@ describe("CLI progress event output", () => {
         expect(() =>
             emitEvent({ type: "turn_error", error, isTimeout: false }),
         ).toThrow(expectedError);
+    });
+});
+
+describe("emitEvent program status reports", () => {
+    /** Original stderr TTY flag restored after each test. */
+    const originalIsTTY = process.stderr.isTTY;
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        process.stderr.isTTY = originalIsTTY;
+    });
+
+    it("reports working, done, error, and idle states for chat turn events", () => {
+        vi.stubEnv(NO_PROGRAM_STATUS_ENV_VAR, undefined);
+        process.stderr.isTTY = true;
+        vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+        vi.spyOn(console, "log").mockImplementation(() => undefined);
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+        const stderrWrite = vi
+            .spyOn(process.stderr, "write")
+            .mockImplementation(() => true);
+
+        emitEvent({ type: "turn_start" });
+        emitEvent({ type: "code_execution_start", code: "print(1)" });
+        emitEvent({
+            type: "code_execution_end",
+            result: {
+                success: true,
+                prints: ["1"],
+                value: null,
+                endedWithExpression: false,
+                continueThinkingCalled: false,
+                sandboxToolCalled: false,
+            },
+        });
+        emitEvent({ type: "turn_end", text: "answer", steps: [] });
+        emitEvent({ type: "turn_error", error: "timed out", isTimeout: true });
+        emitEvent({ type: "turn_cancelled" });
+
+        expect(stderrWrite.mock.calls.map((call) => call[0])).toEqual([
+            buildProgramStatusSequence(
+                CHAT_CLI_PROGRAM_NAME,
+                "working",
+                "Thinking",
+            ),
+            buildProgramStatusSequence(
+                CHAT_CLI_PROGRAM_NAME,
+                "working",
+                "Running Python code",
+            ),
+            buildProgramStatusSequence(
+                CHAT_CLI_PROGRAM_NAME,
+                "working",
+                "Thinking",
+            ),
+            buildProgramStatusSequence(
+                CHAT_CLI_PROGRAM_NAME,
+                "done",
+                "Response ready",
+            ),
+            buildProgramStatusSequence(
+                CHAT_CLI_PROGRAM_NAME,
+                "error",
+                "LLM response timed out (i.e. a message from the LLM took too much time to arrive)",
+            ),
+            buildProgramStatusSequence(CHAT_CLI_PROGRAM_NAME, "idle"),
+        ]);
     });
 });

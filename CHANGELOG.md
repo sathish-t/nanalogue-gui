@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `read_file()` in the AI Chat sandbox now decompresses files ending in `.gz`, including multi-member bgzip/BGZF files such as `.vcf.gz`; decompression streams and stops once the requested page is full, so a call costs at most `offset + max_bytes` of decompression and keeps only that page in memory, even for a gzip bomb; `offset`, `max_bytes`, and `bytes_read` count decompressed bytes, `total_size` is `None` because the decompressed size is unknown, and invalid gzip data raises `ValueError`; trailing zero padding is ignored; the sandbox prompt and `documentation/ai-chat.md` document this in place of the `zcat` guidance ([`a0b2dbc`](https://github.com/sathish-t/nanalogue-gui/commit/a0b2dbc095cf44677709375755827362b9e2f4d6), [`5691798`](https://github.com/sathish-t/nanalogue-gui/commit/56917987f305973db41aaac9835fdf45db70c14c), [`b66a809`](https://github.com/sathish-t/nanalogue-gui/commit/b66a8092d780a3a3f93f643c7e5dd4a268cc38f9), [`b8f06b1`](https://github.com/sathish-t/nanalogue-gui/commit/b8f06b135ee33a37ea1c266bc2828c9569b5a19d), [`cd4c632`](https://github.com/sathish-t/nanalogue-gui/commit/cd4c632ec0d2faee72fd5997a97693526693c8c7), [`4f9f175`](https://github.com/sathish-t/nanalogue-gui/commit/4f9f17503f35e654faf4e889091691748208121f))
+- `nanalogue-chat` and `nanalogue-sandbox-exec` report their status to the terminal with the [OSC 7501 Program Status Protocol](https://www.superlogical.com/rex/docs/build/program-status): `working` while thinking or running code, `done` when a response or script finishes, `error` on failure, `idle` at the chat prompt or when Ctrl+C cancels a chat request, and `clear` when the chat exits; reports go to stderr only when it is a terminal, and setting `NANALOGUE_NO_PROGRAM_STATUS` turns them off
+
+### Changed
+
+- Raises the minimum Node.js version to 22.22.0 on the Node 22 line and 24.8.0 on the Node 24 line, as required by html-validate 11
+- Upgrades the html-validate dev dependency from 10 to 11, which replaces its vulnerable `glob` dependency (GHSA-3g3m-2fjr-6pw4) with Node's built-in glob
 
 ### Fixed
 

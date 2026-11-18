@@ -26,7 +26,7 @@ chmod +x "$TEST_DIR/bin/npx"
   . "$HOOK_DIR/node-22-npm.sh"
   run_node_22_lockfile_install
 )
-grep -Fq 'node@22.20.0' "$COMMAND_LOG"
+grep -Fq 'node@22.22.0' "$COMMAND_LOG"
 grep -Fq 'npm@11.19.0' "$COMMAND_LOG"
 
 # nvm without Node 22: the same portable fallback is used.
@@ -42,7 +42,7 @@ grep -Fq 'npm@11.19.0' "$COMMAND_LOG"
   . "$HOOK_DIR/node-22-npm.sh"
   run_node_22_lockfile_install
 )
-grep -Fq 'node@22.20.0' "$COMMAND_LOG"
+grep -Fq 'node@22.22.0' "$COMMAND_LOG"
 grep -Fq 'npm@11.19.0' "$COMMAND_LOG"
 
 # nvm with Node 22: execute under that Node while still pinning npm 11.
@@ -64,7 +64,7 @@ grep -Fq 'npm@11.19.0' "$COMMAND_LOG"
   run_node_22_lockfile_install
 )
 grep -Fq 'nvm exec 22 npx --yes --package npm@11.19.0 npm install --package-lock-only --ignore-scripts' "$COMMAND_LOG"
-if grep -Fq 'node@22.20.0' "$COMMAND_LOG"; then
+if grep -Fq 'node@22.22.0' "$COMMAND_LOG"; then
   echo "nvm Node 22 case unexpectedly used the portable Node package" >&2
   exit 1
 fi

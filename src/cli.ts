@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { createInterface } from "node:readline";
 import { parseArgs } from "node:util";
 import { version } from "../package.json";
+import { reportProgramStatus } from "./cli-program-status";
 import {
     TERMINAL_BOLD,
     TERMINAL_RED,
@@ -41,6 +42,7 @@ import {
 } from "./lib/cli-user-input-parsing";
 import { fetchModels } from "./lib/model-listing";
 import { deriveMaxOutputBytes } from "./lib/monty-sandbox-helpers";
+import { CHAT_CLI_PROGRAM_NAME } from "./lib/program-names";
 import { parseNumericArg, SANDBOX_ARG_DEFS } from "./lib/sandbox-cli-args";
 import { buildCompleteSystemPrompt } from "./lib/sandbox-prompt";
 import { loadSystemAppend } from "./lib/system-append";
@@ -471,15 +473,17 @@ async function main(): Promise<void> {
     // No banner, no readline, no progress indicators — clean for scripting and piping.
     if (values["non-interactive"] !== undefined) {
         const message = values["non-interactive"].trim();
+        reportProgramStatus(CHAT_CLI_PROGRAM_NAME, "working", "Thinking");
         const promptRequirement = classifyCliPromptRequirement(message);
         let promptForMessage: CliSystemPromptSnapshot | undefined;
         if (promptRequirement !== "none") {
             try {
                 promptForMessage = await loadCurrentSystemPrompt();
             } catch (error) {
-                console.error(
-                    `Error: ${error instanceof Error ? error.message : String(error)}`,
-                );
+                const errorMsg =
+                    error instanceof Error ? error.message : String(error);
+                console.error(`Error: ${errorMsg}`);
+                reportProgramStatus(CHAT_CLI_PROGRAM_NAME, "error", errorMsg);
                 process.exitCode = 1;
                 return;
             }
@@ -509,6 +513,16 @@ async function main(): Promise<void> {
                 "Error message is pathologically long (length > 3000)!",
             );
             console.error(`Error: ${errorMsg}`);
+        }
+        // Leave a done or error record behind, since this process exits now.
+        if (result.success) {
+            reportProgramStatus(
+                CHAT_CLI_PROGRAM_NAME,
+                "done",
+                "Response ready",
+            );
+        } else {
+            reportProgramStatus(CHAT_CLI_PROGRAM_NAME, "error", result.error);
         }
 
         // If --dump-llm-instructions was requested, write the last LLM request
@@ -667,11 +681,13 @@ async function main(): Promise<void> {
             requestInFlight = false;
         } else {
             console.log("\nGoodbye!");
+            reportProgramStatus(CHAT_CLI_PROGRAM_NAME, "clear");
             rl.close();
             process.exit(0);
         }
     });
 
+    reportProgramStatus(CHAT_CLI_PROGRAM_NAME, "idle");
     rl.prompt();
 
     for await (const line of rl) {
@@ -722,9 +738,10 @@ async function main(): Promise<void> {
             }
         } catch (error) {
             requestInFlight = false;
-            console.error(
-                `Error: ${error instanceof Error ? error.message : String(error)}`,
-            );
+            const errorMsg =
+                error instanceof Error ? error.message : String(error);
+            console.error(`Error: ${errorMsg}`);
+            reportProgramStatus(CHAT_CLI_PROGRAM_NAME, "error", errorMsg);
             rl.prompt();
             continue;
         }
@@ -754,15 +771,14 @@ async function main(): Promise<void> {
         rl.prompt();
     }
 
+    // The user left the REPL with /quit or end of input, so remove every record.
+    reportProgramStatus(CHAT_CLI_PROGRAM_NAME, "clear");
     rl.close();
 }
 
 main().catch((error) => {
-    console.error(
-        color(
-            TERMINAL_RED,
-            `Fatal: ${error instanceof Error ? error.message : String(error)}`,
-        ),
-    );
+    const errorMsg = `Fatal: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(color(TERMINAL_RED, errorMsg));
+    reportProgramStatus(CHAT_CLI_PROGRAM_NAME, "error", errorMsg);
     process.exit(1);
 });

@@ -25,6 +25,7 @@ import type { FontSize } from "./font-size";
 import { getFontSize, setFontSize } from "./font-size";
 import { validateIpcFilePath } from "./lib/ipc-path-validation";
 import { countBedDataLines, countNonEmptyLines } from "./lib/line-counter";
+import { GUI_APP_PROGRAM_NAME } from "./lib/program-names";
 import { validateSwipeStartRequest } from "./lib/swipe-contract";
 
 // Prevent Electron from constructing a default menu during application startup.
@@ -238,7 +239,7 @@ function getRendererPagePath(mode: AppMode): string {
 function getWindowTitle(mode: AppMode): string {
     switch (mode) {
         case "landing":
-            return "nanalogue-gui";
+            return GUI_APP_PROGRAM_NAME;
         case "swipe":
             return "nanalogue-swipe";
         case "qc":
