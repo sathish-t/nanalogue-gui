@@ -236,7 +236,7 @@ The configuration screen allows setting:
 - Full region checkbox to restrict to reads that completely span the region
 - Output BED file path
 
-Output is tab-separated BED6 (contig, start, end, read_id, score, strand):
+Output is tab-separated BED6 (contig, start, end, read_id, score, strand), with score fixed at 1000:
 ```
 chr1	100	600	read_abc	1000	+
 chr2	200	700	read_def	1000	-
@@ -397,7 +397,8 @@ instructions to the default system prompt. The file is loaded once at session
 start and its content is inserted after the built-in sandbox instructions.
 Use this for small amounts of domain-specific context — for example, organism
 background, project-specific conventions, or guidance on which modification
-types to focus on. Files larger than 64 KB are silently ignored. Use
+types to focus on. The file must be non-empty and smaller than 1 MiB;
+oversized or invalid files are rejected explicitly. Use
 `/dump_system_prompt` to verify the full effective prompt after loading.
 This feature is available in both the GUI and the CLI.
 

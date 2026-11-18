@@ -32,8 +32,9 @@ sync.
 The one option that differs is `--max-output-bytes`. In chat this is
 derived from `--context-window` (15% of the context budget, clamped to
 4 KB–80 KB). Here there is no LLM context to worry about, so it is
-exposed directly and defaults to **10 MB**, with an in-memory print
-buffer hard ceiling of **100 MB** to prevent accidental OOM.
+exposed directly and defaults to **10 MB**. The sandbox still enforces
+a fixed 50 MiB hard ceiling for individual returned values and printed
+output; above that, execution fails rather than truncating.
 
 LLM-specific flags (`--endpoint`, `--model`, `--temperature`,
 `--context-window`, `--max-retries`, `--max-code-rounds`, etc.) are
@@ -55,11 +56,14 @@ The execution path is intentionally thin:
    lock for the LLM loop's cancel/restart concurrency; there is no
    concurrency here.
 4. **Output** — collected via `collectTerminalOutput` from
-   `monty-sandbox.ts`, then sliced to `--max-output-bytes` with a
-   truncation note appended if cut short. Silent scripts produce truly
-   empty stdout (no placeholder text) so callers can rely on exit code
-   alone. Stdout is drained before exit to handle pipelines cleanly,
-   including graceful EPIPE handling.
+   `monty-sandbox.ts`. The sandbox already decides whether output stays
+   inline, gets written to `ai_chat_output/`, or fails when it exceeds
+   the 50 MiB hard ceiling, so the CLI just preserves the sandbox output
+   and only adjusts a trailing newline when needed for byte-exact stdout
+   behavior. Silent scripts produce truly empty stdout (no placeholder
+   text) so callers can rely on exit code alone. Stdout is drained
+   before exit to handle pipelines cleanly, including graceful EPIPE
+   handling.
 5. **On error** — any print output captured before the failure is
    flushed to stdout first, then the error is written to stderr and the
    process exits with code `1`.

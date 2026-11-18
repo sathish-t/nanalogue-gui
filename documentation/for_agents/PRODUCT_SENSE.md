@@ -136,4 +136,4 @@ or shown to the user. This loop can take multiple rounds if the LLM calls
   reads or names of features like genes; this depends on the context.
   In Swipe, the fourth column is always read_id.
 - Output BED files from Locate Reads are BED6:
-  contig, start, end, read_id, score (a number or '.'), strand.
+  contig, start, end, read_id, score (fixed at 1000), strand.
