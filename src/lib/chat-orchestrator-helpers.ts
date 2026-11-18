@@ -12,6 +12,7 @@ import type {
     HistoryEntry,
 } from "./chat-types";
 import { deriveMaxOutputBytes, resolvePath } from "./monty-sandbox-helpers";
+import { CHAT_CLI_PROGRAM_NAME } from "./program-names";
 import { buildCompleteSystemPrompt } from "./sandbox-prompt";
 
 /** Serialized LLM message content that can be dumped to disk. */
@@ -137,7 +138,7 @@ export async function handleDumpCommand(
 
         const date = new Date().toISOString().slice(0, 10);
         const uuid = randomUUID();
-        const filename = `nanalogue-chat-${date}-${uuid}.log`;
+        const filename = `${CHAT_CLI_PROGRAM_NAME}-${date}-${uuid}.log`;
         const outputFile = join(safeDir, filename);
 
         const maxOutputBytes = Math.min(

@@ -2,7 +2,7 @@
 
 # Shared lockfile toolchain selection for the pre-commit hook.
 
-NODE_22_NPX_PACKAGE="node@22.20.0"
+NODE_22_NPX_PACKAGE="node@22.22.0"
 PINNED_NPM_NPX_PACKAGE="npm@11.19.0"
 
 # Generates the lockfile with Node 22 and pinned npm whether or not nvm has

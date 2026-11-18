@@ -1,4 +1,5 @@
 filename	%lines
+src/cli-program-status.ts	100
 src/cli-terminal-formatting.ts	100
 src/cli-terminal-output.ts	100
 src/electron-security.ts	100
@@ -50,6 +51,7 @@ src/lib/mod-filter.ts	100
 src/lib/model-listing.ts	92.42
 src/lib/monty-sandbox-helpers.ts	100
 src/lib/monty-sandbox.ts	100
+src/lib/program-names.ts	100
 src/lib/qc-config-builder.ts	100
 src/lib/qc-contract.ts	100
 src/lib/qc-data-loader.ts	93.56
