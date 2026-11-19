@@ -64,7 +64,9 @@ describe("/exec slash command", () => {
             'write_file("summary.tsv", "draft")\n' +
                 'write_file("summary.tsv", "user result")\n' +
                 "for i in range(5000):\n" +
-                '    print("user line", i)\n',
+                '    print("user line", i)\n' +
+                // Too long to show inline, so it is saved to a result file.
+                '"x" * 200000\n',
             "utf-8",
         );
         // The model writes a file before the /exec run.
@@ -96,12 +98,21 @@ describe("/exec slash command", () => {
             result.steps[0].result.message,
         ).toBe(true);
 
-        const [printsFile] = (
-            await readdir(join(tmpDir, "ai_chat_output"))
-        ).filter((name) => name.startsWith("python-prints-"));
+        const overflowFiles = await readdir(join(tmpDir, "ai_chat_output"));
+        const printsFile = overflowFiles.find((name) =>
+            name.startsWith("python-prints-"),
+        );
+        const resultFile = overflowFiles.find((name) =>
+            name.startsWith("python-result-"),
+        );
         expect(printsFile).toBeDefined();
+        expect(resultFile).toBeDefined();
 
-        for (const path of ["summary.tsv", `ai_chat_output/${printsFile}`]) {
+        for (const path of [
+            "summary.tsv",
+            `ai_chat_output/${printsFile}`,
+            `ai_chat_output/${resultFile}`,
+        ]) {
             await expect(
                 modelWrite(path, "model result"),
             ).rejects.toMatchObject({ name: "FileExistsError" });
