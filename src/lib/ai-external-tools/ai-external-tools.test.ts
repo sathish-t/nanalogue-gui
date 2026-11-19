@@ -67,6 +67,20 @@ it("makeWindowReads returns an array of records for a real BAM file", async () =
     expect((result as unknown[]).length).toBeGreaterThan(0);
 });
 
+it.each([
+    [
+        { step: 50 },
+        "window_reads() missing required keyword-only argument: 'win'",
+    ],
+    [{ win: 100, step: null }, "window_reads: step must be an int, got None"],
+])("makeWindowReads with %o raises TypeError, not the addon's Missing field error", async (opts, message) => {
+    const fn = makeWindowReads(allowedDir, 1_000);
+    await expect(fn(bamName, opts)).rejects.toMatchObject({
+        name: "TypeError",
+        message,
+    });
+});
+
 // --- makeLs ---
 
 it("makeLs returns a plain array when under the cap", async () => {

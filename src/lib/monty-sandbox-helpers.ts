@@ -218,20 +218,33 @@ export function assertStringToolArgument(
     name: string,
 ): asserts value is string {
     if (typeof value !== "string") {
-        // Monty passes None as null, a list as an array, and a dict as a Map.
-        const pythonType =
-            value === null
-                ? "None"
-                : Array.isArray(value)
-                  ? "list"
-                  : value instanceof Map
-                    ? "dict"
-                    : typeof value;
         throw new SandboxError(
             "TypeError",
-            `${toolName}: ${name} must be a string, got ${pythonType}`,
+            `${toolName}: ${name} must be a string, got ${pythonTypeName(value)}`,
         );
     }
+}
+
+/**
+ * Names the Python type of a non-string value Monty passed to a tool, for
+ * error messages.
+ * Monty passes None as null, a list or tuple as an array, and a dict as a Map.
+ * A float with no fractional part, such as 1.0, arrives as a whole number and
+ * is named int.
+ *
+ * @param value - The argument as Python passed it.
+ * @returns The Python type name, such as "None", "int", or "dict".
+ */
+function pythonTypeName(value: unknown): string {
+    if (value === null || value === undefined) return "None";
+    if (Array.isArray(value)) return "list";
+    if (value instanceof Map) return "dict";
+    if (typeof value === "boolean") return "bool";
+    if (typeof value === "bigint") return "int";
+    if (typeof value === "number") {
+        return Number.isInteger(value) ? "int" : "float";
+    }
+    return typeof value;
 }
 
 // The limit option is not listed because toReadOptions clamps it to the record cap.

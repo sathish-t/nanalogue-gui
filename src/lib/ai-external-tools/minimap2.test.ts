@@ -62,7 +62,7 @@ it("rejects non-string reference_path", async () => {
         minimap2(123 as unknown as string, "query.fa"),
     ).rejects.toMatchObject({
         name: "TypeError",
-        message: expect.stringContaining("reference_path must be a string"),
+        message: "minimap2: reference_path must be a string, got int",
     });
 });
 
@@ -71,7 +71,7 @@ it("rejects non-string query_path", async () => {
         minimap2("contigs.fa", 456 as unknown as string),
     ).rejects.toMatchObject({
         name: "TypeError",
-        message: expect.stringContaining("query_path must be a string"),
+        message: "minimap2: query_path must be a string, got int",
     });
 });
 
@@ -80,7 +80,7 @@ it("rejects non-string preset", async () => {
         minimap2("contigs.fa", "query.fa", 99 as unknown as string),
     ).rejects.toMatchObject({
         name: "TypeError",
-        message: expect.stringContaining("preset must be a string"),
+        message: "minimap2: preset must be a string, got int",
     });
 });
 
@@ -102,7 +102,7 @@ it("rejects a dict passed as the preset", async () => {
         ),
     ).rejects.toMatchObject({
         name: "TypeError",
-        message: expect.stringContaining("preset must be a string"),
+        message: "minimap2: preset must be a string, got dict",
     });
 });
 

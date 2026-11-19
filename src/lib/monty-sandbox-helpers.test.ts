@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+    assertStringToolArgument,
     convertMaps,
     deriveMaxOutputBytes,
     enforceDataSizeLimit,
@@ -267,6 +268,37 @@ describe("safeStringify", () => {
         cyclic.self = cyclic;
         expect(safeStringify(cyclic).ok).toBe(false);
         expect(safeStringify(undefined).ok).toBe(false);
+    });
+});
+
+describe("assertStringToolArgument", () => {
+    // Expected names are what Python's type() would report for each value.
+    it.each([
+        [null, "None"],
+        [undefined, "None"],
+        [7, "int"],
+        [BigInt(2) ** BigInt(70), "int"],
+        [0.5, "float"],
+        [false, "bool"],
+        [["a"], "list"],
+        [new Map([["a", 1]]), "dict"],
+        // Any other JavaScript value falls back to its typeof name.
+        [{}, "object"],
+    ])("names %s as %s", (value, expected) => {
+        expect(() =>
+            assertStringToolArgument(value, "peek", "bam_path"),
+        ).toThrow(
+            new SandboxError(
+                "TypeError",
+                `peek: bam_path must be a string, got ${expected}`,
+            ),
+        );
+    });
+
+    it("accepts a string", () => {
+        expect(() =>
+            assertStringToolArgument("x.bam", "peek", "bam_path"),
+        ).not.toThrow();
     });
 });
 

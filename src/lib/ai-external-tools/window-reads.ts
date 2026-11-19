@@ -48,6 +48,23 @@ export function makeWindowReads(
     ): Promise<unknown> => {
         assertStringToolArgument(bamPath, "window_reads", "bam_path");
         rejectTreatAsUrl(opts);
+        // win and step have no default; without this check a missing value
+        // fails in the native addon with "Missing field `win`".
+        for (const name of ["win", "step"]) {
+            const value = opts?.[name];
+            if (value === undefined) {
+                throw new SandboxError(
+                    "TypeError",
+                    `window_reads() missing required keyword-only argument: '${name}'`,
+                );
+            }
+            if (value === null) {
+                throw new SandboxError(
+                    "TypeError",
+                    `window_reads: ${name} must be an int, got None`,
+                );
+            }
+        }
         const resolved = await resolvePath(allowedDir, bamPath);
         const records = await windowReads(
             toWindowOptions(resolved, opts, maxRecords),

@@ -14,6 +14,7 @@ import {
     MINIMAP2_PRESETS,
 } from "../ai-chat-constants";
 import {
+    assertStringToolArgument,
     isDeniedPath,
     resolvePath,
     SandboxError,
@@ -279,27 +280,12 @@ export function makeRunMinimap2(
         preset?: string | null,
     ): Promise<unknown> => {
         // --- Validate argument types ---
-        if (typeof refPath !== "string") {
-            throw new SandboxError(
-                "TypeError",
-                "minimap2: reference_path must be a string",
-            );
-        }
-        if (typeof queryPath !== "string") {
-            throw new SandboxError(
-                "TypeError",
-                "minimap2: query_path must be a string",
-            );
-        }
+        assertStringToolArgument(refPath, "minimap2", "reference_path");
+        assertStringToolArgument(queryPath, "minimap2", "query_path");
 
         // --- Validate preset (None means minimap2's defaults) ---
         if (preset !== undefined && preset !== null) {
-            if (typeof preset !== "string") {
-                throw new SandboxError(
-                    "TypeError",
-                    "minimap2: preset must be a string",
-                );
-            }
+            assertStringToolArgument(preset, "minimap2", "preset");
             if (!(MINIMAP2_PRESETS as readonly string[]).includes(preset)) {
                 throw new SandboxError(
                     "ValueError",

@@ -1438,7 +1438,7 @@ describe("sandbox tools raise Python TypeErrors for bad arguments", () => {
             "write_file: content must be a string, got list",
         ],
         ["read_file(None)", "read_file: file_path must be a string, got None"],
-        ["peek(5)", "peek: bam_path must be a string, got number"],
+        ["peek(5)", "peek: bam_path must be a string, got int"],
         ["read_info(None)", "read_info: bam_path must be a string, got None"],
         ["bam_mods(None)", "bam_mods: bam_path must be a string, got None"],
         [
