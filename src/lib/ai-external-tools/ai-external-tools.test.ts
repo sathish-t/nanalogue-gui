@@ -12,7 +12,7 @@ import {
     writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { gzipSync } from "node:zlib";
 import { simulateModBam } from "@nanalogue/node";
 import { afterAll, beforeAll, expect, it } from "vitest";
@@ -278,6 +278,29 @@ it("makeWriteFile collision omits the suggestion when every numbered name is tak
     });
     expect((error as Error).message).not.toContain("e.g.");
 });
+
+it.each([
+    ["run_007.tsv", "run_008.tsv"],
+    ["n_12345678901234567890.txt", "n_12345678901234567890_2.txt"],
+    ["trailing.", "trailing_2."],
+])("makeWriteFile collision on %s suggests %s", async (name, expected) => {
+    await writeFile(join(allowedDir, name), "");
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await expect(fn(name, "x")).rejects.toMatchObject({
+        message: expect.stringContaining(`e.g. "${expected}"`),
+    });
+});
+
+it.skipIf(sep === "\\")(
+    "makeWriteFile collision treats a backslash as part of the file name outside Windows",
+    async () => {
+        await writeFile(join(allowedDir, "back\\slash.txt"), "");
+        const fn = makeWriteFile(allowedDir, 1024 * 1024);
+        await expect(fn("back\\slash.txt", "x")).rejects.toMatchObject({
+            message: expect.stringContaining('e.g. "back\\slash_2.txt"'),
+        });
+    },
+);
 
 it("makeWriteFile collision suggestion keeps the directory and a .vcf.gz extension", async () => {
     await mkdir(join(allowedDir, "calls_dir"), { recursive: true });

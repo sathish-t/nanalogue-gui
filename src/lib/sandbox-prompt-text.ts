@@ -251,7 +251,8 @@ result = write_file("chr1/filtered_reads.tsv", tsv_content)
 
 - file_path: path for the output file, relative to the allowed directory.
   Nested paths like "subdir/file.bed" are supported — parent
-  directories are created automatically.
+  directories are created automatically. Use / to separate folders on
+  every platform, never \\.
 - content: text content to write (UTF-8). Max ${maxWriteMB} MB per call.
 - IMPORTANT: This function NEVER overwrites existing files, and files
   cannot be deleted. If a file with the given name already exists, the
@@ -572,13 +573,14 @@ density per window instead of just the mean modification density per window.
 Returns a TSV string with per-read sequence data.
 
 NOTE: region is required for seq_table and cannot be empty, and must be passed
-as a keyword argument: seq_table("file.bam", region="contig_00000"). Use peek()
-first to discover available contigs if you do not know the region.
+as a keyword argument: seq_table("file.bam", region="contig_00000:1000-1100").
+Use peek() first to discover available contigs if you do not know the region.
 
 NOTE: seq_table only returns reads that fully span the requested region;
 reads that overlap it only partially are omitted, and full_region=False is
 rejected. A read that covers part of a long region is returned for a
-shorter sub-region it fully spans.
+shorter sub-region it fully spans, so a whole-contig region such as
+region="contig_00000" usually returns no reads; query short sub-regions instead.
 
 
 Sample output:

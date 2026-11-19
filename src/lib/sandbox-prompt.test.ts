@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { EXTERNAL_FUNCTIONS } from "./ai-chat-constants";
 import { MAX_SYSTEM_PROMPT_BYTES } from "./ai-chat-shared-constants";
 import type { AiChatConfig } from "./chat-types";
+import { BAM_TOOL_KEYWORDS } from "./monty-sandbox-helpers";
 import {
     buildCompleteSystemPrompt,
     buildSandboxPrompt,
@@ -30,6 +31,22 @@ const BASE_OPTIONS: SandboxPromptOptions = {
     maxWriteMB: 10,
     maxDurationSecs: 600,
 };
+
+/**
+ * Returns the prompt text from a heading up to the next ## or ### heading,
+ * so a check can be limited to one tool's section.
+ *
+ * @param prompt - The full sandbox prompt.
+ * @param heading - The start of the section's heading line.
+ * @returns The section text, heading included.
+ */
+function promptSection(prompt: string, heading: string): string {
+    const start = prompt.indexOf(heading);
+    expect(start, `missing section ${heading}`).toBeGreaterThanOrEqual(0);
+    const rest = prompt.slice(start + heading.length);
+    const next = rest.search(/^#{2,3} /m);
+    return heading + (next === -1 ? rest : rest.slice(0, next));
+}
 
 // ---------------------------------------------------------------------------
 // buildSandboxPrompt — external function docs
@@ -83,6 +100,10 @@ describe("buildSandboxPrompt — external function docs", () => {
 
     it("documents each tool's parameters as declared in SANDBOX_TOOL_SIGNATURES", () => {
         const prompt = buildSandboxPrompt(BASE_OPTIONS);
+        const sharedBamSection = promptSection(
+            prompt,
+            "### Shared keyword arguments for read_info",
+        );
         for (const [tool, signature] of Object.entries(
             SANDBOX_TOOL_SIGNATURES,
         )) {
@@ -102,8 +123,18 @@ describe("buildSandboxPrompt — external function docs", () => {
                 .map((param) => param.split(/[:=]/)[0].trim())
                 .filter(Boolean);
             expect(headingParams, tool).toEqual(expectedParams);
+            // Each keyword must have a row in this tool's own section; the BAM
+            // tools' shared keywords live in the shared BAM table instead.
+            const toolSection = promptSection(prompt, `### ${tool}(`);
+            const isBamTool = BAM_TOOL_KEYWORDS.every((name) =>
+                signature.keywordOnly.includes(name),
+            );
             for (const name of documentedKeywords) {
-                expect(prompt, `${tool} keyword ${name}`).toContain(
+                const section =
+                    isBamTool && BAM_TOOL_KEYWORDS.includes(name)
+                        ? sharedBamSection
+                        : toolSection;
+                expect(section, `${tool} keyword ${name}`).toContain(
                     `| ${name} |`,
                 );
             }

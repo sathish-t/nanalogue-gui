@@ -91,10 +91,13 @@ function suggestParameterName(
     let bestDistance = Number.POSITIVE_INFINITY;
     for (const candidate of validNames) {
         const distance = editDistance(name, candidate);
+        // Substring matches only count for names of three or more
+        // characters; otherwise a one-letter typo such as n matches
+        // almost every parameter.
         const close =
             distance <= 2 ||
-            candidate.includes(name) ||
-            name.includes(candidate);
+            (name.length >= 3 &&
+                (candidate.includes(name) || name.includes(candidate)));
         if (close && distance < bestDistance) {
             best = candidate;
             bestDistance = distance;
@@ -150,6 +153,7 @@ export function bindSandboxToolArgs(
     }
     const values: unknown[] = positional.map((_, i) => args[i]);
     const options: Record<string, unknown> = {};
+    // Monty drops a __proto__ keyword before it reaches us, so it is never rejected here.
     for (const [name, value] of Object.entries(kwargs)) {
         const index = positional.indexOf(name);
         if (index >= 0) {

@@ -3,7 +3,7 @@
 // A name collision raises FileExistsError with a suggested free file name.
 
 import { lstat, mkdir, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { MAX_FILENAME_LENGTH } from "../ai-chat-constants";
 import { hasControlChars } from "../control-characters";
 import {
@@ -26,9 +26,11 @@ const FREE_FILE_NAME_ATTEMPTS = 100;
  * Splits a file name into stem, numeric suffix, and extension, keeping a
  * trailing .gz or .bgz with the extension before it ("calls.vcf.gz" has
  * extension ".vcf.gz"). "results_2.bed" has stem "results" and number "2".
+ * Numbers longer than nine digits stay in the stem, so they are never
+ * printed in exponent form.
  */
 const NUMBERED_FILE_NAME_PATTERN =
-    /^(.+?)(?:_(\d+))?((?:\.[^.]+)?\.b?gz|\.[^.]+)?$/i;
+    /^(.+?)(?:_(\d{1,9}))?((?:\.[^.]+)?\.b?gz|\.[^.]*)?$/i;
 
 /**
  * Suggests a free file name in the same directory after a write collision.
@@ -45,14 +47,22 @@ async function suggestFreeFileName(
     filePath: string,
     resolvedPath: string,
 ): Promise<string | undefined> {
-    const slash = filePath.lastIndexOf("/");
-    const dirPrefix = filePath.slice(0, slash + 1);
-    const match = NUMBERED_FILE_NAME_PATTERN.exec(filePath.slice(slash + 1));
+    // Windows also separates folders with backslashes; elsewhere a backslash
+    // is an ordinary file-name character.
+    const callerPath = sep === "\\" ? toForwardSlashes(filePath) : filePath;
+    const slash = callerPath.lastIndexOf("/");
+    const dirPrefix = callerPath.slice(0, slash + 1);
+    const match = NUMBERED_FILE_NAME_PATTERN.exec(callerPath.slice(slash + 1));
     if (!match) return undefined;
     const [, stem, existingNumber, extension = ""] = match;
     const firstNumber = existingNumber ? Number(existingNumber) + 1 : 2;
     for (let i = 0; i < FREE_FILE_NAME_ATTEMPTS; i++) {
-        const candidate = `${stem}_${firstNumber + i}${extension}`;
+        // Keep zero padding, so "run_007.tsv" becomes "run_008.tsv".
+        const number = String(firstNumber + i).padStart(
+            existingNumber?.length ?? 0,
+            "0",
+        );
+        const candidate = `${stem}_${number}${extension}`;
         if (candidate.length > MAX_FILENAME_LENGTH) return undefined;
         try {
             // lstat so a dangling symlink also counts as taken.

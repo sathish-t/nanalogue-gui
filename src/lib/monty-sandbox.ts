@@ -294,7 +294,12 @@ export async function runSandboxCode(
                         ),
                         plot_series: makePlotSeries(allowedDir, maxWriteBytes),
                         minimap2: makeRunMinimap2(allowedDir),
-                    })
+                        // A tool missing from this object, or from
+                        // SANDBOX_TOOL_SIGNATURES, fails to compile.
+                    } satisfies Record<
+                        keyof typeof SANDBOX_TOOL_SIGNATURES,
+                        (...args: never[]) => unknown
+                    >)
                         .filter(([name]) => !removedTools?.has(name))
                         // Match Python positional and keyword arguments
                         // to each tool's declared parameters.

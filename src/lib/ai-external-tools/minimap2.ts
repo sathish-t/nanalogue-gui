@@ -261,39 +261,23 @@ export function makeRunMinimap2(
 ): (
     refPath: string,
     queryPath: string,
-    opts?: Record<string, unknown> | string | null,
+    preset?: string | null,
 ) => Promise<unknown> {
     /**
      * Runs minimap2 alignment and returns PAF output plus stderr.
      *
      * @param refPath - Path to the reference FASTA/FASTQ file, relative to allowedDir.
      * @param queryPath - Path to the query FASTA/FASTQ file, relative to allowedDir.
-     * @param opts - Optional preset string or options object with a preset key.
-     *   Accepts a bare string (positional preset) or `{ preset: "..." }` to
-     *   accommodate both Python calling conventions: `minimap2(ref, q, "sr")` and
-     *   `minimap2(ref, q, preset="sr")`.
+     * @param preset - Optional minimap2 preset name, or null/undefined for the
+     *   built-in defaults. Python may pass it by position or by keyword; the
+     *   argument binder delivers both here.
      * @returns A dict with paf (string) and stderr (string).
      */
     return async (
         refPath: string,
         queryPath: string,
-        opts?: Record<string, unknown> | string | null,
+        preset?: string | null,
     ): Promise<unknown> => {
-        // Normalise: a bare positional string is treated as the preset value,
-        // and None (preset=None) means no preset.
-        if (
-            opts !== undefined &&
-            opts !== null &&
-            typeof opts !== "string" &&
-            (typeof opts !== "object" || Array.isArray(opts))
-        ) {
-            throw new SandboxError(
-                "TypeError",
-                "minimap2: third argument must be a preset string or an options object",
-            );
-        }
-        const normalizedOpts: Record<string, unknown> | undefined =
-            typeof opts === "string" ? { preset: opts } : (opts ?? undefined);
         // --- Validate argument types ---
         if (typeof refPath !== "string") {
             throw new SandboxError(
@@ -308,9 +292,8 @@ export function makeRunMinimap2(
             );
         }
 
-        // --- Validate preset ---
-        const preset = normalizedOpts?.preset ?? null;
-        if (preset !== null) {
+        // --- Validate preset (None means minimap2's defaults) ---
+        if (preset !== undefined && preset !== null) {
             if (typeof preset !== "string") {
                 throw new SandboxError(
                     "TypeError",
@@ -352,7 +335,7 @@ export function makeRunMinimap2(
 
         // --- Build callMain args ---
         const args: string[] = [];
-        if (preset !== null) {
+        if (typeof preset === "string") {
             args.push("-x", preset);
         }
         args.push("/ref", "/query");

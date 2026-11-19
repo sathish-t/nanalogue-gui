@@ -1225,8 +1225,14 @@ it("external function error message includes the Python call site in the traceba
 /** One-bin histogram and one-point series used by the binding tests. */
 const BINDING_BINS = '[{"bin_start": 0, "bin_end": 1, "count": 1}]';
 const BINDING_POINTS = '[{"x": 1, "y": 2}]';
-/** Python expression for the first contig of the shared test BAM. */
-const FIRST_CONTIG = 'list(peek("simple_test.bam")["contigs"].keys())[0]';
+/**
+ * Python expression for a 10 bp region inside the first mapped read, so
+ * seq_table (which keeps only reads spanning the whole region) returns rows.
+ */
+const SPANNED_REGION =
+    "[f\"{r['contig']}:{r['reference_start'] + 10}-{r['reference_start'] + 20}\" " +
+    'for r in read_info("simple_test.bam", limit=50) ' +
+    'if r["alignment_type"] != "unmapped"][0]';
 
 describe("sandbox tools accept required arguments by position or keyword", () => {
     it.each([
@@ -1244,10 +1250,16 @@ describe("sandbox tools accept required arguments by position or keyword", () =>
             'window_reads(bam_path="simple_test.bam", win=5, step=5, limit=2)',
         ],
         [
-            `seq_table("simple_test.bam", region=${FIRST_CONTIG})`,
-            `seq_table(bam_path="simple_test.bam", region=${FIRST_CONTIG})`,
+            // seq_table row order varies between calls, so compare sorted lines.
+            `sorted(seq_table("simple_test.bam", region=${SPANNED_REGION}).splitlines())`,
+            `sorted(seq_table(bam_path="simple_test.bam", region=${SPANNED_REGION}).splitlines())`,
         ],
         ['ls("*.fasta")', 'ls(pattern="*.fasta")'],
+        ["ls()", "ls(pattern=None)"],
+        [
+            'read_info("simple_test.bam", limit=3)',
+            'read_info(**{"bam_path": "simple_test.bam", "limit": 3})',
+        ],
         [
             'read_file("simple_test.fasta", max_bytes=20)',
             'read_file(file_path="simple_test.fasta", max_bytes=20)',
@@ -1274,6 +1286,16 @@ describe("sandbox tools accept required arguments by position or keyword", () =>
         expect(positional.success, positional.message).toBe(true);
         expect(keyword.success, keyword.message).toBe(true);
         expect(keyword.value).toEqual(positional.value);
+    });
+
+    it("passes seq_table options through, returning reads for a spanned region", async () => {
+        const result = await runSandboxCode(
+            `len(seq_table(bam_path="simple_test.bam", region=${SPANNED_REGION}).strip().split("\\n"))`,
+            allowedDir,
+        );
+        expect(result.success, result.message).toBe(true);
+        // Header line plus at least one read.
+        expect(result.value as number).toBeGreaterThan(1);
     });
 
     it("applies ls(pattern=...) instead of listing every file", async () => {
@@ -1312,6 +1334,10 @@ describe("sandbox tools raise Python TypeErrors for bad arguments", () => {
         [
             "continue_thinking(x=1)",
             "continue_thinking() got an unexpected keyword argument 'x'. continue_thinking() takes no arguments.",
+        ],
+        [
+            'read_info("simple_test.bam", n=1)',
+            "read_info() got an unexpected keyword argument 'n'. Valid arguments:",
         ],
         [
             'write_file("bind_missing.txt")',
