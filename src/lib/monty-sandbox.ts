@@ -233,6 +233,7 @@ export async function runSandboxCode(
         maxWriteBytes = DEFAULT_MAX_WRITE_BYTES,
         maxLsEntries = MAX_LS_ENTRIES,
         removedTools,
+        recordSessionWrites = true,
     } = options;
 
     let continueThinkingCalled = false;
@@ -287,12 +288,22 @@ export async function runSandboxCode(
                         seq_table: makeSeqTable(allowedDir, maxRecordsSeqTable),
                         ls: makeLs(allowedDir, maxLsEntries),
                         read_file: makeReadFile(allowedDir, maxReadBytes),
-                        write_file: makeWriteFile(allowedDir, maxWriteBytes),
+                        write_file: makeWriteFile(
+                            allowedDir,
+                            maxWriteBytes,
+                            "write_file",
+                            recordSessionWrites,
+                        ),
                         plot_histogram: makePlotHistogram(
                             allowedDir,
                             maxWriteBytes,
+                            recordSessionWrites,
                         ),
-                        plot_series: makePlotSeries(allowedDir, maxWriteBytes),
+                        plot_series: makePlotSeries(
+                            allowedDir,
+                            maxWriteBytes,
+                            recordSessionWrites,
+                        ),
                         minimap2: makeRunMinimap2(allowedDir),
                         // A tool missing from this object, or from
                         // SANDBOX_TOOL_SIGNATURES, fails to compile.

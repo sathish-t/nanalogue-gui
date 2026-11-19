@@ -1,9 +1,10 @@
 // End-to-end tests for handleUserMessage /exec handling.
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { makeWriteFile } from "./ai-external-tools";
 import { handleUserMessage } from "./chat-orchestrator";
 import { createHandleMessageHarness } from "./chat-orchestrator-handle-message-test-utils";
 import type { AiChatEvent } from "./chat-types";
@@ -55,6 +56,43 @@ describe("/exec slash command", () => {
         expect(types).toContain("code_execution_end");
         expect(types).toContain("turn_end");
         expect(types).not.toContain("llm_request_start");
+    });
+
+    it("keeps files written by /exec protected from the model's overwrites", async () => {
+        await writeFile(
+            join(tmpDir, "mine.py"),
+            'write_file("summary.tsv", "user result")',
+            "utf-8",
+        );
+        const { config, history, events, signal } =
+            createHandleMessageHarness();
+        const result = await handleUserMessage({
+            message: "/exec mine.py",
+            endpointUrl: "http://localhost:1234/v1",
+            apiKey: "",
+            model: "test",
+            allowedDir: tmpDir,
+            config,
+            /**
+             * Collects emitted events for test assertions.
+             *
+             * @param e - The event to collect.
+             */
+            emitEvent: (e: AiChatEvent) => {
+                events.push(e);
+            },
+            history,
+            signal,
+        });
+        expect(result.steps[0].result.success).toBe(true);
+
+        const modelWrite = makeWriteFile(tmpDir, 1024);
+        await expect(
+            modelWrite("summary.tsv", "model result"),
+        ).rejects.toMatchObject({ name: "FileExistsError" });
+        await expect(
+            readFile(join(tmpDir, "summary.tsv"), "utf-8"),
+        ).resolves.toBe("user result");
     });
 
     it("rejects files outside allowedDir", async () => {

@@ -417,6 +417,13 @@ describe("makePlotSeries — output path validation", () => {
         ).rejects.toMatchObject({ name: "ValueError" });
     });
 
+    it("overwrites its own earlier output and reports overwrote", async () => {
+        await plotSeries(VALID_POINTS, { output_path: "own.svg" });
+        await expect(
+            plotSeries(VALID_POINTS, { output_path: "own.svg" }),
+        ).resolves.toMatchObject({ path: "own.svg", overwrote: true });
+    });
+
     it("rejects overwriting an existing file", async () => {
         await writeFile(join(allowedDir, "existing.svg"), "<svg/>");
         await expect(

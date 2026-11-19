@@ -85,14 +85,21 @@ function validateKind(raw: unknown): SeriesKind {
  *
  * @param allowedDir - The sandboxed root directory for path resolution.
  * @param maxWriteBytes - Maximum bytes the SVG file may occupy.
+ * @param recordSessionWrites - Whether the SVG counts as the chat's own file, which later calls may overwrite.
  * @returns An async function callable from Python that renders a line or scatter SVG.
  */
 export function makePlotSeries(
     allowedDir: string,
     maxWriteBytes: number,
+    recordSessionWrites = true,
 ): (points: unknown, opts?: Record<string, unknown>) => Promise<unknown> {
     // Instantiate once; all path safety lives here.
-    const writeFn = makeWriteFile(allowedDir, maxWriteBytes, "plot_series");
+    const writeFn = makeWriteFile(
+        allowedDir,
+        maxWriteBytes,
+        "plot_series",
+        recordSessionWrites,
+    );
 
     /**
      * Renders a line or scatter SVG from x/y point data and writes it to disk.
@@ -167,12 +174,13 @@ export function makePlotSeries(
 
         // --- Write file (all path safety delegated to makeWriteFile) ---
 
-        await writeFn(filePath, svgContent);
+        const written = await writeFn(filePath, svgContent);
 
         return {
             path: filePath,
             points_plotted: points.length,
             note: WRITE_ONLY_NOTE,
+            ...(written.overwrote ? { overwrote: true } : {}),
         };
     };
 }

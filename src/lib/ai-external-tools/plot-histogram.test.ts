@@ -359,6 +359,13 @@ describe("makePlotHistogram — output path validation", () => {
         ).rejects.toMatchObject({ name: "ValueError" });
     });
 
+    it("overwrites its own earlier output and reports overwrote", async () => {
+        await plotHistogram(VALID_BINS, { output_path: "own.svg" });
+        await expect(
+            plotHistogram(VALID_BINS, { output_path: "own.svg" }),
+        ).resolves.toMatchObject({ path: "own.svg", overwrote: true });
+    });
+
     it("rejects overwriting an existing file", async () => {
         await writeFile(join(allowedDir, "existing.svg"), "<svg/>");
         await expect(

@@ -3,7 +3,15 @@
 // wrote can be replaced; any other existing file raises FileExistsError with a
 // suggested free file name.
 
-import { lstat, mkdir, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import {
+    lstat,
+    mkdir,
+    realpath,
+    rename,
+    unlink,
+    writeFile,
+} from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { MAX_FILENAME_LENGTH } from "../ai-chat-constants";
 import { hasControlChars } from "../control-characters";
@@ -120,19 +128,58 @@ async function makeFileExistsError(
     );
 }
 
+/** Result of one write_file call, as returned to Python. */
+export interface SandboxWriteFileResult {
+    /** The path as the caller passed it. */
+    path: string;
+    /** Number of UTF-8 bytes written. */
+    bytes_written: number;
+    /** Present when an existing file from this chat session was replaced. */
+    overwrote?: true;
+}
+
+/**
+ * Replaces an existing file by writing a sibling temporary file and renaming
+ * it over the old one. Renaming replaces the directory entry, so hard links
+ * to the old file keep the old content and a symlink at the path is replaced
+ * rather than followed.
+ *
+ * @param resolvedPath - The real path of the file to replace.
+ * @param content - The new text content.
+ */
+async function replaceFileAtomically(
+    resolvedPath: string,
+    content: string,
+): Promise<void> {
+    const tempPath = join(
+        dirname(resolvedPath),
+        `.write-file-${randomUUID()}.tmp`,
+    );
+    try {
+        await writeFile(tempPath, content, { encoding: "utf-8", flag: "wx" });
+        await rename(tempPath, resolvedPath);
+    } catch (e) {
+        await unlink(tempPath).catch(() => undefined);
+        throw e;
+    }
+}
+
 /**
  * Returns the write_file tool implementation bound to the given context.
  *
  * @param allowedDir - The sandboxed root directory for path resolution.
  * @param maxWriteBytes - Maximum bytes that may be written in a single call.
  * @param toolName - Python tool named in the file-exists error; plotting tools pass their own name.
+ * @param recordSessionWrites - Whether written files count as the chat's own files, which later
+ *   writes may overwrite. False for the user's /exec runs, whose files stay protected.
  * @returns An async function callable from Python that writes a file.
  */
 export function makeWriteFile(
     allowedDir: string,
     maxWriteBytes: number,
     toolName = "write_file",
-): (filePath: string, content: string) => Promise<unknown> {
+    recordSessionWrites = true,
+): (filePath: string, content: string) => Promise<SandboxWriteFileResult> {
     /**
      * Writes a text file to the allowed directory, replacing it only if
      * this chat session wrote it earlier.
@@ -146,7 +193,10 @@ export function makeWriteFile(
      * @returns An object with the written path and bytes_written, plus
      *   overwrote: true when an earlier file from this session was replaced.
      */
-    return async (filePath: string, content: string): Promise<unknown> => {
+    return async (
+        filePath: string,
+        content: string,
+    ): Promise<SandboxWriteFileResult> => {
         for (const component of filePath.split("/")) {
             if (component.length > MAX_FILENAME_LENGTH) {
                 throw new SandboxError(
@@ -196,20 +246,38 @@ export function makeWriteFile(
         await mkdir(parentDir, { recursive: true });
         // Symlink-safe resolution: verify canonical path stays within allowedDir.
         const resolved = await resolvePath(allowedDir, filePath);
-        // Files this session wrote may be replaced; anything else must be new.
-        const overwrite = sessionWrittenFiles.has(resolved);
+        // Files this session wrote may be replaced; anything else must be
+        // new. A session file the user has since deleted is created afresh.
+        const overwrite =
+            recordSessionWrites &&
+            sessionWrittenFiles.has(resolved) &&
+            (await lstat(resolved).then(
+                () => true,
+                (e: NodeJS.ErrnoException) => {
+                    if (e.code === "ENOENT") return false;
+                    throw e;
+                },
+            ));
         try {
-            await writeFile(resolved, content, {
-                encoding: "utf-8",
-                flag: overwrite ? "w" : "wx",
-            });
+            if (overwrite) {
+                await replaceFileAtomically(resolved, content);
+            } else {
+                await writeFile(resolved, content, {
+                    encoding: "utf-8",
+                    flag: "wx",
+                });
+            }
         } catch (e) {
             if ((e as NodeJS.ErrnoException).code === "EEXIST") {
                 throw await makeFileExistsError(toolName, filePath, tentative);
             }
             throw e;
         }
-        sessionWrittenFiles.add(resolved);
+        if (recordSessionWrites) {
+            // Record the real path: before the file existed, resolvePath
+            // returned the path through any symlinked folder instead.
+            sessionWrittenFiles.add(await realpath(resolved));
+        }
         return {
             path: filePath,
             bytes_written: contentBytes,

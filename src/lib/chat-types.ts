@@ -62,6 +62,12 @@ export interface SandboxOptions {
     maxLsEntries?: number;
     /** Tool names to omit from the sandbox. When absent, all tools are registered. */
     removedTools?: ReadonlySet<string>;
+    /**
+     * Whether files written in this run count as the chat's own files, which
+     * later runs may overwrite. False for the user's /exec runs, so their
+     * output stays protected. Default true.
+     */
+    recordSessionWrites?: boolean;
 }
 
 /** An assistant message in the conversation history. */

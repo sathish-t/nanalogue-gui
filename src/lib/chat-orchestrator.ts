@@ -199,6 +199,9 @@ export async function handleUserMessage(
                 maxReadBytes: config.maxReadMB * 1024 * 1024,
                 maxWriteBytes: config.maxWriteMB * 1024 * 1024,
                 removedTools,
+                // The user's own script: its files must stay protected
+                // from the model's overwrites.
+                recordSessionWrites: false,
             },
             signal,
         );

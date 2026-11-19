@@ -4,18 +4,21 @@
 // monty-sandbox.test.ts.
 
 import {
+    link,
     mkdir,
     mkdtemp,
+    readdir,
     readFile,
     realpath,
     rm,
+    symlink,
     writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { gzipSync } from "node:zlib";
 import { simulateModBam } from "@nanalogue/node";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, expect, it } from "vitest";
 import { MAX_FILENAME_LENGTH } from "../ai-chat-constants";
 import { SandboxError } from "../monty-sandbox-helpers";
 import { makeLs } from "./ls";
@@ -42,6 +45,12 @@ beforeAll(async () => {
         fastaPath: join(allowedDir, "simple_test.fasta"),
     });
 }, 60_000);
+
+// The session's written-file set is module-level; clear it so tests that
+// reuse a file name do not depend on test order.
+beforeEach(() => {
+    resetSessionWrittenFiles();
+});
 
 afterAll(async () => {
     await rm(allowedDir, { recursive: true });
@@ -252,6 +261,72 @@ it("makeWriteFile overwrites a file it wrote earlier in the session, by any spel
     await expect(
         readFile(join(allowedDir, "session.tsv"), "utf-8"),
     ).resolves.toBe("second!");
+});
+
+it("makeWriteFile overwrites its own file under a symlinked folder", async () => {
+    await mkdir(join(allowedDir, "real_folder"), { recursive: true });
+    await symlink(
+        join(allowedDir, "real_folder"),
+        join(allowedDir, "linked_folder"),
+    );
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await fn("linked_folder/a.txt", "one");
+    await expect(fn("linked_folder/a.txt", "two")).resolves.toMatchObject({
+        overwrote: true,
+    });
+    await expect(
+        readFile(join(allowedDir, "real_folder", "a.txt"), "utf-8"),
+    ).resolves.toBe("two");
+});
+
+it("makeWriteFile overwrite replaces the file, leaving a hard link to the old one unchanged", async () => {
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await fn("linked_out.txt", "model v1");
+    await link(
+        join(allowedDir, "linked_out.txt"),
+        join(allowedDir, "user_snapshot.txt"),
+    );
+    await fn("linked_out.txt", "model v2");
+    await expect(
+        readFile(join(allowedDir, "user_snapshot.txt"), "utf-8"),
+    ).resolves.toBe("model v1");
+    await expect(
+        readFile(join(allowedDir, "linked_out.txt"), "utf-8"),
+    ).resolves.toBe("model v2");
+});
+
+it("makeWriteFile does not report overwrote when its earlier file was deleted", async () => {
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await fn("deleted_later.txt", "first");
+    await rm(join(allowedDir, "deleted_later.txt"));
+    await expect(fn("deleted_later.txt", "second")).resolves.toEqual({
+        path: "deleted_later.txt",
+        bytes_written: 6,
+    });
+});
+
+it("makeWriteFile removes its temporary file when a replacement fails", async () => {
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await mkdir(join(allowedDir, "replace_dir"), { recursive: true });
+    await fn("replace_dir/target", "first");
+    // The user swaps the model's file for a folder, so the rename fails.
+    await rm(join(allowedDir, "replace_dir", "target"));
+    await mkdir(join(allowedDir, "replace_dir", "target", "inner"), {
+        recursive: true,
+    });
+    await expect(fn("replace_dir/target", "second")).rejects.toThrow();
+    await expect(readdir(join(allowedDir, "replace_dir"))).resolves.toEqual([
+        "target",
+    ]);
+});
+
+it("makeWriteFile with recordSessionWrites false leaves its files protected", async () => {
+    const userRun = makeWriteFile(allowedDir, 1024 * 1024, "write_file", false);
+    await userRun("exec_output.txt", "user result");
+    const modelRun = makeWriteFile(allowedDir, 1024 * 1024);
+    await expect(
+        modelRun("exec_output.txt", "model result"),
+    ).rejects.toMatchObject({ name: "FileExistsError" });
 });
 
 it("makeWriteFile never overwrites a file the session did not write", async () => {

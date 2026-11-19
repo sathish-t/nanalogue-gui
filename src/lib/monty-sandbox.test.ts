@@ -16,8 +16,17 @@ import { join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 import { simulateModBam } from "@nanalogue/node";
 import { runMontyAsync } from "@pydantic/monty";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+    afterAll,
+    beforeAll,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi,
+} from "vitest";
 import { DEFAULT_MAX_WRITE_BYTES } from "./ai-chat-constants";
+import { resetSessionWrittenFiles } from "./ai-external-tools";
 import { buildExecutionFeedback } from "./chat-orchestrator-execution";
 import {
     collectTerminalOutput,
@@ -52,6 +61,12 @@ beforeAll(async () => {
 
 afterAll(async () => {
     await rm(allowedDir, { recursive: true });
+});
+
+// The session's written-file set is module-level; clear it so tests that
+// reuse a file name do not depend on test order.
+beforeEach(() => {
+    resetSessionWrittenFiles();
 });
 
 it("peek returns contigs via sandbox", async () => {
