@@ -573,6 +573,11 @@ NOTE: region is required for seq_table and cannot be empty, and must be passed
 as a keyword argument: seq_table("file.bam", region="contig_00000"). Use peek()
 first to discover available contigs if you do not know the region.
 
+NOTE: seq_table only returns reads that fully span the requested region;
+reads that overlap it only partially are omitted, and full_region=False is
+rejected. A read that covers part of a long region is returned for a
+shorter sub-region it fully spans.
+
 
 Sample output:
 \`\`\`text
@@ -603,7 +608,7 @@ xxxxx ACGTACGTAC 20.20.20.20.20.20.20.20.20.20
 
 ### Shared keyword arguments for read_info, bam_mods, window_reads, seq_table
 
-All four functions accept the same arguments:
+All four functions accept the same arguments, except where a row notes a seq_table restriction:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -619,14 +624,14 @@ All four functions accept the same arguments:
 | mapq_filter | int | 0 | Exclude reads with mapping quality below this |
 | exclude_mapq_unavail | bool | False | Exclude reads where MAPQ is unavailable |
 | region | str | "" | Genomic region: "contig", "contig:start-", or "contig:start-end" (0-based, half-open). Required (non-empty) for seq_table. |
-| full_region | bool | False | Only include reads fully spanning the region |
+| full_region | bool | False (always True for seq_table) | Only include reads fully spanning the region. seq_table always applies this and raises an error if full_region=False is passed. |
 | tag | str | "" | Only process this modification type (e.g. "m", "76792") |
 | mod_strand | str | "" | "bc" or "bc_comp" to filter by basecalled strand |
 | min_mod_qual | int | 0 | Reject mod calls with probability below this (0-255) |
 | reject_mod_qual_non_inclusive | tuple[int, int] | (0, 0) | Reject mods with probability strictly between (low, high), both 0-255 |
 | trim_read_ends_mod | int | 0 | Reject mod info within this many bp of read ends |
 | base_qual_filter_mod | int | 0 | Reject mod info on bases with quality below this |
-| mod_region | str | "" | Reject mod info outside this region (same format as region) |
+| mod_region | str | "" (always equal to region for seq_table) | Reject mod info outside this region (same format as region). seq_table raises an error if mod_region differs from region. |
 
 ## Working with large BAM files
 
