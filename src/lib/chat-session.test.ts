@@ -1,8 +1,12 @@
 // Unit tests for the ChatSession class.
 // Verifies session state management, cancellation, reset, and delegation to the orchestrator.
 
+import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setMockImplementation, setMockResolvedValue } from "../test-helpers";
+import { makeWriteFile } from "./ai-external-tools";
 import { LlmRequestTimeoutError } from "./chat-orchestrator-llm";
 import type { AiChatConfig } from "./chat-types";
 
@@ -241,6 +245,31 @@ describe("ChatSession", () => {
         it("calls resetLastSentMessages to clear dump state", () => {
             session.reset();
             expect(resetLastSentMessages).toHaveBeenCalled();
+        });
+
+        it("protects files the previous chat wrote from being overwritten", async () => {
+            const dir = await realpath(
+                await mkdtemp(join(tmpdir(), "chat-session-reset-")),
+            );
+            try {
+                const write = makeWriteFile(dir, 1024);
+                await write("result.txt", "first chat");
+                await expect(
+                    write("result.txt", "same chat"),
+                ).resolves.toMatchObject({ overwrote: true });
+
+                session.reset();
+
+                // Each run makes its own writer, as runSandboxCode does.
+                await expect(
+                    makeWriteFile(dir, 1024)("result.txt", "next chat"),
+                ).rejects.toMatchObject({ name: "FileExistsError" });
+                await expect(
+                    readFile(join(dir, "result.txt"), "utf-8"),
+                ).resolves.toBe("same chat");
+            } finally {
+                await rm(dir, { recursive: true, force: true });
+            }
         });
 
         it("aborts current request and increments requestId", async () => {

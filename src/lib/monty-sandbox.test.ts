@@ -16,8 +16,17 @@ import { join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 import { simulateModBam } from "@nanalogue/node";
 import { runMontyAsync } from "@pydantic/monty";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+    afterAll,
+    beforeAll,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi,
+} from "vitest";
 import { DEFAULT_MAX_WRITE_BYTES } from "./ai-chat-constants";
+import { resetSessionWrittenFiles } from "./ai-external-tools";
 import { buildExecutionFeedback } from "./chat-orchestrator-execution";
 import {
     collectTerminalOutput,
@@ -52,6 +61,12 @@ beforeAll(async () => {
 
 afterAll(async () => {
     await rm(allowedDir, { recursive: true });
+});
+
+// The session's written-file set is module-level; clear it so tests that
+// reuse a file name do not depend on test order.
+beforeEach(() => {
+    resetSessionWrittenFiles();
 });
 
 it("peek returns contigs via sandbox", async () => {
@@ -170,11 +185,21 @@ it("path traversal is blocked", async () => {
     expect(result.message).toMatch(/outside the allowed directory/);
 });
 
-it("URL access is blocked", async () => {
-    const code = `peek("${bamName}", treat_as_url=True)`;
+// treat_as_url must reach each BAM tool and be refused there, not be
+// rejected as an unknown keyword.
+it.each([
+    "peek",
+    "read_info",
+    "bam_mods",
+    "window_reads",
+    "seq_table",
+])("URL access is blocked in %s", async (tool) => {
+    const code = `${tool}("${bamName}", treat_as_url=True)`;
     const result = await runSandboxCode(code, allowedDir);
     expect(result.success).toBe(false);
-    expect(result.message).toMatch(/not permitted/);
+    expect(result.message).toContain(
+        "OSError: URL access is not permitted in sandbox",
+    );
 });
 
 it.each([
@@ -601,15 +626,40 @@ result
     expect(written).toBe("chr1\t100\t200\n");
 });
 
-it("write_file refuses to overwrite existing file", async () => {
-    const code1 = 'write_file("no_overwrite.txt", "first")';
-    const result1 = await runSandboxCode(code1, allowedDir);
-    expect(result1.success).toBe(true);
+it("write_file refuses to overwrite a file the session did not write", async () => {
+    await writeFile(join(allowedDir, "users_file.txt"), "user data");
+    const result = await runSandboxCode(
+        'write_file("users_file.txt", "model data")',
+        allowedDir,
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/FileExistsError: .*already exists/);
+    await expect(
+        readFile(join(allowedDir, "users_file.txt"), "utf-8"),
+    ).resolves.toBe("user data");
+});
 
-    const code2 = 'write_file("no_overwrite.txt", "second")';
-    const result2 = await runSandboxCode(code2, allowedDir);
-    expect(result2.success).toBe(false);
-    expect(result2.message).toMatch(/already exists/);
+it("re-running code replaces the files and plots it wrote in an earlier run", async () => {
+    /**
+     * Builds a script that writes a TSV and a plot, then rewrites the TSV.
+     *
+     * @param value - The number written to the TSV and used as the bin count.
+     * @returns The Python source.
+     */
+    const script = (value: number) =>
+        `write_file("rerun.tsv", "value\\t${value}\\n")\n` +
+        `plot_histogram([{"bin_start": 0, "bin_end": 1, "count": ${value}}], output_path="rerun.svg")\n` +
+        'write_file("rerun.tsv", read_file("rerun.tsv")["content"])';
+    const first = await runSandboxCode(script(1), allowedDir);
+    expect(first.success, first.message).toBe(true);
+    // The last write in the first run already replaces its own file.
+    expect(first.value).toMatchObject({ overwrote: true });
+
+    const second = await runSandboxCode(script(2), allowedDir);
+    expect(second.success, second.message).toBe(true);
+    await expect(
+        readFile(join(allowedDir, "rerun.tsv"), "utf-8"),
+    ).resolves.toBe("value\t2\n");
 });
 
 it("write_file rejects path traversal outside allowed dir", async () => {
@@ -1218,4 +1268,233 @@ it("external function error message includes the Python call site in the traceba
     expect(result.message).toContain("Traceback (most recent call last):");
     expect(result.message).toContain("line 2");
     expect(result.message).toContain("peek");
+});
+
+// --- Python argument binding for sandbox tools ---
+
+/** One-bin histogram and one-point series used by the binding tests. */
+const BINDING_BINS = '[{"bin_start": 0, "bin_end": 1, "count": 1}]';
+const BINDING_POINTS = '[{"x": 1, "y": 2}]';
+/**
+ * Python expression for a 10 bp region inside the first mapped read, so
+ * seq_table (which keeps only reads spanning the whole region) returns rows.
+ */
+const SPANNED_REGION =
+    "[f\"{r['contig']}:{r['reference_start'] + 10}-{r['reference_start'] + 20}\" " +
+    'for r in read_info("simple_test.bam", limit=50) ' +
+    'if r["alignment_type"] != "unmapped"][0]';
+
+describe("sandbox tools accept required arguments by position or keyword", () => {
+    it.each([
+        ['ls("*.fasta")', 'f = ls\nf("*.fasta")'],
+        ['peek("simple_test.bam")', 'peek(bam_path="simple_test.bam")'],
+        [
+            'read_info("simple_test.bam", limit=3)',
+            'read_info(bam_path="simple_test.bam", limit=3)',
+        ],
+        [
+            '[r["read_id"] for r in bam_mods("simple_test.bam", limit=2)]',
+            '[r["read_id"] for r in bam_mods(bam_path="simple_test.bam", limit=2)]',
+        ],
+        [
+            'window_reads("simple_test.bam", win=5, step=5, limit=2)',
+            'window_reads(bam_path="simple_test.bam", win=5, step=5, limit=2)',
+        ],
+        [
+            // seq_table row order varies between calls, so compare sorted lines.
+            `sorted(seq_table("simple_test.bam", region=${SPANNED_REGION}).splitlines())`,
+            `sorted(seq_table(bam_path="simple_test.bam", region=${SPANNED_REGION}).splitlines())`,
+        ],
+        ['ls("*.fasta")', 'ls(pattern="*.fasta")'],
+        ["ls()", "ls(pattern=None)"],
+        [
+            'read_info("simple_test.bam", limit=3)',
+            'read_info(**{"bam_path": "simple_test.bam", "limit": 3})',
+        ],
+        [
+            'read_file("simple_test.fasta", max_bytes=20)',
+            'read_file(file_path="simple_test.fasta", max_bytes=20)',
+        ],
+        [
+            'write_file("bind_pos.txt", "hi")["bytes_written"]',
+            'write_file(file_path="bind_kw.txt", content="hi")["bytes_written"]',
+        ],
+        [
+            `plot_histogram(${BINDING_BINS}, output_path="bind_pos_h.svg")["bins_plotted"]`,
+            `plot_histogram(bins=${BINDING_BINS}, output_path="bind_kw_h.svg")["bins_plotted"]`,
+        ],
+        [
+            `plot_series(${BINDING_POINTS}, output_path="bind_pos_s.svg")["points_plotted"]`,
+            `plot_series(points=${BINDING_POINTS}, output_path="bind_kw_s.svg")["points_plotted"]`,
+        ],
+        [
+            'minimap2("simple_test.fasta", "simple_test.fasta", "asm5")["paf"]',
+            'minimap2(reference_path="simple_test.fasta", query_path="simple_test.fasta", preset="asm5")["paf"]',
+        ],
+    ])("%s matches its keyword form", async (positionalCode, keywordCode) => {
+        const positional = await runSandboxCode(positionalCode, allowedDir);
+        const keyword = await runSandboxCode(keywordCode, allowedDir);
+        expect(positional.success, positional.message).toBe(true);
+        expect(keyword.success, keyword.message).toBe(true);
+        expect(keyword.value).toEqual(positional.value);
+    });
+
+    it("passes seq_table options through, returning reads for a spanned region", async () => {
+        const result = await runSandboxCode(
+            `len(seq_table(bam_path="simple_test.bam", region=${SPANNED_REGION}).strip().split("\\n"))`,
+            allowedDir,
+        );
+        expect(result.success, result.message).toBe(true);
+        // Header line plus at least one read.
+        expect(result.value as number).toBeGreaterThan(1);
+    });
+
+    it("applies ls(pattern=...) instead of listing every file", async () => {
+        const result = await runSandboxCode(
+            'ls(pattern="*.fasta")',
+            allowedDir,
+        );
+        const files = result.value as string[];
+        expect(files).toContain("simple_test.fasta");
+        expect(files.every((file) => file.endsWith(".fasta"))).toBe(true);
+    });
+
+    it("treats minimap2(preset=None) as no preset", async () => {
+        const result = await runSandboxCode(
+            'minimap2("simple_test.fasta", "simple_test.fasta", preset=None)["paf"] != ""',
+            allowedDir,
+        );
+        expect(result.success, result.message).toBe(true);
+    });
+});
+
+describe("sandbox tools raise Python TypeErrors for bad arguments", () => {
+    it.each([
+        [
+            `plot_histogram(${BINDING_BINS}, output="bind_x.svg")`,
+            "plot_histogram() got an unexpected keyword argument 'output'. Did you mean 'output_path'? Valid arguments: bins, output_path,",
+        ],
+        [
+            'read_info("simple_test.bam", mapq=20)',
+            "read_info() got an unexpected keyword argument 'mapq'. Did you mean 'mapq_filter'?",
+        ],
+        [
+            'ls(glob="*.bam")',
+            "ls() got an unexpected keyword argument 'glob'. Valid arguments: pattern.",
+        ],
+        [
+            "continue_thinking(x=1)",
+            "continue_thinking() got an unexpected keyword argument 'x'. continue_thinking() takes no arguments.",
+        ],
+        [
+            'read_info("simple_test.bam", n=1)',
+            "read_info() got an unexpected keyword argument 'n'. Valid arguments:",
+        ],
+        [
+            'write_file("bind_missing.txt")',
+            "write_file() missing 1 required positional argument: 'content'",
+        ],
+        [
+            "write_file()",
+            "write_file() missing 2 required positional arguments: 'file_path' and 'content'",
+        ],
+        [
+            'read_file("simple_test.fasta", 0, 10)',
+            "read_file() takes 1 positional argument but 3 were given",
+        ],
+        [
+            'minimap2("a.fa", "b.fa", "sr", "x")',
+            "minimap2() takes from 2 to 3 positional arguments but 4 were given",
+        ],
+        [
+            "continue_thinking(1)",
+            "continue_thinking() takes 0 positional arguments but 1 was given",
+        ],
+        [
+            'write_file("bind_a.txt", "b", file_path="bind_c.txt")',
+            "write_file() got multiple values for argument 'file_path'",
+        ],
+        [
+            "ls(5)",
+            "ls() pattern must be a glob string such as '**/*.bam', or None",
+        ],
+        [
+            'ls(["*.bam"])',
+            "ls() pattern must be a glob string such as '**/*.bam', or None",
+        ],
+        [
+            'write_file(None, "x")',
+            "write_file: file_path must be a string, got None",
+        ],
+        [
+            'write_file({"a": 1}, "x")',
+            "write_file: file_path must be a string, got dict",
+        ],
+        [
+            'write_file("bind_none.txt", None)',
+            "write_file: content must be a string, got None",
+        ],
+        [
+            'write_file("bind_list.txt", ["a"])',
+            "write_file: content must be a string, got list",
+        ],
+        ["read_file(None)", "read_file: file_path must be a string, got None"],
+        ["peek(5)", "peek: bam_path must be a string, got int"],
+        ["read_info(None)", "read_info: bam_path must be a string, got None"],
+        ["bam_mods(None)", "bam_mods: bam_path must be a string, got None"],
+        [
+            "window_reads(None)",
+            "window_reads: bam_path must be a string, got None",
+        ],
+        ["seq_table(None)", "seq_table: bam_path must be a string, got None"],
+    ])("%s", async (code, expected) => {
+        const result = await runSandboxCode(code, allowedDir);
+        expect(result.success).toBe(false);
+        expect(result.message).toContain(`TypeError: ${expected}`);
+    });
+});
+
+it("unknown-keyword errors do not list treat_as_url as a valid argument", async () => {
+    const result = await runSandboxCode(
+        'read_info("simple_test.bam", n=1)',
+        allowedDir,
+    );
+    expect(result.message).toContain("Valid arguments:");
+    expect(result.message).not.toContain("treat_as_url");
+});
+
+it.each([
+    `plot_histogram(${BINDING_BINS}, output_path="exec_plot_h.svg")`,
+    `plot_series(${BINDING_POINTS}, output_path="exec_plot_s.svg")`,
+])("a plot from a user's script stays protected from the chat: %s", async (code) => {
+    const execRun = await runSandboxCode(code, allowedDir, {
+        recordSessionWrites: false,
+    });
+    expect(execRun.success, execRun.message).toBe(true);
+    const chatRun = await runSandboxCode(code, allowedDir);
+    expect(chatRun.success).toBe(false);
+    expect(chatRun.message).toContain("FileExistsError");
+});
+
+it("a file a user's script writes where the chat's deleted file was stays protected", async () => {
+    await runSandboxCode(
+        'write_file("exec_recreated.tsv", "model v1")',
+        allowedDir,
+    );
+    await rm(join(allowedDir, "exec_recreated.tsv"));
+    const execRun = await runSandboxCode(
+        'write_file("exec_recreated.tsv", "user")',
+        allowedDir,
+        { recordSessionWrites: false },
+    );
+    expect(execRun.success, execRun.message).toBe(true);
+    const chatRun = await runSandboxCode(
+        'write_file("exec_recreated.tsv", "model v2")',
+        allowedDir,
+    );
+    expect(chatRun.success).toBe(false);
+    expect(chatRun.message).toContain("FileExistsError");
+    await expect(
+        readFile(join(allowedDir, "exec_recreated.tsv"), "utf-8"),
+    ).resolves.toBe("user");
 });

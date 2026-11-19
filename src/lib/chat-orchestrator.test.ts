@@ -35,6 +35,7 @@ vi.mock("./ai-external-tools/ls", async (importOriginal) => {
     const actual =
         await importOriginal<typeof import("./ai-external-tools/ls")>();
     return {
+        ...actual,
         /**
          * Wraps the real ls with a test-only timed wait.
          *

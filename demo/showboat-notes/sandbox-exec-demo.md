@@ -57,7 +57,7 @@ Fetched 5 reads
 
 ## Writing output with write_file
 
-The sandbox can write files into the allowed directory using `write_file`. The output path is relative to `--dir`. The function refuses to overwrite existing files — this is intentional.
+The sandbox can write files into the allowed directory using `write_file`. The output path is relative to `--dir`. The function never overwrites a file that existed before the script started — this is intentional. A script may replace a file it wrote itself earlier in the same run.
 
 ```bash
 cat > /tmp/write_demo.py << 'EOF'

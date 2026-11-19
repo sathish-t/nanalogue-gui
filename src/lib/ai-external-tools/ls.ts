@@ -9,6 +9,10 @@ import {
     SandboxError,
 } from "../monty-sandbox-helpers";
 import { compileSandboxGlob } from "../sandbox-glob";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
+
+export const /** Python parameters of ls(), matched to each call by bindSandboxToolCall. */ LS_SIGNATURE: SandboxToolSignature =
+        { positional: ["pattern"], required: 0, keywordOnly: [] };
 
 /**
  * Returns the ls tool implementation bound to the given allowed directory.
@@ -20,7 +24,7 @@ import { compileSandboxGlob } from "../sandbox-glob";
 export function makeLs(
     allowedDir: string,
     maxEntries = MAX_LS_ENTRIES,
-): (pattern?: string | Record<string, unknown>) => Promise<unknown> {
+): (pattern?: string | null) => Promise<unknown> {
     /**
      * Lists files in the allowed directory, with optional glob filtering.
      *
@@ -29,14 +33,17 @@ export function makeLs(
      * Always returns a plain list; throws if the cap is hit so Python never
      * silently receives a partial listing.
      *
-     * @param pattern - Optional glob pattern string, or options object (pattern ignored).
+     * @param pattern - Optional glob pattern string; None lists every file.
      * @returns An array of relative file paths.
      */
-    return async (
-        pattern?: string | Record<string, unknown>,
-    ): Promise<unknown> => {
-        const patternStr = typeof pattern === "string" ? pattern : undefined;
-        const matcher = patternStr ? compileSandboxGlob(patternStr) : undefined;
+    return async (pattern?: string | null): Promise<unknown> => {
+        if (pattern != null && typeof pattern !== "string") {
+            throw new SandboxError(
+                "TypeError",
+                "ls() pattern must be a glob string such as '**/*.bam', or None",
+            );
+        }
+        const matcher = pattern ? compileSandboxGlob(pattern) : undefined;
         const allowedDirReal = await realpath(allowedDir);
         const { files, capped } = await listFilesRecursive(
             allowedDirReal,

@@ -62,7 +62,7 @@ it("rejects non-string reference_path", async () => {
         minimap2(123 as unknown as string, "query.fa"),
     ).rejects.toMatchObject({
         name: "TypeError",
-        message: expect.stringContaining("reference_path must be a string"),
+        message: "minimap2: reference_path must be a string, got int",
     });
 });
 
@@ -71,29 +71,20 @@ it("rejects non-string query_path", async () => {
         minimap2("contigs.fa", 456 as unknown as string),
     ).rejects.toMatchObject({
         name: "TypeError",
-        message: expect.stringContaining("query_path must be a string"),
+        message: "minimap2: query_path must be a string, got int",
     });
 });
 
 it("rejects non-string preset", async () => {
     await expect(
-        minimap2("contigs.fa", "query.fa", { preset: 99 }),
+        minimap2("contigs.fa", "query.fa", 99 as unknown as string),
     ).rejects.toMatchObject({
         name: "TypeError",
-        message: expect.stringContaining("preset must be a string"),
+        message: "minimap2: preset must be a string, got int",
     });
 });
 
 it("rejects unknown preset string", async () => {
-    await expect(
-        minimap2("contigs.fa", "query.fa", { preset: "not-a-preset" }),
-    ).rejects.toMatchObject({
-        name: "ValueError",
-        message: expect.stringContaining("unknown preset"),
-    });
-});
-
-it("rejects unknown preset passed positionally as a bare string", async () => {
     await expect(
         minimap2("contigs.fa", "query.fa", "not-a-preset"),
     ).rejects.toMatchObject({
@@ -102,21 +93,16 @@ it("rejects unknown preset passed positionally as a bare string", async () => {
     });
 });
 
-it("rejects a non-string non-object third argument (e.g. integer)", async () => {
+it("rejects a dict passed as the preset", async () => {
     await expect(
-        minimap2("contigs.fa", "query.fa", 123 as unknown as string),
+        minimap2(
+            "contigs.fa",
+            "query.fa",
+            new Map([["preset", "sr"]]) as unknown as string,
+        ),
     ).rejects.toMatchObject({
         name: "TypeError",
-        message: expect.stringContaining("third argument"),
-    });
-});
-
-it("rejects an array as the third argument", async () => {
-    await expect(
-        minimap2("contigs.fa", "query.fa", ["sr"] as unknown as string),
-    ).rejects.toMatchObject({
-        name: "TypeError",
-        message: expect.stringContaining("third argument"),
+        message: "minimap2: preset must be a string, got dict",
     });
 });
 
@@ -208,9 +194,11 @@ it("XHR stub calls onerror when the target file does not exist", async () => {
 // --- Successful alignment ---
 
 it("returns PAF output for a known mapping with the sr preset", async () => {
-    const result = (await minimap2("contigs.fa", "query.fa", {
-        preset: "sr",
-    })) as Minimap2Result;
+    const result = (await minimap2(
+        "contigs.fa",
+        "query.fa",
+        "sr",
+    )) as Minimap2Result;
 
     expect(typeof result.paf).toBe("string");
     expect(typeof result.stderr).toBe("string");
@@ -227,17 +215,6 @@ it("returns PAF output for a known mapping with the sr preset", async () => {
 
     // stderr should contain minimap2's standard progress output.
     expect(result.stderr).toContain("[M::main]");
-}, 60_000);
-
-it("accepts preset passed as a positional string argument", async () => {
-    const result = (await minimap2(
-        "contigs.fa",
-        "query.fa",
-        "sr",
-    )) as Minimap2Result;
-    expect(typeof result.paf).toBe("string");
-    const lines = result.paf.split("\n").filter(Boolean);
-    expect(lines.length).toBeGreaterThan(0);
 }, 60_000);
 
 it("returns PAF output without a preset (minimap2 default settings)", async () => {

@@ -119,8 +119,10 @@ interested in per-record information such as read ids, sequences etc.
 
 ## Available external functions
 
-Arguments before / are positional-only: never pass them by keyword.
-Use read_info("sample.bam", limit=5), not read_info(bam_path="sample.bam", limit=5). Options in **kwargs must be passed by keyword.
+Named parameters in each signature can be passed by position or by keyword:
+read_info("sample.bam", limit=5) and read_info(bam_path="sample.bam", limit=5)
+are the same call. Options in **kwargs must be passed by keyword. An unknown
+keyword argument raises TypeError listing the valid ones; it is never ignored.
 
 ### continue_thinking() -> None
 
@@ -131,7 +133,7 @@ results before producing a final answer.
 
 Without continue_thinking(), your output goes directly to the user.
 
-### ls(pattern: str = None, /) -> list[str]
+### ls(pattern: str = None) -> list[str]
 
 Returns a list of file paths under the allowed directory,
 recursively. Paths are relative to the allowed directory (e.g.
@@ -163,7 +165,7 @@ Use separate ls() calls instead of alternatives such as *.{bam,bed}.
 Results are hard-capped at ${MAX_LS_ENTRIES} entries. If the cap is hit, a
 ValueError is raised — use a glob pattern to narrow results.
 
-### read_file(file_path: str, /, **kwargs) -> dict
+### read_file(file_path: str, **kwargs) -> dict
 
 Reads a text file from the allowed directory. Returns a dict with
 the file content and pagination metadata:
@@ -233,7 +235,7 @@ result = write_file("results.bed", content)
 verification = read_file(result["path"])
 \`\`\`
 
-### write_file(file_path: str, content: str, /) -> dict
+### write_file(file_path: str, content: str) -> dict
 
 Writes a text file to the allowed directory. Returns a dict with the
 relative path and bytes written.
@@ -249,11 +251,18 @@ result = write_file("chr1/filtered_reads.tsv", tsv_content)
 
 - file_path: path for the output file, relative to the allowed directory.
   Nested paths like "subdir/file.bed" are supported — parent
-  directories are created automatically.
+  directories are created automatically. Use / to separate folders on
+  every platform, never \\.
 - content: text content to write (UTF-8). Max ${maxWriteMB} MB per call.
-- IMPORTANT: This function NEVER overwrites existing files. If a file
-  with the given name already exists, the call fails. Choose a
-  different name (e.g., append a number: "results_2.bed").
+- IMPORTANT: Overwriting is limited to files written earlier in this
+  chat. Writing to one of them again replaces it, and the result
+  includes "overwrote": True, so re-running corrected code updates your
+  earlier outputs. Any other existing file (the user's files, or files
+  from earlier chats) is never changed: the call raises FileExistsError,
+  which suggests a free name such as "results-v2.bed". A file of yours
+  that the user has since made read-only raises OSError and is not
+  changed. Files cannot be deleted. plot_histogram() and plot_series()
+  follow the same rule for output_path.
 - Filenames must not contain control characters or exceed ${MAX_FILENAME_LENGTH}
   characters per path component.
 - Files can be written anywhere within the allowed directory.
@@ -268,7 +277,7 @@ result = write_file("chr1/filtered_reads.tsv", tsv_content)
   The user can also find these files in the allowed directory after the
   session and adapt them for real Python.
 
-### plot_histogram(bins, /, **kwargs) -> dict
+### plot_histogram(bins, **kwargs) -> dict
 
 Renders pre-binned histogram data as an SVG file. You must compute the
 bins yourself in Python before calling this function.
@@ -300,7 +309,7 @@ result = plot_histogram(bins, output_path="lengths.svg",
   bin_start/bin_end/count dicts before calling this function.
 - Non-uniform bin widths are supported.
 
-### plot_series(points, /, **kwargs) -> dict
+### plot_series(points, **kwargs) -> dict
 
 Renders x/y point data as a line or scatter SVG file.
 
@@ -331,7 +340,7 @@ result = plot_series(points, kind="line", output_path="trend.svg",
 - Single series only. For multiple series, call plot_series() once per series
   with different output paths.
 
-### minimap2(reference_path: str, query_path: str, /, preset: str = None) -> dict
+### minimap2(reference_path: str, query_path: str, preset: str = None) -> dict
 
 - reference_path: path to the reference FASTA/FASTQ file, relative to the allowed directory.
 - query_path: path to the query FASTA/FASTQ file, relative to the allowed directory.
@@ -414,7 +423,7 @@ for line in result["paf"].splitlines():
     target_start, target_end, mapq = int(cols[7]), int(cols[8]), int(cols[11])
 \`\`\`
 
-### peek(bam_path: str, /) -> dict
+### peek(bam_path: str) -> dict
 
 Returns a dict describing a BAM/CRAM file's structure:
 
@@ -437,7 +446,7 @@ Returns a dict describing a BAM/CRAM file's structure:
 - mod_code is a single-letter character or an integer (CheBI code) that represents the
   modification.
 
-### read_info(bam_path: str, /, **kwargs) -> list[dict]
+### read_info(bam_path: str, **kwargs) -> list[dict]
 
 Returns a list of dicts, one per BAM record:
 
@@ -470,7 +479,7 @@ Returns a list of dicts, one per BAM record:
 - if alignment_type is unmapped, then fields like contig, reference_start, reference_end,
   alignment_length do not exist.
 
-### bam_mods(bam_path: str, /, **kwargs) -> list[dict]
+### bam_mods(bam_path: str, **kwargs) -> list[dict]
 
 Returns detailed per-read modification data including position-specific
 probabilities:
@@ -508,7 +517,7 @@ probabilities:
 - This command produces a lot of data per read. so if you are querying lots of reads,
   this can quickly become unmanageable. Use your discretion on when to use this.
 
-### window_reads(bam_path: str, /, **kwargs) -> list[dict]
+### window_reads(bam_path: str, **kwargs) -> list[dict]
 
 Returns a list of per-read dicts with windowed modification densities
 from a BAM file.
@@ -562,13 +571,19 @@ If you use "grad_density" instead of "density" in the win_op parameter above, wi
 (the third element in each data tuple) will be the gradient of the modification
 density per window instead of just the mean modification density per window.
 
-### seq_table(bam_path: str, /, **kwargs) -> str
+### seq_table(bam_path: str, **kwargs) -> str
 
 Returns a TSV string with per-read sequence data.
 
 NOTE: region is required for seq_table and cannot be empty, and must be passed
-as a keyword argument: seq_table("file.bam", region="contig_00000"). Use peek()
-first to discover available contigs if you do not know the region.
+as a keyword argument: seq_table("file.bam", region="contig_00000:1000-1100").
+Use peek() first to discover available contigs if you do not know the region.
+
+NOTE: seq_table only returns reads that fully span the requested region;
+reads that overlap it only partially are omitted, and full_region=False is
+rejected. A read that covers part of a long region is returned for a
+shorter sub-region it fully spans, so a whole-contig region such as
+region="contig_00000" usually returns no reads; query short sub-regions instead.
 
 
 Sample output:
@@ -600,7 +615,7 @@ xxxxx ACGTACGTAC 20.20.20.20.20.20.20.20.20.20
 
 ### Shared keyword arguments for read_info, bam_mods, window_reads, seq_table
 
-All four functions accept the same arguments:
+All four functions accept the same arguments, except where a row notes a seq_table restriction:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -616,14 +631,14 @@ All four functions accept the same arguments:
 | mapq_filter | int | 0 | Exclude reads with mapping quality below this |
 | exclude_mapq_unavail | bool | False | Exclude reads where MAPQ is unavailable |
 | region | str | "" | Genomic region: "contig", "contig:start-", or "contig:start-end" (0-based, half-open). Required (non-empty) for seq_table. |
-| full_region | bool | False | Only include reads fully spanning the region |
+| full_region | bool | False (always True for seq_table) | Only include reads fully spanning the region. seq_table always applies this and raises an error if full_region=False is passed. |
 | tag | str | "" | Only process this modification type (e.g. "m", "76792") |
 | mod_strand | str | "" | "bc" or "bc_comp" to filter by basecalled strand |
 | min_mod_qual | int | 0 | Reject mod calls with probability below this (0-255) |
 | reject_mod_qual_non_inclusive | tuple[int, int] | (0, 0) | Reject mods with probability strictly between (low, high), both 0-255 |
 | trim_read_ends_mod | int | 0 | Reject mod info within this many bp of read ends |
 | base_qual_filter_mod | int | 0 | Reject mod info on bases with quality below this |
-| mod_region | str | "" | Reject mod info outside this region (same format as region) |
+| mod_region | str | "" (always equal to region for seq_table) | Reject mod info outside this region (same format as region). seq_table raises an error if mod_region differs from region. |
 
 ## Working with large BAM files
 
@@ -735,6 +750,6 @@ lengths = [r["sequence_length"] for r in reads]
   files, peek/read_info/bam_mods/window_reads/seq_table for BAM/CRAM
   data, read_file() for text files (including .gz), and write_file() to
   save results.
-- write_file() writes anywhere within the allowed directory and never
-  overwrites existing files.`;
+- write_file() writes anywhere within the allowed directory and only
+  overwrites files written earlier in this chat.`;
 }

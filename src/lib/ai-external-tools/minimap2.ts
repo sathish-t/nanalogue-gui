@@ -14,11 +14,20 @@ import {
     MINIMAP2_PRESETS,
 } from "../ai-chat-constants";
 import {
+    assertStringToolArgument,
     isDeniedPath,
     resolvePath,
     SandboxError,
     toForwardSlashes,
 } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
+
+export const /** Python parameters of minimap2(), matched to each call by bindSandboxToolCall. */ MINIMAP2_SIGNATURE: SandboxToolSignature =
+        {
+            positional: ["reference_path", "query_path", "preset"],
+            required: 2,
+            keywordOnly: [],
+        };
 
 /** The Emscripten module interface exposed by the biowasm minimap2.js bundle. */
 interface Minimap2Module {
@@ -253,60 +262,30 @@ export function makeRunMinimap2(
 ): (
     refPath: string,
     queryPath: string,
-    opts?: Record<string, unknown> | string,
+    preset?: string | null,
 ) => Promise<unknown> {
     /**
      * Runs minimap2 alignment and returns PAF output plus stderr.
      *
      * @param refPath - Path to the reference FASTA/FASTQ file, relative to allowedDir.
      * @param queryPath - Path to the query FASTA/FASTQ file, relative to allowedDir.
-     * @param opts - Optional preset string or options object with a preset key.
-     *   Accepts a bare string (positional preset) or `{ preset: "..." }` to
-     *   accommodate both Python calling conventions: `minimap2(ref, q, "sr")` and
-     *   `minimap2(ref, q, preset="sr")`.
+     * @param preset - Optional minimap2 preset name, or null/undefined for the
+     *   built-in defaults. Python may pass it by position or by keyword; the
+     *   argument binder delivers both here.
      * @returns A dict with paf (string) and stderr (string).
      */
     return async (
         refPath: string,
         queryPath: string,
-        opts?: Record<string, unknown> | string,
+        preset?: string | null,
     ): Promise<unknown> => {
-        // Normalise: a bare positional string is treated as the preset value.
-        if (
-            opts !== undefined &&
-            typeof opts !== "string" &&
-            (typeof opts !== "object" || opts === null || Array.isArray(opts))
-        ) {
-            throw new SandboxError(
-                "TypeError",
-                "minimap2: third argument must be a preset string or an options object",
-            );
-        }
-        const normalizedOpts: Record<string, unknown> | undefined =
-            typeof opts === "string" ? { preset: opts } : opts;
         // --- Validate argument types ---
-        if (typeof refPath !== "string") {
-            throw new SandboxError(
-                "TypeError",
-                "minimap2: reference_path must be a string",
-            );
-        }
-        if (typeof queryPath !== "string") {
-            throw new SandboxError(
-                "TypeError",
-                "minimap2: query_path must be a string",
-            );
-        }
+        assertStringToolArgument(refPath, "minimap2", "reference_path");
+        assertStringToolArgument(queryPath, "minimap2", "query_path");
 
-        // --- Validate preset ---
-        const preset = normalizedOpts?.preset ?? null;
-        if (preset !== null) {
-            if (typeof preset !== "string") {
-                throw new SandboxError(
-                    "TypeError",
-                    "minimap2: preset must be a string",
-                );
-            }
+        // --- Validate preset (None means minimap2's defaults) ---
+        if (preset !== undefined && preset !== null) {
+            assertStringToolArgument(preset, "minimap2", "preset");
             if (!(MINIMAP2_PRESETS as readonly string[]).includes(preset)) {
                 throw new SandboxError(
                     "ValueError",
@@ -342,7 +321,7 @@ export function makeRunMinimap2(
 
         // --- Build callMain args ---
         const args: string[] = [];
-        if (preset !== null) {
+        if (typeof preset === "string") {
             args.push("-x", preset);
         }
         args.push("/ref", "/query");

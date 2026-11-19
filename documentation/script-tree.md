@@ -59,6 +59,7 @@ src/
     sandbox-glob.ts                                 # Restricted glob matching for sandbox file discovery; no expansion or backtracking.
     sandbox-prompt-text.ts                          # Contains the large built-in sandbox prompt template used for AI chat.
     sandbox-prompt.ts                               # Builds the LLM system prompt and assembles the full system message sent on every turn.
+    sandbox-tool-arguments.ts                       # Python-style argument binding for the AI Chat sandbox tools.
     stats.ts                                        # Statistics utilities for QC calculations
     svg-plot-primitives.ts                          # Dependency-free SVG primitives shared by histogram and x/y plot renderers.
     swipe-contract.ts

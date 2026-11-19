@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+    assertStringToolArgument,
     convertMaps,
     deriveMaxOutputBytes,
     enforceDataSizeLimit,
@@ -129,6 +130,53 @@ describe("resolvePath", () => {
 });
 
 describe("toReadOptions", () => {
+    it("maps every Python read option to its own field", () => {
+        expect(
+            toReadOptions("/d/x.bam", {
+                offset: 1,
+                sample_fraction: 0.2,
+                sample_seed: 3,
+                region: "r",
+                full_region: true,
+                min_seq_len: 4,
+                min_align_len: 5,
+                read_id_set: ["id"],
+                threads: 6,
+                read_filter: "primary_forward",
+                mapq_filter: 7,
+                exclude_mapq_unavail: true,
+                tag: "m",
+                mod_strand: "bc",
+                min_mod_qual: 8,
+                reject_mod_qual_non_inclusive: [9, 10],
+                trim_read_ends_mod: 11,
+                base_qual_filter_mod: 12,
+                mod_region: "mr",
+            }),
+        ).toEqual({
+            bamPath: "/d/x.bam",
+            offset: 1,
+            sampleFraction: 0.2,
+            sampleSeed: 3,
+            region: "r",
+            fullRegion: true,
+            minSeqLen: 4,
+            minAlignLen: 5,
+            readIdSet: ["id"],
+            threads: 6,
+            readFilter: "primary_forward",
+            mapqFilter: 7,
+            excludeMapqUnavail: true,
+            tag: "m",
+            modStrand: "bc",
+            minModQual: 8,
+            rejectModQualNonInclusive: [9, 10],
+            trimReadEndsMod: 11,
+            baseQualFilterMod: 12,
+            modRegion: "mr",
+        });
+    });
+
     it("translates snake_case kwargs to camelCase", () => {
         const opts = toReadOptions("/data/test.bam", {
             sample_fraction: 0.1,
@@ -197,6 +245,17 @@ describe("toWindowOptions", () => {
         expect(opts.winOp).toBe("grad_density");
         expect(opts.sampleFraction).toBe(0.5);
     });
+
+    it("treats options passed as None like options not passed", () => {
+        // Python None arrives as null, which the native addon cannot convert.
+        expect(
+            toWindowOptions("/data/test.bam", {
+                region: null,
+                mapq_filter: null,
+                win_op: null,
+            }),
+        ).toEqual(toWindowOptions("/data/test.bam", {}));
+    });
 });
 
 describe("safeStringify", () => {
@@ -209,6 +268,37 @@ describe("safeStringify", () => {
         cyclic.self = cyclic;
         expect(safeStringify(cyclic).ok).toBe(false);
         expect(safeStringify(undefined).ok).toBe(false);
+    });
+});
+
+describe("assertStringToolArgument", () => {
+    // Expected names are what Python's type() would report for each value.
+    it.each([
+        [null, "None"],
+        [undefined, "None"],
+        [7, "int"],
+        [BigInt(2) ** BigInt(70), "int"],
+        [0.5, "float"],
+        [false, "bool"],
+        [["a"], "list"],
+        [new Map([["a", 1]]), "dict"],
+        // Any other JavaScript value falls back to its typeof name.
+        [{}, "object"],
+    ])("names %s as %s", (value, expected) => {
+        expect(() =>
+            assertStringToolArgument(value, "peek", "bam_path"),
+        ).toThrow(
+            new SandboxError(
+                "TypeError",
+                `peek: bam_path must be a string, got ${expected}`,
+            ),
+        );
+    });
+
+    it("accepts a string", () => {
+        expect(() =>
+            assertStringToolArgument("x.bam", "peek", "bam_path"),
+        ).not.toThrow();
     });
 });
 

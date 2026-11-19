@@ -87,7 +87,7 @@ in the Node.js main process. It has no filesystem or network access through
 its built-in modules, and the only importable standard-library modules are
 `re` and `json`. No other stdlib modules or third-party libraries are
 available, and the prompt also tells the model not to use classes. The only
-way code can interact with the outside world is through the thirteen
+way code can interact with the outside world is through the twelve
 registered external functions.
 
 ### External functions
@@ -98,16 +98,16 @@ configurable ones are exposed in [advanced-options.md](advanced-options.md);
 
 | Function | What it does |
 |---|---|
-| `peek(file)` | Summary info for a BAM/CRAM file (contigs, modifications) |
-| `read_info(file, ...)` | Per-read metadata, up to 200 000 records |
-| `bam_mods(file, ...)` | Per-read base-modification data, up to 5 000 records |
-| `window_reads(file, ...)` | Reads in a genomic window, up to 5 000 records |
-| `seq_table(file, ...)` | Sequence table for a region |
-| `ls(glob?)` | Lists files under the allowed directory, up to 10,000 entries by default |
-| `read_file(path, ...)` | Reads a text file, up to 1 MB per call; decompresses `.gz` files |
-| `write_file(path, content)` | Writes a new text file anywhere under `allowedDir` and fails if the path already exists |
-| `plot_histogram(data, ...)` | Renders a histogram as an SVG file in `ai_chat_output/` |
-| `plot_series(data, ...)` | Renders an XY series plot as an SVG file in `ai_chat_output/` |
+| `peek(bam_path)` | Summary info for a BAM/CRAM file (contigs, modifications) |
+| `read_info(bam_path, ...)` | Per-read metadata, up to 200 000 records |
+| `bam_mods(bam_path, ...)` | Per-read base-modification data, up to 5 000 records |
+| `window_reads(bam_path, win=..., step=..., ...)` | Reads in a genomic window, up to 5 000 records |
+| `seq_table(bam_path, ...)` | Sequence table for a region |
+| `ls(pattern?)` | Lists files under the allowed directory, up to 10,000 entries by default |
+| `read_file(file_path, ...)` | Reads a text file, up to 1 MB per call; decompresses `.gz` files |
+| `write_file(file_path, content)` | Writes a text file anywhere under `allowedDir`; replaces only files written earlier in the same chat (or, for `/exec`, the same script run) that are still writable, and otherwise fails if the path already exists |
+| `plot_histogram(bins, ...)` | Renders a histogram as an SVG file in `ai_chat_output/` |
+| `plot_series(points, ...)` | Renders an XY series plot as an SVG file in `ai_chat_output/` |
 | `minimap2(reference_path, query_path, ...)` | Runs minimap2 alignment via WebAssembly |
 | `continue_thinking()` | Signals the orchestrator to feed this round's output back to the LLM instead of showing it to the user |
 

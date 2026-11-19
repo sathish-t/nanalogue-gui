@@ -3,11 +3,21 @@
 
 import { bamMods } from "@nanalogue/node";
 import {
+    assertStringToolArgument,
+    BAM_TOOL_KEYWORDS,
     enforceRecordLimit,
     rejectTreatAsUrl,
     resolvePath,
     toReadOptions,
 } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
+
+export const /** Python parameters of bam_mods(), matched to each call by bindSandboxToolCall. */ BAM_MODS_SIGNATURE: SandboxToolSignature =
+        {
+            positional: ["bam_path"],
+            required: 1,
+            keywordOnly: BAM_TOOL_KEYWORDS,
+        };
 
 /**
  * Returns the bam_mods tool implementation bound to the given context.
@@ -31,6 +41,7 @@ export function makeBamMods(
         bamPath: string,
         opts?: Record<string, unknown>,
     ): Promise<unknown> => {
+        assertStringToolArgument(bamPath, "bam_mods", "bam_path");
         rejectTreatAsUrl(opts);
         const resolved = await resolvePath(allowedDir, bamPath);
         const result = await bamMods(toReadOptions(resolved, opts, maxRecords));

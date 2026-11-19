@@ -13,6 +13,9 @@ export const /** Note included in every successful plot result to steer the LLM 
         "This file cannot be read or interpreted visually by the LLM. " +
         "Report the path to the user so they can open it in a browser or image viewer.";
 
+export const /** Keyword-only parameters shared by plot_histogram and plot_series. */ PLOT_TOOL_KEYWORDS =
+        ["output_path", "xlabel", "ylabel", "title", "xlim", "ylim"];
+
 /**
  * Generates the auto-assigned output path for a plot when the caller does not
  * supply one. Uses the current date and a fresh UUID so filenames never clash.

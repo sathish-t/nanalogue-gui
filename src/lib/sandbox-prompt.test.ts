@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { EXTERNAL_FUNCTIONS } from "./ai-chat-constants";
 import { MAX_SYSTEM_PROMPT_BYTES } from "./ai-chat-shared-constants";
 import type { AiChatConfig } from "./chat-types";
+import { BAM_TOOL_KEYWORDS } from "./monty-sandbox-helpers";
 import {
     buildCompleteSystemPrompt,
     buildSandboxPrompt,
@@ -13,6 +14,7 @@ import {
     joinSystemPromptParts,
     type SandboxPromptOptions,
 } from "./sandbox-prompt";
+import { SANDBOX_TOOL_SIGNATURES } from "./sandbox-tool-arguments";
 
 // ---------------------------------------------------------------------------
 // Shared baseline options used by most buildSandboxPrompt tests.
@@ -30,6 +32,44 @@ const BASE_OPTIONS: SandboxPromptOptions = {
     maxDurationSecs: 600,
 };
 
+/**
+ * Returns the prompt text from a heading up to the next ## or ### heading,
+ * so a check can be limited to one tool's section.
+ *
+ * @param prompt - The full sandbox prompt.
+ * @param heading - The start of the section's heading line.
+ * @returns The section text, heading included.
+ */
+function promptSection(prompt: string, heading: string): string {
+    const start = prompt.indexOf(heading);
+    expect(start, `missing section ${heading}`).toBeGreaterThanOrEqual(0);
+    const rest = prompt.slice(start + heading.length);
+    const next = rest.search(/^#{2,3} /m);
+    return heading + (next === -1 ? rest : rest.slice(0, next));
+}
+
+/**
+ * Returns the names in the first column of every "| Parameter |" table in a
+ * prompt section.
+ *
+ * @param section - Prompt text from promptSection.
+ * @returns The documented parameter names.
+ */
+function parameterTableNames(section: string): string[] {
+    const names: string[] = [];
+    let inTable = false;
+    for (const line of section.split("\n")) {
+        if (line.startsWith("| Parameter |")) {
+            inTable = true;
+        } else if (!line.startsWith("|")) {
+            inTable = false;
+        } else if (inTable && !line.startsWith("|--")) {
+            names.push(line.split("|")[1].trim());
+        }
+    }
+    return names;
+}
+
 // ---------------------------------------------------------------------------
 // buildSandboxPrompt — external function docs
 // ---------------------------------------------------------------------------
@@ -40,6 +80,18 @@ describe("buildSandboxPrompt — external function docs", () => {
         for (const fn of EXTERNAL_FUNCTIONS) {
             expect(prompt, `missing external function: ${fn}`).toContain(fn);
         }
+    });
+
+    it("says write_file overwrites only files written earlier in the chat", () => {
+        const prompt = buildSandboxPrompt(BASE_OPTIONS);
+        expect(prompt).not.toMatch(/never overwrites/i);
+        expect(prompt).toContain(
+            "Overwriting is limited to files written earlier in this\n  chat.",
+        );
+        expect(prompt).toContain('the result\n  includes "overwrote": True');
+        expect(prompt).toContain(
+            "only\n  overwrites files written earlier in this chat.",
+        );
     });
 
     it("documents re and json as the only allowed imports", () => {
@@ -80,31 +132,65 @@ describe("buildSandboxPrompt — external function docs", () => {
         ).toHaveLength(2);
     });
 
-    it("documents positional-only arguments while preserving keyword options", () => {
+    it("documents each tool's parameters as declared in SANDBOX_TOOL_SIGNATURES", () => {
         const prompt = buildSandboxPrompt(BASE_OPTIONS);
-        const signatures = [
-            "ls(pattern: str = None, /)",
-            "read_file(file_path: str, /, **kwargs)",
-            "write_file(file_path: str, content: str, /)",
-            "plot_histogram(bins, /, **kwargs)",
-            "plot_series(points, /, **kwargs)",
-            "minimap2(reference_path: str, query_path: str, /, preset: str = None)",
-            "peek(bam_path: str, /)",
-            "read_info(bam_path: str, /, **kwargs)",
-            "bam_mods(bam_path: str, /, **kwargs)",
-            "window_reads(bam_path: str, /, **kwargs)",
-            "seq_table(bam_path: str, /, **kwargs)",
-        ];
-        for (const signature of signatures) {
-            expect(prompt).toContain(`### ${signature} ->`);
-        }
-        expect(prompt).toContain("### continue_thinking() -> None");
-        expect(prompt).toContain(
-            "Arguments before / are positional-only: never pass them by keyword.",
+        const sharedBamSection = promptSection(
+            prompt,
+            "### Shared keyword arguments for read_info",
         );
-        expect(prompt).toContain('Use read_info("sample.bam", limit=5)');
+        for (const [tool, signature] of Object.entries(
+            SANDBOX_TOOL_SIGNATURES,
+        )) {
+            const heading = new RegExp(`^### ${tool}\\((.*)\\) ->`, "m").exec(
+                prompt,
+            );
+            expect(heading, `missing heading for ${tool}`).not.toBeNull();
+            const documentedKeywords = signature.keywordOnly.filter(
+                (name) => name !== "treat_as_url",
+            );
+            const expectedParams = [
+                ...signature.positional,
+                ...(documentedKeywords.length > 0 ? ["**kwargs"] : []),
+            ];
+            const headingParams = (heading?.[1] ?? "")
+                .split(",")
+                .map((param) => param.split(/[:=]/)[0].trim())
+                .filter(Boolean);
+            expect(headingParams, tool).toEqual(expectedParams);
+            // Each keyword must have a row in this tool's own section; the BAM
+            // tools' shared keywords live in the shared BAM table instead.
+            const toolSection = promptSection(prompt, `### ${tool}(`);
+            const isBamTool = BAM_TOOL_KEYWORDS.every((name) =>
+                signature.keywordOnly.includes(name),
+            );
+            for (const name of documentedKeywords) {
+                const section =
+                    isBamTool && BAM_TOOL_KEYWORDS.includes(name)
+                        ? sharedBamSection
+                        : toolSection;
+                expect(section, `${tool} keyword ${name}`).toContain(
+                    `| ${name} |`,
+                );
+            }
+            // And the other way: every documented row is a real parameter,
+            // so the model is never told to pass one that raises TypeError.
+            for (const name of parameterTableNames(toolSection)) {
+                expect(
+                    [...signature.positional, ...signature.keywordOnly],
+                    `${tool} documents ${name}`,
+                ).toContain(name);
+            }
+        }
+        const sharedNames = parameterTableNames(sharedBamSection);
+        expect(sharedNames.length).toBeGreaterThan(0);
+        for (const name of sharedNames) {
+            expect(BAM_TOOL_KEYWORDS, `shared keyword ${name}`).toContain(name);
+        }
         expect(prompt).toContain(
-            "Options in **kwargs must be passed by keyword.",
+            'read_info("sample.bam", limit=5) and read_info(bam_path="sample.bam", limit=5)',
+        );
+        expect(prompt).toContain(
+            "An unknown\nkeyword argument raises TypeError listing the valid ones",
         );
     });
 });

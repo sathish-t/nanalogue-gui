@@ -5,16 +5,25 @@
 // auditable path guard rather than each replicating the logic.
 
 import { convertMaps, SandboxError } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
 import type { XYPoint } from "../stats";
 import type { SeriesKind, XYOptions } from "../xy-renderer";
 import { renderXySvg } from "../xy-renderer";
 import {
     autoOutputPath,
+    PLOT_TOOL_KEYWORDS,
     validateLabel,
     validateLim,
     WRITE_ONLY_NOTE,
 } from "./plot-utils";
 import { makeWriteFile } from "./write-file";
+
+export const /** Python parameters of plot_series(), matched to each call by bindSandboxToolCall. */ PLOT_SERIES_SIGNATURE: SandboxToolSignature =
+        {
+            positional: ["points"],
+            required: 1,
+            keywordOnly: ["kind", ...PLOT_TOOL_KEYWORDS],
+        };
 
 /**
  * Validates a single raw point dict from Python and returns a typed XYPoint.
@@ -76,14 +85,21 @@ function validateKind(raw: unknown): SeriesKind {
  *
  * @param allowedDir - The sandboxed root directory for path resolution.
  * @param maxWriteBytes - Maximum bytes the SVG file may occupy.
+ * @param runWrittenFiles - A user's /exec run's own list of written files; see makeWriteFile. Omit it to use the chat session's list.
  * @returns An async function callable from Python that renders a line or scatter SVG.
  */
 export function makePlotSeries(
     allowedDir: string,
     maxWriteBytes: number,
+    runWrittenFiles?: Set<string>,
 ): (points: unknown, opts?: Record<string, unknown>) => Promise<unknown> {
     // Instantiate once; all path safety lives here.
-    const writeFn = makeWriteFile(allowedDir, maxWriteBytes);
+    const writeFn = makeWriteFile(
+        allowedDir,
+        maxWriteBytes,
+        "plot_series",
+        runWrittenFiles,
+    );
 
     /**
      * Renders a line or scatter SVG from x/y point data and writes it to disk.
@@ -158,12 +174,13 @@ export function makePlotSeries(
 
         // --- Write file (all path safety delegated to makeWriteFile) ---
 
-        await writeFn(filePath, svgContent);
+        const written = await writeFn(filePath, svgContent);
 
         return {
             path: filePath,
             points_plotted: points.length,
             note: WRITE_ONLY_NOTE,
+            ...(written.overwrote ? { overwrote: true } : {}),
         };
     };
 }

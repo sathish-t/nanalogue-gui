@@ -45,6 +45,10 @@ import {
     SandboxError,
     safeStringify,
 } from "./monty-sandbox-helpers";
+import {
+    bindSandboxToolCall,
+    type SANDBOX_TOOL_SIGNATURES,
+} from "./sandbox-tool-arguments";
 
 export {
     deriveMaxOutputBytes,
@@ -127,6 +131,11 @@ export function wrapForMonty(
                 throw new SandboxError("RuntimeError", String(e));
             }
         };
+        // Monty looks a tool up by the function's name when Python calls it
+        // through another variable (w = write_file; w(...)). An arrow
+        // assigned to wrapped[name] has an empty name, which raised
+        // NameError: name '' is not defined.
+        Object.defineProperty(wrapped[name], "name", { value: name });
     }
     return wrapped;
 }
@@ -229,7 +238,12 @@ export async function runSandboxCode(
         maxWriteBytes = DEFAULT_MAX_WRITE_BYTES,
         maxLsEntries = MAX_LS_ENTRIES,
         removedTools,
+        recordSessionWrites = true,
     } = options;
+    // Files written in this run go on the chat's list unless the caller (the
+    // user's /exec) opted out; then the run keeps its own list, so it may
+    // overwrite only files it wrote itself and the model never may.
+    const runWrittenFiles = recordSessionWrites ? undefined : new Set<string>();
 
     let continueThinkingCalled = false;
     let sandboxToolCalled = false;
@@ -283,14 +297,39 @@ export async function runSandboxCode(
                         seq_table: makeSeqTable(allowedDir, maxRecordsSeqTable),
                         ls: makeLs(allowedDir, maxLsEntries),
                         read_file: makeReadFile(allowedDir, maxReadBytes),
-                        write_file: makeWriteFile(allowedDir, maxWriteBytes),
+                        write_file: makeWriteFile(
+                            allowedDir,
+                            maxWriteBytes,
+                            "write_file",
+                            runWrittenFiles,
+                        ),
                         plot_histogram: makePlotHistogram(
                             allowedDir,
                             maxWriteBytes,
+                            runWrittenFiles,
                         ),
-                        plot_series: makePlotSeries(allowedDir, maxWriteBytes),
+                        plot_series: makePlotSeries(
+                            allowedDir,
+                            maxWriteBytes,
+                            runWrittenFiles,
+                        ),
                         minimap2: makeRunMinimap2(allowedDir),
-                    }).filter(([name]) => !removedTools?.has(name)),
+                        // A tool missing from this object, or from
+                        // SANDBOX_TOOL_SIGNATURES, fails to compile.
+                    } satisfies Record<
+                        keyof typeof SANDBOX_TOOL_SIGNATURES,
+                        (...args: never[]) => unknown
+                    >)
+                        .filter(([name]) => !removedTools?.has(name))
+                        // Match Python positional and keyword arguments
+                        // to each tool's declared parameters.
+                        .map(([name, tool]) => [
+                            name,
+                            bindSandboxToolCall(
+                                name as keyof typeof SANDBOX_TOOL_SIGNATURES,
+                                tool,
+                            ),
+                        ]),
                 ) as Record<string, (...args: never[]) => unknown>,
                 (name) => {
                     if (name !== "continue_thinking") {
@@ -347,10 +386,12 @@ export async function runSandboxCode(
                       : "object (dictionary)";
                 outputFile = `${AI_CHAT_OUTPUT_DIR}/python-result-${randomUUID()}.json`;
                 try {
-                    await makeWriteFile(allowedDir, DEFAULT_MAX_WRITE_BYTES)(
-                        outputFile,
-                        serialized.json,
-                    );
+                    await makeWriteFile(
+                        allowedDir,
+                        DEFAULT_MAX_WRITE_BYTES,
+                        "write_file",
+                        runWrittenFiles,
+                    )(outputFile, serialized.json);
                 } catch (error) {
                     throw new SandboxError(
                         "OutputError",
@@ -445,10 +486,12 @@ export async function runSandboxCode(
         prints.length = 0;
         const path = `${AI_CHAT_OUTPUT_DIR}/python-prints-${randomUUID()}.txt`;
         try {
-            await makeWriteFile(allowedDir, DEFAULT_MAX_WRITE_BYTES)(
-                path,
-                text,
-            );
+            await makeWriteFile(
+                allowedDir,
+                DEFAULT_MAX_WRITE_BYTES,
+                "write_file",
+                runWrittenFiles,
+            )(path, text);
             const readHint =
                 printBytes <= maxReadBytes
                     ? `Read the text with read_file("${path}")["content"].`

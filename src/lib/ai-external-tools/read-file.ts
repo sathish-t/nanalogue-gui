@@ -10,11 +10,20 @@ import { relative } from "node:path";
 import { pipeline } from "node:stream";
 import { createGunzip } from "node:zlib";
 import {
+    assertStringToolArgument,
     isDeniedPath,
     resolvePath,
     SandboxError,
     toForwardSlashes,
 } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
+
+export const /** Python parameters of read_file(), matched to each call by bindSandboxToolCall. */ READ_FILE_SIGNATURE: SandboxToolSignature =
+        {
+            positional: ["file_path"],
+            required: 1,
+            keywordOnly: ["offset", "max_bytes"],
+        };
 
 /** One page of decompressed gzip text, as returned by readGzipPage. */
 interface GzipPage {
@@ -115,6 +124,7 @@ export function makeReadFile(
         filePath: string,
         opts?: Record<string, unknown>,
     ): Promise<unknown> => {
+        assertStringToolArgument(filePath, "read_file", "file_path");
         // Block SVG files: they are write-only visual output produced by
         // plotting tools and contain raw XML, not meaningful text data.
         if (filePath.toLowerCase().endsWith(".svg")) {

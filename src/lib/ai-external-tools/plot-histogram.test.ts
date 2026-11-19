@@ -359,11 +359,23 @@ describe("makePlotHistogram — output path validation", () => {
         ).rejects.toMatchObject({ name: "ValueError" });
     });
 
+    it("overwrites its own earlier output and reports overwrote", async () => {
+        await plotHistogram(VALID_BINS, { output_path: "own.svg" });
+        await expect(
+            plotHistogram(VALID_BINS, { output_path: "own.svg" }),
+        ).resolves.toMatchObject({ path: "own.svg", overwrote: true });
+    });
+
     it("rejects overwriting an existing file", async () => {
         await writeFile(join(allowedDir, "existing.svg"), "<svg/>");
         await expect(
             plotHistogram(VALID_BINS, { output_path: "existing.svg" }),
-        ).rejects.toMatchObject({ name: "FileExistsError" });
+        ).rejects.toMatchObject({
+            name: "FileExistsError",
+            message: expect.stringMatching(
+                /^plot_histogram: "existing\.svg" already exists.*e\.g\. "existing-v2\.svg"/,
+            ),
+        });
     });
 
     it("rejects a non-string output_path", async () => {

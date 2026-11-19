@@ -203,6 +203,113 @@ export function rejectTreatAsUrl(opts?: Record<string, unknown>): void {
 }
 
 /**
+ * Raises a Python TypeError unless a sandbox tool argument is a string, so a
+ * file path or content passed as None (or a number, list, or dict) gets a
+ * clear error instead of a JavaScript crash such as "Cannot read properties
+ * of null".
+ *
+ * @param value - The argument as Python passed it.
+ * @param toolName - The tool's Python name, such as "write_file".
+ * @param name - The parameter's Python name, such as "file_path".
+ */
+export function assertStringToolArgument(
+    value: unknown,
+    toolName: string,
+    name: string,
+): asserts value is string {
+    if (typeof value !== "string") {
+        throw new SandboxError(
+            "TypeError",
+            `${toolName}: ${name} must be a string, got ${pythonTypeName(value)}`,
+        );
+    }
+}
+
+/**
+ * Names the Python type of a value Monty passed to a tool, for error messages.
+ * Monty passes None as null, a list or tuple as an array, and a dict as a Map.
+ * A float with no fractional part, such as 1.0, arrives as a whole number and
+ * is named int.
+ *
+ * @param value - The argument as Python passed it.
+ * @returns The Python type name, such as "None", "str", "int", or "dict".
+ */
+export function pythonTypeName(value: unknown): string {
+    if (value === null || value === undefined) return "None";
+    if (typeof value === "string") return "str";
+    if (Array.isArray(value)) return "list";
+    if (value instanceof Map) return "dict";
+    if (typeof value === "boolean") return "bool";
+    if (typeof value === "bigint") return "int";
+    if (typeof value === "number") {
+        return Number.isInteger(value) ? "int" : "float";
+    }
+    return typeof value;
+}
+
+// The limit option is not listed because toReadOptions clamps it to the record cap.
+export const /** Python keyword names of the shared BAM read options, mapped to their camelCase ReadOptions field. */ BAM_READ_OPTION_FIELDS =
+        {
+            offset: "offset",
+            sample_fraction: "sampleFraction",
+            sample_seed: "sampleSeed",
+            region: "region",
+            full_region: "fullRegion",
+            min_seq_len: "minSeqLen",
+            min_align_len: "minAlignLen",
+            read_id_set: "readIdSet",
+            threads: "threads",
+            read_filter: "readFilter",
+            mapq_filter: "mapqFilter",
+            exclude_mapq_unavail: "excludeMapqUnavail",
+            tag: "tag",
+            mod_strand: "modStrand",
+            min_mod_qual: "minModQual",
+            reject_mod_qual_non_inclusive: "rejectModQualNonInclusive",
+            trim_read_ends_mod: "trimReadEndsMod",
+            base_qual_filter_mod: "baseQualFilterMod",
+            mod_region: "modRegion",
+        } as const satisfies Record<string, keyof ReadOptions>;
+
+export const /** Python keyword names of the window_reads-only options, mapped to their WindowOptions field. */ WINDOW_OPTION_FIELDS =
+        {
+            win: "win",
+            step: "step",
+            win_op: "winOp",
+        } as const satisfies Record<string, keyof WindowOptions>;
+
+// Two names are added to the shared read options by hand. The limit option is
+// accepted but is not in BAM_READ_OPTION_FIELDS, because toReadOptions caps it
+// at the tool's record limit instead of copying it across. The treat_as_url
+// option is not a read option; it is accepted only so rejectTreatAsUrl can
+// raise its "URL access is not permitted" error instead of an
+// unexpected-keyword TypeError.
+export const /** Keyword-only parameters of read_info, bam_mods and seq_table: limit, the shared BAM read options, and treat_as_url (which is rejected). */ BAM_TOOL_KEYWORDS =
+        ["limit", ...Object.keys(BAM_READ_OPTION_FIELDS), "treat_as_url"];
+
+/**
+ * Copies each listed snake_case Python option to its camelCase field.
+ * Options that were not passed, or were passed as None, are copied as
+ * undefined, so `@nanalogue/node` applies their defaults.
+ *
+ * @param fields - Python keyword names mapped to option field names.
+ * @param opts - The snake_case options from sandbox code.
+ * @returns The camelCase fields.
+ */
+function copyOptionFields(
+    fields: Record<string, string>,
+    opts?: Record<string, unknown>,
+): Record<string, unknown> {
+    return Object.fromEntries(
+        Object.entries(fields).map(([pythonName, field]) => [
+            field,
+            // None arrives as null, which the native addon cannot convert.
+            opts?.[pythonName] ?? undefined,
+        ]),
+    );
+}
+
+/**
  * Translates snake_case Python kwargs to camelCase ReadOptions for nanalogue/node.
  *
  * @param resolved - The resolved BAM file path.
@@ -224,27 +331,7 @@ export function toReadOptions(
                       limitOverride,
                   )
                 : (opts?.limit as number | undefined),
-        offset: opts?.offset as number | undefined,
-        sampleFraction: opts?.sample_fraction as number | undefined,
-        sampleSeed: opts?.sample_seed as number | undefined,
-        region: opts?.region as string | undefined,
-        fullRegion: opts?.full_region as boolean | undefined,
-        minSeqLen: opts?.min_seq_len as number | undefined,
-        minAlignLen: opts?.min_align_len as number | undefined,
-        readIdSet: opts?.read_id_set as string[] | undefined,
-        threads: opts?.threads as number | undefined,
-        readFilter: opts?.read_filter as string | undefined,
-        mapqFilter: opts?.mapq_filter as number | undefined,
-        excludeMapqUnavail: opts?.exclude_mapq_unavail as boolean | undefined,
-        tag: opts?.tag as string | undefined,
-        modStrand: opts?.mod_strand as string | undefined,
-        minModQual: opts?.min_mod_qual as number | undefined,
-        rejectModQualNonInclusive: opts?.reject_mod_qual_non_inclusive as
-            | number[]
-            | undefined,
-        trimReadEndsMod: opts?.trim_read_ends_mod as number | undefined,
-        baseQualFilterMod: opts?.base_qual_filter_mod as number | undefined,
-        modRegion: opts?.mod_region as string | undefined,
+        ...copyOptionFields(BAM_READ_OPTION_FIELDS, opts),
     } as ReadOptions;
 }
 
@@ -263,9 +350,7 @@ export function toWindowOptions(
 ): WindowOptions {
     return {
         ...toReadOptions(resolved, opts, limitOverride),
-        win: opts?.win as number | undefined,
-        step: opts?.step as number | undefined,
-        winOp: opts?.win_op as "density" | "grad_density" | undefined,
+        ...copyOptionFields(WINDOW_OPTION_FIELDS, opts),
     } as WindowOptions;
 }
 

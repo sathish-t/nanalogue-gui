@@ -7,14 +7,19 @@
 import type { HistogramOptions } from "../histogram-renderer";
 import { renderHistogramSvg } from "../histogram-renderer";
 import { convertMaps, SandboxError } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
 import type { HistogramBin } from "../stats";
 import {
     autoOutputPath,
+    PLOT_TOOL_KEYWORDS,
     validateLabel,
     validateLim,
     WRITE_ONLY_NOTE,
 } from "./plot-utils";
 import { makeWriteFile } from "./write-file";
+
+export const /** Python parameters of plot_histogram(), matched to each call by bindSandboxToolCall. */ PLOT_HISTOGRAM_SIGNATURE: SandboxToolSignature =
+        { positional: ["bins"], required: 1, keywordOnly: PLOT_TOOL_KEYWORDS };
 
 /**
  * Validates a single raw bin dict from Python and returns a typed HistogramBin.
@@ -80,14 +85,21 @@ function validateBin(raw: unknown, index: number): HistogramBin {
  *
  * @param allowedDir - The sandboxed root directory for path resolution.
  * @param maxWriteBytes - Maximum bytes the SVG file may occupy.
+ * @param runWrittenFiles - A user's /exec run's own list of written files; see makeWriteFile. Omit it to use the chat session's list.
  * @returns An async function callable from Python that renders a histogram SVG.
  */
 export function makePlotHistogram(
     allowedDir: string,
     maxWriteBytes: number,
+    runWrittenFiles?: Set<string>,
 ): (bins: unknown, opts?: Record<string, unknown>) => Promise<unknown> {
     // Instantiate once; all path safety lives here.
-    const writeFn = makeWriteFile(allowedDir, maxWriteBytes);
+    const writeFn = makeWriteFile(
+        allowedDir,
+        maxWriteBytes,
+        "plot_histogram",
+        runWrittenFiles,
+    );
 
     /**
      * Renders a histogram SVG from pre-binned data and writes it to disk.
@@ -164,12 +176,13 @@ export function makePlotHistogram(
 
         // --- Write file (all path safety delegated to makeWriteFile) ---
 
-        await writeFn(filePath, svgContent);
+        const written = await writeFn(filePath, svgContent);
 
         return {
             path: filePath,
             bins_plotted: bins.length,
             note: WRITE_ONLY_NOTE,
+            ...(written.overwrote ? { overwrote: true } : {}),
         };
     };
 }
