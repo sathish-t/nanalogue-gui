@@ -16,4 +16,8 @@ export { makeReadFile, READ_FILE_SIGNATURE } from "./read-file";
 export { makeReadInfo, READ_INFO_SIGNATURE } from "./read-info";
 export { makeSeqTable, SEQ_TABLE_SIGNATURE } from "./seq-table";
 export { makeWindowReads, WINDOW_READS_SIGNATURE } from "./window-reads";
-export { makeWriteFile, WRITE_FILE_SIGNATURE } from "./write-file";
+export {
+    makeWriteFile,
+    resetSessionWrittenFiles,
+    WRITE_FILE_SIGNATURE,
+} from "./write-file";

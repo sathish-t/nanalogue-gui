@@ -1,6 +1,7 @@
 // Reusable chat session state for the AI Chat feature.
 // Wraps conversation history and abort handling so both the GUI and CLI share the same logic.
 
+import { resetSessionWrittenFiles } from "./ai-external-tools";
 import { handleUserMessage, resetLastSentMessages } from "./chat-orchestrator";
 import { LlmRequestTimeoutError } from "./chat-orchestrator-llm";
 import type {
@@ -186,5 +187,7 @@ export class ChatSession {
         this.currentAbortController?.abort();
         this.currentAbortController = null;
         resetLastSentMessages();
+        // A new chat may no longer overwrite the previous chat's files.
+        resetSessionWrittenFiles();
     }
 }

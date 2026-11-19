@@ -254,12 +254,14 @@ result = write_file("chr1/filtered_reads.tsv", tsv_content)
   directories are created automatically. Use / to separate folders on
   every platform, never \\.
 - content: text content to write (UTF-8). Max ${maxWriteMB} MB per call.
-- IMPORTANT: This function NEVER overwrites existing files, and files
-  cannot be deleted. If a file with the given name already exists, the
-  call raises FileExistsError, which suggests a free name such as
-  "results_2.bed". When re-running earlier code, skip the writes that
-  already succeeded instead of repeating them. plot_histogram() and
-  plot_series() follow the same rule for output_path.
+- IMPORTANT: Overwriting is limited to files written earlier in this
+  chat. Writing to one of them again replaces it, and the result
+  includes "overwrote": True, so re-running corrected code updates your
+  earlier outputs. Any other existing file (the user's files, or files
+  from earlier chats) is never changed: the call raises FileExistsError,
+  which suggests a free name such as "results_2.bed". Files cannot be
+  deleted. plot_histogram() and plot_series() follow the same rule for
+  output_path.
 - Filenames must not contain control characters or exceed ${MAX_FILENAME_LENGTH}
   characters per path component.
 - Files can be written anywhere within the allowed directory.
@@ -747,6 +749,6 @@ lengths = [r["sequence_length"] for r in reads]
   files, peek/read_info/bam_mods/window_reads/seq_table for BAM/CRAM
   data, read_file() for text files (including .gz), and write_file() to
   save results.
-- write_file() writes anywhere within the allowed directory and never
-  overwrites existing files.`;
+- write_file() writes anywhere within the allowed directory and only
+  overwrites files written earlier in this chat.`;
 }

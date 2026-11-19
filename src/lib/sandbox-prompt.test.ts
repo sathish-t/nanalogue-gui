@@ -60,6 +60,18 @@ describe("buildSandboxPrompt — external function docs", () => {
         }
     });
 
+    it("says write_file overwrites only files written earlier in the chat", () => {
+        const prompt = buildSandboxPrompt(BASE_OPTIONS);
+        expect(prompt).not.toMatch(/never overwrites/i);
+        expect(prompt).toContain(
+            "Overwriting is limited to files written earlier in this\n  chat.",
+        );
+        expect(prompt).toContain('the result\n  includes "overwrote": True');
+        expect(prompt).toContain(
+            "only\n  overwrites files written earlier in this chat.",
+        );
+    });
+
     it("documents re and json as the only allowed imports", () => {
         const prompt = buildSandboxPrompt(BASE_OPTIONS);
         expect(prompt).toContain("the Python stdlib modules re and json");

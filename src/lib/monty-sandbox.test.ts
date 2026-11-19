@@ -601,15 +601,40 @@ result
     expect(written).toBe("chr1\t100\t200\n");
 });
 
-it("write_file refuses to overwrite existing file", async () => {
-    const code1 = 'write_file("no_overwrite.txt", "first")';
-    const result1 = await runSandboxCode(code1, allowedDir);
-    expect(result1.success).toBe(true);
+it("write_file refuses to overwrite a file the session did not write", async () => {
+    await writeFile(join(allowedDir, "users_file.txt"), "user data");
+    const result = await runSandboxCode(
+        'write_file("users_file.txt", "model data")',
+        allowedDir,
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/FileExistsError: .*already exists/);
+    await expect(
+        readFile(join(allowedDir, "users_file.txt"), "utf-8"),
+    ).resolves.toBe("user data");
+});
 
-    const code2 = 'write_file("no_overwrite.txt", "second")';
-    const result2 = await runSandboxCode(code2, allowedDir);
-    expect(result2.success).toBe(false);
-    expect(result2.message).toMatch(/already exists/);
+it("re-running code replaces the files and plots it wrote in an earlier run", async () => {
+    /**
+     * Builds a script that writes a TSV and a plot, then rewrites the TSV.
+     *
+     * @param value - The number written to the TSV and used as the bin count.
+     * @returns The Python source.
+     */
+    const script = (value: number) =>
+        `write_file("rerun.tsv", "value\\t${value}\\n")\n` +
+        `plot_histogram([{"bin_start": 0, "bin_end": 1, "count": ${value}}], output_path="rerun.svg")\n` +
+        'write_file("rerun.tsv", read_file("rerun.tsv")["content"])';
+    const first = await runSandboxCode(script(1), allowedDir);
+    expect(first.success, first.message).toBe(true);
+    // The last write in the first run already replaces its own file.
+    expect(first.value).toMatchObject({ overwrote: true });
+
+    const second = await runSandboxCode(script(2), allowedDir);
+    expect(second.success, second.message).toBe(true);
+    await expect(
+        readFile(join(allowedDir, "rerun.tsv"), "utf-8"),
+    ).resolves.toBe("value\t2\n");
 });
 
 it("write_file rejects path traversal outside allowed dir", async () => {

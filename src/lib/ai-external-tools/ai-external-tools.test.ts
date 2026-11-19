@@ -21,7 +21,7 @@ import { SandboxError } from "../monty-sandbox-helpers";
 import { makeLs } from "./ls";
 import { makeReadFile } from "./read-file";
 import { makeWindowReads } from "./window-reads";
-import { makeWriteFile } from "./write-file";
+import { makeWriteFile, resetSessionWrittenFiles } from "./write-file";
 
 let allowedDir: string;
 let bamName: string;
@@ -238,13 +238,51 @@ it("makeWriteFile atomically rejects concurrent creation of the same file", asyn
     ).resolves.toBe(contents[successfulIndex]);
 });
 
+it("makeWriteFile overwrites a file it wrote earlier in the session, by any spelling of its path", async () => {
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await expect(fn("session.tsv", "first")).resolves.toEqual({
+        path: "session.tsv",
+        bytes_written: 5,
+    });
+    await expect(fn("./session.tsv", "second!")).resolves.toEqual({
+        path: "./session.tsv",
+        bytes_written: 7,
+        overwrote: true,
+    });
+    await expect(
+        readFile(join(allowedDir, "session.tsv"), "utf-8"),
+    ).resolves.toBe("second!");
+});
+
+it("makeWriteFile never overwrites a file the session did not write", async () => {
+    await writeFile(join(allowedDir, "users_own.tsv"), "user data");
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    // Writing some other file must not unlock the user's file.
+    await fn("unrelated_session_file.tsv", "x");
+    await expect(fn("users_own.tsv", "model data")).rejects.toMatchObject({
+        name: "FileExistsError",
+    });
+    await expect(
+        readFile(join(allowedDir, "users_own.tsv"), "utf-8"),
+    ).resolves.toBe("user data");
+});
+
+it("resetSessionWrittenFiles protects the session's earlier files again", async () => {
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await fn("before_reset.tsv", "first");
+    resetSessionWrittenFiles();
+    await expect(fn("before_reset.tsv", "second")).rejects.toMatchObject({
+        name: "FileExistsError",
+    });
+});
+
 it("makeWriteFile collision names write_file, keeps the file, and suggests a free name", async () => {
     await writeFile(join(allowedDir, "dup.bed"), "original");
     const fn = makeWriteFile(allowedDir, 1024 * 1024);
     await expect(fn("dup.bed", "new")).rejects.toMatchObject({
         name: "FileExistsError",
         message: expect.stringMatching(
-            /^write_file: "dup\.bed" already exists.*cannot be overwritten or deleted.*e\.g\. "dup_2\.bed".*re-running/,
+            /^write_file: "dup\.bed" already exists and was not changed\. Only files written earlier in this chat can be overwritten, and files cannot be deleted\. .*e\.g\. "dup_2\.bed"/,
         ),
     });
     await expect(readFile(join(allowedDir, "dup.bed"), "utf-8")).resolves.toBe(
@@ -274,7 +312,7 @@ it("makeWriteFile collision omits the suggestion when every numbered name is tak
     const error = await fn("full_dir/full.txt", "x").catch((e: unknown) => e);
     expect(error).toMatchObject({
         name: "FileExistsError",
-        message: expect.stringContaining("Write to a new name instead. "),
+        message: expect.stringMatching(/Write to a new name instead\.$/),
     });
     expect((error as Error).message).not.toContain("e.g.");
 });
