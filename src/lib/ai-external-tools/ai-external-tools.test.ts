@@ -238,6 +238,56 @@ it("makeWriteFile atomically rejects concurrent creation of the same file", asyn
     ).resolves.toBe(contents[successfulIndex]);
 });
 
+it("makeWriteFile collision names write_file, keeps the file, and suggests a free name", async () => {
+    await writeFile(join(allowedDir, "dup.bed"), "original");
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await expect(fn("dup.bed", "new")).rejects.toMatchObject({
+        name: "FileExistsError",
+        message: expect.stringMatching(
+            /^write_file: "dup\.bed" already exists.*cannot be overwritten or deleted.*e\.g\. "dup_2\.bed".*re-running/,
+        ),
+    });
+    await expect(readFile(join(allowedDir, "dup.bed"), "utf-8")).resolves.toBe(
+        "original",
+    );
+});
+
+it("makeWriteFile collision suggestion skips taken numbers instead of stacking suffixes", async () => {
+    await writeFile(join(allowedDir, "taken.tsv"), "");
+    await writeFile(join(allowedDir, "taken_2.tsv"), "");
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await expect(fn("taken.tsv", "x")).rejects.toMatchObject({
+        message: expect.stringContaining('e.g. "taken_3.tsv"'),
+    });
+    await expect(fn("taken_2.tsv", "x")).rejects.toMatchObject({
+        message: expect.stringContaining('e.g. "taken_3.tsv"'),
+    });
+});
+
+it("makeWriteFile collision omits the suggestion when every numbered name is taken", async () => {
+    await mkdir(join(allowedDir, "full_dir"), { recursive: true });
+    await writeFile(join(allowedDir, "full_dir", "full.txt"), "");
+    for (let n = 2; n <= 101; n++) {
+        await writeFile(join(allowedDir, "full_dir", `full_${n}.txt`), "");
+    }
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    const error = await fn("full_dir/full.txt", "x").catch((e: unknown) => e);
+    expect(error).toMatchObject({
+        name: "FileExistsError",
+        message: expect.stringContaining("Write to a new name instead. "),
+    });
+    expect((error as Error).message).not.toContain("e.g.");
+});
+
+it("makeWriteFile collision suggestion keeps the directory and a .vcf.gz extension", async () => {
+    await mkdir(join(allowedDir, "calls_dir"), { recursive: true });
+    await writeFile(join(allowedDir, "calls_dir", "calls.vcf.gz"), "");
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await expect(fn("calls_dir/calls.vcf.gz", "x")).rejects.toMatchObject({
+        message: expect.stringContaining('e.g. "calls_dir/calls_2.vcf.gz"'),
+    });
+});
+
 // --- makeReadFile ---
 
 it("makeReadFile rejects .svg files with ValueError", async () => {

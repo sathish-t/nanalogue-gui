@@ -87,7 +87,7 @@ export function makePlotHistogram(
     maxWriteBytes: number,
 ): (bins: unknown, opts?: Record<string, unknown>) => Promise<unknown> {
     // Instantiate once; all path safety lives here.
-    const writeFn = makeWriteFile(allowedDir, maxWriteBytes);
+    const writeFn = makeWriteFile(allowedDir, maxWriteBytes, "plot_histogram");
 
     /**
      * Renders a histogram SVG from pre-binned data and writes it to disk.

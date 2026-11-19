@@ -83,7 +83,7 @@ export function makePlotSeries(
     maxWriteBytes: number,
 ): (points: unknown, opts?: Record<string, unknown>) => Promise<unknown> {
     // Instantiate once; all path safety lives here.
-    const writeFn = makeWriteFile(allowedDir, maxWriteBytes);
+    const writeFn = makeWriteFile(allowedDir, maxWriteBytes, "plot_series");
 
     /**
      * Renders a line or scatter SVG from x/y point data and writes it to disk.

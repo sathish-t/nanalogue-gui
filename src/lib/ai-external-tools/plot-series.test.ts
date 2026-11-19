@@ -421,7 +421,10 @@ describe("makePlotSeries — output path validation", () => {
         await writeFile(join(allowedDir, "existing.svg"), "<svg/>");
         await expect(
             plotSeries(VALID_POINTS, { output_path: "existing.svg" }),
-        ).rejects.toMatchObject({ name: "FileExistsError" });
+        ).rejects.toMatchObject({
+            name: "FileExistsError",
+            message: expect.stringMatching(/^plot_series: "existing\.svg"/),
+        });
     });
 
     it("rejects a non-string output_path", async () => {

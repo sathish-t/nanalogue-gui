@@ -251,9 +251,12 @@ result = write_file("chr1/filtered_reads.tsv", tsv_content)
   Nested paths like "subdir/file.bed" are supported — parent
   directories are created automatically.
 - content: text content to write (UTF-8). Max ${maxWriteMB} MB per call.
-- IMPORTANT: This function NEVER overwrites existing files. If a file
-  with the given name already exists, the call fails. Choose a
-  different name (e.g., append a number: "results_2.bed").
+- IMPORTANT: This function NEVER overwrites existing files, and files
+  cannot be deleted. If a file with the given name already exists, the
+  call raises FileExistsError, which suggests a free name such as
+  "results_2.bed". When re-running earlier code, skip the writes that
+  already succeeded instead of repeating them. plot_histogram() and
+  plot_series() follow the same rule for output_path.
 - Filenames must not contain control characters or exceed ${MAX_FILENAME_LENGTH}
   characters per path component.
 - Files can be written anywhere within the allowed directory.
