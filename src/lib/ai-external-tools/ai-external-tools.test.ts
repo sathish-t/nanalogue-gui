@@ -70,14 +70,36 @@ it("makeWindowReads returns an array of records for a real BAM file", async () =
 it.each([
     [
         { step: 50 },
-        "window_reads() missing required keyword-only argument: 'win'",
+        "window_reads() missing 1 required keyword-only argument: 'win'",
+    ],
+    [
+        {},
+        "window_reads() missing 2 required keyword-only arguments: 'win' and 'step'",
     ],
     [{ win: 100, step: null }, "window_reads: step must be an int, got None"],
-])("makeWindowReads with %o raises TypeError, not the addon's Missing field error", async (opts, message) => {
+    [{ win: 100, step: "2" }, "window_reads: step must be an int, got str"],
+    [{ win: 2.5, step: 50 }, "window_reads: win must be an int, got float"],
+    [{ win: true, step: 50 }, "window_reads: win must be an int, got bool"],
+])("makeWindowReads with %o raises TypeError, not a native addon error", async (opts, message) => {
     const fn = makeWindowReads(allowedDir, 1_000);
     await expect(fn(bamName, opts)).rejects.toMatchObject({
         name: "TypeError",
         message,
+    });
+});
+
+// The addon reads win and step as i32: it rejects 0 and bigints with its own
+// errors, and wraps 2**32 + 100 to 100 without complaint.
+it.each([
+    [{ win: 100, step: 0 }, "step", "0"],
+    [{ win: -5, step: 50 }, "win", "-5"],
+    [{ win: 2 ** 32 + 100, step: 50 }, "win", "4294967396"],
+    [{ win: 100, step: 2n ** 60n }, "step", "1152921504606846976"],
+])("makeWindowReads with %o raises ValueError for an out-of-range value", async (opts, name, shown) => {
+    const fn = makeWindowReads(allowedDir, 1_000);
+    await expect(fn(bamName, opts)).rejects.toMatchObject({
+        name: "ValueError",
+        message: `window_reads: ${name} must be between 1 and 2147483647, got ${shown}`,
     });
 });
 

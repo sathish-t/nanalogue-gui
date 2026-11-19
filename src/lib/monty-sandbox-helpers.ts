@@ -226,17 +226,17 @@ export function assertStringToolArgument(
 }
 
 /**
- * Names the Python type of a non-string value Monty passed to a tool, for
- * error messages.
+ * Names the Python type of a value Monty passed to a tool, for error messages.
  * Monty passes None as null, a list or tuple as an array, and a dict as a Map.
  * A float with no fractional part, such as 1.0, arrives as a whole number and
  * is named int.
  *
  * @param value - The argument as Python passed it.
- * @returns The Python type name, such as "None", "int", or "dict".
+ * @returns The Python type name, such as "None", "str", "int", or "dict".
  */
-function pythonTypeName(value: unknown): string {
+export function pythonTypeName(value: unknown): string {
     if (value === null || value === undefined) return "None";
+    if (typeof value === "string") return "str";
     if (Array.isArray(value)) return "list";
     if (value instanceof Map) return "dict";
     if (typeof value === "boolean") return "bool";

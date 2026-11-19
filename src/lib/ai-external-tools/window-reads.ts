@@ -6,6 +6,7 @@ import {
     assertStringToolArgument,
     BAM_TOOL_KEYWORDS,
     enforceRecordLimit,
+    pythonTypeName,
     rejectTreatAsUrl,
     resolvePath,
     SandboxError,
@@ -23,6 +24,9 @@ export const /** Python parameters of window_reads(), matched to each call by bi
                 ...Object.keys(WINDOW_OPTION_FIELDS),
             ],
         };
+
+/** Largest win or step the native addon accepts; it reads both as a Rust i32. */
+const I32_MAX = 2_147_483_647;
 
 /**
  * Returns the window_reads tool implementation bound to the given context.
@@ -48,20 +52,39 @@ export function makeWindowReads(
     ): Promise<unknown> => {
         assertStringToolArgument(bamPath, "window_reads", "bam_path");
         rejectTreatAsUrl(opts);
-        // win and step have no default; without this check a missing value
-        // fails in the native addon with "Missing field `win`".
+        // win and step have no default; without these checks a missing,
+        // non-integer, or out-of-range value fails in the native addon with
+        // "Missing field `win`" or "Failed to convert napi value String into
+        // rust type `i32`", and a whole number past the i32 range wraps.
+        const missing = ["win", "step"].filter(
+            (name) => opts?.[name] === undefined,
+        );
+        if (missing.length > 0) {
+            throw new SandboxError(
+                "TypeError",
+                `window_reads() missing ${missing.length} required keyword-only ` +
+                    `argument${missing.length === 1 ? "" : "s"}: ` +
+                    missing.map((name) => `'${name}'`).join(" and "),
+            );
+        }
         for (const name of ["win", "step"]) {
             const value = opts?.[name];
-            if (value === undefined) {
+            // A Python int beyond 2**53 arrives as a bigint, which is an int
+            // but always out of range.
+            if (typeof value !== "bigint" && !Number.isInteger(value)) {
                 throw new SandboxError(
                     "TypeError",
-                    `window_reads() missing required keyword-only argument: '${name}'`,
+                    `window_reads: ${name} must be an int, got ${pythonTypeName(value)}`,
                 );
             }
-            if (value === null) {
+            if (
+                typeof value === "bigint" ||
+                (value as number) < 1 ||
+                (value as number) > I32_MAX
+            ) {
                 throw new SandboxError(
-                    "TypeError",
-                    `window_reads: ${name} must be an int, got None`,
+                    "ValueError",
+                    `window_reads: ${name} must be between 1 and ${I32_MAX}, got ${value}`,
                 );
             }
         }
