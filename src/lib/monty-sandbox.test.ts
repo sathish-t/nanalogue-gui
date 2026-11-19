@@ -1286,6 +1286,7 @@ const SPANNED_REGION =
 
 describe("sandbox tools accept required arguments by position or keyword", () => {
     it.each([
+        ['ls("*.fasta")', 'f = ls\nf("*.fasta")'],
         ['peek("simple_test.bam")', 'peek(bam_path="simple_test.bam")'],
         [
             'read_info("simple_test.bam", limit=3)',

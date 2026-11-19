@@ -131,6 +131,11 @@ export function wrapForMonty(
                 throw new SandboxError("RuntimeError", String(e));
             }
         };
+        // Monty looks a tool up by the function's name when Python calls it
+        // through another variable (w = write_file; w(...)). An arrow
+        // assigned to wrapped[name] has an empty name, which raised
+        // NameError: name '' is not defined.
+        Object.defineProperty(wrapped[name], "name", { value: name });
     }
     return wrapped;
 }
