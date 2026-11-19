@@ -1449,3 +1449,26 @@ it.each([
     expect(chatRun.success).toBe(false);
     expect(chatRun.message).toContain("FileExistsError");
 });
+
+it("a file a user's script writes where the chat's deleted file was stays protected", async () => {
+    await runSandboxCode(
+        'write_file("exec_recreated.tsv", "model v1")',
+        allowedDir,
+    );
+    await rm(join(allowedDir, "exec_recreated.tsv"));
+    const execRun = await runSandboxCode(
+        'write_file("exec_recreated.tsv", "user")',
+        allowedDir,
+        { recordSessionWrites: false },
+    );
+    expect(execRun.success, execRun.message).toBe(true);
+    const chatRun = await runSandboxCode(
+        'write_file("exec_recreated.tsv", "model v2")',
+        allowedDir,
+    );
+    expect(chatRun.success).toBe(false);
+    expect(chatRun.message).toContain("FileExistsError");
+    await expect(
+        readFile(join(allowedDir, "exec_recreated.tsv"), "utf-8"),
+    ).resolves.toBe("user");
+});

@@ -316,7 +316,11 @@ export function makeWriteFile(
         }
         // Record the real path: before the file existed, resolvePath
         // returned the path through any symlinked folder instead.
-        writtenFiles.add(await realpath(resolved));
+        const real = await realpath(resolved);
+        writtenFiles.add(real);
+        // A file the user's /exec script wrote is the user's, even at a path
+        // the chat wrote before.
+        if (runWrittenFiles) sessionWrittenFiles.delete(real);
         return {
             path: filePath,
             bytes_written: contentBytes,
