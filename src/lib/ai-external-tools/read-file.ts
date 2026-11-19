@@ -10,6 +10,7 @@ import { relative } from "node:path";
 import { pipeline } from "node:stream";
 import { createGunzip } from "node:zlib";
 import {
+    assertStringToolArgument,
     isDeniedPath,
     resolvePath,
     SandboxError,
@@ -123,6 +124,7 @@ export function makeReadFile(
         filePath: string,
         opts?: Record<string, unknown>,
     ): Promise<unknown> => {
+        assertStringToolArgument(filePath, "read_file", "file_path");
         // Block SVG files: they are write-only visual output produced by
         // plotting tools and contain raw XML, not meaningful text data.
         if (filePath.toLowerCase().endsWith(".svg")) {

@@ -244,6 +244,17 @@ describe("toWindowOptions", () => {
         expect(opts.winOp).toBe("grad_density");
         expect(opts.sampleFraction).toBe(0.5);
     });
+
+    it("treats options passed as None like options not passed", () => {
+        // Python None arrives as null, which the native addon cannot convert.
+        expect(
+            toWindowOptions("/data/test.bam", {
+                region: null,
+                mapq_filter: null,
+                win_op: null,
+            }),
+        ).toEqual(toWindowOptions("/data/test.bam", {}));
+    });
 });
 
 describe("safeStringify", () => {

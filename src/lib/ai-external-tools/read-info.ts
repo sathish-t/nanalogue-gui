@@ -3,6 +3,7 @@
 
 import { readInfo } from "@nanalogue/node";
 import {
+    assertStringToolArgument,
     BAM_TOOL_KEYWORDS,
     enforceRecordLimit,
     rejectTreatAsUrl,
@@ -40,6 +41,7 @@ export function makeReadInfo(
         bamPath: string,
         opts?: Record<string, unknown>,
     ): Promise<unknown> => {
+        assertStringToolArgument(bamPath, "read_info", "bam_path");
         rejectTreatAsUrl(opts);
         const resolved = await resolvePath(allowedDir, bamPath);
         const result = await readInfo(

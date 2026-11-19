@@ -3,6 +3,7 @@
 
 import { seqTable } from "@nanalogue/node";
 import {
+    assertStringToolArgument,
     BAM_TOOL_KEYWORDS,
     rejectTreatAsUrl,
     resolvePath,
@@ -39,6 +40,7 @@ export function makeSeqTable(
         bamPath: string,
         opts?: Record<string, unknown>,
     ): Promise<unknown> => {
+        assertStringToolArgument(bamPath, "seq_table", "bam_path");
         rejectTreatAsUrl(opts);
         const resolved = await resolvePath(allowedDir, bamPath);
         return seqTable(toReadOptions(resolved, opts, maxRecords));

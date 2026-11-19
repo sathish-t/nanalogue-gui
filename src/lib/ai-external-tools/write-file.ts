@@ -19,6 +19,7 @@ import { hasControlChars } from "../control-characters";
 import {
     assertExistingAncestorInside,
     assertInside,
+    assertStringToolArgument,
     isDeniedPath,
     resolvePath,
     SandboxError,
@@ -220,6 +221,8 @@ export function makeWriteFile(
         filePath: string,
         content: string,
     ): Promise<SandboxWriteFileResult> => {
+        assertStringToolArgument(filePath, toolName, "file_path");
+        assertStringToolArgument(content, toolName, "content");
         for (const component of filePath.split("/")) {
             if (component.length > MAX_FILENAME_LENGTH) {
                 throw new SandboxError(

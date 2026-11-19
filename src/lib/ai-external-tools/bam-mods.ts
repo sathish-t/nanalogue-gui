@@ -3,6 +3,7 @@
 
 import { bamMods } from "@nanalogue/node";
 import {
+    assertStringToolArgument,
     BAM_TOOL_KEYWORDS,
     enforceRecordLimit,
     rejectTreatAsUrl,
@@ -40,6 +41,7 @@ export function makeBamMods(
         bamPath: string,
         opts?: Record<string, unknown>,
     ): Promise<unknown> => {
+        assertStringToolArgument(bamPath, "bam_mods", "bam_path");
         rejectTreatAsUrl(opts);
         const resolved = await resolvePath(allowedDir, bamPath);
         const result = await bamMods(toReadOptions(resolved, opts, maxRecords));

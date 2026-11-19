@@ -3,6 +3,7 @@
 
 import { windowReads } from "@nanalogue/node";
 import {
+    assertStringToolArgument,
     BAM_TOOL_KEYWORDS,
     enforceRecordLimit,
     rejectTreatAsUrl,
@@ -45,6 +46,7 @@ export function makeWindowReads(
         bamPath: string,
         opts?: Record<string, unknown>,
     ): Promise<unknown> => {
+        assertStringToolArgument(bamPath, "window_reads", "bam_path");
         rejectTreatAsUrl(opts);
         const resolved = await resolvePath(allowedDir, bamPath);
         const records = await windowReads(

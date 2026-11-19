@@ -202,6 +202,38 @@ export function rejectTreatAsUrl(opts?: Record<string, unknown>): void {
     }
 }
 
+/**
+ * Raises a Python TypeError unless a sandbox tool argument is a string, so a
+ * file path or content passed as None (or a number, list, or dict) gets a
+ * clear error instead of a JavaScript crash such as "Cannot read properties
+ * of null".
+ *
+ * @param value - The argument as Python passed it.
+ * @param toolName - The tool's Python name, such as "write_file".
+ * @param name - The parameter's Python name, such as "file_path".
+ */
+export function assertStringToolArgument(
+    value: unknown,
+    toolName: string,
+    name: string,
+): asserts value is string {
+    if (typeof value !== "string") {
+        // Monty passes None as null, a list as an array, and a dict as a Map.
+        const pythonType =
+            value === null
+                ? "None"
+                : Array.isArray(value)
+                  ? "list"
+                  : value instanceof Map
+                    ? "dict"
+                    : typeof value;
+        throw new SandboxError(
+            "TypeError",
+            `${toolName}: ${name} must be a string, got ${pythonType}`,
+        );
+    }
+}
+
 // The limit option is not listed because toReadOptions clamps it to the record cap.
 export const /** Python keyword names of the shared BAM read options, mapped to their camelCase ReadOptions field. */ BAM_READ_OPTION_FIELDS =
         {
@@ -244,7 +276,8 @@ export const /** Keyword-only parameters of read_info, bam_mods and seq_table: l
 
 /**
  * Copies each listed snake_case Python option to its camelCase field.
- * Options that were not passed are copied as undefined.
+ * Options that were not passed, or were passed as None, are copied as
+ * undefined, so `@nanalogue/node` applies their defaults.
  *
  * @param fields - Python keyword names mapped to option field names.
  * @param opts - The snake_case options from sandbox code.
@@ -257,7 +290,8 @@ function copyOptionFields(
     return Object.fromEntries(
         Object.entries(fields).map(([pythonName, field]) => [
             field,
-            opts?.[pythonName],
+            // None arrives as null, which the native addon cannot convert.
+            opts?.[pythonName] ?? undefined,
         ]),
     );
 }

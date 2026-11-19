@@ -1421,6 +1421,31 @@ describe("sandbox tools raise Python TypeErrors for bad arguments", () => {
             'ls(["*.bam"])',
             "ls() pattern must be a glob string such as '**/*.bam', or None",
         ],
+        [
+            'write_file(None, "x")',
+            "write_file: file_path must be a string, got None",
+        ],
+        [
+            'write_file({"a": 1}, "x")',
+            "write_file: file_path must be a string, got dict",
+        ],
+        [
+            'write_file("bind_none.txt", None)',
+            "write_file: content must be a string, got None",
+        ],
+        [
+            'write_file("bind_list.txt", ["a"])',
+            "write_file: content must be a string, got list",
+        ],
+        ["read_file(None)", "read_file: file_path must be a string, got None"],
+        ["peek(5)", "peek: bam_path must be a string, got number"],
+        ["read_info(None)", "read_info: bam_path must be a string, got None"],
+        ["bam_mods(None)", "bam_mods: bam_path must be a string, got None"],
+        [
+            "window_reads(None)",
+            "window_reads: bam_path must be a string, got None",
+        ],
+        ["seq_table(None)", "seq_table: bam_path must be a string, got None"],
     ])("%s", async (code, expected) => {
         const result = await runSandboxCode(code, allowedDir);
         expect(result.success).toBe(false);
