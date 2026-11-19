@@ -4,6 +4,7 @@
 // monty-sandbox.test.ts.
 
 import {
+    chmod,
     link,
     mkdir,
     mkdtemp,
@@ -11,6 +12,7 @@ import {
     readFile,
     realpath,
     rm,
+    stat,
     symlink,
     writeFile,
 } from "node:fs/promises";
@@ -295,6 +297,35 @@ it("makeWriteFile overwrite replaces the file, leaving a hard link to the old on
     ).resolves.toBe("model v2");
 });
 
+it("makeWriteFile refuses to overwrite a session file the user made read-only", async () => {
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await fn("locked.tsv", "model v1");
+    await chmod(join(allowedDir, "locked.tsv"), 0o444);
+    await expect(fn("locked.tsv", "model v2")).rejects.toMatchObject({
+        name: "OSError",
+        message:
+            'write_file: "locked.tsv" has been made read-only, so it was not ' +
+            'changed. Write to a new name instead, e.g. "locked-v2.tsv" (currently free).',
+    });
+    await expect(
+        readFile(join(allowedDir, "locked.tsv"), "utf-8"),
+    ).resolves.toBe("model v1");
+});
+
+// Windows keeps only a read-only flag, not the full permission bits.
+it.skipIf(process.platform === "win32")(
+    "makeWriteFile keeps the old file's permissions when overwriting",
+    async () => {
+        const fn = makeWriteFile(allowedDir, 1024 * 1024);
+        await fn("shared.tsv", "model v1");
+        await chmod(join(allowedDir, "shared.tsv"), 0o640);
+        await fn("shared.tsv", "model v2");
+        expect((await stat(join(allowedDir, "shared.tsv"))).mode & 0o777).toBe(
+            0o640,
+        );
+    },
+);
+
 it("makeWriteFile does not report overwrote when its earlier file was deleted", async () => {
     const fn = makeWriteFile(allowedDir, 1024 * 1024);
     await fn("deleted_later.txt", "first");
@@ -370,10 +401,24 @@ it("makeWriteFile never overwrites a file the session did not write", async () =
     ).resolves.toBe("user data");
 });
 
-it("resetSessionWrittenFiles protects the session's earlier files again", async () => {
-    const fn = makeWriteFile(allowedDir, 1024 * 1024);
-    await fn("before_reset.tsv", "first");
+it("resetSessionWrittenFiles keeps a run still going from the old chat from unlocking files in the new chat", async () => {
+    // Each run makes its writer when it starts, before New Chat resets.
+    const oldChatRun = makeWriteFile(allowedDir, 1024 * 1024);
     resetSessionWrittenFiles();
+    await oldChatRun("late_old_chat.tsv", "old chat");
+    const newChatRun = makeWriteFile(allowedDir, 1024 * 1024);
+    await expect(
+        newChatRun("late_old_chat.tsv", "new chat"),
+    ).rejects.toMatchObject({ name: "FileExistsError" });
+    await expect(
+        readFile(join(allowedDir, "late_old_chat.tsv"), "utf-8"),
+    ).resolves.toBe("old chat");
+});
+
+it("resetSessionWrittenFiles protects the session's earlier files again", async () => {
+    await makeWriteFile(allowedDir, 1024 * 1024)("before_reset.tsv", "first");
+    resetSessionWrittenFiles();
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
     await expect(fn("before_reset.tsv", "second")).rejects.toMatchObject({
         name: "FileExistsError",
     });
@@ -385,7 +430,7 @@ it("makeWriteFile collision names write_file, keeps the file, and suggests a fre
     await expect(fn("dup.bed", "new")).rejects.toMatchObject({
         name: "FileExistsError",
         message: expect.stringMatching(
-            /^write_file: "dup\.bed" already exists and was not written by the current chat or script \(it may be the user's file, or from an earlier chat or script\), so it is read-only and was not changed\. Files cannot be deleted\. Write to a new name instead, e\.g\. "dup_2\.bed" \(currently free\)\.$/,
+            /^write_file: "dup\.bed" already exists and was not written by the current chat or script \(it may be the user's file, or from an earlier chat or script\), so it is read-only and was not changed\. Files cannot be deleted\. Write to a new name instead, e\.g\. "dup-v2\.bed" \(currently free\)\.$/,
         ),
     });
     await expect(readFile(join(allowedDir, "dup.bed"), "utf-8")).resolves.toBe(
@@ -395,21 +440,21 @@ it("makeWriteFile collision names write_file, keeps the file, and suggests a fre
 
 it("makeWriteFile collision suggestion skips taken numbers instead of stacking suffixes", async () => {
     await writeFile(join(allowedDir, "taken.tsv"), "");
-    await writeFile(join(allowedDir, "taken_2.tsv"), "");
+    await writeFile(join(allowedDir, "taken-v2.tsv"), "");
     const fn = makeWriteFile(allowedDir, 1024 * 1024);
     await expect(fn("taken.tsv", "x")).rejects.toMatchObject({
-        message: expect.stringContaining('e.g. "taken_3.tsv"'),
+        message: expect.stringContaining('e.g. "taken-v3.tsv"'),
     });
-    await expect(fn("taken_2.tsv", "x")).rejects.toMatchObject({
-        message: expect.stringContaining('e.g. "taken_3.tsv"'),
+    await expect(fn("taken-v2.tsv", "x")).rejects.toMatchObject({
+        message: expect.stringContaining('e.g. "taken-v3.tsv"'),
     });
 });
 
-it("makeWriteFile collision omits the suggestion when every numbered name is taken", async () => {
+it("makeWriteFile collision omits the suggestion when every versioned name is taken", async () => {
     await mkdir(join(allowedDir, "full_dir"), { recursive: true });
     await writeFile(join(allowedDir, "full_dir", "full.txt"), "");
     for (let n = 2; n <= 101; n++) {
-        await writeFile(join(allowedDir, "full_dir", `full_${n}.txt`), "");
+        await writeFile(join(allowedDir, "full_dir", `full-v${n}.txt`), "");
     }
     const fn = makeWriteFile(allowedDir, 1024 * 1024);
     const error = await fn("full_dir/full.txt", "x").catch((e: unknown) => e);
@@ -421,9 +466,10 @@ it("makeWriteFile collision omits the suggestion when every numbered name is tak
 });
 
 it.each([
-    ["run_007.tsv", "run_008.tsv"],
-    ["n_12345678901234567890.txt", "n_12345678901234567890_2.txt"],
-    ["trailing.", "trailing_2."],
+    // A number that means something is kept, not counted up.
+    ["region_1.bed", "region_1-v2.bed"],
+    ["n-v12345678901234567890.txt", "n-v12345678901234567890-v2.txt"],
+    ["trailing.", "trailing-v2."],
 ])("makeWriteFile collision on %s suggests %s", async (name, expected) => {
     await writeFile(join(allowedDir, name), "");
     const fn = makeWriteFile(allowedDir, 1024 * 1024);
@@ -438,7 +484,7 @@ it.skipIf(sep === "\\")(
         await writeFile(join(allowedDir, "back\\slash.txt"), "");
         const fn = makeWriteFile(allowedDir, 1024 * 1024);
         await expect(fn("back\\slash.txt", "x")).rejects.toMatchObject({
-            message: expect.stringContaining('e.g. "back\\slash_2.txt"'),
+            message: expect.stringContaining('e.g. "back\\slash-v2.txt"'),
         });
     },
 );
@@ -448,7 +494,16 @@ it("makeWriteFile collision suggestion keeps the directory and a .vcf.gz extensi
     await writeFile(join(allowedDir, "calls_dir", "calls.vcf.gz"), "");
     const fn = makeWriteFile(allowedDir, 1024 * 1024);
     await expect(fn("calls_dir/calls.vcf.gz", "x")).rejects.toMatchObject({
-        message: expect.stringContaining('e.g. "calls_dir/calls_2.vcf.gz"'),
+        message: expect.stringContaining('e.g. "calls_dir/calls-v2.vcf.gz"'),
+    });
+});
+
+it("makeWriteFile collision on an existing folder written with a trailing slash omits the suggestion", async () => {
+    await mkdir(join(allowedDir, "slash_dir"), { recursive: true });
+    const fn = makeWriteFile(allowedDir, 1024 * 1024);
+    await expect(fn("slash_dir/", "x")).rejects.toMatchObject({
+        name: "FileExistsError",
+        message: expect.stringMatching(/Write to a new name instead\.$/),
     });
 });
 

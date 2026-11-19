@@ -215,7 +215,9 @@ export function bindSandboxToolCall(
 ): (...args: unknown[]) => unknown {
     const signature = SANDBOX_TOOL_SIGNATURES[toolName];
     return (...callArgs: unknown[]) => {
-        const kwargs = (callArgs.at(-1) ?? {}) as Record<string, unknown>;
+        // Monty always passes the keyword arguments as a final object,
+        // empty when the call has none.
+        const kwargs = callArgs.at(-1) as Record<string, unknown>;
         const bound = bindSandboxToolArgs(
             toolName,
             signature,

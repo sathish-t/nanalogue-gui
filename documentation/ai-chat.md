@@ -105,7 +105,7 @@ configurable ones are exposed in [advanced-options.md](advanced-options.md);
 | `seq_table(file, ...)` | Sequence table for a region |
 | `ls(glob?)` | Lists files under the allowed directory, up to 10,000 entries by default |
 | `read_file(path, ...)` | Reads a text file, up to 1 MB per call; decompresses `.gz` files |
-| `write_file(path, content)` | Writes a new text file anywhere under `allowedDir` and fails if the path already exists |
+| `write_file(path, content)` | Writes a text file anywhere under `allowedDir`; replaces only files written earlier in the same chat (or, for `/exec`, the same script run) that are still writable, and otherwise fails if the path already exists |
 | `plot_histogram(data, ...)` | Renders a histogram as an SVG file in `ai_chat_output/` |
 | `plot_series(data, ...)` | Renders an XY series plot as an SVG file in `ai_chat_output/` |
 | `minimap2(reference_path, query_path, ...)` | Runs minimap2 alignment via WebAssembly |

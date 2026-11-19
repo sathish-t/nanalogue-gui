@@ -260,8 +260,9 @@ describe("ChatSession", () => {
 
                 session.reset();
 
+                // Each run makes its own writer, as runSandboxCode does.
                 await expect(
-                    write("result.txt", "next chat"),
+                    makeWriteFile(dir, 1024)("result.txt", "next chat"),
                 ).rejects.toMatchObject({ name: "FileExistsError" });
                 await expect(
                     readFile(join(dir, "result.txt"), "utf-8"),

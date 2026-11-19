@@ -185,11 +185,21 @@ it("path traversal is blocked", async () => {
     expect(result.message).toMatch(/outside the allowed directory/);
 });
 
-it("URL access is blocked", async () => {
-    const code = `peek("${bamName}", treat_as_url=True)`;
+// treat_as_url must reach each BAM tool and be refused there, not be
+// rejected as an unknown keyword.
+it.each([
+    "peek",
+    "read_info",
+    "bam_mods",
+    "window_reads",
+    "seq_table",
+])("URL access is blocked in %s", async (tool) => {
+    const code = `${tool}("${bamName}", treat_as_url=True)`;
     const result = await runSandboxCode(code, allowedDir);
     expect(result.success).toBe(false);
-    expect(result.message).toMatch(/not permitted/);
+    expect(result.message).toContain(
+        "OSError: URL access is not permitted in sandbox",
+    );
 });
 
 it.each([
@@ -1403,9 +1413,39 @@ describe("sandbox tools raise Python TypeErrors for bad arguments", () => {
             'write_file("bind_a.txt", "b", file_path="bind_c.txt")',
             "write_file() got multiple values for argument 'file_path'",
         ],
+        [
+            "ls(5)",
+            "ls() pattern must be a glob string such as '**/*.bam', or None",
+        ],
+        [
+            'ls(["*.bam"])',
+            "ls() pattern must be a glob string such as '**/*.bam', or None",
+        ],
     ])("%s", async (code, expected) => {
         const result = await runSandboxCode(code, allowedDir);
         expect(result.success).toBe(false);
         expect(result.message).toContain(`TypeError: ${expected}`);
     });
+});
+
+it("unknown-keyword errors do not list treat_as_url as a valid argument", async () => {
+    const result = await runSandboxCode(
+        'read_info("simple_test.bam", n=1)',
+        allowedDir,
+    );
+    expect(result.message).toContain("Valid arguments:");
+    expect(result.message).not.toContain("treat_as_url");
+});
+
+it.each([
+    `plot_histogram(${BINDING_BINS}, output_path="exec_plot_h.svg")`,
+    `plot_series(${BINDING_POINTS}, output_path="exec_plot_s.svg")`,
+])("a plot from a user's script stays protected from the chat: %s", async (code) => {
+    const execRun = await runSandboxCode(code, allowedDir, {
+        recordSessionWrites: false,
+    });
+    expect(execRun.success, execRun.message).toBe(true);
+    const chatRun = await runSandboxCode(code, allowedDir);
+    expect(chatRun.success).toBe(false);
+    expect(chatRun.message).toContain("FileExistsError");
 });

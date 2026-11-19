@@ -259,9 +259,10 @@ result = write_file("chr1/filtered_reads.tsv", tsv_content)
   includes "overwrote": True, so re-running corrected code updates your
   earlier outputs. Any other existing file (the user's files, or files
   from earlier chats) is never changed: the call raises FileExistsError,
-  which suggests a free name such as "results_2.bed". Files cannot be
-  deleted. plot_histogram() and plot_series() follow the same rule for
-  output_path.
+  which suggests a free name such as "results-v2.bed". A file of yours
+  that the user has since made read-only raises OSError and is not
+  changed. Files cannot be deleted. plot_histogram() and plot_series()
+  follow the same rule for output_path.
 - Filenames must not contain control characters or exceed ${MAX_FILENAME_LENGTH}
   characters per path component.
 - Files can be written anywhere within the allowed directory.

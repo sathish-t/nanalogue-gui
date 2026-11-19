@@ -373,7 +373,7 @@ describe("makePlotHistogram — output path validation", () => {
         ).rejects.toMatchObject({
             name: "FileExistsError",
             message: expect.stringMatching(
-                /^plot_histogram: "existing\.svg" already exists.*e\.g\. "existing_2\.svg"/,
+                /^plot_histogram: "existing\.svg" already exists.*e\.g\. "existing-v2\.svg"/,
             ),
         });
     });

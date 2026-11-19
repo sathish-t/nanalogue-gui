@@ -48,6 +48,28 @@ function promptSection(prompt: string, heading: string): string {
     return heading + (next === -1 ? rest : rest.slice(0, next));
 }
 
+/**
+ * Returns the names in the first column of every "| Parameter |" table in a
+ * prompt section.
+ *
+ * @param section - Prompt text from promptSection.
+ * @returns The documented parameter names.
+ */
+function parameterTableNames(section: string): string[] {
+    const names: string[] = [];
+    let inTable = false;
+    for (const line of section.split("\n")) {
+        if (line.startsWith("| Parameter |")) {
+            inTable = true;
+        } else if (!line.startsWith("|")) {
+            inTable = false;
+        } else if (inTable && !line.startsWith("|--")) {
+            names.push(line.split("|")[1].trim());
+        }
+    }
+    return names;
+}
+
 // ---------------------------------------------------------------------------
 // buildSandboxPrompt — external function docs
 // ---------------------------------------------------------------------------
@@ -150,6 +172,19 @@ describe("buildSandboxPrompt — external function docs", () => {
                     `| ${name} |`,
                 );
             }
+            // And the other way: every documented row is a real parameter,
+            // so the model is never told to pass one that raises TypeError.
+            for (const name of parameterTableNames(toolSection)) {
+                expect(
+                    [...signature.positional, ...signature.keywordOnly],
+                    `${tool} documents ${name}`,
+                ).toContain(name);
+            }
+        }
+        const sharedNames = parameterTableNames(sharedBamSection);
+        expect(sharedNames.length).toBeGreaterThan(0);
+        for (const name of sharedNames) {
+            expect(BAM_TOOL_KEYWORDS, `shared keyword ${name}`).toContain(name);
         }
         expect(prompt).toContain(
             'read_info("sample.bam", limit=5) and read_info(bam_path="sample.bam", limit=5)',

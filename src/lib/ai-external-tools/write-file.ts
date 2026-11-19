@@ -5,6 +5,7 @@
 
 import { randomUUID } from "node:crypto";
 import {
+    chmod,
     lstat,
     mkdir,
     realpath,
@@ -30,38 +31,43 @@ export const /** Python parameters of write_file(), matched to each call by bind
 
 /**
  * Real paths of files written by write_file, plot_histogram, and plot_series
- * in the current chat session. Only these files may be overwritten; the set is
- * cleared by ChatSession.reset() through resetSessionWrittenFiles.
+ * in the current chat session. Only these files may be overwritten.
+ * ChatSession.reset() replaces the set through resetSessionWrittenFiles.
  */
-const sessionWrittenFiles = new Set<string>();
+let sessionWrittenFiles = new Set<string>();
 
 /**
  * Forgets which files the current chat session wrote, so they are protected
  * from overwriting again. Called by ChatSession.reset() when a new chat starts.
+ *
+ * Replaces the set instead of clearing it: a run from the old chat that is
+ * still going keeps the old set, so its later writes never become
+ * overwritable in the new chat.
  */
 export function resetSessionWrittenFiles(): void {
-    sessionWrittenFiles.clear();
+    sessionWrittenFiles = new Set<string>();
 }
 
-/** Number of numbered names tried when suggesting a free file name. */
+/** Number of versioned names tried when suggesting a free file name. */
 const FREE_FILE_NAME_ATTEMPTS = 100;
 
 /**
- * Splits a file name into stem, numeric suffix, and extension, keeping a
+ * Splits a file name into stem, version suffix, and extension, keeping a
  * trailing .gz or .bgz with the extension before it ("calls.vcf.gz" has
- * extension ".vcf.gz"). "results_2.bed" has stem "results" and number "2".
- * Numbers longer than nine digits stay in the stem, so they are never
- * printed in exponent form.
+ * extension ".vcf.gz"). "results-v2.bed" has stem "results" and version "2".
+ * Only a "-vN" suffix counts as a version, so numbers that mean something,
+ * like the 1 in "region_1.bed", are never changed. Versions longer than nine
+ * digits stay in the stem, so they are never printed in exponent form.
  */
-const NUMBERED_FILE_NAME_PATTERN =
-    /^(.+?)(?:_(\d{1,9}))?((?:\.[^.]+)?\.b?gz|\.[^.]*)?$/i;
+const VERSIONED_FILE_NAME_PATTERN =
+    /^(.+?)(?:-v(\d{1,9}))?((?:\.[^.]+)?\.b?gz|\.[^.]*)?$/i;
 
 /**
  * Suggests a free file name in the same directory after a write collision.
  *
- * Inserts or increments a numeric suffix before the extension, so
- * "results.bed" becomes "results_2.bed" and "results_2.bed" becomes
- * "results_3.bed". The name is only free when checked; it is not reserved.
+ * Inserts or increments a "-vN" suffix before the extension, so
+ * "region_1.bed" becomes "region_1-v2.bed" and "region_1-v2.bed" becomes
+ * "region_1-v3.bed". The name is only free when checked; it is not reserved.
  *
  * @param filePath - The colliding path as the caller passed it.
  * @param resolvedPath - The colliding path resolved against allowedDir.
@@ -76,17 +82,12 @@ async function suggestFreeFileName(
     const callerPath = sep === "\\" ? toForwardSlashes(filePath) : filePath;
     const slash = callerPath.lastIndexOf("/");
     const dirPrefix = callerPath.slice(0, slash + 1);
-    const match = NUMBERED_FILE_NAME_PATTERN.exec(callerPath.slice(slash + 1));
+    const match = VERSIONED_FILE_NAME_PATTERN.exec(callerPath.slice(slash + 1));
     if (!match) return undefined;
-    const [, stem, existingNumber, extension = ""] = match;
-    const firstNumber = existingNumber ? Number(existingNumber) + 1 : 2;
+    const [, stem, existingVersion, extension = ""] = match;
+    const firstVersion = existingVersion ? Number(existingVersion) + 1 : 2;
     for (let i = 0; i < FREE_FILE_NAME_ATTEMPTS; i++) {
-        // Keep zero padding, so "run_007.tsv" becomes "run_008.tsv".
-        const number = String(firstNumber + i).padStart(
-            existingNumber?.length ?? 0,
-            "0",
-        );
-        const candidate = `${stem}_${number}${extension}`;
+        const candidate = `${stem}-v${firstVersion + i}${extension}`;
         if (candidate.length > MAX_FILENAME_LENGTH) return undefined;
         try {
             // lstat so a dangling symlink also counts as taken.
@@ -117,17 +118,30 @@ async function makeFileExistsError(
     filePath: string,
     resolvedPath: string,
 ): Promise<SandboxError> {
-    const suggestion = await suggestFreeFileName(filePath, resolvedPath);
-    const newNameAdvice = suggestion
-        ? `Write to a new name instead, e.g. "${suggestion}" (currently free).`
-        : "Write to a new name instead.";
     return new SandboxError(
         "FileExistsError",
         `${toolName}: "${filePath}" already exists and was not written by ` +
             "the current chat or script (it may be the user's file, or from an " +
             "earlier chat or script), so it is read-only and was not changed. " +
-            `Files cannot be deleted. ${newNameAdvice}`,
+            `Files cannot be deleted. ${await newNameAdvice(filePath, resolvedPath)}`,
     );
+}
+
+/**
+ * Advises writing to a new name, with a free name when one is found.
+ *
+ * @param filePath - The colliding path as the caller passed it.
+ * @param resolvedPath - The colliding path resolved against allowedDir.
+ * @returns The advice sentence.
+ */
+async function newNameAdvice(
+    filePath: string,
+    resolvedPath: string,
+): Promise<string> {
+    const suggestion = await suggestFreeFileName(filePath, resolvedPath);
+    return suggestion
+        ? `Write to a new name instead, e.g. "${suggestion}" (currently free).`
+        : "Write to a new name instead.";
 }
 
 /** Result of one write_file call, as returned to Python. */
@@ -149,10 +163,12 @@ export interface SandboxWriteFileResult {
  *
  * @param resolvedPath - The real path of the file to replace.
  * @param content - The new text content.
+ * @param mode - The old file's permission bits, given to the new file.
  */
 async function replaceFileAtomically(
     resolvedPath: string,
     content: string,
+    mode: number,
 ): Promise<void> {
     const tempPath = join(
         dirname(resolvedPath),
@@ -160,6 +176,7 @@ async function replaceFileAtomically(
     );
     try {
         await writeFile(tempPath, content, { encoding: "utf-8", flag: "wx" });
+        await chmod(tempPath, mode);
         await rename(tempPath, resolvedPath);
     } catch (e) {
         await unlink(tempPath).catch(() => undefined);
@@ -255,26 +272,36 @@ export function makeWriteFile(
         // Files this chat (or /exec run) wrote may be replaced; anything else
         // must be new. A recorded file that has since been deleted is
         // created afresh.
-        const overwrite =
-            writtenFiles.has(resolved) &&
-            (await lstat(resolved).then(
-                () => true,
-                (e: NodeJS.ErrnoException) => {
-                    if (e.code === "ENOENT") return false;
-                    throw e;
-                },
-            ));
+        const existing = writtenFiles.has(resolved)
+            ? await lstat(resolved).catch((e: NodeJS.ErrnoException) => {
+                  if (e.code === "ENOENT") return undefined;
+                  throw e;
+              })
+            : undefined;
+        const overwrite = existing !== undefined;
+        // The user can protect a chat file by clearing its owner write bit
+        // (on Windows, by setting its read-only attribute).
+        if (existing && (existing.mode & 0o200) === 0) {
+            // Monty does not know PermissionError, so raise its base, OSError.
+            throw new SandboxError(
+                "OSError",
+                `${toolName}: "${filePath}" has been made read-only, so it ` +
+                    `was not changed. ${await newNameAdvice(filePath, tentative)}`,
+            );
+        }
         try {
-            if (overwrite) {
-                await replaceFileAtomically(resolved, content).catch(
-                    (e: NodeJS.ErrnoException) => {
-                        // Hide the host path and temporary file name.
-                        throw new SandboxError(
-                            "OSError",
-                            `${toolName}: could not replace "${filePath}" (${e.code ?? e.message})`,
-                        );
-                    },
-                );
+            if (existing) {
+                await replaceFileAtomically(
+                    resolved,
+                    content,
+                    existing.mode & 0o7777,
+                ).catch((e: NodeJS.ErrnoException) => {
+                    // Hide the host path and temporary file name.
+                    throw new SandboxError(
+                        "OSError",
+                        `${toolName}: could not replace "${filePath}" (${e.code ?? e.message})`,
+                    );
+                });
             } else {
                 await writeFile(resolved, content, {
                     encoding: "utf-8",
