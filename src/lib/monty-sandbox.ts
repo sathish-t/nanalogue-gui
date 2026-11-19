@@ -45,6 +45,10 @@ import {
     SandboxError,
     safeStringify,
 } from "./monty-sandbox-helpers";
+import {
+    bindSandboxToolCall,
+    type SANDBOX_TOOL_SIGNATURES,
+} from "./sandbox-tool-arguments";
 
 export {
     deriveMaxOutputBytes,
@@ -290,7 +294,17 @@ export async function runSandboxCode(
                         ),
                         plot_series: makePlotSeries(allowedDir, maxWriteBytes),
                         minimap2: makeRunMinimap2(allowedDir),
-                    }).filter(([name]) => !removedTools?.has(name)),
+                    })
+                        .filter(([name]) => !removedTools?.has(name))
+                        // Match Python positional and keyword arguments
+                        // to each tool's declared parameters.
+                        .map(([name, tool]) => [
+                            name,
+                            bindSandboxToolCall(
+                                name as keyof typeof SANDBOX_TOOL_SIGNATURES,
+                                tool,
+                            ),
+                        ]),
                 ) as Record<string, (...args: never[]) => unknown>,
                 (name) => {
                     if (name !== "continue_thinking") {

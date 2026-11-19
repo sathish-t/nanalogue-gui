@@ -13,6 +13,7 @@ import {
     joinSystemPromptParts,
     type SandboxPromptOptions,
 } from "./sandbox-prompt";
+import { SANDBOX_TOOL_SIGNATURES } from "./sandbox-tool-arguments";
 
 // ---------------------------------------------------------------------------
 // Shared baseline options used by most buildSandboxPrompt tests.
@@ -80,31 +81,38 @@ describe("buildSandboxPrompt — external function docs", () => {
         ).toHaveLength(2);
     });
 
-    it("documents positional-only arguments while preserving keyword options", () => {
+    it("documents each tool's parameters as declared in SANDBOX_TOOL_SIGNATURES", () => {
         const prompt = buildSandboxPrompt(BASE_OPTIONS);
-        const signatures = [
-            "ls(pattern: str = None, /)",
-            "read_file(file_path: str, /, **kwargs)",
-            "write_file(file_path: str, content: str, /)",
-            "plot_histogram(bins, /, **kwargs)",
-            "plot_series(points, /, **kwargs)",
-            "minimap2(reference_path: str, query_path: str, /, preset: str = None)",
-            "peek(bam_path: str, /)",
-            "read_info(bam_path: str, /, **kwargs)",
-            "bam_mods(bam_path: str, /, **kwargs)",
-            "window_reads(bam_path: str, /, **kwargs)",
-            "seq_table(bam_path: str, /, **kwargs)",
-        ];
-        for (const signature of signatures) {
-            expect(prompt).toContain(`### ${signature} ->`);
+        for (const [tool, signature] of Object.entries(
+            SANDBOX_TOOL_SIGNATURES,
+        )) {
+            const heading = new RegExp(`^### ${tool}\\((.*)\\) ->`, "m").exec(
+                prompt,
+            );
+            expect(heading, `missing heading for ${tool}`).not.toBeNull();
+            const documentedKeywords = signature.keywordOnly.filter(
+                (name) => name !== "treat_as_url",
+            );
+            const expectedParams = [
+                ...signature.positional,
+                ...(documentedKeywords.length > 0 ? ["**kwargs"] : []),
+            ];
+            const headingParams = (heading?.[1] ?? "")
+                .split(",")
+                .map((param) => param.split(/[:=]/)[0].trim())
+                .filter(Boolean);
+            expect(headingParams, tool).toEqual(expectedParams);
+            for (const name of documentedKeywords) {
+                expect(prompt, `${tool} keyword ${name}`).toContain(
+                    `| ${name} |`,
+                );
+            }
         }
-        expect(prompt).toContain("### continue_thinking() -> None");
         expect(prompt).toContain(
-            "Arguments before / are positional-only: never pass them by keyword.",
+            'read_info("sample.bam", limit=5) and read_info(bam_path="sample.bam", limit=5)',
         );
-        expect(prompt).toContain('Use read_info("sample.bam", limit=5)');
         expect(prompt).toContain(
-            "Options in **kwargs must be passed by keyword.",
+            "An unknown\nkeyword argument raises TypeError listing the valid ones",
         );
     });
 });

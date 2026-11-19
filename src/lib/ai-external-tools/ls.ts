@@ -9,6 +9,10 @@ import {
     SandboxError,
 } from "../monty-sandbox-helpers";
 import { compileSandboxGlob } from "../sandbox-glob";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
+
+export const /** Python parameters of ls(), matched to each call by bindSandboxToolCall. */ LS_SIGNATURE: SandboxToolSignature =
+        { positional: ["pattern"], required: 0, keywordOnly: [] };
 
 /**
  * Returns the ls tool implementation bound to the given allowed directory.

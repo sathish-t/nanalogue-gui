@@ -3,6 +3,14 @@
 
 import { peek as peekFn } from "@nanalogue/node";
 import { rejectTreatAsUrl, resolvePath } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
+
+export const /** Python parameters of peek(), matched to each call by bindSandboxToolCall. */ PEEK_SIGNATURE: SandboxToolSignature =
+        {
+            positional: ["bam_path"],
+            required: 1,
+            keywordOnly: ["treat_as_url"],
+        };
 
 /**
  * Returns the peek tool implementation bound to the given allowed directory.

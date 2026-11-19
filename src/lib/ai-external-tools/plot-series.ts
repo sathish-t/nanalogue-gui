@@ -5,16 +5,25 @@
 // auditable path guard rather than each replicating the logic.
 
 import { convertMaps, SandboxError } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
 import type { XYPoint } from "../stats";
 import type { SeriesKind, XYOptions } from "../xy-renderer";
 import { renderXySvg } from "../xy-renderer";
 import {
     autoOutputPath,
+    PLOT_TOOL_KEYWORDS,
     validateLabel,
     validateLim,
     WRITE_ONLY_NOTE,
 } from "./plot-utils";
 import { makeWriteFile } from "./write-file";
+
+export const /** Python parameters of plot_series(), matched to each call by bindSandboxToolCall. */ PLOT_SERIES_SIGNATURE: SandboxToolSignature =
+        {
+            positional: ["points"],
+            required: 1,
+            keywordOnly: ["kind", ...PLOT_TOOL_KEYWORDS],
+        };
 
 /**
  * Validates a single raw point dict from Python and returns a typed XYPoint.

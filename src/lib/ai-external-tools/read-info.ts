@@ -3,11 +3,20 @@
 
 import { readInfo } from "@nanalogue/node";
 import {
+    BAM_TOOL_KEYWORDS,
     enforceRecordLimit,
     rejectTreatAsUrl,
     resolvePath,
     toReadOptions,
 } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
+
+export const /** Python parameters of read_info(), matched to each call by bindSandboxToolCall. */ READ_INFO_SIGNATURE: SandboxToolSignature =
+        {
+            positional: ["bam_path"],
+            required: 1,
+            keywordOnly: BAM_TOOL_KEYWORDS,
+        };
 
 /**
  * Returns the read_info tool implementation bound to the given context.

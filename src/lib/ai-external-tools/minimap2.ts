@@ -19,6 +19,14 @@ import {
     SandboxError,
     toForwardSlashes,
 } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
+
+export const /** Python parameters of minimap2(), matched to each call by bindSandboxToolCall. */ MINIMAP2_SIGNATURE: SandboxToolSignature =
+        {
+            positional: ["reference_path", "query_path", "preset"],
+            required: 2,
+            keywordOnly: [],
+        };
 
 /** The Emscripten module interface exposed by the biowasm minimap2.js bundle. */
 interface Minimap2Module {
@@ -253,7 +261,7 @@ export function makeRunMinimap2(
 ): (
     refPath: string,
     queryPath: string,
-    opts?: Record<string, unknown> | string,
+    opts?: Record<string, unknown> | string | null,
 ) => Promise<unknown> {
     /**
      * Runs minimap2 alignment and returns PAF output plus stderr.
@@ -269,13 +277,15 @@ export function makeRunMinimap2(
     return async (
         refPath: string,
         queryPath: string,
-        opts?: Record<string, unknown> | string,
+        opts?: Record<string, unknown> | string | null,
     ): Promise<unknown> => {
-        // Normalise: a bare positional string is treated as the preset value.
+        // Normalise: a bare positional string is treated as the preset value,
+        // and None (preset=None) means no preset.
         if (
             opts !== undefined &&
+            opts !== null &&
             typeof opts !== "string" &&
-            (typeof opts !== "object" || opts === null || Array.isArray(opts))
+            (typeof opts !== "object" || Array.isArray(opts))
         ) {
             throw new SandboxError(
                 "TypeError",
@@ -283,7 +293,7 @@ export function makeRunMinimap2(
             );
         }
         const normalizedOpts: Record<string, unknown> | undefined =
-            typeof opts === "string" ? { preset: opts } : opts;
+            typeof opts === "string" ? { preset: opts } : (opts ?? undefined);
         // --- Validate argument types ---
         if (typeof refPath !== "string") {
             throw new SandboxError(

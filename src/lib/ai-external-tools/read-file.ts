@@ -15,6 +15,14 @@ import {
     SandboxError,
     toForwardSlashes,
 } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
+
+export const /** Python parameters of read_file(), matched to each call by bindSandboxToolCall. */ READ_FILE_SIGNATURE: SandboxToolSignature =
+        {
+            positional: ["file_path"],
+            required: 1,
+            keywordOnly: ["offset", "max_bytes"],
+        };
 
 /** One page of decompressed gzip text, as returned by readGzipPage. */
 interface GzipPage {

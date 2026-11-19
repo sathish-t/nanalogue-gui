@@ -3,10 +3,19 @@
 
 import { seqTable } from "@nanalogue/node";
 import {
+    BAM_TOOL_KEYWORDS,
     rejectTreatAsUrl,
     resolvePath,
     toReadOptions,
 } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
+
+export const /** Python parameters of seq_table(), matched to each call by bindSandboxToolCall. */ SEQ_TABLE_SIGNATURE: SandboxToolSignature =
+        {
+            positional: ["bam_path"],
+            required: 1,
+            keywordOnly: BAM_TOOL_KEYWORDS,
+        };
 
 /**
  * Returns the seq_table tool implementation bound to the given context.

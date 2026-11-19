@@ -1219,3 +1219,127 @@ it("external function error message includes the Python call site in the traceba
     expect(result.message).toContain("line 2");
     expect(result.message).toContain("peek");
 });
+
+// --- Python argument binding for sandbox tools ---
+
+/** One-bin histogram and one-point series used by the binding tests. */
+const BINDING_BINS = '[{"bin_start": 0, "bin_end": 1, "count": 1}]';
+const BINDING_POINTS = '[{"x": 1, "y": 2}]';
+/** Python expression for the first contig of the shared test BAM. */
+const FIRST_CONTIG = 'list(peek("simple_test.bam")["contigs"].keys())[0]';
+
+describe("sandbox tools accept required arguments by position or keyword", () => {
+    it.each([
+        ['peek("simple_test.bam")', 'peek(bam_path="simple_test.bam")'],
+        [
+            'read_info("simple_test.bam", limit=3)',
+            'read_info(bam_path="simple_test.bam", limit=3)',
+        ],
+        [
+            '[r["read_id"] for r in bam_mods("simple_test.bam", limit=2)]',
+            '[r["read_id"] for r in bam_mods(bam_path="simple_test.bam", limit=2)]',
+        ],
+        [
+            'window_reads("simple_test.bam", win=5, step=5, limit=2)',
+            'window_reads(bam_path="simple_test.bam", win=5, step=5, limit=2)',
+        ],
+        [
+            `seq_table("simple_test.bam", region=${FIRST_CONTIG})`,
+            `seq_table(bam_path="simple_test.bam", region=${FIRST_CONTIG})`,
+        ],
+        ['ls("*.fasta")', 'ls(pattern="*.fasta")'],
+        [
+            'read_file("simple_test.fasta", max_bytes=20)',
+            'read_file(file_path="simple_test.fasta", max_bytes=20)',
+        ],
+        [
+            'write_file("bind_pos.txt", "hi")["bytes_written"]',
+            'write_file(file_path="bind_kw.txt", content="hi")["bytes_written"]',
+        ],
+        [
+            `plot_histogram(${BINDING_BINS}, output_path="bind_pos_h.svg")["bins_plotted"]`,
+            `plot_histogram(bins=${BINDING_BINS}, output_path="bind_kw_h.svg")["bins_plotted"]`,
+        ],
+        [
+            `plot_series(${BINDING_POINTS}, output_path="bind_pos_s.svg")["points_plotted"]`,
+            `plot_series(points=${BINDING_POINTS}, output_path="bind_kw_s.svg")["points_plotted"]`,
+        ],
+        [
+            'minimap2("simple_test.fasta", "simple_test.fasta", "asm5")["paf"]',
+            'minimap2(reference_path="simple_test.fasta", query_path="simple_test.fasta", preset="asm5")["paf"]',
+        ],
+    ])("%s matches its keyword form", async (positionalCode, keywordCode) => {
+        const positional = await runSandboxCode(positionalCode, allowedDir);
+        const keyword = await runSandboxCode(keywordCode, allowedDir);
+        expect(positional.success, positional.message).toBe(true);
+        expect(keyword.success, keyword.message).toBe(true);
+        expect(keyword.value).toEqual(positional.value);
+    });
+
+    it("applies ls(pattern=...) instead of listing every file", async () => {
+        const result = await runSandboxCode(
+            'ls(pattern="*.fasta")',
+            allowedDir,
+        );
+        const files = result.value as string[];
+        expect(files).toContain("simple_test.fasta");
+        expect(files.every((file) => file.endsWith(".fasta"))).toBe(true);
+    });
+
+    it("treats minimap2(preset=None) as no preset", async () => {
+        const result = await runSandboxCode(
+            'minimap2("simple_test.fasta", "simple_test.fasta", preset=None)["paf"] != ""',
+            allowedDir,
+        );
+        expect(result.success, result.message).toBe(true);
+    });
+});
+
+describe("sandbox tools raise Python TypeErrors for bad arguments", () => {
+    it.each([
+        [
+            `plot_histogram(${BINDING_BINS}, output="bind_x.svg")`,
+            "plot_histogram() got an unexpected keyword argument 'output'. Did you mean 'output_path'? Valid arguments: bins, output_path,",
+        ],
+        [
+            'read_info("simple_test.bam", mapq=20)',
+            "read_info() got an unexpected keyword argument 'mapq'. Did you mean 'mapq_filter'?",
+        ],
+        [
+            'ls(glob="*.bam")',
+            "ls() got an unexpected keyword argument 'glob'. Valid arguments: pattern.",
+        ],
+        [
+            "continue_thinking(x=1)",
+            "continue_thinking() got an unexpected keyword argument 'x'. continue_thinking() takes no arguments.",
+        ],
+        [
+            'write_file("bind_missing.txt")',
+            "write_file() missing 1 required positional argument: 'content'",
+        ],
+        [
+            "write_file()",
+            "write_file() missing 2 required positional arguments: 'file_path' and 'content'",
+        ],
+        [
+            'read_file("simple_test.fasta", 0, 10)',
+            "read_file() takes 1 positional argument but 3 were given",
+        ],
+        [
+            'minimap2("a.fa", "b.fa", "sr", "x")',
+            "minimap2() takes from 2 to 3 positional arguments but 4 were given",
+        ],
+        [
+            "continue_thinking(1)",
+            "continue_thinking() takes 0 positional arguments but 1 was given",
+        ],
+        [
+            'write_file("bind_a.txt", "b", file_path="bind_c.txt")',
+            "write_file() got multiple values for argument 'file_path'",
+        ],
+    ])("%s", async (code, expected) => {
+        const result = await runSandboxCode(code, allowedDir);
+        expect(result.success).toBe(false);
+        expect(result.message).toContain(`TypeError: ${expected}`);
+    });
+});

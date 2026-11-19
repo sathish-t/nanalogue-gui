@@ -1,6 +1,11 @@
 // External tool: continue_thinking
 // Signals to the orchestrator that the LLM wants another code-execution round.
 
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
+
+export const /** Python parameters of continue_thinking(), matched to each call by bindSandboxToolCall. */ CONTINUE_THINKING_SIGNATURE: SandboxToolSignature =
+        { positional: [], required: 0, keywordOnly: [] };
+
 /**
  * Returns the continue_thinking tool implementation.
  *

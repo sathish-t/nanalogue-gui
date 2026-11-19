@@ -14,6 +14,10 @@ import {
     SandboxError,
     toForwardSlashes,
 } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
+
+export const /** Python parameters of write_file(), matched to each call by bindSandboxToolCall. */ WRITE_FILE_SIGNATURE: SandboxToolSignature =
+        { positional: ["file_path", "content"], required: 2, keywordOnly: [] };
 
 /** Number of numbered names tried when suggesting a free file name. */
 const FREE_FILE_NAME_ATTEMPTS = 100;

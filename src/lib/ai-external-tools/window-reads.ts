@@ -3,12 +3,25 @@
 
 import { windowReads } from "@nanalogue/node";
 import {
+    BAM_TOOL_KEYWORDS,
     enforceRecordLimit,
     rejectTreatAsUrl,
     resolvePath,
     SandboxError,
     toWindowOptions,
+    WINDOW_OPTION_FIELDS,
 } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
+
+export const /** Python parameters of window_reads(), matched to each call by bindSandboxToolCall. */ WINDOW_READS_SIGNATURE: SandboxToolSignature =
+        {
+            positional: ["bam_path"],
+            required: 1,
+            keywordOnly: [
+                ...BAM_TOOL_KEYWORDS,
+                ...Object.keys(WINDOW_OPTION_FIELDS),
+            ],
+        };
 
 /**
  * Returns the window_reads tool implementation bound to the given context.

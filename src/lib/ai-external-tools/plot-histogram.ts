@@ -7,14 +7,19 @@
 import type { HistogramOptions } from "../histogram-renderer";
 import { renderHistogramSvg } from "../histogram-renderer";
 import { convertMaps, SandboxError } from "../monty-sandbox-helpers";
+import type { SandboxToolSignature } from "../sandbox-tool-arguments";
 import type { HistogramBin } from "../stats";
 import {
     autoOutputPath,
+    PLOT_TOOL_KEYWORDS,
     validateLabel,
     validateLim,
     WRITE_ONLY_NOTE,
 } from "./plot-utils";
 import { makeWriteFile } from "./write-file";
+
+export const /** Python parameters of plot_histogram(), matched to each call by bindSandboxToolCall. */ PLOT_HISTOGRAM_SIGNATURE: SandboxToolSignature =
+        { positional: ["bins"], required: 1, keywordOnly: PLOT_TOOL_KEYWORDS };
 
 /**
  * Validates a single raw bin dict from Python and returns a typed HistogramBin.
