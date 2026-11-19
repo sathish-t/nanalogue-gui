@@ -85,20 +85,20 @@ function validateBin(raw: unknown, index: number): HistogramBin {
  *
  * @param allowedDir - The sandboxed root directory for path resolution.
  * @param maxWriteBytes - Maximum bytes the SVG file may occupy.
- * @param recordSessionWrites - Whether the SVG counts as the chat's own file, which later calls may overwrite.
+ * @param runWrittenFiles - A user's /exec run's own list of written files; see makeWriteFile. Omit it to use the chat session's list.
  * @returns An async function callable from Python that renders a histogram SVG.
  */
 export function makePlotHistogram(
     allowedDir: string,
     maxWriteBytes: number,
-    recordSessionWrites = true,
+    runWrittenFiles?: Set<string>,
 ): (bins: unknown, opts?: Record<string, unknown>) => Promise<unknown> {
     // Instantiate once; all path safety lives here.
     const writeFn = makeWriteFile(
         allowedDir,
         maxWriteBytes,
         "plot_histogram",
-        recordSessionWrites,
+        runWrittenFiles,
     );
 
     /**

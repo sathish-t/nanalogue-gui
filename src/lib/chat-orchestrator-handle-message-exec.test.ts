@@ -1,6 +1,6 @@
 // End-to-end tests for handleUserMessage /exec handling.
 
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -58,12 +58,19 @@ describe("/exec slash command", () => {
         expect(types).not.toContain("llm_request_start");
     });
 
-    it("keeps files written by /exec protected from the model's overwrites", async () => {
+    it("lets /exec overwrite its own files but keeps them, and its overflow output, protected from the model", async () => {
         await writeFile(
             join(tmpDir, "mine.py"),
-            'write_file("summary.tsv", "user result")',
+            'write_file("summary.tsv", "draft")\n' +
+                'write_file("summary.tsv", "user result")\n' +
+                "for i in range(5000):\n" +
+                '    print("user line", i)\n',
             "utf-8",
         );
+        // The model writes a file before the /exec run.
+        const modelWrite = makeWriteFile(tmpDir, 1024);
+        await modelWrite("model.tsv", "model v1");
+
         const { config, history, events, signal } =
             createHandleMessageHarness();
         const result = await handleUserMessage({
@@ -84,15 +91,33 @@ describe("/exec slash command", () => {
             history,
             signal,
         });
-        expect(result.steps[0].result.success).toBe(true);
+        expect(
+            result.steps[0].result.success,
+            result.steps[0].result.message,
+        ).toBe(true);
 
-        const modelWrite = makeWriteFile(tmpDir, 1024);
-        await expect(
-            modelWrite("summary.tsv", "model result"),
-        ).rejects.toMatchObject({ name: "FileExistsError" });
+        const [printsFile] = (
+            await readdir(join(tmpDir, "ai_chat_output"))
+        ).filter((name) => name.startsWith("python-prints-"));
+        expect(printsFile).toBeDefined();
+
+        for (const path of ["summary.tsv", `ai_chat_output/${printsFile}`]) {
+            await expect(
+                modelWrite(path, "model result"),
+            ).rejects.toMatchObject({ name: "FileExistsError" });
+        }
         await expect(
             readFile(join(tmpDir, "summary.tsv"), "utf-8"),
         ).resolves.toBe("user result");
+
+        // The /exec run neither cleared nor changed the chat's list, so the
+        // model can still overwrite the file it wrote before the run.
+        await expect(
+            modelWrite("model.tsv", "model v2"),
+        ).resolves.toMatchObject({ overwrote: true });
+        await expect(
+            readFile(join(tmpDir, "model.tsv"), "utf-8"),
+        ).resolves.toBe("model v2");
     });
 
     it("rejects files outside allowedDir", async () => {

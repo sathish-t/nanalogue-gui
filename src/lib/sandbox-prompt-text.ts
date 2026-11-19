@@ -257,8 +257,7 @@ result = write_file("chr1/filtered_reads.tsv", tsv_content)
 - IMPORTANT: Overwriting is limited to files written earlier in this
   chat. Writing to one of them again replaces it, and the result
   includes "overwrote": True, so re-running corrected code updates your
-  earlier outputs. Files written by the user's own /exec scripts count
-  as the user's files. Any other existing file (the user's files, or files
+  earlier outputs. Any other existing file (the user's files, or files
   from earlier chats) is never changed: the call raises FileExistsError,
   which suggests a free name such as "results_2.bed". Files cannot be
   deleted. plot_histogram() and plot_series() follow the same rule for

@@ -314,19 +314,47 @@ it("makeWriteFile removes its temporary file when a replacement fails", async ()
     await mkdir(join(allowedDir, "replace_dir", "target", "inner"), {
         recursive: true,
     });
-    await expect(fn("replace_dir/target", "second")).rejects.toThrow();
+    await expect(fn("replace_dir/target", "second")).rejects.toMatchObject({
+        name: "OSError",
+        message: expect.stringMatching(
+            /^write_file: could not replace "replace_dir\/target" \((EISDIR|ENOTEMPTY|EPERM)\)$/,
+        ),
+    });
     await expect(readdir(join(allowedDir, "replace_dir"))).resolves.toEqual([
         "target",
     ]);
 });
 
-it("makeWriteFile with recordSessionWrites false leaves its files protected", async () => {
-    const userRun = makeWriteFile(allowedDir, 1024 * 1024, "write_file", false);
-    await userRun("exec_output.txt", "user result");
-    const modelRun = makeWriteFile(allowedDir, 1024 * 1024);
+it("makeWriteFile with its own list overwrites only its own files and leaves them protected from the chat", async () => {
+    const execRun = makeWriteFile(
+        allowedDir,
+        1024 * 1024,
+        "write_file",
+        new Set<string>(),
+    );
+    await execRun("exec_output.txt", "draft");
     await expect(
-        modelRun("exec_output.txt", "model result"),
-    ).rejects.toMatchObject({ name: "FileExistsError" });
+        execRun("exec_output.txt", "user result"),
+    ).resolves.toMatchObject({ overwrote: true });
+
+    const chatRun = makeWriteFile(allowedDir, 1024 * 1024);
+    await expect(
+        chatRun("exec_output.txt", "model result"),
+    ).rejects.toMatchObject({
+        name: "FileExistsError",
+        message: expect.stringContaining(
+            "was not written by the current chat or script",
+        ),
+    });
+    await chatRun("chat_output.txt", "model result");
+    await expect(
+        execRun("chat_output.txt", "user overwrite"),
+    ).rejects.toMatchObject({
+        name: "FileExistsError",
+        message: expect.stringContaining(
+            "was not written by the current chat or script",
+        ),
+    });
 });
 
 it("makeWriteFile never overwrites a file the session did not write", async () => {
@@ -357,7 +385,7 @@ it("makeWriteFile collision names write_file, keeps the file, and suggests a fre
     await expect(fn("dup.bed", "new")).rejects.toMatchObject({
         name: "FileExistsError",
         message: expect.stringMatching(
-            /^write_file: "dup\.bed" already exists and was not changed\. Only files written earlier in this chat can be overwritten, and files cannot be deleted\. .*e\.g\. "dup_2\.bed"/,
+            /^write_file: "dup\.bed" already exists and was not written by the current chat or script \(it may be the user's file, or from an earlier chat or script\), so it is read-only and was not changed\. Files cannot be deleted\. Write to a new name instead, e\.g\. "dup_2\.bed" \(currently free\)\.$/,
         ),
     });
     await expect(readFile(join(allowedDir, "dup.bed"), "utf-8")).resolves.toBe(

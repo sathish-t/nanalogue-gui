@@ -235,6 +235,10 @@ export async function runSandboxCode(
         removedTools,
         recordSessionWrites = true,
     } = options;
+    // Files written in this run go on the chat's list unless the caller (the
+    // user's /exec) opted out; then the run keeps its own list, so it may
+    // overwrite only files it wrote itself and the model never may.
+    const runWrittenFiles = recordSessionWrites ? undefined : new Set<string>();
 
     let continueThinkingCalled = false;
     let sandboxToolCalled = false;
@@ -292,17 +296,17 @@ export async function runSandboxCode(
                             allowedDir,
                             maxWriteBytes,
                             "write_file",
-                            recordSessionWrites,
+                            runWrittenFiles,
                         ),
                         plot_histogram: makePlotHistogram(
                             allowedDir,
                             maxWriteBytes,
-                            recordSessionWrites,
+                            runWrittenFiles,
                         ),
                         plot_series: makePlotSeries(
                             allowedDir,
                             maxWriteBytes,
-                            recordSessionWrites,
+                            runWrittenFiles,
                         ),
                         minimap2: makeRunMinimap2(allowedDir),
                         // A tool missing from this object, or from
@@ -377,10 +381,12 @@ export async function runSandboxCode(
                       : "object (dictionary)";
                 outputFile = `${AI_CHAT_OUTPUT_DIR}/python-result-${randomUUID()}.json`;
                 try {
-                    await makeWriteFile(allowedDir, DEFAULT_MAX_WRITE_BYTES)(
-                        outputFile,
-                        serialized.json,
-                    );
+                    await makeWriteFile(
+                        allowedDir,
+                        DEFAULT_MAX_WRITE_BYTES,
+                        "write_file",
+                        runWrittenFiles,
+                    )(outputFile, serialized.json);
                 } catch (error) {
                     throw new SandboxError(
                         "OutputError",
@@ -475,10 +481,12 @@ export async function runSandboxCode(
         prints.length = 0;
         const path = `${AI_CHAT_OUTPUT_DIR}/python-prints-${randomUUID()}.txt`;
         try {
-            await makeWriteFile(allowedDir, DEFAULT_MAX_WRITE_BYTES)(
-                path,
-                text,
-            );
+            await makeWriteFile(
+                allowedDir,
+                DEFAULT_MAX_WRITE_BYTES,
+                "write_file",
+                runWrittenFiles,
+            )(path, text);
             const readHint =
                 printBytes <= maxReadBytes
                     ? `Read the text with read_file("${path}")["content"].`

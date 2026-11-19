@@ -64,8 +64,9 @@ export interface SandboxOptions {
     removedTools?: ReadonlySet<string>;
     /**
      * Whether files written in this run count as the chat's own files, which
-     * later runs may overwrite. False for the user's /exec runs, so their
-     * output stays protected. Default true.
+     * later runs may overwrite. False for the user's /exec runs: the run may
+     * still overwrite files it wrote itself, but its output stays protected
+     * from the model afterwards. Default true.
      */
     recordSessionWrites?: boolean;
 }
