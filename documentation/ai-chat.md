@@ -87,7 +87,7 @@ in the Node.js main process. It has no filesystem or network access through
 its built-in modules, and the only importable standard-library modules are
 `re` and `json`. No other stdlib modules or third-party libraries are
 available, and the prompt also tells the model not to use classes. The only
-way code can interact with the outside world is through the thirteen
+way code can interact with the outside world is through the twelve
 registered external functions.
 
 ### External functions
