@@ -51,7 +51,8 @@ export const /** Maximum inline output allowance for AI execution feedback; larg
 
 // --- LLM request parameters ---
 
-export const /** Maximum completion tokens sent to the LLM per request. */ DEFAULT_MAX_COMPLETION_TOKENS = 16_384;
+export const /** Largest completion-token cap sent to the LLM per request; smaller context windows get less (see MAX_COMPLETION_CONTEXT_FRACTION). */ DEFAULT_MAX_COMPLETION_TOKENS = 32_768;
+export const /** Largest fraction of the model context window reserved for one completion, so small windows keep room for chat history. */ MAX_COMPLETION_CONTEXT_FRACTION = 0.25;
 
 // --- File operation limits ---
 

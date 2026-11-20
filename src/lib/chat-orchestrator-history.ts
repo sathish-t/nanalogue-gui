@@ -1,7 +1,11 @@
 // History and context helpers for AI chat orchestration.
 // Keeps token budgeting, sliding-window limits, and LLM message conversion separate.
 
-import { NOMINAL_BYTES_PER_TOKEN } from "./ai-chat-constants";
+import {
+    DEFAULT_MAX_COMPLETION_TOKENS,
+    MAX_COMPLETION_CONTEXT_FRACTION,
+    NOMINAL_BYTES_PER_TOKEN,
+} from "./ai-chat-constants";
 import type { HistoryEntry } from "./chat-types";
 
 /**
@@ -80,6 +84,21 @@ export function transformContext(
         history,
         config.contextBudgetTokens,
         config.bytesPerToken,
+    );
+}
+
+/**
+ * Derives the completion-token cap for one LLM request: DEFAULT_MAX_COMPLETION_TOKENS,
+ * lowered to MAX_COMPLETION_CONTEXT_FRACTION of the context window so that
+ * models with small windows keep room for the system prompt and chat history.
+ *
+ * @param contextWindowTokens - The model context window in tokens.
+ * @returns Completion tokens to request and to reserve from the context window.
+ */
+export function deriveMaxCompletionTokens(contextWindowTokens: number): number {
+    return Math.min(
+        DEFAULT_MAX_COMPLETION_TOKENS,
+        Math.floor(contextWindowTokens * MAX_COMPLETION_CONTEXT_FRACTION),
     );
 }
 

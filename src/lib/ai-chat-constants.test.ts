@@ -81,8 +81,8 @@ describe("ai-chat-constants scalar exports", () => {
         expect(Number.isInteger(MODEL_LIST_TIMEOUT_MS)).toBe(true);
     });
 
-    it("allows 16,384 completion tokens per LLM request", () => {
-        expect(DEFAULT_MAX_COMPLETION_TOKENS).toBe(16_384);
+    it("allows 32,768 completion tokens per LLM request", () => {
+        expect(DEFAULT_MAX_COMPLETION_TOKENS).toBe(32_768);
     });
 
     it("retries blank assistant responses three times", () => {

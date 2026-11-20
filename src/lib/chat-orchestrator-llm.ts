@@ -89,6 +89,7 @@ function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
  * @param cancellationSignal - Abort signal for user cancellation.
  * @param temperature - Optional sampling temperature.
  * @param timeoutSeconds - Budget for this logical LLM call, including response body reads.
+ * @param maxCompletionTokens - Completion-token cap for this request, from deriveMaxCompletionTokens.
  * @returns The parsed completion response.
  */
 export async function fetchChatCompletion(
@@ -106,6 +107,7 @@ export async function fetchChatCompletion(
     cancellationSignal: AbortSignal,
     temperature?: number,
     timeoutSeconds = CONFIG_FIELD_SPECS.timeoutSeconds.fallback,
+    maxCompletionTokens = DEFAULT_MAX_COMPLETION_TOKENS,
 ): Promise<ChatCompletionResponse> {
     const signal = AbortSignal.any([
         cancellationSignal,
@@ -115,7 +117,7 @@ export async function fetchChatCompletion(
     const url = new URL("chat/completions", base).href;
     const providerNeutralPayload: ChatCompletionPayload = {
         model,
-        max_completion_tokens: DEFAULT_MAX_COMPLETION_TOKENS,
+        max_completion_tokens: maxCompletionTokens,
         messages: [{ role: "system", content: systemPrompt }, ...messages],
     };
     // Only include temperature when explicitly set — omitting lets the
