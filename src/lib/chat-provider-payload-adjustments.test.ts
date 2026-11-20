@@ -32,9 +32,14 @@ describe("adjustChatCompletionPayloadForProvider", () => {
         expect(adjustedPayload.max_completion_tokens).toBeUndefined();
     });
 
-    it("uses medium reasoning effort for Gemini 3.1 Pro", () => {
+    it.each([
+        "gemini-3.1-pro-preview",
+        "gemini-4-neon",
+        "gemini-4-hydrogen",
+        "gemini-4-neon-001",
+    ])("uses medium reasoning effort for %s", (model) => {
         const adjustedPayload = adjustChatCompletionPayloadForProvider(
-            { ...BASE_PAYLOAD, model: "gemini-3.1-pro-preview" },
+            { ...BASE_PAYLOAD, model },
             "https://generativelanguage.googleapis.com/v1beta",
         );
 
@@ -42,6 +47,15 @@ describe("adjustChatCompletionPayloadForProvider", () => {
         expect(adjustedPayload.max_completion_tokens).toBe(
             DEFAULT_MAX_COMPLETION_TOKENS,
         );
+    });
+
+    it("leaves Gemini models with a medium reasoning default unchanged", () => {
+        const adjustedPayload = adjustChatCompletionPayloadForProvider(
+            { ...BASE_PAYLOAD, model: "gemini-4-carbon" },
+            "https://generativelanguage.googleapis.com/v1beta",
+        );
+
+        expect(adjustedPayload.reasoning_effort).toBeUndefined();
     });
 
     it("leaves generic OpenAI-compatible payloads unchanged", () => {
