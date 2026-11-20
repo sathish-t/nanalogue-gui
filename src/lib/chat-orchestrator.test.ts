@@ -7,8 +7,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-    DEFAULT_MAX_COMPLETION_TOKENS,
     DEFAULT_MAX_WRITE_BYTES,
+    MAX_COMPLETION_CONTEXT_FRACTION,
     MAX_INPUT_CONTEXT_FRACTION,
 } from "./ai-chat-constants";
 import {
@@ -637,11 +637,11 @@ describe("adversarial/edge-case tests", () => {
             config: minimalConfig,
             maxOutputKB: 10,
         });
+        // The completion cap is MAX_COMPLETION_CONTEXT_FRACTION of this small
+        // window, so history gets the input fraction minus that fraction.
         const contextWindowTokens = Math.ceil(
-            (Math.ceil(Buffer.byteLength(systemPrompt) / 4) +
-                DEFAULT_MAX_COMPLETION_TOKENS +
-                4000) /
-                MAX_INPUT_CONTEXT_FRACTION,
+            (Math.ceil(Buffer.byteLength(systemPrompt) / 4) + 4000) /
+                (MAX_INPUT_CONTEXT_FRACTION - MAX_COMPLETION_CONTEXT_FRACTION),
         );
         await callOrchestrator(mockServer.url, {
             config: { maxCodeRounds: 1, contextWindowTokens },
@@ -945,6 +945,9 @@ describe("adversarial/edge-case tests", () => {
         });
 
         expect(result.text).toBe("ok\n");
+        // A 32,000-token window gets a quarter of it, not the 32,768 ceiling,
+        // so earlier rounds still fit in the history budget.
+        expect(mockServer.requestBodies()[2].max_completion_tokens).toBe(8000);
         const finalRequestMessages = mockServer.requestBodies()[2]
             .messages as Array<{
             /** Message role sent to the mock LLM. */

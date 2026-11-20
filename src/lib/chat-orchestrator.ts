@@ -4,7 +4,6 @@
 import {
     DEFAULT_MAX_BLANK_RETRIES,
     DEFAULT_MAX_CODE_ROUNDS,
-    DEFAULT_MAX_COMPLETION_TOKENS,
     DEFAULT_MAX_CUMULATIVE_SANDBOX_MS,
     FEEDBACK_OUTPUT_MAX_BYTES,
     MAX_INPUT_CONTEXT_FRACTION,
@@ -26,6 +25,7 @@ import {
     applySlidingWindow,
     convertToLlmMessages,
     deriveHistoryBudgetTokens,
+    deriveMaxCompletionTokens,
     transformContext,
 } from "./chat-orchestrator-history";
 import {
@@ -256,6 +256,10 @@ export async function handleUserMessage(
         FEEDBACK_OUTPUT_MAX_BYTES,
     );
     const maxOutputKB = Math.round(maxOutputBytes / 1024);
+    // Every request in this turn asks for, and reserves, the same completion cap.
+    const maxCompletionTokens = deriveMaxCompletionTokens(
+        config.contextWindowTokens,
+    );
     // Reuse the same derived output ceiling for both sandbox limits and the
     // default sandbox prompt so those two views of the runtime stay in sync.
     const systemPrompt = buildCompleteSystemPrompt({
@@ -316,7 +320,7 @@ export async function handleUserMessage(
         const historyBudgetTokens = deriveHistoryBudgetTokens(
             maxInputContextTokens,
             systemPrompt,
-            DEFAULT_MAX_COMPLETION_TOKENS,
+            maxCompletionTokens,
             estimatedBytesPerToken,
         );
         const prepared = transformContext(history, {
@@ -344,6 +348,7 @@ export async function handleUserMessage(
             signal,
             config.temperature,
             config.timeoutSeconds,
+            maxCompletionTokens,
         );
         emitEvent({ type: "llm_request_end" });
 
@@ -579,7 +584,7 @@ export async function handleUserMessage(
         const historyBudgetTokens = deriveHistoryBudgetTokens(
             maxInputContextTokens,
             systemPrompt,
-            DEFAULT_MAX_COMPLETION_TOKENS,
+            maxCompletionTokens,
             estimatedBytesPerToken,
         );
         const prepared = transformContext(history, {
@@ -606,6 +611,7 @@ export async function handleUserMessage(
             signal,
             config.temperature,
             config.timeoutSeconds,
+            maxCompletionTokens,
         );
         emitEvent({ type: "llm_request_end" });
 

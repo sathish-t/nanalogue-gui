@@ -6,6 +6,7 @@ import {
     deriveHistoryBudgetTokens,
     transformContext,
 } from "./chat-orchestrator";
+import { deriveMaxCompletionTokens } from "./chat-orchestrator-history";
 import type { HistoryEntry } from "./chat-types";
 
 describe("applySlidingWindow", () => {
@@ -106,6 +107,19 @@ describe("deriveHistoryBudgetTokens", () => {
     it("never returns less than one token", () => {
         const systemPrompt = "x".repeat(100000);
         expect(deriveHistoryBudgetTokens(1000, systemPrompt, 4096, 4)).toBe(1);
+    });
+});
+
+describe("deriveMaxCompletionTokens", () => {
+    it("caps completions at a quarter of a small context window", () => {
+        expect(deriveMaxCompletionTokens(8000)).toBe(2000);
+        expect(deriveMaxCompletionTokens(32_000)).toBe(8000);
+        expect(deriveMaxCompletionTokens(131_071)).toBe(32_767);
+    });
+
+    it("never exceeds 32,768 tokens for large context windows", () => {
+        expect(deriveMaxCompletionTokens(131_072)).toBe(32_768);
+        expect(deriveMaxCompletionTokens(200_000)).toBe(32_768);
     });
 });
 
