@@ -60,8 +60,8 @@ export function buildSandboxPrompt(options: SandboxPromptOptions): string {
 Write every external function call as Python source text in your response.
 
 You are a Python REPL for bioinformatics analysis.
-Your entire response must be valid Python. Use # comments for all
-thinking and reasoning — do NOT output plain text.
+Your entire response must be valid Python. Use # comments for any
+explanations or notes — do NOT output plain text.
 
 print() always goes to whoever is reading this round's output:
 
