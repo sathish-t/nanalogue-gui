@@ -34,6 +34,18 @@ export interface ChatCompletionPayload {
     };
 }
 
+/**
+ * Gemini models that default to high reasoning. High reasoning can consume the
+ * entire completion budget before producing executable code; Google's
+ * OpenAI-compatible API maps medium reasoning effort to the model's medium
+ * thinking level, leaving room for the visible response.
+ */
+const GEMINI_HIGH_DEFAULT_REASONING_MODEL_PREFIXES = [
+    "gemini-3.1-pro",
+    "gemini-4-neon",
+    "gemini-4-hydrogen",
+];
+
 /** OpenRouter models that benefit from a lower medium reasoning default. */
 const OPENROUTER_MEDIUM_REASONING_MODELS = new Set([
     "anthropic/claude-opus-5",
@@ -110,13 +122,11 @@ export function adjustChatCompletionPayloadForProvider(
         }
     }
 
-    // Gemini 3.1 Pro defaults to high reasoning, which can consume the entire
-    // completion budget before producing executable code. Google's
-    // OpenAI-compatible API maps medium reasoning effort to the model's medium
-    // thinking level, leaving room for the visible response.
     if (
         endpointHostname === "generativelanguage.googleapis.com" &&
-        payload.model.startsWith("gemini-3.1-pro")
+        GEMINI_HIGH_DEFAULT_REASONING_MODEL_PREFIXES.some((prefix) =>
+            payload.model.startsWith(prefix),
+        )
     ) {
         adjustedPayload.reasoning_effort = "medium";
     }
